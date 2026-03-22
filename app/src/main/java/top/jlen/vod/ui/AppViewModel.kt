@@ -570,7 +570,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onSuccess { page ->
                 accountState = accountState.copy(
                     isContentLoading = false,
-                    membershipInfo = page.info,
+                    membershipInfo = page.info.copy(
+                        groupName = page.info.groupName.ifBlank {
+                            accountState.session.groupName
+                        }
+                    ),
                     membershipPlans = page.plans
                 )
             }.onFailure { error ->

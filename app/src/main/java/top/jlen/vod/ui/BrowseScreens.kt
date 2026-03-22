@@ -557,7 +557,7 @@ fun AccountScreen(
                         onDeleteItem = onDeleteHistory,
                         onClearAll = onClearHistory
                     )
-                    AccountSection.Member -> MembershipPane(
+                    AccountSection.Member -> MembershipPaneV2(
                         isLoading = state.isContentLoading,
                         info = state.membershipInfo,
                         plans = state.membershipPlans,
@@ -748,7 +748,7 @@ private fun AccountProfilePaneV2(
                         ReadonlyBindingField(
                             label = "邮箱",
                             value = editor.email.ifBlank { "未绑定" },
-                            actionText = if (editor.email.isBlank()) "去绑定" else null,
+                            actionText = if (editor.email.isBlank()) "去绑定邮箱" else "管理邮箱",
                             onAction = {
                                 openExternalLink(
                                     context = context,
@@ -947,31 +947,23 @@ private fun ReadonlyBindingField(
     onAction: (() -> Unit)? = null
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = {},
+        OutlinedButton(
+            onClick = { onAction?.invoke() },
+            enabled = onAction != null,
             modifier = Modifier.fillMaxWidth(),
-            readOnly = true,
             shape = RoundedCornerShape(18.dp),
-            singleLine = true,
-            label = { Text(label) },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = UiPalette.BorderSoft,
-                unfocusedBorderColor = UiPalette.BorderSoft,
-                focusedTextColor = UiPalette.Ink,
-                unfocusedTextColor = UiPalette.Ink,
-                cursorColor = UiPalette.Accent,
-                focusedContainerColor = UiPalette.Surface,
-                unfocusedContainerColor = UiPalette.Surface
-            )
-        )
-        if (!actionText.isNullOrBlank() && onAction != null) {
-            OutlinedButton(
-                onClick = onAction,
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, UiPalette.BorderSoft)
+            border = BorderStroke(1.dp, UiPalette.BorderSoft),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(actionText)
+                Text(label, color = UiPalette.TextSecondary, style = MaterialTheme.typography.labelLarge)
+                Text(value, color = UiPalette.Ink, style = MaterialTheme.typography.bodyLarge)
+                if (!actionText.isNullOrBlank()) {
+                    Text(actionText, color = UiPalette.Accent, style = MaterialTheme.typography.labelLarge)
+                }
             }
         }
     }
@@ -979,7 +971,11 @@ private fun ReadonlyBindingField(
 
 private fun openExternalLink(context: Context, url: String) {
     runCatching {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        )
     }
 }
 
@@ -1084,6 +1080,86 @@ private fun AccountRecordCard(
                     colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
                 ) {
                     Text("删除")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MembershipPaneV2(
+    isLoading: Boolean,
+    info: top.jlen.vod.data.MembershipInfo,
+    plans: List<MembershipPlan>,
+    isActionLoading: Boolean,
+    onUpgrade: (MembershipPlan) -> Unit
+) {
+    when {
+        isLoading && plans.isEmpty() && info.groupName.isBlank() -> LoadingPane("会员信息加载中...")
+        else -> Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                shape = RoundedCornerShape(24.dp),
+                border = BorderStroke(1.dp, UiPalette.Border)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("会员信息", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+                    Text("当前分组：${info.groupName.ifBlank { "普通用户" }}", color = UiPalette.Ink)
+                    Text("剩余积分：${info.points.ifBlank { "--" }}", color = UiPalette.Ink)
+                    Text("到期时间：${info.expiry.ifBlank { "--" }}", color = UiPalette.Ink)
+                }
+            }
+
+            if (plans.isEmpty()) {
+                EmptyPane("当前没有可用的升级方案")
+            } else {
+                plans.forEach { plan ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                        shape = RoundedCornerShape(22.dp),
+                        border = BorderStroke(1.dp, UiPalette.Border)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(18.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "${plan.groupName} ${plan.duration.toMembershipDuration()}",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = UiPalette.Ink
+                                )
+                                Text(
+                                    text = "${plan.points} 积分",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = UiPalette.TextSecondary
+                                )
+                            }
+                            Button(
+                                onClick = { onUpgrade(plan) },
+                                enabled = !isActionLoading,
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = UiPalette.Accent,
+                                    contentColor = UiPalette.AccentText
+                                )
+                            ) {
+                                Text(if (isActionLoading) "处理中..." else "立即升级")
+                            }
+                        }
+                    }
                 }
             }
         }
