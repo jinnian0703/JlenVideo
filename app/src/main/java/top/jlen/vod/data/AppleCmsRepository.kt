@@ -7,9 +7,6 @@ import com.google.gson.Gson
 import java.io.IOException
 import java.net.URI
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -29,6 +26,12 @@ class AppleCmsRepository(
     private val client: OkHttpClient = createClient(cookieJar)
 ) {
     private val allCategoryTypeIds = listOf("1", "2", "3", "4")
+    private val defaultCategories = listOf(
+        AppleCmsCategory(typeId = "1", typeName = "电影", parentId = "1"),
+        AppleCmsCategory(typeId = "2", typeName = "连续剧", parentId = "2"),
+        AppleCmsCategory(typeId = "3", typeName = "综艺", parentId = "3"),
+        AppleCmsCategory(typeId = "4", typeName = "动漫", parentId = "4")
+    )
     private val baseUrl = BuildConfig.APPLE_CMS_BASE_URL.trimEnd('/')
     private val gson = Gson()
     private val api: AppleCmsApi = Retrofit.Builder()
@@ -38,24 +41,17 @@ class AppleCmsRepository(
         .build()
         .create(AppleCmsApi::class.java)
 
-    suspend fun loadHome(): HomePayload = coroutineScope {
-        val latestDeferred = async { loadAllCategoryPage(page = 1) }
-        val categoriesDeferred = async {
-            runCatching { api.getCategories().categories }
-                .getOrDefault(emptyList())
-        }
-        val latestPage = latestDeferred.await()
+    suspend fun loadHome(): HomePayload {
+        val latestPage = loadAllCategoryPage(page = 1)
         val latest = latestPage.items
 
         if (latest.isEmpty()) {
             throw IOException("首页内容解析失败")
         }
 
-        val categories = categoriesDeferred.await()
-            .filter(::isBrowsableCategory)
-            .distinctBy { it.typeId }
+        val categories = defaultCategories
 
-        HomePayload(
+        return HomePayload(
             featured = latest.take(6),
             latest = latest,
             categories = categories,
@@ -71,16 +67,13 @@ class AppleCmsRepository(
     suspend fun loadByCategory(typeId: String): List<VodItem> =
         loadCategoryPage(typeId = typeId, page = 1).items
 
-    suspend fun loadAllCategoryPage(page: Int): PagedVodItems = coroutineScope {
+    suspend fun loadAllCategoryPage(page: Int): PagedVodItems {
         val safePage = page.coerceAtLeast(1)
         val responses = allCategoryTypeIds
-            .map { typeId ->
-                async { api.getByType(typeId = typeId, page = safePage) }
-            }
-            .awaitAll()
+            .map { typeId -> api.getByType(typeId = typeId, page = safePage) }
 
         val mergedItems = interleaveCategoryItems(responses)
-        PagedVodItems(
+        return PagedVodItems(
             items = mergedItems,
             page = safePage,
             pageCount = responses.maxOfOrNull { it.safePageCount } ?: safePage,
@@ -97,8 +90,9 @@ class AppleCmsRepository(
         api.getByType(typeId = typeId, page = page.coerceAtLeast(1)).toPagedVodItems()
 
     suspend fun search(keyword: String): List<VodItem> {
-        return api.search(keyword = keyword.trim())
-            .list
+        val encodedKeyword = Uri.encode(keyword.trim())
+        val document = fetchDocument("$baseUrl/vodsearch/-------------/?wd=$encodedKeyword")
+        return parseSearchResults(document)
             .distinctBy { it.vodId }
             .take(60)
     }
@@ -679,8 +673,8 @@ class AppleCmsRepository(
 
             return OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(20, TimeUnit.SECONDS)
-                .writeTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
                 .protocols(listOf(Protocol.HTTP_1_1))
                 .cookieJar(cookieJar)
                 .addInterceptor(logging)
