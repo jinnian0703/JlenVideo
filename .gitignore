@@ -1,0 +1,20 @@
+# Gradle
+.gradle/
+**/build/
+
+# Local configuration
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# Native build outputs
+.cxx/
+.externalNativeBuild/
+
+# Misc
+captures/
+.DS_Store
+Thumbs.db
+gcm-diagnose.log
