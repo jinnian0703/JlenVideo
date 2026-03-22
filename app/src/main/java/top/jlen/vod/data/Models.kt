@@ -142,3 +142,39 @@ data class AuthSession(
     val groupName: String = "",
     val portraitUrl: String = ""
 )
+
+data class UserProfilePage(
+    val fields: List<Pair<String, String>> = emptyList()
+)
+
+data class UserCenterItem(
+    val recordId: String = "",
+    val vodId: String = "",
+    val title: String = "",
+    val subtitle: String = "",
+    val actionLabel: String = "",
+    val actionUrl: String = ""
+)
+
+data class UserCenterPage(
+    val items: List<UserCenterItem> = emptyList(),
+    val nextPageUrl: String? = null
+)
+
+data class MembershipInfo(
+    val groupName: String = "",
+    val points: String = "",
+    val expiry: String = ""
+)
+
+data class MembershipPlan(
+    val groupId: String = "",
+    val groupName: String = "",
+    val duration: String = "",
+    val points: String = ""
+)
+
+data class MembershipPage(
+    val info: MembershipInfo = MembershipInfo(),
+    val plans: List<MembershipPlan> = emptyList()
+)

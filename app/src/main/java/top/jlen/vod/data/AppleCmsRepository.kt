@@ -162,6 +162,76 @@ class AppleCmsRepository(
         cookieJar.clear()
     }
 
+    suspend fun loadUserProfile(): UserProfilePage {
+        val document = fetchUserDocument("/index.php/user/index.html")
+        return UserProfilePage(
+            fields = listOfNotNull(
+                readLabeledValue(document, "用户名"),
+                readLabeledValue(document, "QQ号码"),
+                readLabeledValue(document, "Email地址"),
+                readLabeledValue(document, "注册时间"),
+                readLabeledValue(document, "登陆IP"),
+                readLabeledValue(document, "登陆时间")
+            )
+        )
+    }
+
+    suspend fun loadFavoritePage(pageUrl: String? = null): UserCenterPage =
+        parseUserCenterPage(
+            document = fetchUserDocument(pageUrl ?: "/index.php/user/favs.html")
+        )
+
+    suspend fun loadHistoryPage(pageUrl: String? = null): UserCenterPage =
+        parseUserCenterPage(
+            document = fetchUserDocument(pageUrl ?: "/index.php/user/plays.html")
+        )
+
+    suspend fun loadMembershipPage(): MembershipPage {
+        val document = fetchUserDocument("/index.php/user/upgrade.html")
+        return MembershipPage(
+            info = MembershipInfo(
+                groupName = readLabeledText(document, "所属会员组"),
+                points = readLabeledText(document, "剩余积分"),
+                expiry = readLabeledText(document, "到期时间")
+            ),
+            plans = document.select("[data-id][data-name][data-points][data-long]")
+                .map { element ->
+                    MembershipPlan(
+                        groupId = element.attr("data-id").trim(),
+                        groupName = element.attr("data-name").trim(),
+                        duration = element.attr("data-long").trim(),
+                        points = element.attr("data-points").trim()
+                    )
+                }
+                .distinctBy { "${it.groupId}:${it.duration}" }
+        )
+    }
+
+    suspend fun deleteUserRecord(recordIds: List<String>, type: Int, clearAll: Boolean): String {
+        val form = FormBody.Builder()
+            .add("ids", recordIds.joinToString(","))
+            .add("type", type.toString())
+            .add("all", if (clearAll) "1" else "0")
+            .build()
+        return submitUserAction(
+            url = "$baseUrl/index.php/user/ulog_del",
+            referer = "$baseUrl/index.php/user/${if (type == 2) "favs" else "plays"}.html",
+            formBody = form
+        )
+    }
+
+    suspend fun upgradeMembership(plan: MembershipPlan): String {
+        val form = FormBody.Builder()
+            .add("group_id", plan.groupId)
+            .add("long", plan.duration)
+            .build()
+        return submitUserAction(
+            url = "$baseUrl/index.php/user/upgrade",
+            referer = "$baseUrl/index.php/user/upgrade.html",
+            formBody = form
+        )
+    }
+
     suspend fun loadDetail(vodId: String): VodItem? =
         parseDetail(fetchDocument("$baseUrl/voddetail/$vodId/"))
 
@@ -292,6 +362,55 @@ class AppleCmsRepository(
             }
             .distinctBy { it.vodId }
 
+    private fun parseUserCenterPage(document: Document): UserCenterPage {
+        val items = document.select("input[name='ids[]']")
+            .mapNotNull { input ->
+                val row = input.parents().firstOrNull { parent ->
+                    parent.select("input[name='ids[]']").size == 1 &&
+                        parent.select("a[href*=/voddetail/], a[href*=/vodplay/]").isNotEmpty()
+                } ?: return@mapNotNull null
+
+                val primaryAnchor = row.selectFirst("a[href*=/vodplay/], a[href*=/voddetail/]")
+                    ?: return@mapNotNull null
+                val title = primaryAnchor.text()
+                    .replace(Regex("^\\[[^\\]]+\\]\\s*"), "")
+                    .trim()
+                val rowText = row.text()
+                val subtitle = rowText
+                    .replace(primaryAnchor.text(), "")
+                    .replace("删除", "")
+                    .replace("重新观看", "")
+                    .replace(Regex("\\s+"), " ")
+                    .trim()
+                val actionUrl = primaryAnchor.attr("href")
+
+                UserCenterItem(
+                    recordId = input.attr("value").trim(),
+                    vodId = extractVodIdFromUserUrl(actionUrl),
+                    title = title.ifBlank { "未命名条目" },
+                    subtitle = subtitle,
+                    actionLabel = if (actionUrl.contains("/vodplay/")) "继续观看" else "查看详情",
+                    actionUrl = normalizeUrl(actionUrl)
+                )
+            }
+
+        val nextPageUrl = document.select("a[href]")
+            .firstOrNull { anchor ->
+                val text = anchor.text().trim()
+                anchor.attr("href").isNotBlank() &&
+                    !anchor.attr("href").startsWith("javascript", ignoreCase = true) &&
+                    (text.contains("下一页") || text == ">" || text == "›")
+            }
+            ?.attr("href")
+            ?.takeIf { it.isNotBlank() }
+            ?.let(::normalizeUrl)
+
+        return UserCenterPage(
+            items = items.distinctBy { "${it.recordId}:${it.actionUrl}" },
+            nextPageUrl = nextPageUrl
+        )
+    }
+
     private fun AppleCmsResponse.toPagedVodItems(): PagedVodItems =
         PagedVodItems(
             items = list.distinctBy { it.vodId },
@@ -329,6 +448,65 @@ class AppleCmsRepository(
         return category.typeId.isNotBlank() &&
             category.typeName.isNotBlank() &&
             parentId in allCategoryTypeIds
+    }
+
+    private suspend fun fetchUserDocument(pathOrUrl: String): Document {
+        val document = fetchDocument(resolveUrl(pathOrUrl))
+        if (document.select(".ewave-jump-msg, .panel-body").any { it.text().contains("未登录") }) {
+            throw IOException("请先登录")
+        }
+        return document
+    }
+
+    private suspend fun submitUserAction(
+        url: String,
+        referer: String,
+        formBody: FormBody
+    ): String {
+        val request = Request.Builder()
+            .url(url)
+            .header("Referer", referer)
+            .header("X-Requested-With", "XMLHttpRequest")
+            .post(formBody)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("请求失败：HTTP ${response.code}")
+            }
+
+            val body = response.body?.string().orEmpty()
+            val authResponse = runCatching { gson.fromJson(body, AuthResponse::class.java) }.getOrNull()
+            if (authResponse != null && (authResponse.msg.isNotBlank() || authResponse.code != 0)) {
+                if (authResponse.code == 1) {
+                    return authResponse.msg.ifBlank { "操作成功" }
+                }
+                throw IOException(authResponse.msg.ifBlank { "操作失败" })
+            }
+            if (body.contains("未登录")) {
+                throw IOException("请先登录")
+            }
+            return "操作成功"
+        }
+    }
+
+    private fun readLabeledValue(document: Document, label: String): Pair<String, String>? {
+        val value = readLabeledText(document, label)
+        return value.takeIf { it.isNotBlank() }?.let { label to it }
+    }
+
+    private fun readLabeledText(document: Document, label: String): String {
+        document.select("p, li, div, span").forEach { element ->
+            val text = element.text()
+                .replace('\u00A0', ' ')
+                .replace(Regex("\\s+"), " ")
+                .trim()
+            val match = Regex("$label[：: ]+(.+)").find(text)
+            if (match != null) {
+                return match.groupValues.getOrNull(1).orEmpty().trim()
+            }
+        }
+        return ""
     }
 
     private fun parseCategories(homeDocument: Document, mapDocument: Document?): List<AppleCmsCategory> {
@@ -603,6 +781,18 @@ class AppleCmsRepository(
             .removeSuffix("/")
             .substringAfterLast("/vodtype/", typeId.trim().removeSuffix("/"))
             .substringAfterLast('/')
+
+    private fun extractVodIdFromUserUrl(pathOrUrl: String): String {
+        val normalized = resolveUrl(pathOrUrl)
+        return when {
+            normalized.contains("/voddetail/") -> extractVodId(normalized)
+            normalized.contains("/vodplay/") -> normalized
+                .substringAfter("/vodplay/")
+                .substringBefore('/')
+                .substringBefore('-')
+            else -> ""
+        }
+    }
 
     private fun buildCategoryPageUrl(categorySlug: String, page: Int): String =
         "$baseUrl/vodshow/$categorySlug--------${page.coerceAtLeast(1)}---/"

@@ -122,7 +122,17 @@ fun JlenVideoApp() {
                                 onPasswordChange = viewModel::updateLoginPassword,
                                 onLogin = viewModel::login,
                                 onLogout = viewModel::logout,
-                                onRefresh = viewModel::refreshAccount
+                                onRefresh = viewModel::refreshAccount,
+                                onSelectSection = viewModel::selectAccountSection,
+                                onRefreshSection = viewModel::refreshSelectedAccountSection,
+                                onOpenDetail = { navController.navigate("detail/$it") },
+                                onLoadMoreFavorites = viewModel::loadMoreFavorites,
+                                onLoadMoreHistory = viewModel::loadMoreHistory,
+                                onDeleteFavorite = viewModel::deleteFavorite,
+                                onClearFavorites = viewModel::clearFavorites,
+                                onDeleteHistory = viewModel::deleteHistory,
+                                onClearHistory = viewModel::clearHistory,
+                                onUpgradeMembership = viewModel::upgradeMembership
                             )
                         }
                         composable(

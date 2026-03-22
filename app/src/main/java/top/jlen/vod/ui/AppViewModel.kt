@@ -13,7 +13,10 @@ import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.AppleCmsRepository
 import top.jlen.vod.data.AuthSession
 import top.jlen.vod.data.Episode
+import top.jlen.vod.data.MembershipInfo
+import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.PlaySource
+import top.jlen.vod.data.UserCenterItem
 import top.jlen.vod.data.VodItem
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -41,9 +44,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshAccount() {
-        accountState = accountState.copy(
-            session = repository.currentSession()
-        )
+        val session = repository.currentSession()
+        accountState = if (session.isLoggedIn) {
+            accountState.copy(session = session, error = null)
+        } else {
+            AccountUiState(userName = accountState.userName, session = session)
+        }
+        if (session.isLoggedIn) {
+            selectAccountSection(accountState.selectedSection, forceRefresh = true)
+        }
     }
 
     fun refreshHome() {
@@ -264,11 +273,112 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateLoginUserName(value: String) {
-        accountState = accountState.copy(userName = value)
+        accountState = accountState.copy(userName = value, error = null, message = null)
     }
 
     fun updateLoginPassword(value: String) {
-        accountState = accountState.copy(password = value)
+        accountState = accountState.copy(password = value, error = null, message = null)
+    }
+
+    fun selectAccountSection(section: AccountSection, forceRefresh: Boolean = false) {
+        accountState = accountState.copy(selectedSection = section, error = null, message = null)
+        if (!accountState.session.isLoggedIn) return
+        when (section) {
+            AccountSection.Profile -> {
+                if (forceRefresh || accountState.profileFields.isEmpty()) {
+                    loadAccountProfile()
+                }
+            }
+            AccountSection.Favorites -> {
+                if (forceRefresh || accountState.favoriteItems.isEmpty()) {
+                    loadFavoriteRecords()
+                }
+            }
+            AccountSection.History -> {
+                if (forceRefresh || accountState.historyItems.isEmpty()) {
+                    loadHistoryRecords()
+                }
+            }
+            AccountSection.Member -> {
+                if (forceRefresh || accountState.membershipPlans.isEmpty()) {
+                    loadMembership()
+                }
+            }
+        }
+    }
+
+    fun refreshSelectedAccountSection() {
+        selectAccountSection(accountState.selectedSection, forceRefresh = true)
+    }
+
+    fun loadMoreFavorites() {
+        if (accountState.isContentLoading || accountState.favoriteNextPageUrl.isNullOrBlank()) return
+        loadFavoriteRecords(pageUrl = accountState.favoriteNextPageUrl, append = true)
+    }
+
+    fun loadMoreHistory() {
+        if (accountState.isContentLoading || accountState.historyNextPageUrl.isNullOrBlank()) return
+        loadHistoryRecords(pageUrl = accountState.historyNextPageUrl, append = true)
+    }
+
+    fun deleteFavorite(recordId: String) {
+        if (recordId.isBlank()) return
+        runAccountAction(
+            block = { deleteUserRecord(recordIds = listOf(recordId), type = 2, clearAll = false) },
+            onSuccess = {
+            accountState = accountState.copy(
+                favoriteItems = accountState.favoriteItems.filterNot { item -> item.recordId == recordId }
+            )
+            selectAccountSection(AccountSection.Favorites, forceRefresh = true)
+            }
+        )
+    }
+
+    fun clearFavorites() {
+        runAccountAction(
+            block = { deleteUserRecord(recordIds = emptyList(), type = 2, clearAll = true) },
+            onSuccess = {
+            accountState = accountState.copy(
+                favoriteItems = emptyList(),
+                favoriteNextPageUrl = null
+            )
+            selectAccountSection(AccountSection.Favorites, forceRefresh = true)
+            }
+        )
+    }
+
+    fun deleteHistory(recordId: String) {
+        if (recordId.isBlank()) return
+        runAccountAction(
+            block = { deleteUserRecord(recordIds = listOf(recordId), type = 4, clearAll = false) },
+            onSuccess = {
+            accountState = accountState.copy(
+                historyItems = accountState.historyItems.filterNot { item -> item.recordId == recordId }
+            )
+            selectAccountSection(AccountSection.History, forceRefresh = true)
+            }
+        )
+    }
+
+    fun clearHistory() {
+        runAccountAction(
+            block = { deleteUserRecord(recordIds = emptyList(), type = 4, clearAll = true) },
+            onSuccess = {
+            accountState = accountState.copy(
+                historyItems = emptyList(),
+                historyNextPageUrl = null
+            )
+            selectAccountSection(AccountSection.History, forceRefresh = true)
+            }
+        )
+    }
+
+    fun upgradeMembership(plan: MembershipPlan) {
+        if (plan.groupId.isBlank() || plan.duration.isBlank()) return
+        runAccountAction(
+            block = { upgradeMembership(plan) },
+            onSuccess = { selectAccountSection(AccountSection.Member, forceRefresh = true) }
+        )
     }
 
     fun login() {
@@ -294,8 +404,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     isLoading = false,
                     session = session,
                     password = "",
-                    error = null
+                    error = null,
+                    message = "登录成功"
                 )
+                selectAccountSection(AccountSection.Profile, forceRefresh = true)
             }.onFailure { error ->
                 accountState = accountState.copy(
                     isLoading = false,
@@ -314,7 +426,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onSuccess {
                 accountState = AccountUiState(
                     userName = accountState.userName,
-                    session = AuthSession()
+                    session = AuthSession(),
+                    message = "已退出登录"
                 )
             }.onFailure { error ->
                 accountState = accountState.copy(
@@ -324,6 +437,121 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    private fun loadAccountProfile() {
+        viewModelScope.launch {
+            accountState = accountState.copy(isContentLoading = true, error = null)
+            runCatching {
+                withContext(Dispatchers.IO) { repository.loadUserProfile() }
+            }.onSuccess { page ->
+                accountState = accountState.copy(
+                    isContentLoading = false,
+                    profileFields = page.fields
+                )
+            }.onFailure { error ->
+                accountState = accountState.copy(
+                    isContentLoading = false,
+                    error = error.message ?: "加载资料失败"
+                )
+            }
+        }
+    }
+
+    private fun loadFavoriteRecords(pageUrl: String? = null, append: Boolean = false) {
+        viewModelScope.launch {
+            accountState = accountState.copy(isContentLoading = true, error = null)
+            runCatching {
+                withContext(Dispatchers.IO) { repository.loadFavoritePage(pageUrl) }
+            }.onSuccess { page ->
+                accountState = accountState.copy(
+                    isContentLoading = false,
+                    favoriteItems = mergeAccountItems(
+                        current = if (append) accountState.favoriteItems else emptyList(),
+                        incoming = page.items
+                    ),
+                    favoriteNextPageUrl = page.nextPageUrl
+                )
+            }.onFailure { error ->
+                accountState = accountState.copy(
+                    isContentLoading = false,
+                    error = error.message ?: "加载收藏失败"
+                )
+            }
+        }
+    }
+
+    private fun loadHistoryRecords(pageUrl: String? = null, append: Boolean = false) {
+        viewModelScope.launch {
+            accountState = accountState.copy(isContentLoading = true, error = null)
+            runCatching {
+                withContext(Dispatchers.IO) { repository.loadHistoryPage(pageUrl) }
+            }.onSuccess { page ->
+                accountState = accountState.copy(
+                    isContentLoading = false,
+                    historyItems = mergeAccountItems(
+                        current = if (append) accountState.historyItems else emptyList(),
+                        incoming = page.items
+                    ),
+                    historyNextPageUrl = page.nextPageUrl
+                )
+            }.onFailure { error ->
+                accountState = accountState.copy(
+                    isContentLoading = false,
+                    error = error.message ?: "加载播放记录失败"
+                )
+            }
+        }
+    }
+
+    private fun loadMembership() {
+        viewModelScope.launch {
+            accountState = accountState.copy(isContentLoading = true, error = null)
+            runCatching {
+                withContext(Dispatchers.IO) { repository.loadMembershipPage() }
+            }.onSuccess { page ->
+                accountState = accountState.copy(
+                    isContentLoading = false,
+                    membershipInfo = page.info,
+                    membershipPlans = page.plans
+                )
+            }.onFailure { error ->
+                accountState = accountState.copy(
+                    isContentLoading = false,
+                    error = error.message ?: "加载会员信息失败"
+                )
+            }
+        }
+    }
+
+    private fun runAccountAction(
+        block: suspend AppleCmsRepository.() -> String,
+        onSuccess: () -> Unit
+    ) {
+        if (accountState.isActionLoading) return
+        viewModelScope.launch {
+            accountState = accountState.copy(isActionLoading = true, error = null, message = null)
+            runCatching {
+                withContext(Dispatchers.IO) { repository.block() }
+            }.onSuccess { message ->
+                accountState = accountState.copy(
+                    isActionLoading = false,
+                    message = message.ifBlank { "操作成功" }
+                )
+                onSuccess()
+            }.onFailure { error ->
+                accountState = accountState.copy(
+                    isActionLoading = false,
+                    error = error.message ?: "操作失败"
+                )
+            }
+        }
+    }
+
+    private fun mergeAccountItems(
+        current: List<UserCenterItem>,
+        incoming: List<UserCenterItem>
+    ): List<UserCenterItem> = (current + incoming)
+        .distinctBy { item -> "${item.recordId}:${item.actionUrl}:${item.vodId}" }
 
     fun loadDetail(vodId: String) {
         if (detailState.item?.vodId == vodId && detailState.sources.isNotEmpty()) {
@@ -520,12 +748,30 @@ data class SearchUiState(
     val results: List<VodItem> = emptyList()
 )
 
+enum class AccountSection {
+    Profile,
+    Favorites,
+    History,
+    Member
+}
+
 data class AccountUiState(
     val isLoading: Boolean = false,
+    val isContentLoading: Boolean = false,
+    val isActionLoading: Boolean = false,
     val error: String? = null,
+    val message: String? = null,
     val userName: String = "",
     val password: String = "",
-    val session: AuthSession = AuthSession()
+    val session: AuthSession = AuthSession(),
+    val selectedSection: AccountSection = AccountSection.Profile,
+    val profileFields: List<Pair<String, String>> = emptyList(),
+    val favoriteItems: List<UserCenterItem> = emptyList(),
+    val favoriteNextPageUrl: String? = null,
+    val historyItems: List<UserCenterItem> = emptyList(),
+    val historyNextPageUrl: String? = null,
+    val membershipInfo: MembershipInfo = MembershipInfo(),
+    val membershipPlans: List<MembershipPlan> = emptyList()
 )
 
 data class DetailUiState(

@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.data.AppleCmsCategory
+import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.VodItem
 
 @Composable
@@ -323,7 +324,17 @@ fun AccountScreen(
     onPasswordChange: (String) -> Unit,
     onLogin: () -> Unit,
     onLogout: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onSelectSection: (AccountSection) -> Unit,
+    onRefreshSection: () -> Unit,
+    onOpenDetail: (String) -> Unit,
+    onLoadMoreFavorites: () -> Unit,
+    onLoadMoreHistory: () -> Unit,
+    onDeleteFavorite: (String) -> Unit,
+    onClearFavorites: () -> Unit,
+    onDeleteHistory: (String) -> Unit,
+    onClearHistory: () -> Unit,
+    onUpgradeMembership: (MembershipPlan) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -353,8 +364,29 @@ fun AccountScreen(
             }
         }
 
+        state.message?.let { message ->
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = UiPalette.AccentSoft.copy(alpha = 0.25f)),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Text(
+                        text = message,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                        color = UiPalette.Ink,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+
         state.error?.let { message ->
-            item { ErrorBanner(message = message, onRetry = onRefresh) }
+            item {
+                ErrorBanner(
+                    message = message,
+                    onRetry = if (state.session.isLoggedIn) onRefreshSection else onRefresh
+                )
+            }
         }
 
         if (state.session.isLoggedIn) {
@@ -424,12 +456,12 @@ fun AccountScreen(
 
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             OutlinedButton(
-                                onClick = onRefresh,
+                                onClick = onRefreshSection,
                                 enabled = !state.isLoading,
                                 modifier = Modifier.weight(1f),
                                 border = BorderStroke(1.dp, UiPalette.BorderSoft)
                             ) {
-                                Text("刷新状态")
+                                Text("刷新")
                             }
                             Button(
                                 onClick = onLogout,
@@ -444,6 +476,78 @@ fun AccountScreen(
                             }
                         }
                     }
+                }
+            }
+
+            item {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(AccountSection.entries.toList()) { section ->
+                        val selected = state.selectedSection == section
+                        AssistChip(
+                            onClick = { onSelectSection(section) },
+                            label = {
+                                Text(
+                                    when (section) {
+                                        AccountSection.Profile -> "资料"
+                                        AccountSection.Favorites -> "收藏"
+                                        AccountSection.History -> "记录"
+                                        AccountSection.Member -> "会员"
+                                    },
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = if (selected) UiPalette.Accent else UiPalette.Surface,
+                                labelColor = if (selected) UiPalette.AccentText else UiPalette.Ink
+                            ),
+                            border = AssistChipDefaults.assistChipBorder(
+                                borderColor = if (selected) UiPalette.Accent else UiPalette.BorderSoft,
+                                enabled = true
+                            )
+                        )
+                    }
+                }
+            }
+
+            item {
+                when (state.selectedSection) {
+                    AccountSection.Profile -> AccountProfilePane(
+                        isLoading = state.isContentLoading,
+                        fields = state.profileFields
+                    )
+                    AccountSection.Favorites -> AccountRecordPane(
+                        title = "我的收藏",
+                        emptyMessage = "你还没有收藏任何内容",
+                        isLoading = state.isContentLoading,
+                        items = state.favoriteItems,
+                        hasMore = !state.favoriteNextPageUrl.isNullOrBlank(),
+                        isActionLoading = state.isActionLoading,
+                        onLoadMore = onLoadMoreFavorites,
+                        onOpenDetail = onOpenDetail,
+                        onDeleteItem = onDeleteFavorite,
+                        onClearAll = onClearFavorites
+                    )
+                    AccountSection.History -> AccountRecordPane(
+                        title = "播放记录",
+                        emptyMessage = "还没有播放记录",
+                        isLoading = state.isContentLoading,
+                        items = state.historyItems,
+                        hasMore = !state.historyNextPageUrl.isNullOrBlank(),
+                        isActionLoading = state.isActionLoading,
+                        onLoadMore = onLoadMoreHistory,
+                        onOpenDetail = onOpenDetail,
+                        onDeleteItem = onDeleteHistory,
+                        onClearAll = onClearHistory
+                    )
+                    AccountSection.Member -> MembershipPane(
+                        isLoading = state.isContentLoading,
+                        info = state.membershipInfo,
+                        plans = state.membershipPlans,
+                        isActionLoading = state.isActionLoading,
+                        onUpgrade = onUpgradeMembership
+                    )
                 }
             }
         } else {
@@ -516,6 +620,229 @@ fun AccountScreen(
             }
         }
     }
+}
+
+@Composable
+private fun AccountProfilePane(
+    isLoading: Boolean,
+    fields: List<Pair<String, String>>
+) {
+    when {
+        isLoading -> LoadingPane("资料加载中...")
+        fields.isEmpty() -> EmptyPane("暂时没有资料信息")
+        else -> Card(
+            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(1.dp, UiPalette.Border)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                fields.forEach { (label, value) ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(label, color = UiPalette.TextSecondary)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(value, color = UiPalette.Ink, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountRecordPane(
+    title: String,
+    emptyMessage: String,
+    isLoading: Boolean,
+    items: List<top.jlen.vod.data.UserCenterItem>,
+    hasMore: Boolean,
+    isActionLoading: Boolean,
+    onLoadMore: () -> Unit,
+    onOpenDetail: (String) -> Unit,
+    onDeleteItem: (String) -> Unit,
+    onClearAll: () -> Unit
+) {
+    when {
+        isLoading && items.isEmpty() -> LoadingPane("$title 加载中...")
+        items.isEmpty() -> EmptyPane(emptyMessage)
+        else -> Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, UiPalette.Border)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    TextButton(onClick = onClearAll, enabled = !isActionLoading) {
+                        Text(if (isActionLoading) "处理中..." else "清空")
+                    }
+                }
+            }
+
+            items.forEach { item ->
+                AccountRecordCard(
+                    item = item,
+                    isActionLoading = isActionLoading,
+                    onOpenDetail = onOpenDetail,
+                    onDelete = onDeleteItem
+                )
+            }
+
+            LoadMoreFooter(
+                hasMore = hasMore,
+                isLoading = isLoading && items.isNotEmpty(),
+                onLoadMore = onLoadMore
+            )
+        }
+    }
+}
+
+@Composable
+private fun AccountRecordCard(
+    item: top.jlen.vod.data.UserCenterItem,
+    isActionLoading: Boolean,
+    onOpenDetail: (String) -> Unit,
+    onDelete: (String) -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        shape = RoundedCornerShape(22.dp),
+        border = BorderStroke(1.dp, UiPalette.Border)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = UiPalette.Ink
+            )
+            if (item.subtitle.isNotBlank()) {
+                Text(
+                    text = item.subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = UiPalette.TextSecondary
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(
+                    onClick = { if (item.vodId.isNotBlank()) onOpenDetail(item.vodId) },
+                    enabled = item.vodId.isNotBlank() && !isActionLoading,
+                    border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                ) {
+                    Text(item.actionLabel.ifBlank { "查看详情" })
+                }
+                TextButton(
+                    onClick = { onDelete(item.recordId) },
+                    enabled = item.recordId.isNotBlank() && !isActionLoading,
+                    colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
+                ) {
+                    Text("删除")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MembershipPane(
+    isLoading: Boolean,
+    info: top.jlen.vod.data.MembershipInfo,
+    plans: List<MembershipPlan>,
+    isActionLoading: Boolean,
+    onUpgrade: (MembershipPlan) -> Unit
+) {
+    when {
+        isLoading && plans.isEmpty() && info.groupName.isBlank() -> LoadingPane("会员信息加载中...")
+        else -> Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                shape = RoundedCornerShape(24.dp),
+                border = BorderStroke(1.dp, UiPalette.Border)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("会员信息", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+                    Text("当前分组：${info.groupName.ifBlank { "未知" }}", color = UiPalette.Ink)
+                    Text("剩余积分：${info.points.ifBlank { "未知" }}", color = UiPalette.Ink)
+                    Text("到期时间：${info.expiry.ifBlank { "未知" }}", color = UiPalette.Ink)
+                }
+            }
+
+            if (plans.isEmpty()) {
+                EmptyPane("当前没有可用的升级方案")
+            } else {
+                plans.forEach { plan ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                        shape = RoundedCornerShape(22.dp),
+                        border = BorderStroke(1.dp, UiPalette.Border)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "${plan.groupName} ${plan.duration.toMembershipDuration()}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = UiPalette.Ink
+                                )
+                                Text(
+                                    text = "${plan.points} 积分",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = UiPalette.TextSecondary
+                                )
+                            }
+                            Button(
+                                onClick = { onUpgrade(plan) },
+                                enabled = !isActionLoading,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = UiPalette.Accent,
+                                    contentColor = UiPalette.AccentText
+                                )
+                            ) {
+                                Text(if (isActionLoading) "处理中..." else "升级")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun String.toMembershipDuration(): String = when (lowercase()) {
+    "day" -> "包天"
+    "week" -> "包周"
+    "month" -> "包月"
+    "year" -> "包年"
+    else -> this
 }
 
 @Composable
