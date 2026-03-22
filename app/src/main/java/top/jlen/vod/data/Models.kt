@@ -153,6 +153,8 @@ data class UserProfilePage(
 data class UserProfileEditor(
     val qq: String = "",
     val email: String = "",
+    val pendingEmail: String = "",
+    val emailCode: String = "",
     val phone: String = "",
     val question: String = "",
     val answer: String = "",

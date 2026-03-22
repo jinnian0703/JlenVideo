@@ -1,8 +1,5 @@
 package top.jlen.vod.ui
 
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -55,7 +52,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -344,7 +340,9 @@ fun AccountScreen(
     onClearHistory: () -> Unit,
     onUpgradeMembership: (MembershipPlan) -> Unit,
     onProfileEditorChange: ((UserProfileEditor) -> UserProfileEditor) -> Unit,
-    onSaveProfile: () -> Unit
+    onSaveProfile: () -> Unit,
+    onSendEmailCode: () -> Unit,
+    onBindEmail: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -529,7 +527,9 @@ fun AccountScreen(
                         editor = state.profileEditor,
                         isSaving = state.isActionLoading,
                         onEditorChange = onProfileEditorChange,
-                        onSave = onSaveProfile
+                        onSave = onSaveProfile,
+                        onSendEmailCode = onSendEmailCode,
+                        onBindEmail = onBindEmail
                     )
                     AccountSection.Favorites -> AccountRecordPane(
                         title = "我的收藏",
@@ -650,12 +650,13 @@ private fun AccountProfilePaneV2(
     editor: UserProfileEditor,
     isSaving: Boolean,
     onEditorChange: ((UserProfileEditor) -> UserProfileEditor) -> Unit,
-    onSave: () -> Unit
+    onSave: () -> Unit,
+    onSendEmailCode: () -> Unit,
+    onBindEmail: () -> Unit
 ) {
     val tabState = rememberSaveable { mutableStateOf(AccountProfileTab.Overview.name) }
     val selectedTab = runCatching { AccountProfileTab.valueOf(tabState.value) }
         .getOrDefault(AccountProfileTab.Overview)
-    val context = LocalContext.current
 
     when {
         isLoading -> LoadingPane("资料加载中...")
@@ -745,17 +746,47 @@ private fun AccountProfilePaneV2(
                             onValueChange = { value -> onEditorChange { it.copy(answer = value) } }
                         )
 
-                        ReadonlyBindingField(
-                            label = "邮箱",
-                            value = editor.email.ifBlank { "未绑定" },
-                            actionText = if (editor.email.isBlank()) "去绑定邮箱" else "管理邮箱",
-                            onAction = {
-                                openExternalLink(
-                                    context = context,
-                                    url = BuildConfig.APPLE_CMS_BASE_URL.trimEnd('/') + "/index.php/user/bind?ac=email"
-                                )
+                        if (editor.email.isBlank()) {
+                            ProfileEditorField(
+                                label = "邮箱",
+                                value = editor.pendingEmail,
+                                onValueChange = { value -> onEditorChange { it.copy(pendingEmail = value) } }
+                            )
+                            ProfileEditorField(
+                                label = "邮箱验证码",
+                                value = editor.emailCode,
+                                onValueChange = { value -> onEditorChange { it.copy(emailCode = value) } }
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                OutlinedButton(
+                                    onClick = onSendEmailCode,
+                                    enabled = !isSaving,
+                                    modifier = Modifier.weight(1f),
+                                    border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                                ) {
+                                    Text("发送验证码")
+                                }
+                                Button(
+                                    onClick = onBindEmail,
+                                    enabled = !isSaving,
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(18.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = UiPalette.Accent,
+                                        contentColor = UiPalette.AccentText
+                                    )
+                                ) {
+                                    Text(if (isSaving) "绑定中..." else "确认绑定")
+                                }
                             }
-                        )
+                        } else {
+                            ReadonlyBindingField(
+                                label = "邮箱",
+                                value = editor.email,
+                                actionText = "已绑定",
+                                onAction = null
+                            )
+                        }
 
                         Text(
                             text = "修改密码",
@@ -966,16 +997,6 @@ private fun ReadonlyBindingField(
                 }
             }
         }
-    }
-}
-
-private fun openExternalLink(context: Context, url: String) {
-    runCatching {
-        context.startActivity(
-            Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        )
     }
 }
 

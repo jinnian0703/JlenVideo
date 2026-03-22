@@ -407,6 +407,44 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    fun sendEmailBindCode() {
+        val email = accountState.profileEditor.pendingEmail.trim()
+        if (email.isBlank()) {
+            accountState = accountState.copy(error = "请输入邮箱地址")
+            return
+        }
+        runAccountAction(
+            block = { sendEmailBindCode(email) },
+            onSuccess = { }
+        )
+    }
+
+    fun bindEmail() {
+        val email = accountState.profileEditor.pendingEmail.trim()
+        val code = accountState.profileEditor.emailCode.trim()
+        if (email.isBlank()) {
+            accountState = accountState.copy(error = "请输入邮箱地址")
+            return
+        }
+        if (code.isBlank()) {
+            accountState = accountState.copy(error = "请输入邮箱验证码")
+            return
+        }
+        runAccountAction(
+            block = { bindEmail(email, code) },
+            onSuccess = {
+                accountState = accountState.copy(
+                    profileEditor = accountState.profileEditor.copy(
+                        email = email,
+                        pendingEmail = "",
+                        emailCode = ""
+                    )
+                )
+                selectAccountSection(AccountSection.Profile, forceRefresh = true)
+            }
+        )
+    }
+
     fun addCurrentDetailFavorite() {
         val item = detailState.item ?: return
         if (!accountState.session.isLoggedIn) {

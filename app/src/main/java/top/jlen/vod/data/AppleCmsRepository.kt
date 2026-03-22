@@ -229,6 +229,31 @@ class AppleCmsRepository(
         )
     }
 
+    suspend fun sendEmailBindCode(email: String): String {
+        val form = FormBody.Builder()
+            .add("ac", "email")
+            .add("to", email.trim())
+            .build()
+        return submitUserAction(
+            url = "$baseUrl/index.php/user/bindmsg",
+            referer = "$baseUrl/index.php/user/bind?ac=email",
+            formBody = form
+        )
+    }
+
+    suspend fun bindEmail(email: String, code: String): String {
+        val form = FormBody.Builder()
+            .add("ac", "email")
+            .add("to", email.trim())
+            .add("code", code.trim())
+            .build()
+        return submitUserAction(
+            url = "$baseUrl/index.php/user/bind",
+            referer = "$baseUrl/index.php/user/bind?ac=email",
+            formBody = form
+        )
+    }
+
     suspend fun addFavorite(item: VodItem): String =
         submitUserUlog(
             siteVodId = item.siteLogId,
