@@ -608,6 +608,64 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     ): List<UserCenterItem> = (current + incoming)
         .distinctBy { item -> "${item.recordId}:${item.actionUrl}:${item.vodId}" }
 
+    fun openHistoryRecord(item: UserCenterItem) {
+        if (item.vodId.isBlank()) {
+            playerState = PlayerUiState(
+                title = item.title,
+                isResolving = false,
+                resolveError = "无法定位到影片详情"
+            )
+            return
+        }
+
+        playerState = PlayerUiState(
+            title = item.title,
+            isResolving = true,
+            resolveError = null
+        )
+
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { repository.loadDetail(item.vodId) }
+            }.onSuccess { detailItem ->
+                if (detailItem == null) {
+                    playerState = PlayerUiState(
+                        title = item.title,
+                        isResolving = false,
+                        resolveError = "未找到影片详情"
+                    )
+                    return@onSuccess
+                }
+
+                val sources = repository.parseSources(detailItem)
+                val safeSourceIndex = item.sourceIndex.coerceIn(0, (sources.lastIndex).coerceAtLeast(0))
+                val episodes = sources.getOrNull(safeSourceIndex)?.episodes.orEmpty()
+                val matchedEpisodeIndex = episodes.indexOfFirst { episode ->
+                    item.playUrl.isNotBlank() && episode.url == item.playUrl
+                }
+                val safeEpisodeIndex = when {
+                    matchedEpisodeIndex >= 0 -> matchedEpisodeIndex
+                    item.episodeIndex >= 0 -> item.episodeIndex.coerceIn(0, (episodes.lastIndex).coerceAtLeast(0))
+                    else -> 0
+                }
+
+                openPlayer(
+                    title = detailItem.displayTitle,
+                    item = detailItem,
+                    sources = sources,
+                    sourceIndex = safeSourceIndex,
+                    episodeIndex = safeEpisodeIndex
+                )
+            }.onFailure { error ->
+                playerState = PlayerUiState(
+                    title = item.title,
+                    isResolving = false,
+                    resolveError = error.message ?: "继续观看失败"
+                )
+            }
+        }
+    }
+
     fun loadDetail(vodId: String) {
         if (detailState.item?.vodId == vodId && detailState.sources.isNotEmpty()) {
             return

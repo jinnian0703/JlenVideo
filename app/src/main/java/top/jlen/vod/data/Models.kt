@@ -167,7 +167,10 @@ data class UserCenterItem(
     val title: String = "",
     val subtitle: String = "",
     val actionLabel: String = "",
-    val actionUrl: String = ""
+    val actionUrl: String = "",
+    val playUrl: String = "",
+    val sourceIndex: Int = -1,
+    val episodeIndex: Int = -1
 )
 
 data class UserCenterPage(

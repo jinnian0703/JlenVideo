@@ -1,5 +1,8 @@
 package top.jlen.vod.ui
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -43,6 +46,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +55,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -329,6 +335,7 @@ fun AccountScreen(
     onSelectSection: (AccountSection) -> Unit,
     onRefreshSection: () -> Unit,
     onOpenDetail: (String) -> Unit,
+    onOpenHistoryRecord: (top.jlen.vod.data.UserCenterItem) -> Unit,
     onLoadMoreFavorites: () -> Unit,
     onLoadMoreHistory: () -> Unit,
     onDeleteFavorite: (String) -> Unit,
@@ -516,7 +523,7 @@ fun AccountScreen(
 
             item {
                 when (state.selectedSection) {
-                    AccountSection.Profile -> AccountProfilePane(
+                    AccountSection.Profile -> AccountProfilePaneV2(
                         isLoading = state.isContentLoading,
                         fields = state.profileFields,
                         editor = state.profileEditor,
@@ -532,7 +539,9 @@ fun AccountScreen(
                         hasMore = !state.favoriteNextPageUrl.isNullOrBlank(),
                         isActionLoading = state.isActionLoading,
                         onLoadMore = onLoadMoreFavorites,
-                        onOpenDetail = onOpenDetail,
+                        onPrimaryAction = { item ->
+                            if (item.vodId.isNotBlank()) onOpenDetail(item.vodId)
+                        },
                         onDeleteItem = onDeleteFavorite,
                         onClearAll = onClearFavorites
                     )
@@ -544,7 +553,7 @@ fun AccountScreen(
                         hasMore = !state.historyNextPageUrl.isNullOrBlank(),
                         isActionLoading = state.isActionLoading,
                         onLoadMore = onLoadMoreHistory,
-                        onOpenDetail = onOpenDetail,
+                        onPrimaryAction = onOpenHistoryRecord,
                         onDeleteItem = onDeleteHistory,
                         onClearAll = onClearHistory
                     )
@@ -621,6 +630,172 @@ fun AccountScreen(
                             )
                         ) {
                             Text(if (state.isLoading) "正在登录..." else "立即登录", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private enum class AccountProfileTab {
+    Overview,
+    Edit
+}
+
+@Composable
+private fun AccountProfilePaneV2(
+    isLoading: Boolean,
+    fields: List<Pair<String, String>>,
+    editor: UserProfileEditor,
+    isSaving: Boolean,
+    onEditorChange: ((UserProfileEditor) -> UserProfileEditor) -> Unit,
+    onSave: () -> Unit
+) {
+    val tabState = rememberSaveable { mutableStateOf(AccountProfileTab.Overview.name) }
+    val selectedTab = runCatching { AccountProfileTab.valueOf(tabState.value) }
+        .getOrDefault(AccountProfileTab.Overview)
+    val context = LocalContext.current
+
+    when {
+        isLoading -> LoadingPane("资料加载中...")
+        else -> Card(
+            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(1.dp, UiPalette.Border)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(AccountProfileTab.entries.toList()) { tab ->
+                        val selected = tab == selectedTab
+                        AssistChip(
+                            onClick = { tabState.value = tab.name },
+                            label = {
+                                Text(
+                                    text = when (tab) {
+                                        AccountProfileTab.Overview -> "基本资料"
+                                        AccountProfileTab.Edit -> "修改信息"
+                                    },
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = if (selected) UiPalette.Accent else UiPalette.Surface,
+                                labelColor = if (selected) UiPalette.AccentText else UiPalette.Ink
+                            ),
+                            border = AssistChipDefaults.assistChipBorder(
+                                borderColor = if (selected) UiPalette.Accent else UiPalette.BorderSoft,
+                                enabled = true
+                            )
+                        )
+                    }
+                }
+
+                when (selectedTab) {
+                    AccountProfileTab.Overview -> {
+                        if (fields.isEmpty()) {
+                            Text(
+                                text = "暂时没有解析到基础资料。",
+                                color = UiPalette.TextSecondary,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        } else {
+                            fields.forEach { (label, value) ->
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(label, color = UiPalette.TextSecondary, style = MaterialTheme.typography.labelLarge)
+                                    Text(
+                                        value,
+                                        color = UiPalette.Ink,
+                                        fontWeight = FontWeight.SemiBold,
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    AccountProfileTab.Edit -> {
+                        Text(
+                            text = "资料修改",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = UiPalette.Ink
+                        )
+                        ProfileEditorField(
+                            label = "QQ号码",
+                            value = editor.qq,
+                            onValueChange = { value -> onEditorChange { it.copy(qq = value) } }
+                        )
+                        ProfileEditorField(
+                            label = "找回问题",
+                            value = editor.question,
+                            onValueChange = { value -> onEditorChange { it.copy(question = value) } }
+                        )
+                        ProfileEditorField(
+                            label = "找回答案",
+                            value = editor.answer,
+                            onValueChange = { value -> onEditorChange { it.copy(answer = value) } }
+                        )
+
+                        ReadonlyBindingField(
+                            label = "邮箱",
+                            value = editor.email.ifBlank { "未绑定" },
+                            actionText = if (editor.email.isBlank()) "去绑定" else null,
+                            onAction = {
+                                openExternalLink(
+                                    context = context,
+                                    url = BuildConfig.APPLE_CMS_BASE_URL.trimEnd('/') + "/index.php/user/bind?ac=email"
+                                )
+                            }
+                        )
+
+                        Text(
+                            text = "修改密码",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = UiPalette.Ink
+                        )
+                        Text(
+                            text = "只在修改密码时填写原密码；不改密码就留空。",
+                            color = UiPalette.TextSecondary,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        ProfileEditorField(
+                            label = "原密码",
+                            value = editor.currentPassword,
+                            onValueChange = { value -> onEditorChange { it.copy(currentPassword = value) } },
+                            password = true
+                        )
+                        ProfileEditorField(
+                            label = "新密码",
+                            value = editor.newPassword,
+                            onValueChange = { value -> onEditorChange { it.copy(newPassword = value) } },
+                            password = true
+                        )
+                        ProfileEditorField(
+                            label = "确认新密码",
+                            value = editor.confirmPassword,
+                            onValueChange = { value -> onEditorChange { it.copy(confirmPassword = value) } },
+                            password = true
+                        )
+                        Button(
+                            onClick = onSave,
+                            enabled = !isSaving,
+                            shape = RoundedCornerShape(18.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = UiPalette.Accent,
+                                contentColor = UiPalette.AccentText
+                            )
+                        ) {
+                            Text(if (isSaving) "保存中..." else "保存修改", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -765,6 +940,50 @@ private fun ProfileEditorField(
 }
 
 @Composable
+private fun ReadonlyBindingField(
+    label: String,
+    value: String,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            modifier = Modifier.fillMaxWidth(),
+            readOnly = true,
+            shape = RoundedCornerShape(18.dp),
+            singleLine = true,
+            label = { Text(label) },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = UiPalette.BorderSoft,
+                unfocusedBorderColor = UiPalette.BorderSoft,
+                focusedTextColor = UiPalette.Ink,
+                unfocusedTextColor = UiPalette.Ink,
+                cursorColor = UiPalette.Accent,
+                focusedContainerColor = UiPalette.Surface,
+                unfocusedContainerColor = UiPalette.Surface
+            )
+        )
+        if (!actionText.isNullOrBlank() && onAction != null) {
+            OutlinedButton(
+                onClick = onAction,
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, UiPalette.BorderSoft)
+            ) {
+                Text(actionText)
+            }
+        }
+    }
+}
+
+private fun openExternalLink(context: Context, url: String) {
+    runCatching {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }
+}
+
+@Composable
 private fun AccountRecordPane(
     title: String,
     emptyMessage: String,
@@ -773,7 +992,7 @@ private fun AccountRecordPane(
     hasMore: Boolean,
     isActionLoading: Boolean,
     onLoadMore: () -> Unit,
-    onOpenDetail: (String) -> Unit,
+    onPrimaryAction: (top.jlen.vod.data.UserCenterItem) -> Unit,
     onDeleteItem: (String) -> Unit,
     onClearAll: () -> Unit
 ) {
@@ -804,7 +1023,7 @@ private fun AccountRecordPane(
                 AccountRecordCard(
                     item = item,
                     isActionLoading = isActionLoading,
-                    onOpenDetail = onOpenDetail,
+                    onPrimaryAction = onPrimaryAction,
                     onDelete = onDeleteItem
                 )
             }
@@ -822,7 +1041,7 @@ private fun AccountRecordPane(
 private fun AccountRecordCard(
     item: top.jlen.vod.data.UserCenterItem,
     isActionLoading: Boolean,
-    onOpenDetail: (String) -> Unit,
+    onPrimaryAction: (top.jlen.vod.data.UserCenterItem) -> Unit,
     onDelete: (String) -> Unit
 ) {
     Card(
@@ -853,8 +1072,8 @@ private fun AccountRecordCard(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
-                    onClick = { if (item.vodId.isNotBlank()) onOpenDetail(item.vodId) },
-                    enabled = item.vodId.isNotBlank() && !isActionLoading,
+                    onClick = { onPrimaryAction(item) },
+                    enabled = !isActionLoading && (item.vodId.isNotBlank() || item.playUrl.isNotBlank()),
                     border = BorderStroke(1.dp, UiPalette.BorderSoft)
                 ) {
                     Text(item.actionLabel.ifBlank { "查看详情" })

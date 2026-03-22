@@ -176,12 +176,12 @@ class AppleCmsRepository(
     }
 
     suspend fun loadFavoritePage(pageUrl: String? = null): UserCenterPage =
-        parseUserCenterPage(
+        parseUserCenterPageEnhanced(
             document = fetchUserDocument(pageUrl ?: "/index.php/user/favs.html")
         )
 
     suspend fun loadHistoryPage(pageUrl: String? = null): UserCenterPage =
-        parseUserCenterPage(
+        parseUserCenterPageEnhanced(
             document = fetchUserDocument(pageUrl ?: "/index.php/user/plays.html")
         )
 
@@ -554,6 +554,61 @@ class AppleCmsRepository(
             limit = safeLimit,
             hasNextPage = hasNextPage
         )
+
+    private fun parseUserCenterPageEnhanced(document: Document): UserCenterPage {
+        val items = document.select("input[name='ids[]']")
+            .mapNotNull { input ->
+                val row = input.parents().firstOrNull { parent ->
+                    parent.select("input[name='ids[]']").size == 1 &&
+                        parent.select("a[href*=/voddetail/], a[href*=/vodplay/]").isNotEmpty()
+                } ?: return@mapNotNull null
+
+                val detailAnchor = row.selectFirst("a[href*=/voddetail/]")
+                val playAnchor = row.selectFirst("a[href*=/vodplay/]")
+                val actionUrl = normalizeUrl((playAnchor?.attr("href") ?: detailAnchor?.attr("href")).orEmpty())
+                if (actionUrl.isBlank()) return@mapNotNull null
+
+                val rawTitle = listOfNotNull(
+                    detailAnchor?.attr("title"),
+                    detailAnchor?.text(),
+                    row.selectFirst("h3 a, h4 a, h5 a, .title a, .name a")?.text(),
+                    row.selectFirst("h3, h4, h5, .title, .name")?.text()
+                ).firstOrNull { !it.isNullOrBlank() }.orEmpty()
+                val rowText = decodeSiteText(row.text())
+                val title = normalizeRecordTitle(rawTitle, rowText)
+                val playUrl = normalizeUrl(playAnchor?.attr("href").orEmpty())
+                val route = parsePlayRoute(playUrl.ifBlank { actionUrl })
+                val detailHref = detailAnchor?.attr("href").orEmpty()
+
+                UserCenterItem(
+                    recordId = input.attr("value").trim(),
+                    vodId = extractVodId(detailHref.ifBlank { extractVodIdFromUserUrl(actionUrl) }),
+                    title = title.ifBlank { "未命名条目" },
+                    subtitle = buildUserRecordSubtitleEnhanced(rowText, title, route),
+                    actionLabel = if (playAnchor != null) "继续观看" else "查看详情",
+                    actionUrl = actionUrl,
+                    playUrl = playUrl,
+                    sourceIndex = route?.sid?.toIntOrNull()?.minus(1) ?: -1,
+                    episodeIndex = route?.nid?.toIntOrNull()?.minus(1) ?: -1
+                )
+            }
+
+        val nextPageUrl = document.select("a[href]")
+            .firstOrNull { anchor ->
+                val text = anchor.text().trim()
+                anchor.attr("href").isNotBlank() &&
+                    !anchor.attr("href").startsWith("javascript", ignoreCase = true) &&
+                    (text.contains("下一页") || text == ">" || text == "›")
+            }
+            ?.attr("href")
+            ?.takeIf { it.isNotBlank() }
+            ?.let(::normalizeUrl)
+
+        return UserCenterPage(
+            items = items.distinctBy { "${it.recordId}:${it.actionUrl}" },
+            nextPageUrl = nextPageUrl
+        )
+    }
 
     private fun interleaveCategoryItems(responses: List<AppleCmsResponse>): List<VodItem> {
         val buckets = responses.map { response ->
@@ -1095,9 +1150,51 @@ class AppleCmsRepository(
             .replace(Regex("\\s+"), " ")
             .trim()
 
+    private fun buildUserRecordSubtitleEnhanced(
+        rowText: String,
+        title: String,
+        route: PlayRoute?
+    ): String {
+        val metaText = rowText
+            .removePrefix(title)
+            .replace(title, "")
+            .replace(Regex("\\[\\d+-\\d+-\\d+]"), "")
+            .replace("继续观看", "")
+            .replace("查看详情", "")
+            .replace("删除", "")
+            .replace("重播", "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
+        return listOfNotNull(
+            route?.let(::formatHistoryRouteLabel),
+            metaText.takeIf { it.isNotBlank() }
+        ).joinToString(" | ")
+    }
+
+    private fun formatHistoryRouteLabel(route: PlayRoute): String {
+        val episodeNumber = route.nid.toIntOrNull()
+        val sourceNumber = route.sid.toIntOrNull()
+        return buildString {
+            if (sourceNumber != null && sourceNumber > 0) {
+                append("线路")
+                append(sourceNumber)
+            }
+            if (episodeNumber != null && episodeNumber > 0) {
+                if (isNotEmpty()) append(" · ")
+                append("第")
+                append(episodeNumber)
+                append("集")
+            }
+        }.ifBlank {
+            listOf(route.sid.takeIf { it.isNotBlank() }, route.nid.takeIf { it.isNotBlank() })
+                .joinToString(" - ")
+        }
+    }
+
     private fun parsePlayRoute(episodePageUrl: String): PlayRoute? {
         val normalized = resolveUrl(episodePageUrl)
-        val match = Regex("""/vodplay/[^/]+-(\d+)-(\d+)/?""")
+        val match = Regex("""/vodplay/[^/]+?-(\d+)-(\d+)(?:\.html)?/?(?:\?.*)?$""")
             .find(normalized)
             ?: return null
         return PlayRoute(
