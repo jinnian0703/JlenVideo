@@ -539,7 +539,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             accountState = accountState.copy(isContentLoading = true, error = null)
             runCatching {
-                withContext(Dispatchers.IO) { repository.loadHistoryPage(pageUrl) }
+                withContext(Dispatchers.IO) {
+                    repository.loadHistoryPage(pageUrl).let { page ->
+                        page.copy(items = repository.enrichHistoryItems(page.items))
+                    }
+                }
             }.onSuccess { page ->
                 accountState = accountState.copy(
                     isContentLoading = false,
@@ -609,7 +613,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         .distinctBy { item -> "${item.recordId}:${item.actionUrl}:${item.vodId}" }
 
     fun openHistoryRecord(item: UserCenterItem) {
-        if (item.vodId.isBlank()) {
+        val resolvedVodId = item.vodId.ifBlank {
+            Regex("""/vodplay/([^/]+?)-\d+-\d+(?:\.html)?/?(?:\?.*)?$""")
+                .find(item.playUrl.ifBlank { item.actionUrl })
+                ?.groupValues
+                ?.getOrNull(1)
+                .orEmpty()
+        }
+
+        if (resolvedVodId.isBlank()) {
+            openHistoryRecordDirectly(item)
+            return
+        }
+
+        if (false) {
             playerState = PlayerUiState(
                 title = item.title,
                 isResolving = false,
@@ -664,6 +681,90 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
+    }
+
+    fun resumeHistoryRecord(item: UserCenterItem) {
+        val resolvedVodId = item.vodId.ifBlank {
+            Regex("""/vodplay/([^/]+?)-\d+-\d+(?:\.html)?/?(?:\?.*)?$""")
+                .find(item.playUrl.ifBlank { item.actionUrl })
+                ?.groupValues
+                ?.getOrNull(1)
+                .orEmpty()
+        }
+
+        if (resolvedVodId.isBlank()) {
+            openHistoryRecordDirectly(item)
+            return
+        }
+
+        playerState = PlayerUiState(
+            title = item.title,
+            isResolving = true,
+            resolveError = null
+        )
+
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { repository.loadDetail(resolvedVodId) }
+            }.onSuccess { detailItem ->
+                if (detailItem == null) {
+                    openHistoryRecordDirectly(item)
+                    return@onSuccess
+                }
+
+                val sources = repository.parseSources(detailItem)
+                val safeSourceIndex = item.sourceIndex.coerceIn(0, (sources.lastIndex).coerceAtLeast(0))
+                val episodes = sources.getOrNull(safeSourceIndex)?.episodes.orEmpty()
+                val matchedEpisodeIndex = episodes.indexOfFirst { episode ->
+                    item.playUrl.isNotBlank() && episode.url == item.playUrl
+                }
+                val safeEpisodeIndex = when {
+                    matchedEpisodeIndex >= 0 -> matchedEpisodeIndex
+                    item.episodeIndex >= 0 -> item.episodeIndex.coerceIn(0, (episodes.lastIndex).coerceAtLeast(0))
+                    else -> 0
+                }
+
+                openPlayer(
+                    title = detailItem.displayTitle,
+                    item = detailItem,
+                    sources = sources,
+                    sourceIndex = safeSourceIndex,
+                    episodeIndex = safeEpisodeIndex
+                )
+            }.onFailure {
+                openHistoryRecordDirectly(item)
+            }
+        }
+    }
+
+    private fun openHistoryRecordDirectly(item: UserCenterItem) {
+        val resumeUrl = item.playUrl.ifBlank { item.actionUrl }
+        if (resumeUrl.isBlank()) {
+            playerState = PlayerUiState(
+                title = item.title,
+                isResolving = false,
+                resolveError = "无法恢复该条播放记录"
+            )
+            return
+        }
+
+        openPlayer(
+            title = item.title,
+            item = null,
+            sources = listOf(
+                PlaySource(
+                    name = item.sourceName.ifBlank { "继续观看" },
+                    episodes = listOf(
+                        Episode(
+                            name = item.subtitle.substringBefore("|").trim().ifBlank { "继续观看" },
+                            url = resumeUrl
+                        )
+                    )
+                )
+            ),
+            sourceIndex = 0,
+            episodeIndex = 0
+        )
     }
 
     fun loadDetail(vodId: String) {

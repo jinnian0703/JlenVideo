@@ -588,6 +588,7 @@ class AppleCmsRepository(
                     actionLabel = if (playAnchor != null) "继续观看" else "查看详情",
                     actionUrl = actionUrl,
                     playUrl = playUrl,
+                    sourceName = "",
                     sourceIndex = route?.sid?.toIntOrNull()?.minus(1) ?: -1,
                     episodeIndex = route?.nid?.toIntOrNull()?.minus(1) ?: -1
                 )
@@ -608,6 +609,34 @@ class AppleCmsRepository(
             items = items.distinctBy { "${it.recordId}:${it.actionUrl}" },
             nextPageUrl = nextPageUrl
         )
+    }
+
+    suspend fun enrichHistoryItems(items: List<UserCenterItem>): List<UserCenterItem> {
+        if (items.isEmpty()) return items
+
+        val sourceCache = mutableMapOf<String, List<PlaySource>>()
+
+        return items.map { item ->
+            val resolvedVodId = item.vodId.ifBlank {
+                extractVodIdFromUserUrl(item.playUrl.ifBlank { item.actionUrl })
+            }
+            if (resolvedVodId.isBlank() || item.sourceIndex < 0) {
+                return@map item.copy(vodId = resolvedVodId.ifBlank { item.vodId })
+            }
+
+            val sources = sourceCache.getOrPut(resolvedVodId) {
+                runCatching {
+                    loadDetail(resolvedVodId)?.let(::parseSources).orEmpty()
+                }.getOrDefault(emptyList())
+            }
+            val sourceName = sources.getOrNull(item.sourceIndex)?.name.orEmpty()
+
+            item.copy(
+                vodId = resolvedVodId,
+                sourceName = sourceName,
+                subtitle = replaceHistorySourceLabel(item.subtitle, sourceName)
+            )
+        }
     }
 
     private fun interleaveCategoryItems(responses: List<AppleCmsResponse>): List<VodItem> {
@@ -1189,6 +1218,16 @@ class AppleCmsRepository(
         }.ifBlank {
             listOf(route.sid.takeIf { it.isNotBlank() }, route.nid.takeIf { it.isNotBlank() })
                 .joinToString(" - ")
+        }
+    }
+
+    private fun replaceHistorySourceLabel(subtitle: String, sourceName: String): String {
+        if (subtitle.isBlank() || sourceName.isBlank()) return subtitle
+        val replaced = subtitle.replaceFirst(Regex("^线路\\d+"), sourceName)
+        return if (replaced == subtitle) {
+            "$sourceName | $subtitle"
+        } else {
+            replaced
         }
     }
 

@@ -127,7 +127,7 @@ fun JlenVideoApp() {
                                 onRefreshSection = viewModel::refreshSelectedAccountSection,
                                 onOpenDetail = { navController.navigate("detail/$it") },
                                 onOpenHistoryRecord = { item ->
-                                    viewModel.openHistoryRecord(item)
+                                    viewModel.resumeHistoryRecord(item)
                                     navController.navigate("player")
                                 },
                                 onLoadMoreFavorites = viewModel::loadMoreFavorites,
