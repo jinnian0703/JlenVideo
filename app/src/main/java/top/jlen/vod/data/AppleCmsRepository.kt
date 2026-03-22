@@ -232,8 +232,23 @@ class AppleCmsRepository(
         )
     }
 
-    suspend fun loadDetail(vodId: String): VodItem? =
-        parseDetail(fetchDocument("$baseUrl/voddetail/$vodId/"))
+    suspend fun loadDetail(vodId: String): VodItem? {
+        val normalizedId = vodId.trim()
+        if (normalizedId.isBlank()) return null
+
+        if (normalizedId.all(Char::isDigit)) {
+            val apiItem = runCatching {
+                api.getDetail(vodId = normalizedId)
+                    .list
+                    .firstOrNull()
+            }.getOrNull()
+            if (apiItem != null) {
+                return apiItem
+            }
+        }
+
+        return parseDetail(fetchDocument("$baseUrl/voddetail/$normalizedId/"))
+    }
 
     suspend fun resolvePlayUrl(playPageUrl: String): ResolvedPlayUrl {
         val normalizedPageUrl = resolveUrl(playPageUrl)
