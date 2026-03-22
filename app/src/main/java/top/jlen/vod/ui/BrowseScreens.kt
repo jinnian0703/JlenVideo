@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -42,8 +41,6 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,7 +52,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import kotlinx.coroutines.flow.distinctUntilChanged
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.VodItem
@@ -70,17 +66,11 @@ fun HomeScreen(
     onOpenSearch: () -> Unit
 ) {
     if (state.isLoading) {
-        LoadingPane("Loading home...")
+        LoadingPane("首页加载中...")
         return
     }
 
     val listState = rememberLazyListState()
-    AutoPagingEffect(
-        listState = listState,
-        hasMore = state.hasMoreLatest,
-        isLoading = state.isHomeAppending,
-        onLoadMore = onLoadMore
-    )
 
     LazyColumn(
         state = listState,
@@ -102,8 +92,8 @@ fun HomeScreen(
         if (state.featured.isNotEmpty()) {
             item {
                 SectionTitle(
-                    title = "Featured",
-                    action = "Refresh",
+                    title = "推荐",
+                    action = "刷新",
                     icon = {
                         Icon(
                             imageVector = Icons.Rounded.Whatshot,
@@ -128,15 +118,15 @@ fun HomeScreen(
         }
         item {
             SectionTitle(
-                title = "Latest",
-                action = "Open library",
+                title = "片库更新",
+                action = "进入片库",
                 onAction = onOpenCategory
             )
         }
         if (state.latest.isEmpty()) {
             item {
                 ErrorBanner(
-                    message = "No home content yet. Tap refresh and try again.",
+                    message = "首页暂时没有内容，点刷新再试试。",
                     onRetry = onRefresh
                 )
             }
@@ -151,8 +141,7 @@ fun HomeScreen(
                 LoadMoreFooter(
                     hasMore = state.hasMoreLatest,
                     isLoading = state.isHomeAppending,
-                    loadedCount = state.visibleLatest.size,
-                    totalCount = state.homeTotalCount
+                    onLoadMore = onLoadMore
                 )
             }
         }
@@ -167,12 +156,6 @@ fun CategoryScreen(
     onOpenDetail: (String) -> Unit
 ) {
     val listState = rememberLazyListState()
-    AutoPagingEffect(
-        listState = listState,
-        hasMore = state.hasMoreCategoryVideos,
-        isLoading = state.isCategoryAppending,
-        onLoadMore = onLoadMore
-    )
 
     LazyColumn(
         state = listState,
@@ -183,14 +166,14 @@ fun CategoryScreen(
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 Text(
-                    text = "Library",
+                    text = "片库",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold,
                     color = UiPalette.Ink
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Default shows all items first. Switch categories below.",
+                    text = "默认先显示全部分类，下方可以切换其他分类。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = UiPalette.TextSecondary
                 )
@@ -220,7 +203,7 @@ fun CategoryScreen(
         }
         item {
             SectionTitle(
-                title = state.selectedCategory?.typeName ?: "Category",
+                title = state.selectedCategory?.typeName ?: "分类",
                 action = null,
                 icon = {
                     Icon(
@@ -235,8 +218,8 @@ fun CategoryScreen(
         }
         item {
             when {
-                state.isCategoryLoading -> LoadingPane("Loading category...")
-                state.categoryVideos.isEmpty() -> EmptyPane("No content in this category yet")
+                state.isCategoryLoading -> LoadingPane("分类加载中...")
+                state.categoryVideos.isEmpty() -> EmptyPane("这个分类暂时没有内容")
                 else -> PosterGridSection(
                     items = state.visibleCategoryVideos,
                     onOpenDetail = onOpenDetail
@@ -248,34 +231,10 @@ fun CategoryScreen(
                 LoadMoreFooter(
                     hasMore = state.hasMoreCategoryVideos,
                     isLoading = state.isCategoryAppending,
-                    loadedCount = state.visibleCategoryVideos.size,
-                    totalCount = state.categoryTotalCount
+                    onLoadMore = onLoadMore
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun AutoPagingEffect(
-    listState: LazyListState,
-    hasMore: Boolean,
-    isLoading: Boolean,
-    onLoadMore: () -> Unit
-) {
-    LaunchedEffect(listState, hasMore, isLoading) {
-        snapshotFlow {
-            val layoutInfo = listState.layoutInfo
-            val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@snapshotFlow false
-            val totalItemsCount = layoutInfo.totalItemsCount
-            hasMore && !isLoading && totalItemsCount > 0 && lastVisibleIndex >= totalItemsCount - 2
-        }
-            .distinctUntilChanged()
-            .collect { shouldLoadMore ->
-                if (shouldLoadMore) {
-                    onLoadMore()
-                }
-            }
     }
 }
 
@@ -294,14 +253,14 @@ fun SearchScreen(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Search",
+            text = "搜索",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.ExtraBold,
             color = UiPalette.Ink
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Search the site catalog directly",
+            text = "直接搜索站内影片、剧集、综艺和动漫",
             style = MaterialTheme.typography.bodyMedium,
             color = UiPalette.TextSecondary
         )
@@ -325,21 +284,21 @@ fun SearchScreen(
                 focusedPlaceholderColor = UiPalette.TextMuted,
                 unfocusedPlaceholderColor = UiPalette.TextMuted
             ),
-            placeholder = { Text("Search movies, series, variety, anime") },
+            placeholder = { Text("输入影片名称开始搜索") },
             trailingIcon = {
                 TextButton(
                     onClick = onSearch,
                     colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
                 ) {
-                    Text("Search", fontWeight = FontWeight.Bold)
+                    Text("搜索", fontWeight = FontWeight.Bold)
                 }
             }
         )
         Spacer(modifier = Modifier.height(16.dp))
         when {
-            state.isLoading -> LoadingPane("Searching...")
+            state.isLoading -> LoadingPane("搜索中...")
             !state.error.isNullOrBlank() && state.results.isEmpty() -> ErrorBanner(message = state.error, onRetry = onSearch)
-            state.results.isEmpty() -> EmptyPane("Search results will appear here")
+            state.results.isEmpty() -> EmptyPane("搜索结果会显示在这里")
             else -> LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 contentPadding = PaddingValues(bottom = 24.dp)
@@ -372,7 +331,7 @@ private fun HomeTopBlock(
                     color = UiPalette.TextSecondary
                 )
                 Text(
-                    text = "Jlen Video",
+                    text = "Jlen 影视",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.ExtraBold,
                     color = UiPalette.Ink
@@ -402,11 +361,16 @@ private fun SearchDock(onClick: () -> Unit) {
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-
             Icon(
                 imageVector = Icons.Rounded.Search,
                 contentDescription = null,
                 tint = UiPalette.Accent
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "搜索影片、剧集、综艺、动漫",
+                style = MaterialTheme.typography.bodyMedium,
+                color = UiPalette.TextSecondary
             )
         }
     }
@@ -523,7 +487,7 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = item.subtitle.ifBlank { "In-app resource" },
+                    text = item.subtitle.ifBlank { "站内资源" },
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.86f),
                     maxLines = 2,
@@ -561,8 +525,7 @@ private fun PosterGridSection(items: List<VodItem>, onOpenDetail: (String) -> Un
 private fun LoadMoreFooter(
     hasMore: Boolean,
     isLoading: Boolean,
-    loadedCount: Int,
-    totalCount: Int
+    onLoadMore: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -571,7 +534,6 @@ private fun LoadMoreFooter(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        val remainingCount = (totalCount - loadedCount).coerceAtLeast(0)
         if (isLoading) {
             CircularProgressIndicator(
                 modifier = Modifier.size(22.dp),
@@ -579,25 +541,20 @@ private fun LoadMoreFooter(
                 color = UiPalette.Accent
             )
             Text(
-                text = "Loading next page...",
+                text = "正在加载...",
                 style = MaterialTheme.typography.bodySmall,
                 color = UiPalette.TextMuted
             )
         } else if (hasMore) {
-            Text(
-                text = "Scroll to the bottom to auto-load the next page",
-                style = MaterialTheme.typography.bodySmall,
-                color = UiPalette.Accent,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = "Remaining $remainingCount items",
-                style = MaterialTheme.typography.bodySmall,
-                color = UiPalette.TextMuted
-            )
+            TextButton(
+                onClick = onLoadMore,
+                colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
+            ) {
+                Text("继续加载", fontWeight = FontWeight.Bold)
+            }
         } else {
             Text(
-                text = "All items loaded",
+                text = "已经全部加载完了",
                 style = MaterialTheme.typography.bodySmall,
                 color = UiPalette.TextMuted
             )
@@ -649,7 +606,7 @@ private fun CompactPosterCard(
         )
         Spacer(modifier = Modifier.height(3.dp))
         Text(
-            text = item.subtitle.ifBlank { "In-app resource" },
+            text = item.subtitle.ifBlank { "站内资源" },
             style = MaterialTheme.typography.bodySmall,
             color = UiPalette.TextMuted,
             maxLines = 1,
@@ -691,7 +648,7 @@ private fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = item.subtitle.ifBlank { "In-app resource" },
+                    text = item.subtitle.ifBlank { "站内资源" },
                     style = MaterialTheme.typography.bodyMedium,
                     color = UiPalette.TextSecondary
                 )

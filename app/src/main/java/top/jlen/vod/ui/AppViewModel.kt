@@ -122,7 +122,7 @@ class AppViewModel : ViewModel() {
             homeState = homeState.copy(isHomeAppending = true, error = null)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.loadLatestPage(page = nextPage)
+                    repository.loadAllCategoryPage(page = nextPage)
                 }
             }.onSuccess { payload ->
                 val mergedLatest = (homeState.latest + payload.items).distinctBy { it.vodId }
@@ -163,7 +163,7 @@ class AppViewModel : ViewModel() {
                 homeState = homeState.copy(isCategoryAppending = true, error = null)
                 runCatching {
                     withContext(Dispatchers.IO) {
-                        repository.loadLatestPage(page = nextPage)
+                        repository.loadAllCategoryPage(page = nextPage)
                     }
                 }.onSuccess { payload ->
                     val mergedVideos = (homeState.categoryVideos + payload.items).distinctBy { it.vodId }
@@ -392,7 +392,7 @@ class AppViewModel : ViewModel() {
                     useWebPlayer = resolved.useWebPlayer,
                     resolveError = if (resolved.url.isBlank()) "解析播放地址失败" else null
                 )
-            }.onFailure { error ->
+            }.onFailure {
                 if (playerState.currentEpisode?.url != episodePageUrl) return@onFailure
                 playerState = playerState.copy(
                     isResolving = false,

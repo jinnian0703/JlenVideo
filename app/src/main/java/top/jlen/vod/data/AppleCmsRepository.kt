@@ -5,6 +5,9 @@ import android.util.Base64
 import java.io.IOException
 import java.net.URI
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -21,6 +24,7 @@ import top.jlen.vod.ui.PLAYER_DESKTOP_UA
 class AppleCmsRepository(
     private val client: OkHttpClient = createClient()
 ) {
+    private val allCategoryTypeIds = listOf("1", "2", "3", "4")
     private val baseUrl = BuildConfig.APPLE_CMS_BASE_URL.trimEnd('/')
     private val api: AppleCmsApi = Retrofit.Builder()
         .baseUrl("$baseUrl/")
@@ -29,33 +33,57 @@ class AppleCmsRepository(
         .build()
         .create(AppleCmsApi::class.java)
 
-    suspend fun loadHome(): HomePayload {
-        val latestResponse = api.getLatest(page = 1)
-        val latest = latestResponse.list.distinctBy { it.vodId }
+    suspend fun loadHome(): HomePayload = coroutineScope {
+        val latestDeferred = async { loadAllCategoryPage(page = 1) }
+        val categoriesDeferred = async {
+            runCatching { api.getCategories().categories }
+                .getOrDefault(emptyList())
+        }
+        val latestPage = latestDeferred.await()
+        val latest = latestPage.items
 
         if (latest.isEmpty()) {
             throw IOException("首页内容解析失败")
         }
 
-        val categories = latestResponse.categories
+        val categories = categoriesDeferred.await()
             .filter(::isBrowsableCategory)
             .distinctBy { it.typeId }
 
-        return HomePayload(
+        HomePayload(
             featured = latest.take(6),
             latest = latest,
             categories = categories,
             selectedCategory = categories.firstOrNull(),
             categoryVideos = latest,
-            latestPage = latestResponse.safePage,
-            latestPageCount = latestResponse.safePageCount,
-            latestTotal = latestResponse.safeTotal,
-            latestHasNextPage = latestResponse.hasNextPage
+            latestPage = latestPage.page,
+            latestPageCount = latestPage.pageCount,
+            latestTotal = latestPage.totalItems,
+            latestHasNextPage = latestPage.hasNextPage
         )
     }
 
     suspend fun loadByCategory(typeId: String): List<VodItem> =
         loadCategoryPage(typeId = typeId, page = 1).items
+
+    suspend fun loadAllCategoryPage(page: Int): PagedVodItems = coroutineScope {
+        val safePage = page.coerceAtLeast(1)
+        val responses = allCategoryTypeIds
+            .map { typeId ->
+                async { api.getByType(typeId = typeId, page = safePage) }
+            }
+            .awaitAll()
+
+        val mergedItems = interleaveCategoryItems(responses)
+        PagedVodItems(
+            items = mergedItems,
+            page = safePage,
+            pageCount = responses.maxOfOrNull { it.safePageCount } ?: safePage,
+            totalItems = responses.sumOf { it.safeTotal },
+            limit = responses.sumOf { it.safeLimit }.takeIf { it > 0 } ?: mergedItems.size,
+            hasNextPage = responses.any { it.hasNextPage }
+        )
+    }
 
     suspend fun loadLatestPage(page: Int): PagedVodItems =
         api.getLatest(page = page.coerceAtLeast(1)).toPagedVodItems()
@@ -210,11 +238,33 @@ class AppleCmsRepository(
             hasNextPage = hasNextPage
         )
 
+    private fun interleaveCategoryItems(responses: List<AppleCmsResponse>): List<VodItem> {
+        val buckets = responses.map { response ->
+            ArrayDeque(response.list.distinctBy { it.vodId })
+        }
+        val seenIds = LinkedHashSet<String>()
+        val mergedItems = mutableListOf<VodItem>()
+
+        while (buckets.any { it.isNotEmpty() }) {
+            buckets.forEach { bucket ->
+                while (bucket.isNotEmpty()) {
+                    val item = bucket.removeFirst()
+                    if (seenIds.add(item.vodId)) {
+                        mergedItems += item
+                        break
+                    }
+                }
+            }
+        }
+
+        return mergedItems
+    }
+
     private fun isBrowsableCategory(category: AppleCmsCategory): Boolean {
         val parentId = category.parentId.orEmpty()
         return category.typeId.isNotBlank() &&
             category.typeName.isNotBlank() &&
-            parentId in setOf("1", "2", "3", "4")
+            parentId in allCategoryTypeIds
     }
 
     private fun parseCategories(homeDocument: Document, mapDocument: Document?): List<AppleCmsCategory> {
