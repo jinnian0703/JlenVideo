@@ -29,6 +29,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Whatshot
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -36,6 +37,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -49,6 +51,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -305,6 +309,209 @@ fun SearchScreen(
             ) {
                 items(state.results) { item ->
                     ListCard(item = item, onClick = onOpenDetail)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AccountScreen(
+    state: AccountUiState,
+    onUserNameChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onLogin: () -> Unit,
+    onLogout: () -> Unit,
+    onRefresh: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
+    ) {
+        item {
+            Column {
+                Text(
+                    text = "我的",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Ink
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = if (state.session.isLoggedIn) {
+                        "当前账号已经登录，可以直接继续使用会员相关功能。"
+                    } else {
+                        "登录后可以同步站内账号状态和后续会员功能。"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = UiPalette.TextSecondary
+                )
+            }
+        }
+
+        state.error?.let { message ->
+            item { ErrorBanner(message = message, onRetry = onRefresh) }
+        }
+
+        if (state.session.isLoggedIn) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                    shape = RoundedCornerShape(24.dp),
+                    border = BorderStroke(1.dp, UiPalette.Border)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            if (state.session.portraitUrl.isNotBlank()) {
+                                AsyncImage(
+                                    model = state.session.portraitUrl,
+                                    contentDescription = state.session.userName,
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .clip(CircleShape)
+                                        .background(UiPalette.Accent.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = state.session.userName.take(1).ifBlank { "我" },
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = UiPalette.Accent
+                                    )
+                                }
+                            }
+
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = state.session.userName,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = UiPalette.Ink
+                                )
+                                Text(
+                                    text = state.session.groupName.ifBlank { "普通用户" },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = UiPalette.TextSecondary
+                                )
+                                if (state.session.userId.isNotBlank()) {
+                                    Text(
+                                        text = "用户 ID：${state.session.userId}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = UiPalette.TextMuted
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedButton(
+                                onClick = onRefresh,
+                                enabled = !state.isLoading,
+                                modifier = Modifier.weight(1f),
+                                border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                            ) {
+                                Text("刷新状态")
+                            }
+                            Button(
+                                onClick = onLogout,
+                                enabled = !state.isLoading,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = UiPalette.Accent,
+                                    contentColor = UiPalette.AccentText
+                                )
+                            ) {
+                                Text(if (state.isLoading) "正在退出..." else "退出登录")
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                    shape = RoundedCornerShape(24.dp),
+                    border = BorderStroke(1.dp, UiPalette.Border)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = state.userName,
+                            onValueChange = onUserNameChange,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(20.dp),
+                            singleLine = true,
+                            label = { Text("用户名") },
+                            placeholder = { Text("请输入站内用户名") },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = UiPalette.Accent,
+                                unfocusedBorderColor = UiPalette.BorderSoft,
+                                focusedTextColor = UiPalette.Ink,
+                                unfocusedTextColor = UiPalette.Ink,
+                                cursorColor = UiPalette.Accent,
+                                focusedContainerColor = UiPalette.Surface,
+                                unfocusedContainerColor = UiPalette.Surface
+                            )
+                        )
+                        OutlinedTextField(
+                            value = state.password,
+                            onValueChange = onPasswordChange,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(20.dp),
+                            singleLine = true,
+                            label = { Text("密码") },
+                            placeholder = { Text("请输入密码") },
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = KeyboardType.Password
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = UiPalette.Accent,
+                                unfocusedBorderColor = UiPalette.BorderSoft,
+                                focusedTextColor = UiPalette.Ink,
+                                unfocusedTextColor = UiPalette.Ink,
+                                cursorColor = UiPalette.Accent,
+                                focusedContainerColor = UiPalette.Surface,
+                                unfocusedContainerColor = UiPalette.Surface
+                            )
+                        )
+                        Button(
+                            onClick = onLogin,
+                            enabled = !state.isLoading,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = UiPalette.Accent,
+                                contentColor = UiPalette.AccentText
+                            )
+                        ) {
+                            Text(if (state.isLoading) "正在登录..." else "立即登录", fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
         }

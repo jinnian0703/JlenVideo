@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -58,7 +59,7 @@ fun JlenVideoApp() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-    val showBottomBar = currentRoute in setOf("home", "categories", "search")
+    val showBottomBar = currentRoute in setOf("home", "categories", "search", "account")
 
     MaterialTheme(colorScheme = appColors) {
         Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
@@ -114,6 +115,16 @@ fun JlenVideoApp() {
                                 onOpenDetail = { navController.navigate("detail/$it") }
                             )
                         }
+                        composable("account") {
+                            AccountScreen(
+                                state = viewModel.accountState,
+                                onUserNameChange = viewModel::updateLoginUserName,
+                                onPasswordChange = viewModel::updateLoginPassword,
+                                onLogin = viewModel::login,
+                                onLogout = viewModel::logout,
+                                onRefresh = viewModel::refreshAccount
+                            )
+                        }
                         composable(
                             route = "detail/{vodId}",
                             arguments = listOf(navArgument("vodId") { type = NavType.StringType })
@@ -160,7 +171,8 @@ private fun AppBottomBar(currentRoute: String, onNavigate: (String) -> Unit) {
     val items = listOf(
         Triple("home", "首页", Icons.Rounded.Home),
         Triple("categories", "片库", Icons.Rounded.Category),
-        Triple("search", "搜索", Icons.Rounded.Search)
+        Triple("search", "搜索", Icons.Rounded.Search),
+        Triple("account", "我的", Icons.Rounded.Person)
     )
 
     NavigationBar(

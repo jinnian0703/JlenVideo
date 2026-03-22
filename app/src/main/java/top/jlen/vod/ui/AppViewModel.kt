@@ -1,21 +1,23 @@
 package top.jlen.vod.ui
 
+import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.AppleCmsRepository
+import top.jlen.vod.data.AuthSession
 import top.jlen.vod.data.Episode
 import top.jlen.vod.data.PlaySource
 import top.jlen.vod.data.VodItem
 
-class AppViewModel : ViewModel() {
-    private val repository = AppleCmsRepository()
+class AppViewModel(application: Application) : AndroidViewModel(application) {
+    private val repository = AppleCmsRepository(application)
     private val allCategory = AppleCmsCategory(typeId = "__all__", typeName = "全部分类")
 
     var homeState by mutableStateOf(HomeUiState())
@@ -30,8 +32,18 @@ class AppViewModel : ViewModel() {
     var playerState by mutableStateOf(PlayerUiState())
         private set
 
+    var accountState by mutableStateOf(AccountUiState())
+        private set
+
     init {
+        refreshAccount()
         refreshHome()
+    }
+
+    fun refreshAccount() {
+        accountState = accountState.copy(
+            session = repository.currentSession()
+        )
     }
 
     fun refreshHome() {
@@ -251,6 +263,68 @@ class AppViewModel : ViewModel() {
         }
     }
 
+    fun updateLoginUserName(value: String) {
+        accountState = accountState.copy(userName = value)
+    }
+
+    fun updateLoginPassword(value: String) {
+        accountState = accountState.copy(password = value)
+    }
+
+    fun login() {
+        val userName = accountState.userName.trim()
+        val password = accountState.password
+        if (userName.isBlank()) {
+            accountState = accountState.copy(error = "请输入用户名")
+            return
+        }
+        if (password.isBlank()) {
+            accountState = accountState.copy(error = "请输入密码")
+            return
+        }
+
+        viewModelScope.launch {
+            accountState = accountState.copy(isLoading = true, error = null)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    repository.login(userName = userName, password = password)
+                }
+            }.onSuccess { session ->
+                accountState = accountState.copy(
+                    isLoading = false,
+                    session = session,
+                    password = "",
+                    error = null
+                )
+            }.onFailure { error ->
+                accountState = accountState.copy(
+                    isLoading = false,
+                    error = error.message ?: "登录失败"
+                )
+            }
+        }
+    }
+
+    fun logout() {
+        if (accountState.isLoading) return
+        viewModelScope.launch {
+            accountState = accountState.copy(isLoading = true, error = null)
+            runCatching {
+                withContext(Dispatchers.IO) { repository.logout() }
+            }.onSuccess {
+                accountState = AccountUiState(
+                    userName = accountState.userName,
+                    session = AuthSession()
+                )
+            }.onFailure { error ->
+                accountState = accountState.copy(
+                    isLoading = false,
+                    error = error.message ?: "退出登录失败"
+                )
+            }
+        }
+    }
+
     fun loadDetail(vodId: String) {
         if (detailState.item?.vodId == vodId && detailState.sources.isNotEmpty()) {
             return
@@ -444,6 +518,14 @@ data class SearchUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val results: List<VodItem> = emptyList()
+)
+
+data class AccountUiState(
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val userName: String = "",
+    val password: String = "",
+    val session: AuthSession = AuthSession()
 )
 
 data class DetailUiState(

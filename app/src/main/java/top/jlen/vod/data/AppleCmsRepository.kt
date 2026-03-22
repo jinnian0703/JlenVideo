@@ -1,7 +1,9 @@
 package top.jlen.vod.data
 
+import android.content.Context
 import android.net.Uri
 import android.util.Base64
+import com.google.gson.Gson
 import java.io.IOException
 import java.net.URI
 import java.util.concurrent.TimeUnit
@@ -22,10 +24,13 @@ import top.jlen.vod.BuildConfig
 import top.jlen.vod.ui.PLAYER_DESKTOP_UA
 
 class AppleCmsRepository(
-    private val client: OkHttpClient = createClient()
+    context: Context,
+    private val cookieJar: PersistentCookieJar = PersistentCookieJar(context),
+    private val client: OkHttpClient = createClient(cookieJar)
 ) {
     private val allCategoryTypeIds = listOf("1", "2", "3", "4")
     private val baseUrl = BuildConfig.APPLE_CMS_BASE_URL.trimEnd('/')
+    private val gson = Gson()
     private val api: AppleCmsApi = Retrofit.Builder()
         .baseUrl("$baseUrl/")
         .client(client)
@@ -96,6 +101,71 @@ class AppleCmsRepository(
             .list
             .distinctBy { it.vodId }
             .take(60)
+    }
+
+    fun currentSession(): AuthSession {
+        val cookies = cookieJar.snapshot()
+        val userId = cookies.firstCookieValue("user_id")
+        val userName = cookies.firstCookieValue("user_name")
+        val groupName = cookies.firstCookieValue("group_name")
+        val portraitUrl = cookies.firstCookieValue("user_portrait")
+
+        return AuthSession(
+            isLoggedIn = userId.isNotBlank() && userName.isNotBlank(),
+            userId = userId,
+            userName = userName,
+            groupName = groupName,
+            portraitUrl = normalizePortraitUrl(portraitUrl)
+        )
+    }
+
+    suspend fun login(userName: String, password: String): AuthSession {
+        val payload = FormBody.Builder()
+            .add("user_name", userName.trim())
+            .add("user_pwd", password)
+            .build()
+        val request = Request.Builder()
+            .url("$baseUrl/index.php/user/login")
+            .header("Referer", "$baseUrl/index.php/user/login.html")
+            .header("X-Requested-With", "XMLHttpRequest")
+            .post(payload)
+            .build()
+
+        val response = client.newCall(request).execute()
+        response.use {
+            if (!it.isSuccessful) {
+                throw IOException("登录失败：HTTP ${it.code}")
+            }
+            val body = it.body?.string().orEmpty()
+            val authResponse = runCatching {
+                gson.fromJson(body, AuthResponse::class.java)
+            }.getOrNull()
+
+            val session = currentSession()
+            if (session.isLoggedIn) {
+                return session
+            }
+
+            throw IOException(
+                authResponse?.msg?.takeIf(String::isNotBlank)
+                    ?: "登录失败，请检查账号或密码"
+            )
+        }
+    }
+
+    suspend fun logout() {
+        val request = Request.Builder()
+            .url("$baseUrl/index.php/user/logout")
+            .header("Referer", "$baseUrl/index.php/user")
+            .post(FormBody.Builder().build())
+            .build()
+
+        client.newCall(request).execute().use {
+            if (!it.isSuccessful && it.code != 302) {
+                throw IOException("退出登录失败：HTTP ${it.code}")
+            }
+        }
+        cookieJar.clear()
     }
 
     suspend fun loadDetail(vodId: String): VodItem? =
@@ -588,8 +658,21 @@ class AppleCmsRepository(
             lower.contains("/index.m3u8")
     }
 
+    private fun List<okhttp3.Cookie>.firstCookieValue(name: String): String =
+        firstOrNull { it.name == name }
+            ?.value
+            .orEmpty()
+            .takeUnless { it == "deleted" }
+            .orEmpty()
+
+    private fun normalizePortraitUrl(raw: String): String {
+        val value = raw.trim()
+        if (value.isBlank() || value == "deleted") return ""
+        return normalizeUrl(value)
+    }
+
     companion object {
-        private fun createClient(): OkHttpClient {
+        private fun createClient(cookieJar: PersistentCookieJar): OkHttpClient {
             val logging = HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BASIC
             }
@@ -599,6 +682,7 @@ class AppleCmsRepository(
                 .readTimeout(20, TimeUnit.SECONDS)
                 .writeTimeout(20, TimeUnit.SECONDS)
                 .protocols(listOf(Protocol.HTTP_1_1))
+                .cookieJar(cookieJar)
                 .addInterceptor(logging)
                 .build()
         }

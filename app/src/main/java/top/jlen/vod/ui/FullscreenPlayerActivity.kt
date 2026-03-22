@@ -30,7 +30,7 @@ import kotlinx.coroutines.withContext
 import top.jlen.vod.data.AppleCmsRepository
 
 class FullscreenPlayerActivity : ComponentActivity() {
-    private val repository = AppleCmsRepository()
+    private val repository by lazy { AppleCmsRepository(applicationContext) }
     private var latestSnapshot: PlaybackSnapshot = PlaybackSnapshot()
     private var currentEpisodeIndex by mutableIntStateOf(0)
     private var currentResolvedUrl by mutableStateOf("")

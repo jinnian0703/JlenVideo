@@ -127,3 +127,18 @@ data class Episode(
     val name: String,
     val url: String
 )
+
+data class AuthResponse(
+    @SerializedName("code") val code: Int = 0,
+    @SerializedName("msg") val msg: String = "",
+    @SerializedName("url") val url: String? = null,
+    @SerializedName("wait") val wait: Int? = null
+)
+
+data class AuthSession(
+    val isLoggedIn: Boolean = false,
+    val userId: String = "",
+    val userName: String = "",
+    val groupName: String = "",
+    val portraitUrl: String = ""
+)
