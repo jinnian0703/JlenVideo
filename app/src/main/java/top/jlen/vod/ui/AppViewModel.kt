@@ -14,9 +14,6 @@ import top.jlen.vod.data.Episode
 import top.jlen.vod.data.PlaySource
 import top.jlen.vod.data.VodItem
 
-private const val HOME_BATCH_SIZE = 18
-private const val CATEGORY_BATCH_SIZE = 18
-
 class AppViewModel : ViewModel() {
     private val repository = AppleCmsRepository()
     private val allCategory = AppleCmsCategory(typeId = "__all__", typeName = "全部分类")
@@ -50,12 +47,14 @@ class AppViewModel : ViewModel() {
                     latest = payload.latest,
                     homeVisibleCount = payload.latest.size,
                     homePage = payload.latestPage,
+                    homeTotalCount = payload.latestTotal,
                     hasMoreHomePages = payload.latestHasNextPage,
                     categories = categories,
                     selectedCategory = allCategory,
                     categoryVideos = payload.latest,
                     categoryVisibleCount = payload.latest.size,
                     categoryPage = payload.latestPage,
+                    categoryTotalCount = payload.latestTotal,
                     hasMoreCategoryPages = payload.latestHasNextPage
                 )
             }.onFailure { error ->
@@ -74,6 +73,7 @@ class AppViewModel : ViewModel() {
                 categoryVideos = homeState.latest,
                 categoryVisibleCount = homeState.latest.size,
                 categoryPage = homeState.homePage,
+                categoryTotalCount = homeState.homeTotalCount,
                 hasMoreCategoryPages = homeState.hasMoreHomePages,
                 isCategoryAppending = false,
                 isCategoryLoading = false,
@@ -98,6 +98,7 @@ class AppViewModel : ViewModel() {
                     categoryVideos = payload.items,
                     categoryVisibleCount = payload.items.size,
                     categoryPage = payload.page,
+                    categoryTotalCount = payload.totalItems,
                     hasMoreCategoryPages = payload.hasNextPage,
                     isCategoryAppending = false,
                     isCategoryLoading = false
@@ -116,14 +117,12 @@ class AppViewModel : ViewModel() {
         if (homeState.isHomeAppending || !homeState.hasMoreHomePages) {
             return
         }
-        val feedCategories = homeState.categories.filterNot { it.typeId == allCategory.typeId }
-        if (feedCategories.isEmpty()) return
         viewModelScope.launch {
             val nextPage = homeState.homePage + 1
             homeState = homeState.copy(isHomeAppending = true, error = null)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.loadAggregateCategoryPage(feedCategories, page = nextPage)
+                    repository.loadLatestPage(page = nextPage)
                 }
             }.onSuccess { payload ->
                 val mergedLatest = (homeState.latest + payload.items).distinctBy { it.vodId }
@@ -132,6 +131,7 @@ class AppViewModel : ViewModel() {
                     latest = mergedLatest,
                     homeVisibleCount = mergedLatest.size,
                     homePage = payload.page,
+                    homeTotalCount = payload.totalItems,
                     hasMoreHomePages = payload.hasNextPage,
                     categoryVideos = if (selectedAll) mergedLatest else homeState.categoryVideos,
                     categoryVisibleCount = if (selectedAll) {
@@ -140,6 +140,7 @@ class AppViewModel : ViewModel() {
                         homeState.categoryVisibleCount
                     },
                     categoryPage = if (selectedAll) payload.page else homeState.categoryPage,
+                    categoryTotalCount = if (selectedAll) payload.totalItems else homeState.categoryTotalCount,
                     hasMoreCategoryPages = if (selectedAll) payload.hasNextPage else homeState.hasMoreCategoryPages,
                     isHomeAppending = false
                 )
@@ -157,14 +158,12 @@ class AppViewModel : ViewModel() {
             if (homeState.isCategoryAppending || !homeState.hasMoreCategoryPages) {
                 return
             }
-            val feedCategories = homeState.categories.filterNot { it.typeId == allCategory.typeId }
-            if (feedCategories.isEmpty()) return
             viewModelScope.launch {
                 val nextPage = homeState.categoryPage + 1
                 homeState = homeState.copy(isCategoryAppending = true, error = null)
                 runCatching {
                     withContext(Dispatchers.IO) {
-                        repository.loadAggregateCategoryPage(feedCategories, page = nextPage)
+                        repository.loadLatestPage(page = nextPage)
                     }
                 }.onSuccess { payload ->
                     val mergedVideos = (homeState.categoryVideos + payload.items).distinctBy { it.vodId }
@@ -172,10 +171,12 @@ class AppViewModel : ViewModel() {
                         latest = mergedVideos,
                         homeVisibleCount = mergedVideos.size,
                         homePage = payload.page,
+                        homeTotalCount = payload.totalItems,
                         hasMoreHomePages = payload.hasNextPage,
                         categoryVideos = mergedVideos,
                         categoryVisibleCount = mergedVideos.size,
                         categoryPage = payload.page,
+                        categoryTotalCount = payload.totalItems,
                         hasMoreCategoryPages = payload.hasNextPage,
                         isCategoryAppending = false
                     )
@@ -205,6 +206,7 @@ class AppViewModel : ViewModel() {
                     categoryVideos = mergedVideos,
                     categoryVisibleCount = mergedVideos.size,
                     categoryPage = payload.page,
+                    categoryTotalCount = payload.totalItems,
                     hasMoreCategoryPages = payload.hasNextPage,
                     isCategoryAppending = false
                 )
@@ -402,10 +404,6 @@ class AppViewModel : ViewModel() {
         }
     }
 
-    private fun initialVisibleCount(totalSize: Int, batchSize: Int): Int {
-        if (totalSize <= 0) return 0
-        return totalSize.coerceAtMost(batchSize)
-    }
 }
 
 data class HomeUiState(
@@ -418,12 +416,14 @@ data class HomeUiState(
     val latest: List<VodItem> = emptyList(),
     val homeVisibleCount: Int = 0,
     val homePage: Int = 1,
+    val homeTotalCount: Int = 0,
     val hasMoreHomePages: Boolean = false,
     val categories: List<AppleCmsCategory> = emptyList(),
     val selectedCategory: AppleCmsCategory? = null,
     val categoryVideos: List<VodItem> = emptyList(),
     val categoryVisibleCount: Int = 0,
     val categoryPage: Int = 1,
+    val categoryTotalCount: Int = 0,
     val hasMoreCategoryPages: Boolean = false
 ) {
     val visibleLatest: List<VodItem>

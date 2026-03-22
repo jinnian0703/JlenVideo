@@ -16,8 +16,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,6 +33,7 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +42,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import kotlinx.coroutines.flow.distinctUntilChanged
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.VodItem
@@ -64,11 +70,20 @@ fun HomeScreen(
     onOpenSearch: () -> Unit
 ) {
     if (state.isLoading) {
-        LoadingPane("正在加载首页...")
+        LoadingPane("Loading home...")
         return
     }
 
+    val listState = rememberLazyListState()
+    AutoPagingEffect(
+        listState = listState,
+        hasMore = state.hasMoreLatest,
+        isLoading = state.isHomeAppending,
+        onLoadMore = onLoadMore
+    )
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
@@ -87,8 +102,8 @@ fun HomeScreen(
         if (state.featured.isNotEmpty()) {
             item {
                 SectionTitle(
-                    title = "热门推荐",
-                    action = "刷新",
+                    title = "Featured",
+                    action = "Refresh",
                     icon = {
                         Icon(
                             imageVector = Icons.Rounded.Whatshot,
@@ -113,15 +128,15 @@ fun HomeScreen(
         }
         item {
             SectionTitle(
-                title = "最新上架",
-                action = "进入片库",
+                title = "Latest",
+                action = "Open library",
                 onAction = onOpenCategory
             )
         }
         if (state.latest.isEmpty()) {
             item {
                 ErrorBanner(
-                    message = "当前没有加载到首页内容，点刷新再试一次。",
+                    message = "No home content yet. Tap refresh and try again.",
                     onRetry = onRefresh
                 )
             }
@@ -136,7 +151,8 @@ fun HomeScreen(
                 LoadMoreFooter(
                     hasMore = state.hasMoreLatest,
                     isLoading = state.isHomeAppending,
-                    onLoadMore = onLoadMore
+                    loadedCount = state.visibleLatest.size,
+                    totalCount = state.homeTotalCount
                 )
             }
         }
@@ -150,7 +166,16 @@ fun CategoryScreen(
     onLoadMore: () -> Unit,
     onOpenDetail: (String) -> Unit
 ) {
+    val listState = rememberLazyListState()
+    AutoPagingEffect(
+        listState = listState,
+        hasMore = state.hasMoreCategoryVideos,
+        isLoading = state.isCategoryAppending,
+        onLoadMore = onLoadMore
+    )
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -158,14 +183,14 @@ fun CategoryScreen(
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 Text(
-                    text = "片库",
+                    text = "Library",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold,
                     color = UiPalette.Ink
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "默认先显示全部分类，再按频道切换浏览",
+                    text = "Default shows all items first. Switch categories below.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = UiPalette.TextSecondary
                 )
@@ -195,7 +220,7 @@ fun CategoryScreen(
         }
         item {
             SectionTitle(
-                title = state.selectedCategory?.typeName ?: "分类",
+                title = state.selectedCategory?.typeName ?: "Category",
                 action = null,
                 icon = {
                     Icon(
@@ -210,8 +235,8 @@ fun CategoryScreen(
         }
         item {
             when {
-                state.isCategoryLoading -> LoadingPane("正在切换分类...")
-                state.categoryVideos.isEmpty() -> EmptyPane("这个分类暂时没有内容")
+                state.isCategoryLoading -> LoadingPane("Loading category...")
+                state.categoryVideos.isEmpty() -> EmptyPane("No content in this category yet")
                 else -> PosterGridSection(
                     items = state.visibleCategoryVideos,
                     onOpenDetail = onOpenDetail
@@ -223,10 +248,34 @@ fun CategoryScreen(
                 LoadMoreFooter(
                     hasMore = state.hasMoreCategoryVideos,
                     isLoading = state.isCategoryAppending,
-                    onLoadMore = onLoadMore
+                    loadedCount = state.visibleCategoryVideos.size,
+                    totalCount = state.categoryTotalCount
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun AutoPagingEffect(
+    listState: LazyListState,
+    hasMore: Boolean,
+    isLoading: Boolean,
+    onLoadMore: () -> Unit
+) {
+    LaunchedEffect(listState, hasMore, isLoading) {
+        snapshotFlow {
+            val layoutInfo = listState.layoutInfo
+            val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@snapshotFlow false
+            val totalItemsCount = layoutInfo.totalItemsCount
+            hasMore && !isLoading && totalItemsCount > 0 && lastVisibleIndex >= totalItemsCount - 2
+        }
+            .distinctUntilChanged()
+            .collect { shouldLoadMore ->
+                if (shouldLoadMore) {
+                    onLoadMore()
+                }
+            }
     }
 }
 
@@ -245,14 +294,14 @@ fun SearchScreen(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "搜索",
+            text = "Search",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.ExtraBold,
             color = UiPalette.Ink
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "直接搜索站内影片资源",
+            text = "Search the site catalog directly",
             style = MaterialTheme.typography.bodyMedium,
             color = UiPalette.TextSecondary
         )
@@ -276,21 +325,21 @@ fun SearchScreen(
                 focusedPlaceholderColor = UiPalette.TextMuted,
                 unfocusedPlaceholderColor = UiPalette.TextMuted
             ),
-            placeholder = { Text("输入电影、电视剧、综艺、动漫名称") },
+            placeholder = { Text("Search movies, series, variety, anime") },
             trailingIcon = {
                 TextButton(
                     onClick = onSearch,
                     colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
                 ) {
-                    Text("搜索", fontWeight = FontWeight.Bold)
+                    Text("Search", fontWeight = FontWeight.Bold)
                 }
             }
         )
         Spacer(modifier = Modifier.height(16.dp))
         when {
-            state.isLoading -> LoadingPane("正在搜索...")
+            state.isLoading -> LoadingPane("Searching...")
             !state.error.isNullOrBlank() && state.results.isEmpty() -> ErrorBanner(message = state.error, onRetry = onSearch)
-            state.results.isEmpty() -> EmptyPane("搜索结果会显示在这里")
+            state.results.isEmpty() -> EmptyPane("Search results will appear here")
             else -> LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 contentPadding = PaddingValues(bottom = 24.dp)
@@ -323,7 +372,7 @@ private fun HomeTopBlock(
                     color = UiPalette.TextSecondary
                 )
                 Text(
-                    text = "堇年影视",
+                    text = "Jlen Video",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.ExtraBold,
                     color = UiPalette.Ink
@@ -353,13 +402,7 @@ private fun SearchDock(onClick: () -> Unit) {
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (false) {
-                Text(
-                text = "搜索电影、电视剧、综艺、动漫",
-                color = UiPalette.TextMuted,
-                modifier = Modifier.weight(1f)
-                )
-            }
+
             Icon(
                 imageVector = Icons.Rounded.Search,
                 contentDescription = null,
@@ -480,7 +523,7 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = item.subtitle.ifBlank { "站内资源" },
+                    text = item.subtitle.ifBlank { "In-app resource" },
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.86f),
                     maxLines = 2,
@@ -518,7 +561,8 @@ private fun PosterGridSection(items: List<VodItem>, onOpenDetail: (String) -> Un
 private fun LoadMoreFooter(
     hasMore: Boolean,
     isLoading: Boolean,
-    onLoadMore: () -> Unit
+    loadedCount: Int,
+    totalCount: Int
 ) {
     Column(
         modifier = Modifier
@@ -527,23 +571,33 @@ private fun LoadMoreFooter(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        val remainingCount = 0
-        if (hasMore) {
-            TextButton(
-                onClick = onLoadMore,
-                enabled = !isLoading,
-                colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
-            ) {
-                Text("继续加载", fontWeight = FontWeight.Bold)
-            }
+        val remainingCount = (totalCount - loadedCount).coerceAtLeast(0)
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(22.dp),
+                strokeWidth = 2.5.dp,
+                color = UiPalette.Accent
+            )
             Text(
-                text = "还有 $remainingCount 条内容",
+                text = "Loading next page...",
+                style = MaterialTheme.typography.bodySmall,
+                color = UiPalette.TextMuted
+            )
+        } else if (hasMore) {
+            Text(
+                text = "Scroll to the bottom to auto-load the next page",
+                style = MaterialTheme.typography.bodySmall,
+                color = UiPalette.Accent,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = "Remaining $remainingCount items",
                 style = MaterialTheme.typography.bodySmall,
                 color = UiPalette.TextMuted
             )
         } else {
             Text(
-                text = "已经全部加载完了",
+                text = "All items loaded",
                 style = MaterialTheme.typography.bodySmall,
                 color = UiPalette.TextMuted
             )
@@ -595,7 +649,7 @@ private fun CompactPosterCard(
         )
         Spacer(modifier = Modifier.height(3.dp))
         Text(
-            text = item.subtitle.ifBlank { "站内资源" },
+            text = item.subtitle.ifBlank { "In-app resource" },
             style = MaterialTheme.typography.bodySmall,
             color = UiPalette.TextMuted,
             maxLines = 1,
@@ -637,7 +691,7 @@ private fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = item.subtitle.ifBlank { "站内资源" },
+                    text = item.subtitle.ifBlank { "In-app resource" },
                     style = MaterialTheme.typography.bodyMedium,
                     color = UiPalette.TextSecondary
                 )

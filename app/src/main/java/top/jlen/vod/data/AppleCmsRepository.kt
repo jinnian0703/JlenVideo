@@ -5,9 +5,6 @@ import android.util.Base64
 import java.io.IOException
 import java.net.URI
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -16,6 +13,8 @@ import okhttp3.logging.HttpLoggingInterceptor
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.ui.PLAYER_DESKTOP_UA
 
@@ -23,83 +22,52 @@ class AppleCmsRepository(
     private val client: OkHttpClient = createClient()
 ) {
     private val baseUrl = BuildConfig.APPLE_CMS_BASE_URL.trimEnd('/')
+    private val api: AppleCmsApi = Retrofit.Builder()
+        .baseUrl("$baseUrl/")
+        .client(client)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+        .create(AppleCmsApi::class.java)
 
-    suspend fun loadHome(): HomePayload = coroutineScope {
-        val homeDocument = fetchDocument("$baseUrl/")
-        val mapDocument = runCatching {
-            async { fetchDocument("$baseUrl/map/") }.await()
-        }.getOrNull()
-        val latestDocument = runCatching {
-            async { fetchDocument("$baseUrl/label/new/") }.await()
-        }.getOrNull()
+    suspend fun loadHome(): HomePayload {
+        val latestResponse = api.getLatest(page = 1)
+        val latest = latestResponse.list.distinctBy { it.vodId }
 
-        val categories = parseCategories(homeDocument, mapDocument)
-        val aggregatePage = categories.takeIf { it.isNotEmpty() }?.let {
-            runCatching { async { loadAggregateCategoryPage(it, page = 1) }.await() }.getOrNull()
-        }
-        val featured = parseBannerItems(homeDocument)
-        val latest = aggregatePage?.items.orEmpty()
-            .ifEmpty { latestDocument?.let(::parseLatestItems).orEmpty() }
-            .ifEmpty { parseVodCards(homeDocument) }
-            .ifEmpty { mapDocument?.let(::parseVodCards).orEmpty() }
-
-        if (featured.isEmpty() && latest.isEmpty()) {
+        if (latest.isEmpty()) {
             throw IOException("首页内容解析失败")
         }
 
-        HomePayload(
-            featured = featured.take(6),
+        val categories = latestResponse.categories
+            .filter(::isBrowsableCategory)
+            .distinctBy { it.typeId }
+
+        return HomePayload(
+            featured = latest.take(6),
             latest = latest,
             categories = categories,
             selectedCategory = categories.firstOrNull(),
             categoryVideos = latest,
-            latestPage = aggregatePage?.page ?: 1,
-            latestHasNextPage = aggregatePage?.hasNextPage == true
+            latestPage = latestResponse.safePage,
+            latestPageCount = latestResponse.safePageCount,
+            latestTotal = latestResponse.safeTotal,
+            latestHasNextPage = latestResponse.hasNextPage
         )
     }
 
     suspend fun loadByCategory(typeId: String): List<VodItem> =
         loadCategoryPage(typeId = typeId, page = 1).items
 
-    suspend fun loadCategoryPage(typeId: String, page: Int): PagedVodItems {
-        val safePage = page.coerceAtLeast(1)
-        val categorySlug = extractCategorySlug(typeId)
-        val document = fetchDocument(buildCategoryPageUrl(categorySlug, safePage))
-        val items = parseVodCards(document)
-        return PagedVodItems(
-            items = items,
-            page = safePage,
-            hasNextPage = hasCategoryNextPage(document, categorySlug, safePage)
-        )
-    }
+    suspend fun loadLatestPage(page: Int): PagedVodItems =
+        api.getLatest(page = page.coerceAtLeast(1)).toPagedVodItems()
 
-    suspend fun loadAggregateCategoryPage(categories: List<AppleCmsCategory>, page: Int): PagedVodItems =
-        coroutineScope {
-            val safePage = page.coerceAtLeast(1)
-            val pageResults = categories
-                .distinctBy { it.typeId }
-                .map { category ->
-                    async {
-                        runCatching { loadCategoryPage(category.typeId, safePage) }.getOrNull()
-                    }
-                }
-                .awaitAll()
-                .filterNotNull()
-
-            PagedVodItems(
-                items = pageResults.flatMap { it.items }.distinctBy { it.vodId },
-                page = safePage,
-                hasNextPage = pageResults.any { it.hasNextPage }
-            )
-        }
+    suspend fun loadCategoryPage(typeId: String, page: Int): PagedVodItems =
+        api.getByType(typeId = typeId, page = page.coerceAtLeast(1)).toPagedVodItems()
 
     suspend fun search(keyword: String): List<VodItem> {
-        val body = FormBody.Builder()
-            .add("wd", keyword.trim())
-            .build()
-        return parseSearchResults(
-            fetchDocument("$baseUrl/vodsearch/-------------/", body)
-        ).take(60)
+        return api.search(keyword = keyword.trim())
+            .list
+            .distinctBy { it.vodId }
+            .take(60)
     }
 
     suspend fun loadDetail(vodId: String): VodItem? =
@@ -231,6 +199,23 @@ class AppleCmsRepository(
                 )
             }
             .distinctBy { it.vodId }
+
+    private fun AppleCmsResponse.toPagedVodItems(): PagedVodItems =
+        PagedVodItems(
+            items = list.distinctBy { it.vodId },
+            page = safePage,
+            pageCount = safePageCount,
+            totalItems = safeTotal,
+            limit = safeLimit,
+            hasNextPage = hasNextPage
+        )
+
+    private fun isBrowsableCategory(category: AppleCmsCategory): Boolean {
+        val parentId = category.parentId.orEmpty()
+        return category.typeId.isNotBlank() &&
+            category.typeName.isNotBlank() &&
+            parentId in setOf("1", "2", "3", "4")
+    }
 
     private fun parseCategories(homeDocument: Document, mapDocument: Document?): List<AppleCmsCategory> {
         val homeCategories = homeDocument.select(".clist-left-tabs-title[href*=/vodtype/]")
@@ -577,12 +562,17 @@ data class HomePayload(
     val selectedCategory: AppleCmsCategory?,
     val categoryVideos: List<VodItem>,
     val latestPage: Int,
+    val latestPageCount: Int,
+    val latestTotal: Int,
     val latestHasNextPage: Boolean
 )
 
 data class PagedVodItems(
     val items: List<VodItem>,
     val page: Int,
+    val pageCount: Int,
+    val totalItems: Int,
+    val limit: Int,
     val hasNextPage: Boolean
 )
 

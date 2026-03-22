@@ -4,9 +4,30 @@ import androidx.core.text.HtmlCompat
 import com.google.gson.annotations.SerializedName
 
 data class AppleCmsResponse(
+    @SerializedName("code") val code: Int = 0,
+    @SerializedName("msg") val message: String = "",
+    @SerializedName("page") val page: Int = 1,
+    @SerializedName("pagecount") val pageCount: Int = 1,
+    @SerializedName("limit") val limit: Int = 0,
+    @SerializedName("total") val total: Int = 0,
     @SerializedName("class") val categories: List<AppleCmsCategory> = emptyList(),
     @SerializedName("list") val list: List<VodItem> = emptyList()
-)
+) {
+    val safePage: Int
+        get() = page.coerceAtLeast(1)
+
+    val safePageCount: Int
+        get() = pageCount.coerceAtLeast(safePage)
+
+    val safeLimit: Int
+        get() = limit.coerceAtLeast(0)
+
+    val safeTotal: Int
+        get() = total.coerceAtLeast(list.size)
+
+    val hasNextPage: Boolean
+        get() = safePage < safePageCount
+}
 
 data class AppleCmsCategory(
     @SerializedName("type_id") val typeId: String = "",
