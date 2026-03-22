@@ -50,9 +50,11 @@ class AppleCmsRepository(
         }
 
         val categories = defaultCategories
+        val featured = runCatching { loadFeaturedFromHomePage() }
+            .getOrDefault(emptyList())
 
         return HomePayload(
-            featured = latest.take(6),
+            featured = featured.ifEmpty { latest.take(6) },
             latest = latest,
             categories = categories,
             selectedCategory = categories.firstOrNull(),
@@ -310,6 +312,19 @@ class AppleCmsRepository(
         }
     }
 
+    private suspend fun loadFeaturedFromHomePage(): List<VodItem> {
+        val document = fetchDocument("$baseUrl/")
+        val hotItems = document.select(".slide-list.vod-list, .slide-list")
+            .asSequence()
+            .map { section -> parseVodCards(section) }
+            .firstOrNull { items -> items.isNotEmpty() }
+            .orEmpty()
+
+        return (parseBannerItems(document) + hotItems)
+            .distinctBy { it.vodId }
+            .take(12)
+    }
+
     private fun parseBannerItems(document: Document): List<VodItem> =
         document.select(".banner-box a.swiper-slide[href*=/voddetail/]")
             .mapNotNull { element ->
@@ -324,8 +339,8 @@ class AppleCmsRepository(
             }
             .distinctBy { it.vodId }
 
-    private fun parseVodCards(document: Document): List<VodItem> =
-        document.select("div.pic")
+    private fun parseVodCards(root: Element): List<VodItem> =
+        root.select("div.pic")
             .mapNotNull { card ->
                 val detailAnchor = card.selectFirst("a[href*=/voddetail/]") ?: return@mapNotNull null
                 val container: Element = card.parent() ?: card
