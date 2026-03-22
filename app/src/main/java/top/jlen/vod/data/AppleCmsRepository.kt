@@ -6,6 +6,8 @@ import android.util.Base64
 import com.google.gson.Gson
 import java.io.IOException
 import java.net.URI
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
@@ -54,7 +56,7 @@ class AppleCmsRepository(
             .getOrDefault(emptyList())
 
         return HomePayload(
-            featured = featured.ifEmpty { latest.take(6) },
+            featured = featured,
             latest = latest,
             categories = categories,
             selectedCategory = categories.firstOrNull(),
@@ -109,8 +111,8 @@ class AppleCmsRepository(
         return AuthSession(
             isLoggedIn = userId.isNotBlank() && userName.isNotBlank(),
             userId = userId,
-            userName = userName,
-            groupName = groupName,
+            userName = decodeSiteText(userName),
+            groupName = decodeSiteText(groupName),
             portraitUrl = normalizePortraitUrl(portraitUrl)
         )
     }
@@ -166,6 +168,8 @@ class AppleCmsRepository(
 
     suspend fun loadUserProfile(): UserProfilePage {
         val document = fetchUserDocument("/index.php/user/index.html")
+        return UserProfilePage(fields = parseUserProfileFields(document))
+        /*
         return UserProfilePage(
             fields = listOfNotNull(
                 readLabeledValue(document, "用户名"),
@@ -178,6 +182,8 @@ class AppleCmsRepository(
         )
     }
 
+        */
+    }
     suspend fun loadFavoritePage(pageUrl: String? = null): UserCenterPage =
         parseUserCenterPage(
             document = fetchUserDocument(pageUrl ?: "/index.php/user/favs.html")
@@ -190,6 +196,29 @@ class AppleCmsRepository(
 
     suspend fun loadMembershipPage(): MembershipPage {
         val document = fetchUserDocument("/index.php/user/upgrade.html")
+        val infoMap = extractLabeledValues(
+            document = document,
+            labels = listOf("当前分组", "剩余积分", "到期时间"),
+            stopPhrases = listOf("点击需要的会员组和时长进行购买升级", "购买升级")
+        )
+        return MembershipPage(
+            info = MembershipInfo(
+                groupName = infoMap["当前分组"].orEmpty(),
+                points = infoMap["剩余积分"].orEmpty(),
+                expiry = infoMap["到期时间"].orEmpty()
+            ),
+            plans = document.select("[data-id][data-name][data-points][data-long]")
+                .map { element ->
+                    MembershipPlan(
+                        groupId = element.attr("data-id").trim(),
+                        groupName = decodeSiteText(element.attr("data-name").trim()),
+                        duration = decodeSiteText(element.attr("data-long").trim()),
+                        points = decodeSiteText(element.attr("data-points").trim())
+                    )
+                }
+                .distinctBy { "${it.groupId}:${it.duration}" }
+        )
+        /*
         return MembershipPage(
             info = MembershipInfo(
                 groupName = readLabeledText(document, "所属会员组"),
@@ -209,6 +238,8 @@ class AppleCmsRepository(
         )
     }
 
+        */
+    }
     suspend fun deleteUserRecord(recordIds: List<String>, type: Int, clearAll: Boolean): String {
         val form = FormBody.Builder()
             .add("ids", recordIds.joinToString(","))
@@ -400,6 +431,31 @@ class AppleCmsRepository(
                         parent.select("a[href*=/voddetail/], a[href*=/vodplay/]").isNotEmpty()
                 } ?: return@mapNotNull null
 
+                val detailAnchor = row.selectFirst("a[href*=/voddetail/]")
+                val playAnchor = row.selectFirst("a[href*=/vodplay/]")
+                val actionUrl = (playAnchor?.attr("href") ?: detailAnchor?.attr("href")).orEmpty()
+                if (actionUrl.isBlank()) return@mapNotNull null
+
+                val rawTitle = listOfNotNull(
+                    detailAnchor?.attr("title"),
+                    detailAnchor?.text(),
+                    row.selectFirst("h3 a, h4 a, h5 a, .title a, .name a")?.text(),
+                    row.selectFirst("h3, h4, h5, .title, .name")?.text()
+                ).firstOrNull { !it.isNullOrBlank() }.orEmpty()
+                val rowText = decodeSiteText(row.text())
+                val title = normalizeRecordTitle(rawTitle, rowText)
+                val subtitle = buildUserRecordSubtitle(rowText, title)
+                val detailHref = detailAnchor?.attr("href").orEmpty()
+
+                return@mapNotNull UserCenterItem(
+                    recordId = input.attr("value").trim(),
+                    vodId = extractVodId(detailHref.ifBlank { extractVodIdFromUserUrl(actionUrl) }),
+                    title = title.ifBlank { "未命名条目" },
+                    subtitle = subtitle,
+                    actionLabel = if (playAnchor != null) "继续观看" else "查看详情",
+                    actionUrl = normalizeUrl(actionUrl)
+                )
+                /*
                 val primaryAnchor = row.selectFirst("a[href*=/vodplay/], a[href*=/voddetail/]")
                     ?: return@mapNotNull null
                 val title = primaryAnchor.text()
@@ -422,6 +478,7 @@ class AppleCmsRepository(
                     actionLabel = if (actionUrl.contains("/vodplay/")) "继续观看" else "查看详情",
                     actionUrl = normalizeUrl(actionUrl)
                 )
+            */
             }
 
         val nextPageUrl = document.select("a[href]")
@@ -883,6 +940,109 @@ class AppleCmsRepository(
         val value = raw.trim()
         if (value.isBlank() || value == "deleted") return ""
         return normalizeUrl(value)
+    }
+
+    private fun parseUserProfileFields(document: Document): List<Pair<String, String>> {
+        val labels = listOf(
+            "用户名",
+            "所属用户组",
+            "会员期限",
+            "QQ号码",
+            "Email地址",
+            "注册时间",
+            "登录IP",
+            "登录时间",
+            "账户积分"
+        )
+        val values = extractLabeledValues(
+            document = document,
+            labels = labels,
+            stopPhrases = listOf("推广注册链接", "推广访问链接", "友情链接")
+        )
+        return labels.mapNotNull { label ->
+            values[label]
+                ?.takeIf { it.isNotBlank() }
+                ?.let { label to it }
+        }
+    }
+
+    private fun extractLabeledValues(
+        document: Document,
+        labels: List<String>,
+        stopPhrases: List<String> = emptyList()
+    ): Map<String, String> {
+        val bodyText = decodeSiteText(document.body()?.text().orEmpty())
+            .replace('\u00A0', ' ')
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        if (bodyText.isBlank()) return emptyMap()
+
+        data class LabelHit(val label: String, val start: Int, val valueStart: Int)
+
+        val hits = labels.mapNotNull { label ->
+            Regex("${Regex.escape(label)}(?:[:： ]+)?")
+                .find(bodyText)
+                ?.let { match -> LabelHit(label, match.range.first, match.range.last + 1) }
+        }.sortedBy { it.start }
+
+        if (hits.isEmpty()) return emptyMap()
+
+        return buildMap {
+            hits.forEachIndexed { index, hit ->
+                val nextStart = hits.getOrNull(index + 1)?.start ?: bodyText.length
+                val rawValue = bodyText.substring(hit.valueStart, nextStart)
+                val cleaned = stopPhrases.fold(rawValue) { acc, stop -> acc.substringBefore(stop) }
+                    .replace(Regex("^[:：\\s]+"), "")
+                    .replace(Regex("\\s+"), " ")
+                    .trim()
+                if (cleaned.isNotBlank()) {
+                    put(hit.label, cleaned)
+                }
+            }
+        }
+    }
+
+    private fun normalizeRecordTitle(rawTitle: String, rowText: String): String {
+        val decodedTitle = decodeSiteText(rawTitle)
+            .replace(Regex("^\\[[^\\]]+\\]\\s*"), "")
+            .trim()
+        if (decodedTitle.isNotBlank()) return decodedTitle
+
+        return rowText
+            .substringBefore("类型：")
+            .substringBefore("积分：")
+            .substringBefore("时间：")
+            .substringBefore("[")
+            .replace("继续观看", "")
+            .replace("查看详情", "")
+            .replace("删除", "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    private fun buildUserRecordSubtitle(rowText: String, title: String): String =
+        rowText
+            .removePrefix(title)
+            .replace(title, "")
+            .replace("继续观看", "")
+            .replace("查看详情", "")
+            .replace("删除", "")
+            .replace("重播", "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
+    private fun decodeSiteText(raw: String): String {
+        val cleaned = raw.trim()
+        if (cleaned.isBlank() || cleaned == "deleted") return ""
+
+        val decoded = runCatching {
+            URLDecoder.decode(cleaned, StandardCharsets.UTF_8.name())
+        }.getOrDefault(cleaned)
+
+        return decoded
+            .replace('\u00A0', ' ')
+            .replace(Regex("\\s+"), " ")
+            .trim()
     }
 
     companion object {

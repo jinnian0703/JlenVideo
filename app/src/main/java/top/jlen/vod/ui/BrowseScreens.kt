@@ -639,16 +639,20 @@ private fun AccountProfilePane(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 fields.forEach { (label, value) ->
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(label, color = UiPalette.TextSecondary)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(value, color = UiPalette.Ink, fontWeight = FontWeight.SemiBold)
+                        Text(label, color = UiPalette.TextSecondary, style = MaterialTheme.typography.labelLarge)
+                        Text(
+                            value,
+                            color = UiPalette.Ink,
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
                     }
                 }
             }
@@ -738,7 +742,9 @@ private fun AccountRecordCard(
                 Text(
                     text = item.subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = UiPalette.TextSecondary
+                    color = UiPalette.TextSecondary,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -781,7 +787,7 @@ private fun MembershipPane(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text("会员信息", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
                     Text("当前分组：${info.groupName.ifBlank { "未知" }}", color = UiPalette.Ink)
