@@ -132,7 +132,9 @@ fun JlenVideoApp() {
                                 onClearFavorites = viewModel::clearFavorites,
                                 onDeleteHistory = viewModel::deleteHistory,
                                 onClearHistory = viewModel::clearHistory,
-                                onUpgradeMembership = viewModel::upgradeMembership
+                                onUpgradeMembership = viewModel::upgradeMembership,
+                                onProfileEditorChange = viewModel::updateProfileEditor,
+                                onSaveProfile = viewModel::saveProfile
                             )
                         }
                         composable(
@@ -145,11 +147,14 @@ fun JlenVideoApp() {
                             }
                             DetailScreen(
                                 state = viewModel.detailState,
+                                isLoggedIn = viewModel.accountState.session.isLoggedIn,
                                 onBack = { navController.popBackStack() },
                                 onSelectSource = viewModel::selectSource,
+                                onFavorite = viewModel::addCurrentDetailFavorite,
                                 onPlay = { title, sourceIndex, episodeIndex ->
                                     viewModel.openPlayer(
                                         title = title,
+                                        item = viewModel.detailState.item,
                                         sources = viewModel.detailState.sources,
                                         sourceIndex = sourceIndex,
                                         episodeIndex = episodeIndex

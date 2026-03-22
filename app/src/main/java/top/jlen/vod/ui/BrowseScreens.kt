@@ -59,6 +59,7 @@ import coil.compose.AsyncImage
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.MembershipPlan
+import top.jlen.vod.data.UserProfileEditor
 import top.jlen.vod.data.VodItem
 
 @Composable
@@ -334,7 +335,9 @@ fun AccountScreen(
     onClearFavorites: () -> Unit,
     onDeleteHistory: (String) -> Unit,
     onClearHistory: () -> Unit,
-    onUpgradeMembership: (MembershipPlan) -> Unit
+    onUpgradeMembership: (MembershipPlan) -> Unit,
+    onProfileEditorChange: ((UserProfileEditor) -> UserProfileEditor) -> Unit,
+    onSaveProfile: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -515,7 +518,11 @@ fun AccountScreen(
                 when (state.selectedSection) {
                     AccountSection.Profile -> AccountProfilePane(
                         isLoading = state.isContentLoading,
-                        fields = state.profileFields
+                        fields = state.profileFields,
+                        editor = state.profileEditor,
+                        isSaving = state.isActionLoading,
+                        onEditorChange = onProfileEditorChange,
+                        onSave = onSaveProfile
                     )
                     AccountSection.Favorites -> AccountRecordPane(
                         title = "我的收藏",
@@ -625,7 +632,11 @@ fun AccountScreen(
 @Composable
 private fun AccountProfilePane(
     isLoading: Boolean,
-    fields: List<Pair<String, String>>
+    fields: List<Pair<String, String>>,
+    editor: UserProfileEditor,
+    isSaving: Boolean,
+    onEditorChange: ((UserProfileEditor) -> UserProfileEditor) -> Unit,
+    onSave: () -> Unit
 ) {
     when {
         isLoading -> LoadingPane("资料加载中...")
@@ -655,9 +666,102 @@ private fun AccountProfilePane(
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "修改资料",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Ink
+                )
+                ProfileEditorField(
+                    label = "QQ号码",
+                    value = editor.qq,
+                    onValueChange = { value -> onEditorChange { it.copy(qq = value) } }
+                )
+                ProfileEditorField(
+                    label = "Email",
+                    value = editor.email,
+                    onValueChange = { value -> onEditorChange { it.copy(email = value) } }
+                )
+                ProfileEditorField(
+                    label = "手机号",
+                    value = editor.phone,
+                    onValueChange = { value -> onEditorChange { it.copy(phone = value) } }
+                )
+                ProfileEditorField(
+                    label = "找回问题",
+                    value = editor.question,
+                    onValueChange = { value -> onEditorChange { it.copy(question = value) } }
+                )
+                ProfileEditorField(
+                    label = "找回答案",
+                    value = editor.answer,
+                    onValueChange = { value -> onEditorChange { it.copy(answer = value) } }
+                )
+                ProfileEditorField(
+                    label = "当前密码",
+                    value = editor.currentPassword,
+                    onValueChange = { value -> onEditorChange { it.copy(currentPassword = value) } },
+                    password = true
+                )
+                ProfileEditorField(
+                    label = "新密码",
+                    value = editor.newPassword,
+                    onValueChange = { value -> onEditorChange { it.copy(newPassword = value) } },
+                    password = true
+                )
+                ProfileEditorField(
+                    label = "确认新密码",
+                    value = editor.confirmPassword,
+                    onValueChange = { value -> onEditorChange { it.copy(confirmPassword = value) } },
+                    password = true
+                )
+                Button(
+                    onClick = onSave,
+                    enabled = !isSaving,
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = UiPalette.Accent,
+                        contentColor = UiPalette.AccentText
+                    )
+                ) {
+                    Text(if (isSaving) "保存中..." else "保存修改", fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProfileEditorField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    password: Boolean = false
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        singleLine = true,
+        label = { Text(label) },
+        visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            keyboardType = if (password) KeyboardType.Password else KeyboardType.Text
+        ),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = UiPalette.Accent,
+            unfocusedBorderColor = UiPalette.BorderSoft,
+            focusedTextColor = UiPalette.Ink,
+            unfocusedTextColor = UiPalette.Ink,
+            cursorColor = UiPalette.Accent,
+            focusedContainerColor = UiPalette.Surface,
+            unfocusedContainerColor = UiPalette.Surface
+        )
+    )
 }
 
 @Composable

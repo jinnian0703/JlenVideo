@@ -54,7 +54,9 @@ data class VodItem(
     @SerializedName("vod_score") val vodScore: String? = null,
     @SerializedName("type_name") val typeName: String? = null,
     @SerializedName("vod_play_from") val vodPlayFrom: String? = null,
-    @SerializedName("vod_play_url") val vodPlayUrl: String? = null
+    @SerializedName("vod_play_url") val vodPlayUrl: String? = null,
+    val siteVodId: String = "",
+    val detailUrl: String = ""
 ) {
     val displayTitle: String
         get() = vodName.ifBlank { "未命名影片" }
@@ -144,7 +146,19 @@ data class AuthSession(
 )
 
 data class UserProfilePage(
-    val fields: List<Pair<String, String>> = emptyList()
+    val fields: List<Pair<String, String>> = emptyList(),
+    val editor: UserProfileEditor = UserProfileEditor()
+)
+
+data class UserProfileEditor(
+    val qq: String = "",
+    val email: String = "",
+    val phone: String = "",
+    val question: String = "",
+    val answer: String = "",
+    val currentPassword: String = "",
+    val newPassword: String = "",
+    val confirmPassword: String = ""
 )
 
 data class UserCenterItem(

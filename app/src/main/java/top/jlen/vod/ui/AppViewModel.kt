@@ -17,6 +17,7 @@ import top.jlen.vod.data.MembershipInfo
 import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.PlaySource
 import top.jlen.vod.data.UserCenterItem
+import top.jlen.vod.data.UserProfileEditor
 import top.jlen.vod.data.VodItem
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -280,6 +281,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         accountState = accountState.copy(password = value, error = null, message = null)
     }
 
+    fun updateProfileEditor(transform: (UserProfileEditor) -> UserProfileEditor) {
+        accountState = accountState.copy(
+            profileEditor = transform(accountState.profileEditor),
+            error = null,
+            message = null
+        )
+    }
+
     fun selectAccountSection(section: AccountSection, forceRefresh: Boolean = false) {
         accountState = accountState.copy(selectedSection = section, error = null, message = null)
         if (!accountState.session.isLoggedIn) return
@@ -381,6 +390,51 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    fun saveProfile() {
+        runAccountAction(
+            block = { saveUserProfile(accountState.profileEditor) },
+            onSuccess = {
+                accountState = accountState.copy(
+                    profileEditor = accountState.profileEditor.copy(
+                        currentPassword = "",
+                        newPassword = "",
+                        confirmPassword = ""
+                    )
+                )
+                selectAccountSection(AccountSection.Profile, forceRefresh = true)
+                refreshAccount()
+            }
+        )
+    }
+
+    fun addCurrentDetailFavorite() {
+        val item = detailState.item ?: return
+        if (!accountState.session.isLoggedIn) {
+            detailState = detailState.copy(actionMessage = "请先登录后再收藏")
+            return
+        }
+        if (detailState.isActionLoading) return
+        viewModelScope.launch {
+            detailState = detailState.copy(isActionLoading = true, actionMessage = null)
+            runCatching {
+                withContext(Dispatchers.IO) { repository.addFavorite(item) }
+            }.onSuccess { message ->
+                detailState = detailState.copy(
+                    isActionLoading = false,
+                    actionMessage = message.ifBlank { "收藏成功" }
+                )
+                if (accountState.selectedSection == AccountSection.Favorites) {
+                    selectAccountSection(AccountSection.Favorites, forceRefresh = true)
+                }
+            }.onFailure { error ->
+                detailState = detailState.copy(
+                    isActionLoading = false,
+                    actionMessage = error.message ?: "收藏失败"
+                )
+            }
+        }
+    }
+
     fun login() {
         val userName = accountState.userName.trim()
         val password = accountState.password
@@ -446,7 +500,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onSuccess { page ->
                 accountState = accountState.copy(
                     isContentLoading = false,
-                    profileFields = page.fields
+                    profileFields = page.fields,
+                    profileEditor = page.editor
                 )
             }.onFailure { error ->
                 accountState = accountState.copy(
@@ -569,7 +624,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         isLoading = false,
                         item = item,
                         sources = repository.parseSources(item),
-                        selectedSourceIndex = 0
+                        selectedSourceIndex = 0,
+                        actionMessage = null,
+                        isActionLoading = false
                     )
                 }
             }.onFailure { error ->
@@ -585,17 +642,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         detailState = detailState.copy(selectedSourceIndex = index)
     }
 
-    fun openPlayer(title: String, sources: List<PlaySource>, sourceIndex: Int, episodeIndex: Int) {
+    fun openPlayer(
+        title: String,
+        item: VodItem?,
+        sources: List<PlaySource>,
+        sourceIndex: Int,
+        episodeIndex: Int
+    ) {
         val safeSourceIndex = sourceIndex.coerceIn(0, (sources.size - 1).coerceAtLeast(0))
         val safeEpisodes = sources.getOrNull(safeSourceIndex)?.episodes.orEmpty()
         playerState = PlayerUiState(
             title = title,
+            item = item,
             sources = sources,
             selectedSourceIndex = safeSourceIndex,
             selectedEpisodeIndex = episodeIndex.coerceIn(0, (safeEpisodes.size - 1).coerceAtLeast(0)),
             playbackSnapshot = PlaybackSnapshot()
         )
         resolveCurrentPlayerUrl()
+        recordCurrentPlayback()
     }
 
     fun selectPlayerEpisode(index: Int) {
@@ -606,6 +671,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             playbackSnapshot = PlaybackSnapshot()
         )
         resolveCurrentPlayerUrl()
+        recordCurrentPlayback()
     }
 
     fun selectPlayerSource(index: Int) {
@@ -617,6 +683,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             playbackSnapshot = PlaybackSnapshot()
         )
         resolveCurrentPlayerUrl()
+        recordCurrentPlayback()
     }
 
     fun playNextEpisode() {
@@ -663,6 +730,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
         if (result.resolvedUrl.isBlank() && safeEpisodeIndex != playerState.selectedEpisodeIndex) {
             resolveCurrentPlayerUrl()
+        }
+    }
+
+    private fun recordCurrentPlayback() {
+        val item = playerState.item ?: return
+        val episodePageUrl = playerState.episodePageUrl
+        if (!accountState.session.isLoggedIn || episodePageUrl.isBlank()) return
+
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { repository.addPlayRecord(item, episodePageUrl) }
+            }.onSuccess {
+                if (accountState.selectedSection == AccountSection.History) {
+                    selectAccountSection(AccountSection.History, forceRefresh = true)
+                }
+            }
         }
     }
 
@@ -766,6 +849,7 @@ data class AccountUiState(
     val session: AuthSession = AuthSession(),
     val selectedSection: AccountSection = AccountSection.Profile,
     val profileFields: List<Pair<String, String>> = emptyList(),
+    val profileEditor: UserProfileEditor = UserProfileEditor(),
     val favoriteItems: List<UserCenterItem> = emptyList(),
     val favoriteNextPageUrl: String? = null,
     val historyItems: List<UserCenterItem> = emptyList(),
@@ -779,7 +863,9 @@ data class DetailUiState(
     val error: String? = null,
     val item: VodItem? = null,
     val sources: List<PlaySource> = emptyList(),
-    val selectedSourceIndex: Int = 0
+    val selectedSourceIndex: Int = 0,
+    val isActionLoading: Boolean = false,
+    val actionMessage: String? = null
 ) {
     val selectedSource: PlaySource?
         get() = sources.getOrNull(selectedSourceIndex)
@@ -787,6 +873,7 @@ data class DetailUiState(
 
 data class PlayerUiState(
     val title: String = "",
+    val item: VodItem? = null,
     val sources: List<PlaySource> = emptyList(),
     val selectedSourceIndex: Int = 0,
     val selectedEpisodeIndex: Int = 0,

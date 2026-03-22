@@ -167,23 +167,14 @@ class AppleCmsRepository(
     }
 
     suspend fun loadUserProfile(): UserProfilePage {
-        val document = fetchUserDocument("/index.php/user/index.html")
-        return UserProfilePage(fields = parseUserProfileFields(document))
-        /*
+        val profileDocument = fetchUserDocument("/index.php/user/index.html")
+        val editorDocument = fetchUserDocument("/index.php/user/info.html")
         return UserProfilePage(
-            fields = listOfNotNull(
-                readLabeledValue(document, "用户名"),
-                readLabeledValue(document, "QQ号码"),
-                readLabeledValue(document, "Email地址"),
-                readLabeledValue(document, "注册时间"),
-                readLabeledValue(document, "登陆IP"),
-                readLabeledValue(document, "登陆时间")
-            )
+            fields = parseUserProfileFields(profileDocument),
+            editor = parseUserProfileEditor(editorDocument)
         )
     }
 
-        */
-    }
     suspend fun loadFavoritePage(pageUrl: String? = null): UserCenterPage =
         parseUserCenterPage(
             document = fetchUserDocument(pageUrl ?: "/index.php/user/favs.html")
@@ -218,27 +209,83 @@ class AppleCmsRepository(
                 }
                 .distinctBy { "${it.groupId}:${it.duration}" }
         )
-        /*
-        return MembershipPage(
-            info = MembershipInfo(
-                groupName = readLabeledText(document, "所属会员组"),
-                points = readLabeledText(document, "剩余积分"),
-                expiry = readLabeledText(document, "到期时间")
-            ),
-            plans = document.select("[data-id][data-name][data-points][data-long]")
-                .map { element ->
-                    MembershipPlan(
-                        groupId = element.attr("data-id").trim(),
-                        groupName = element.attr("data-name").trim(),
-                        duration = element.attr("data-long").trim(),
-                        points = element.attr("data-points").trim()
-                    )
-                }
-                .distinctBy { "${it.groupId}:${it.duration}" }
+    }
+
+    suspend fun saveUserProfile(editor: UserProfileEditor): String {
+        val form = FormBody.Builder()
+            .add("user_pwd", editor.currentPassword)
+            .add("user_pwd1", editor.newPassword)
+            .add("user_pwd2", editor.confirmPassword)
+            .add("user_qq", editor.qq)
+            .add("user_email", editor.email)
+            .add("user_phone", editor.phone)
+            .add("user_question", editor.question)
+            .add("user_answer", editor.answer)
+            .build()
+        return submitUserAction(
+            url = "$baseUrl/index.php/user/info",
+            referer = "$baseUrl/index.php/user/info.html",
+            formBody = form
         )
     }
 
-        */
+    suspend fun addFavorite(item: VodItem): String =
+        submitUserUlog(
+            siteVodId = item.siteLogId,
+            type = 2
+        )
+
+    suspend fun addPlayRecord(item: VodItem, episodePageUrl: String): String {
+        val route = parsePlayRoute(episodePageUrl)
+        return submitUserUlog(
+            siteVodId = item.siteLogId,
+            type = 4,
+            sid = route?.sid.orEmpty(),
+            nid = route?.nid.orEmpty()
+        )
+    }
+
+    private suspend fun submitUserUlog(
+        siteVodId: String,
+        type: Int,
+        sid: String = "",
+        nid: String = ""
+    ): String {
+        if (siteVodId.isBlank()) {
+            throw IOException("未找到站内影片编号")
+        }
+
+        val url = buildString {
+            append("$baseUrl/index.php/user/ajax_ulog/?ac=set&mid=1")
+            append("&id=").append(Uri.encode(siteVodId))
+            append("&type=").append(type)
+            if (sid.isNotBlank()) append("&sid=").append(Uri.encode(sid))
+            if (nid.isNotBlank()) append("&nid=").append(Uri.encode(nid))
+        }
+        val request = Request.Builder()
+            .url(url)
+            .header("X-Requested-With", "XMLHttpRequest")
+            .get()
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("请求失败：HTTP ${response.code}")
+            }
+
+            val body = response.body?.string().orEmpty()
+            val authResponse = runCatching { gson.fromJson(body, AuthResponse::class.java) }.getOrNull()
+            if (authResponse != null && (authResponse.msg.isNotBlank() || authResponse.code != 0)) {
+                if (authResponse.code == 1) {
+                    return authResponse.msg.ifBlank { "操作成功" }
+                }
+                throw IOException(authResponse.msg.ifBlank { "操作失败" })
+            }
+            if (body.contains("未登录")) {
+                throw IOException("请先登录")
+            }
+            return "操作成功"
+        }
     }
     suspend fun deleteUserRecord(recordIds: List<String>, type: Int, clearAll: Boolean): String {
         val form = FormBody.Builder()
@@ -654,7 +701,11 @@ class AppleCmsRepository(
             director = metaMap["导演"].orEmpty(),
             actor = metaMap["主演"].orEmpty(),
             vodPlayFrom = playFrom,
-            vodPlayUrl = playUrl
+            vodPlayUrl = playUrl,
+            siteVodId = document.selectFirst(".fav-btn[data-id], .mac_hits[data-id], .mac_ulog_set[data-id]")
+                ?.attr("data-id")
+                .orEmpty(),
+            detailUrl = document.location()
         )
     }
 
@@ -709,7 +760,9 @@ class AppleCmsRepository(
         director: String = "",
         actor: String = "",
         vodPlayFrom: String = "",
-        vodPlayUrl: String = ""
+        vodPlayUrl: String = "",
+        siteVodId: String = "",
+        detailUrl: String = ""
     ): VodItem? {
         val vodId = extractVodId(detailHref)
         if (vodId.isBlank() || title.isBlank()) return null
@@ -726,7 +779,9 @@ class AppleCmsRepository(
             vodDirector = director,
             vodActor = actor,
             vodPlayFrom = vodPlayFrom,
-            vodPlayUrl = vodPlayUrl
+            vodPlayUrl = vodPlayUrl,
+            siteVodId = siteVodId.ifBlank { vodId.takeIf { it.all(Char::isDigit) }.orEmpty() },
+            detailUrl = normalizeUrl(detailUrl.ifBlank { detailHref })
         )
     }
 
@@ -966,6 +1021,15 @@ class AppleCmsRepository(
         }
     }
 
+    private fun parseUserProfileEditor(document: Document): UserProfileEditor =
+        UserProfileEditor(
+            qq = decodeSiteText(document.selectFirst("input[name=user_qq]")?.attr("value").orEmpty()),
+            email = decodeSiteText(document.selectFirst("input[name=user_email]")?.attr("value").orEmpty()),
+            phone = decodeSiteText(document.selectFirst("input[name=user_phone]")?.attr("value").orEmpty()),
+            question = decodeSiteText(document.selectFirst("input[name=user_question]")?.attr("value").orEmpty()),
+            answer = decodeSiteText(document.selectFirst("input[name=user_answer]")?.attr("value").orEmpty())
+        )
+
     private fun extractLabeledValues(
         document: Document,
         labels: List<String>,
@@ -1031,6 +1095,17 @@ class AppleCmsRepository(
             .replace(Regex("\\s+"), " ")
             .trim()
 
+    private fun parsePlayRoute(episodePageUrl: String): PlayRoute? {
+        val normalized = resolveUrl(episodePageUrl)
+        val match = Regex("""/vodplay/[^/]+-(\d+)-(\d+)/?""")
+            .find(normalized)
+            ?: return null
+        return PlayRoute(
+            sid = match.groupValues.getOrNull(1).orEmpty(),
+            nid = match.groupValues.getOrNull(2).orEmpty()
+        )
+    }
+
     private fun decodeSiteText(raw: String): String {
         val cleaned = raw.trim()
         if (cleaned.isBlank() || cleaned == "deleted") return ""
@@ -1044,6 +1119,9 @@ class AppleCmsRepository(
             .replace(Regex("\\s+"), " ")
             .trim()
     }
+
+    private val VodItem.siteLogId: String
+        get() = siteVodId.ifBlank { vodId.takeIf { it.all(Char::isDigit) }.orEmpty() }
 
     companion object {
         private fun createClient(cookieJar: PersistentCookieJar): OkHttpClient {
@@ -1087,4 +1165,9 @@ data class PagedVodItems(
 data class ResolvedPlayUrl(
     val url: String,
     val useWebPlayer: Boolean
+)
+
+private data class PlayRoute(
+    val sid: String,
+    val nid: String
 )

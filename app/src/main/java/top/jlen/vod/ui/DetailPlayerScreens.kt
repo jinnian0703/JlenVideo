@@ -54,8 +54,10 @@ import top.jlen.vod.data.VodItem
 @Composable
 fun DetailScreen(
     state: DetailUiState,
+    isLoggedIn: Boolean,
     onBack: () -> Unit,
     onSelectSource: (Int) -> Unit,
+    onFavorite: () -> Unit,
     onPlay: (String, Int, Int) -> Unit
 ) {
     when {
@@ -129,6 +131,33 @@ fun DetailScreen(
                             ) {
                                 Text("返回")
                             }
+                        }
+                    }
+                }
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedButton(
+                                onClick = onFavorite,
+                                enabled = isLoggedIn && !state.isActionLoading,
+                                shape = RoundedCornerShape(20.dp),
+                                border = BorderStroke(1.dp, UiPalette.BorderSoft),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = UiPalette.Accent)
+                            ) {
+                                Text(
+                                    if (!isLoggedIn) "登录后收藏"
+                                    else if (state.isActionLoading) "收藏中..."
+                                    else "收藏"
+                                )
+                            }
+                        }
+                        state.actionMessage?.takeIf { it.isNotBlank() }?.let { message ->
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = message,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = UiPalette.Accent
+                            )
                         }
                     }
                 }
