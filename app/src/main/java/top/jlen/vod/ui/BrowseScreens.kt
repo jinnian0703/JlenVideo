@@ -372,28 +372,30 @@ fun AccountScreen(
             }
         }
 
-        state.message?.let { message ->
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = UiPalette.AccentSoft.copy(alpha = 0.25f)),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Text(
-                        text = message,
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                        color = UiPalette.Ink,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+        if (!state.session.isLoggedIn) {
+            state.message?.let { message ->
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = UiPalette.AccentSoft.copy(alpha = 0.25f)),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Text(
+                            text = message,
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                            color = UiPalette.Ink,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
             }
-        }
 
-        state.error?.let { message ->
-            item {
-                ErrorBanner(
-                    message = message,
-                    onRetry = if (state.session.isLoggedIn) onRefreshSection else onRefresh
-                )
+            state.error?.let { message ->
+                item {
+                    ErrorBanner(
+                        message = message,
+                        onRetry = onRefresh
+                    )
+                }
             }
         }
 
@@ -516,6 +518,31 @@ fun AccountScreen(
                             )
                         )
                     }
+                }
+            }
+
+            state.message?.let { message ->
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = UiPalette.AccentSoft.copy(alpha = 0.25f)),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Text(
+                            text = message,
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                            color = UiPalette.Ink,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+
+            state.error?.let { message ->
+                item {
+                    ErrorBanner(
+                        message = message,
+                        onRetry = onRefreshSection
+                    )
                 }
             }
 
@@ -796,7 +823,7 @@ private fun AccountProfilePaneV2(
                                 enabled = !isSaving,
                                 border = BorderStroke(1.dp, UiPalette.BorderSoft)
                             ) {
-                                Text(if (isSaving) "瑙ｇ粦涓?.." else "瑙ｇ粦閭")
+                                Text(if (isSaving) "解绑中..." else "解绑邮箱")
                             }
                         }
 
