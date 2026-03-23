@@ -194,6 +194,54 @@ class AppleCmsRepository(
         }
     }
 
+    suspend fun loadFindPasswordPage(): FindPasswordPage {
+        val document = fetchDocument("$baseUrl/index.php/user/findpass.html")
+        val requiresVerify = document.selectFirst("input[name=verify]") != null
+        val captchaUrl = document.selectFirst("img[src*=/verify/], img.mac_verify_img")
+            ?.attr("src")
+            .orEmpty()
+
+        return FindPasswordPage(
+            requiresVerify = requiresVerify,
+            captchaUrl = resolveUrl(captchaUrl),
+            captchaBytes = if (requiresVerify && captchaUrl.isNotBlank()) {
+                loadFindPasswordCaptcha(resolveUrl(captchaUrl))
+            } else {
+                null
+            }
+        )
+    }
+
+    suspend fun loadFindPasswordCaptcha(captchaUrl: String): ByteArray {
+        val request = Request.Builder()
+            .url(appendTimestamp(captchaUrl))
+            .header("Referer", "$baseUrl/index.php/user/findpass.html")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("鍔犺浇楠岃瘉鐮佸け璐ワ細HTTP ${response.code}")
+            }
+            return response.body?.bytes() ?: throw IOException("鍔犺浇楠岃瘉鐮佸け璐?")
+        }
+    }
+
+    suspend fun findPassword(editor: FindPasswordEditor): String {
+        val form = FormBody.Builder()
+            .add("user_name", editor.userName.trim())
+            .add("user_question", editor.question.trim())
+            .add("user_answer", editor.answer.trim())
+            .add("user_pwd", editor.password)
+            .add("user_pwd2", editor.confirmPassword)
+            .add("verify", editor.verify.trim())
+            .build()
+        return submitPublicAction(
+            url = "$baseUrl/index.php/user/findpass",
+            referer = "$baseUrl/index.php/user/findpass.html",
+            formBody = form
+        )
+    }
+
     suspend fun sendRegisterCode(channel: String, contact: String): String {
         val form = FormBody.Builder()
             .add("ac", channel.trim())

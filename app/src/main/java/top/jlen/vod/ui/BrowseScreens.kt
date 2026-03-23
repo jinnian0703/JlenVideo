@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.data.AppleCmsCategory
+import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.RegisterEditor
 import top.jlen.vod.data.UserProfileEditor
@@ -394,11 +395,14 @@ fun AccountScreen(
     onProfileEditorChange: ((UserProfileEditor) -> UserProfileEditor) -> Unit,
     onProfileTabChange: (Boolean) -> Unit,
     onSaveProfile: () -> Unit,
-    onToggleRegisterMode: (Boolean) -> Unit,
+    onAuthModeChange: (AccountAuthMode) -> Unit,
     onRegisterEditorChange: ((RegisterEditor) -> RegisterEditor) -> Unit,
     onRefreshRegisterCaptcha: () -> Unit,
     onSendRegisterCode: () -> Unit,
     onRegister: () -> Unit,
+    onFindPasswordEditorChange: ((FindPasswordEditor) -> FindPasswordEditor) -> Unit,
+    onRefreshFindPasswordCaptcha: () -> Unit,
+    onFindPassword: () -> Unit,
     onSendEmailCode: () -> Unit,
     onBindEmail: () -> Unit,
     onUnbindEmail: () -> Unit
@@ -665,35 +669,49 @@ fun AccountScreen(
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         item {
                             AssistChip(
-                                onClick = { onToggleRegisterMode(false) },
+                                onClick = { onAuthModeChange(AccountAuthMode.Login) },
                                 label = { Text("登录", fontWeight = FontWeight.SemiBold) },
                                 colors = AssistChipDefaults.assistChipColors(
-                                    containerColor = if (!state.isRegisterMode) UiPalette.Accent else UiPalette.Surface,
-                                    labelColor = if (!state.isRegisterMode) UiPalette.AccentText else UiPalette.Ink
+                                    containerColor = if (state.authMode == AccountAuthMode.Login) UiPalette.Accent else UiPalette.Surface,
+                                    labelColor = if (state.authMode == AccountAuthMode.Login) UiPalette.AccentText else UiPalette.Ink
                                 ),
                                 border = AssistChipDefaults.assistChipBorder(
-                                    borderColor = if (!state.isRegisterMode) UiPalette.Accent else UiPalette.BorderSoft,
+                                    borderColor = if (state.authMode == AccountAuthMode.Login) UiPalette.Accent else UiPalette.BorderSoft,
                                     enabled = true
                                 )
                             )
                         }
                         item {
                             AssistChip(
-                                onClick = { onToggleRegisterMode(true) },
+                                onClick = { onAuthModeChange(AccountAuthMode.Register) },
                                 label = { Text("注册", fontWeight = FontWeight.SemiBold) },
                                 colors = AssistChipDefaults.assistChipColors(
-                                    containerColor = if (state.isRegisterMode) UiPalette.Accent else UiPalette.Surface,
-                                    labelColor = if (state.isRegisterMode) UiPalette.AccentText else UiPalette.Ink
+                                    containerColor = if (state.authMode == AccountAuthMode.Register) UiPalette.Accent else UiPalette.Surface,
+                                    labelColor = if (state.authMode == AccountAuthMode.Register) UiPalette.AccentText else UiPalette.Ink
                                 ),
                                 border = AssistChipDefaults.assistChipBorder(
-                                    borderColor = if (state.isRegisterMode) UiPalette.Accent else UiPalette.BorderSoft,
+                                    borderColor = if (state.authMode == AccountAuthMode.Register) UiPalette.Accent else UiPalette.BorderSoft,
+                                    enabled = true
+                                )
+                            )
+                        }
+                        item {
+                            AssistChip(
+                                onClick = { onAuthModeChange(AccountAuthMode.FindPassword) },
+                                label = { Text("找回密码", fontWeight = FontWeight.SemiBold) },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = if (state.authMode == AccountAuthMode.FindPassword) UiPalette.Accent else UiPalette.Surface,
+                                    labelColor = if (state.authMode == AccountAuthMode.FindPassword) UiPalette.AccentText else UiPalette.Ink
+                                ),
+                                border = AssistChipDefaults.assistChipBorder(
+                                    borderColor = if (state.authMode == AccountAuthMode.FindPassword) UiPalette.Accent else UiPalette.BorderSoft,
                                     enabled = true
                                 )
                             )
                         }
                     }
 
-                    if (state.isRegisterMode) {
+                    if (state.authMode == AccountAuthMode.Register) {
                         Card(
                             colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
                             shape = RoundedCornerShape(24.dp),
@@ -705,6 +723,21 @@ fun AccountScreen(
                                 onRefreshCaptcha = onRefreshRegisterCaptcha,
                                 onSendCode = onSendRegisterCode,
                                 onSubmit = onRegister
+                            )
+                        }
+                        return@item
+                    }
+                    if (state.authMode == AccountAuthMode.FindPassword) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                            shape = RoundedCornerShape(24.dp),
+                            border = BorderStroke(1.dp, UiPalette.Border)
+                        ) {
+                            AccountFindPasswordPane(
+                                state = state,
+                                onEditorChange = onFindPasswordEditorChange,
+                                onRefreshCaptcha = onRefreshFindPasswordCaptcha,
+                                onSubmit = onFindPassword
                             )
                         }
                         return@item
@@ -982,6 +1015,196 @@ private fun AccountRegisterPane(
             )
         ) {
             Text(if (state.isActionLoading) "注册中..." else "立即注册", fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun AccountFindPasswordPane(
+    state: AccountUiState,
+    onEditorChange: ((FindPasswordEditor) -> FindPasswordEditor) -> Unit,
+    onRefreshCaptcha: () -> Unit,
+    onSubmit: () -> Unit
+) {
+    val captchaBitmap = remember(state.findPasswordCaptcha) {
+        state.findPasswordCaptcha?.let { bytes ->
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        OutlinedTextField(
+            value = state.findPasswordEditor.userName,
+            onValueChange = { value -> onEditorChange { it.copy(userName = value) } },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            singleLine = true,
+            label = { Text("用户名") },
+            placeholder = { Text("请输入登录账号") },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = UiPalette.Accent,
+                unfocusedBorderColor = UiPalette.BorderSoft,
+                focusedTextColor = UiPalette.Ink,
+                unfocusedTextColor = UiPalette.Ink,
+                cursorColor = UiPalette.Accent,
+                focusedContainerColor = UiPalette.Surface,
+                unfocusedContainerColor = UiPalette.Surface
+            )
+        )
+        OutlinedTextField(
+            value = state.findPasswordEditor.question,
+            onValueChange = { value -> onEditorChange { it.copy(question = value) } },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            singleLine = true,
+            label = { Text("密保问题") },
+            placeholder = { Text("请输入密保问题") },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = UiPalette.Accent,
+                unfocusedBorderColor = UiPalette.BorderSoft,
+                focusedTextColor = UiPalette.Ink,
+                unfocusedTextColor = UiPalette.Ink,
+                cursorColor = UiPalette.Accent,
+                focusedContainerColor = UiPalette.Surface,
+                unfocusedContainerColor = UiPalette.Surface
+            )
+        )
+        OutlinedTextField(
+            value = state.findPasswordEditor.answer,
+            onValueChange = { value -> onEditorChange { it.copy(answer = value) } },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            singleLine = true,
+            label = { Text("密保答案") },
+            placeholder = { Text("请输入密保答案") },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = UiPalette.Accent,
+                unfocusedBorderColor = UiPalette.BorderSoft,
+                focusedTextColor = UiPalette.Ink,
+                unfocusedTextColor = UiPalette.Ink,
+                cursorColor = UiPalette.Accent,
+                focusedContainerColor = UiPalette.Surface,
+                unfocusedContainerColor = UiPalette.Surface
+            )
+        )
+        OutlinedTextField(
+            value = state.findPasswordEditor.password,
+            onValueChange = { value -> onEditorChange { it.copy(password = value) } },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            singleLine = true,
+            label = { Text("新密码") },
+            placeholder = { Text("请输入新的登录密码") },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = KeyboardType.Password
+            ),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = UiPalette.Accent,
+                unfocusedBorderColor = UiPalette.BorderSoft,
+                focusedTextColor = UiPalette.Ink,
+                unfocusedTextColor = UiPalette.Ink,
+                cursorColor = UiPalette.Accent,
+                focusedContainerColor = UiPalette.Surface,
+                unfocusedContainerColor = UiPalette.Surface
+            )
+        )
+        OutlinedTextField(
+            value = state.findPasswordEditor.confirmPassword,
+            onValueChange = { value -> onEditorChange { it.copy(confirmPassword = value) } },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            singleLine = true,
+            label = { Text("确认新密码") },
+            placeholder = { Text("请再次输入新密码") },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = KeyboardType.Password
+            ),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = UiPalette.Accent,
+                unfocusedBorderColor = UiPalette.BorderSoft,
+                focusedTextColor = UiPalette.Ink,
+                unfocusedTextColor = UiPalette.Ink,
+                cursorColor = UiPalette.Accent,
+                focusedContainerColor = UiPalette.Surface,
+                unfocusedContainerColor = UiPalette.Surface
+            )
+        )
+        if (state.findPasswordRequiresVerify) {
+            OutlinedTextField(
+                value = state.findPasswordEditor.verify,
+                onValueChange = { value -> onEditorChange { it.copy(verify = value) } },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                singleLine = true,
+                label = { Text("验证码") },
+                placeholder = { Text("请输入图片验证码") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = UiPalette.Accent,
+                    unfocusedBorderColor = UiPalette.BorderSoft,
+                    focusedTextColor = UiPalette.Ink,
+                    unfocusedTextColor = UiPalette.Ink,
+                    cursorColor = UiPalette.Accent,
+                    focusedContainerColor = UiPalette.Surface,
+                    unfocusedContainerColor = UiPalette.Surface
+                )
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(UiPalette.SurfaceSoft),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (captchaBitmap != null) {
+                        Image(
+                            bitmap = captchaBitmap,
+                            contentDescription = "图片验证码",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clickable(onClick = onRefreshCaptcha),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        Text(
+                            text = if (state.isContentLoading) "加载中..." else "点击刷新验证码",
+                            color = UiPalette.TextSecondary
+                        )
+                    }
+                }
+                OutlinedButton(
+                    onClick = onRefreshCaptcha,
+                    enabled = !state.isContentLoading,
+                    border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                ) {
+                    Text("刷新")
+                }
+            }
+        }
+
+        Button(
+            onClick = onSubmit,
+            enabled = !state.isActionLoading,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = UiPalette.Accent,
+                contentColor = UiPalette.AccentText
+            )
+        ) {
+            Text(if (state.isActionLoading) "提交中..." else "立即找回", fontWeight = FontWeight.Bold)
         }
     }
 }

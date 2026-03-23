@@ -13,6 +13,7 @@ import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.AppleCmsRepository
 import top.jlen.vod.data.AuthSession
 import top.jlen.vod.data.Episode
+import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.MembershipInfo
 import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.PlaySource
@@ -299,14 +300,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         accountState = accountState.copy(password = value, error = null, message = null)
     }
 
-    fun setRegisterMode(registerMode: Boolean) {
+    fun setAccountAuthMode(mode: AccountAuthMode) {
         accountState = accountState.copy(
-            isRegisterMode = registerMode,
+            authMode = mode,
             error = null,
             message = null
         )
-        if (registerMode) {
-            loadRegisterPage(forceRefresh = true)
+        when (mode) {
+            AccountAuthMode.Login -> Unit
+            AccountAuthMode.Register -> loadRegisterPage(forceRefresh = true)
+            AccountAuthMode.FindPassword -> loadFindPasswordPage(forceRefresh = true)
         }
     }
 
@@ -338,6 +341,39 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 accountState = accountState.copy(
                     isContentLoading = false,
                     error = error.message ?: "验证码加载失败"
+                )
+            }
+        }
+    }
+
+    fun updateFindPasswordEditor(transform: (FindPasswordEditor) -> FindPasswordEditor) {
+        accountState = accountState.copy(
+            findPasswordEditor = transform(accountState.findPasswordEditor),
+            error = null,
+            message = null
+        )
+    }
+
+    fun refreshFindPasswordCaptcha() {
+        val captchaUrl = accountState.findPasswordCaptchaUrl
+        if (captchaUrl.isBlank()) {
+            loadFindPasswordPage(forceRefresh = true)
+            return
+        }
+
+        viewModelScope.launch {
+            accountState = accountState.copy(isContentLoading = true, error = null)
+            runCatching {
+                withContext(Dispatchers.IO) { repository.loadFindPasswordCaptcha(captchaUrl) }
+            }.onSuccess { bytes ->
+                accountState = accountState.copy(
+                    isContentLoading = false,
+                    findPasswordCaptcha = bytes
+                )
+            }.onFailure { error ->
+                accountState = accountState.copy(
+                    isContentLoading = false,
+                    error = error.message ?: "楠岃瘉鐮佸姞杞藉け璐?"
                 )
             }
         }
@@ -582,10 +618,54 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             block = { register(editor.copy(channel = accountState.registerChannel)) },
             onSuccess = {
                 accountState = accountState.copy(
-                    isRegisterMode = false,
+                    authMode = AccountAuthMode.Login,
                     userName = editor.userName,
                     password = "",
                     registerEditor = RegisterEditor(channel = accountState.registerChannel)
+                )
+            }
+        )
+    }
+
+    fun findPassword() {
+        val editor = accountState.findPasswordEditor
+        if (editor.userName.isBlank()) {
+            accountState = accountState.copy(error = "璇疯緭鍏ョ敤鎴峰悕")
+            return
+        }
+        if (editor.question.isBlank()) {
+            accountState = accountState.copy(error = "璇疯緭鍏ュ瘑淇濋棶棰?")
+            return
+        }
+        if (editor.answer.isBlank()) {
+            accountState = accountState.copy(error = "璇疯緭鍏ュ瘑淇濈瓟妗?")
+            return
+        }
+        if (editor.password.isBlank()) {
+            accountState = accountState.copy(error = "璇疯緭鍏ユ柊瀵嗙爜")
+            return
+        }
+        if (editor.confirmPassword.isBlank()) {
+            accountState = accountState.copy(error = "璇风‘璁ゆ柊瀵嗙爜")
+            return
+        }
+        if (editor.password != editor.confirmPassword) {
+            accountState = accountState.copy(error = "涓ゆ杈撳叆鐨勫瘑鐮佷笉涓€鑷?")
+            return
+        }
+        if (accountState.findPasswordRequiresVerify && editor.verify.isBlank()) {
+            accountState = accountState.copy(error = "璇疯緭鍏ュ浘鐗囬獙璇佺爜")
+            return
+        }
+
+        runAccountAction(
+            block = { findPassword(editor) },
+            onSuccess = {
+                accountState = accountState.copy(
+                    authMode = AccountAuthMode.Login,
+                    userName = editor.userName,
+                    password = "",
+                    findPasswordEditor = FindPasswordEditor()
                 )
             }
         )
@@ -698,6 +778,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 accountState = accountState.copy(
                     isContentLoading = false,
                     error = error.message ?: "注册页面加载失败"
+                )
+            }
+        }
+    }
+
+    private fun loadFindPasswordPage(forceRefresh: Boolean = false) {
+        if (accountState.isContentLoading && !forceRefresh) return
+        viewModelScope.launch {
+            accountState = accountState.copy(isContentLoading = true, error = null)
+            runCatching {
+                withContext(Dispatchers.IO) { repository.loadFindPasswordPage() }
+            }.onSuccess { page ->
+                accountState = accountState.copy(
+                    isContentLoading = false,
+                    findPasswordRequiresVerify = page.requiresVerify,
+                    findPasswordCaptchaUrl = page.captchaUrl,
+                    findPasswordCaptcha = page.captchaBytes
+                )
+            }.onFailure { error ->
+                accountState = accountState.copy(
+                    isContentLoading = false,
+                    error = error.message ?: "鎵惧洖瀵嗙爜椤甸潰鍔犺浇澶辫触"
                 )
             }
         }
@@ -1213,6 +1315,12 @@ enum class AccountSection {
     Member
 }
 
+enum class AccountAuthMode {
+    Login,
+    Register,
+    FindPassword
+}
+
 data class AccountUiState(
     val isLoading: Boolean = false,
     val isContentLoading: Boolean = false,
@@ -1221,7 +1329,7 @@ data class AccountUiState(
     val message: String? = null,
     val userName: String = "",
     val password: String = "",
-    val isRegisterMode: Boolean = false,
+    val authMode: AccountAuthMode = AccountAuthMode.Login,
     val registerChannel: String = "email",
     val registerContactLabel: String = "邮箱",
     val registerCodeLabel: String = "邮箱验证码",
@@ -1230,6 +1338,10 @@ data class AccountUiState(
     val registerCaptchaUrl: String = "",
     val registerCaptcha: ByteArray? = null,
     val registerEditor: RegisterEditor = RegisterEditor(),
+    val findPasswordRequiresVerify: Boolean = true,
+    val findPasswordCaptchaUrl: String = "",
+    val findPasswordCaptcha: ByteArray? = null,
+    val findPasswordEditor: FindPasswordEditor = FindPasswordEditor(),
     val session: AuthSession = AuthSession(),
     val selectedSection: AccountSection = AccountSection.Profile,
     val isProfileEditTab: Boolean = false,

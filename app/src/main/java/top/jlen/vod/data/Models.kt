@@ -183,6 +183,21 @@ data class RegisterEditor(
     val verify: String = ""
 )
 
+data class FindPasswordPage(
+    val requiresVerify: Boolean = true,
+    val captchaUrl: String = "",
+    val captchaBytes: ByteArray? = null
+)
+
+data class FindPasswordEditor(
+    val userName: String = "",
+    val question: String = "",
+    val answer: String = "",
+    val password: String = "",
+    val confirmPassword: String = "",
+    val verify: String = ""
+)
+
 data class UserCenterItem(
     val recordId: String = "",
     val vodId: String = "",
