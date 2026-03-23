@@ -138,9 +138,11 @@ fun JlenVideoApp() {
                                 onClearHistory = viewModel::clearHistory,
                                 onUpgradeMembership = viewModel::upgradeMembership,
                                 onProfileEditorChange = viewModel::updateProfileEditor,
+                                onProfileTabChange = viewModel::setProfileEditTab,
                                 onSaveProfile = viewModel::saveProfile,
                                 onSendEmailCode = viewModel::sendEmailBindCode,
-                                onBindEmail = viewModel::bindEmail
+                                onBindEmail = viewModel::bindEmail,
+                                onUnbindEmail = viewModel::unbindEmail
                             )
                         }
                         composable(

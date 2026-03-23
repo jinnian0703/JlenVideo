@@ -289,6 +289,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    fun setProfileEditTab(editMode: Boolean) {
+        accountState = accountState.copy(isProfileEditTab = editMode)
+    }
+
     fun selectAccountSection(section: AccountSection, forceRefresh: Boolean = false) {
         accountState = accountState.copy(selectedSection = section, error = null, message = null)
         if (!accountState.session.isLoggedIn) return
@@ -436,6 +440,23 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 accountState = accountState.copy(
                     profileEditor = accountState.profileEditor.copy(
                         email = email,
+                        pendingEmail = "",
+                        emailCode = ""
+                    )
+                )
+                selectAccountSection(AccountSection.Profile, forceRefresh = true)
+            }
+        )
+    }
+
+    fun unbindEmail() {
+        runAccountAction(
+            block = { unbindEmail() },
+            onSuccess = {
+                accountState = accountState.copy(
+                    isProfileEditTab = true,
+                    profileEditor = accountState.profileEditor.copy(
+                        email = "",
                         pendingEmail = "",
                         emailCode = ""
                     )
@@ -1049,6 +1070,7 @@ data class AccountUiState(
     val password: String = "",
     val session: AuthSession = AuthSession(),
     val selectedSection: AccountSection = AccountSection.Profile,
+    val isProfileEditTab: Boolean = false,
     val profileFields: List<Pair<String, String>> = emptyList(),
     val profileEditor: UserProfileEditor = UserProfileEditor(),
     val favoriteItems: List<UserCenterItem> = emptyList(),

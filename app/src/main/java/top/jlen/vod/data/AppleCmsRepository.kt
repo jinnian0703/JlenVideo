@@ -254,6 +254,17 @@ class AppleCmsRepository(
         )
     }
 
+    suspend fun unbindEmail(): String {
+        val form = FormBody.Builder()
+            .add("ac", "email")
+            .build()
+        return submitUserAction(
+            url = "$baseUrl/index.php/user/unbind",
+            referer = "$baseUrl/index.php/user/info.html",
+            formBody = form
+        )
+    }
+
     suspend fun addFavorite(item: VodItem): String =
         submitUserUlog(
             siteVodId = item.siteLogId,

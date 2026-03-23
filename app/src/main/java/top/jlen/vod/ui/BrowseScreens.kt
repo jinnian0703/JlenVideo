@@ -43,8 +43,6 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -340,9 +338,11 @@ fun AccountScreen(
     onClearHistory: () -> Unit,
     onUpgradeMembership: (MembershipPlan) -> Unit,
     onProfileEditorChange: ((UserProfileEditor) -> UserProfileEditor) -> Unit,
+    onProfileTabChange: (Boolean) -> Unit,
     onSaveProfile: () -> Unit,
     onSendEmailCode: () -> Unit,
-    onBindEmail: () -> Unit
+    onBindEmail: () -> Unit,
+    onUnbindEmail: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -526,10 +526,13 @@ fun AccountScreen(
                         fields = state.profileFields,
                         editor = state.profileEditor,
                         isSaving = state.isActionLoading,
+                        isEditTab = state.isProfileEditTab,
+                        onTabChange = onProfileTabChange,
                         onEditorChange = onProfileEditorChange,
                         onSave = onSaveProfile,
                         onSendEmailCode = onSendEmailCode,
-                        onBindEmail = onBindEmail
+                        onBindEmail = onBindEmail,
+                        onUnbindEmail = onUnbindEmail
                     )
                     AccountSection.Favorites -> AccountRecordPane(
                         title = "我的收藏",
@@ -649,14 +652,15 @@ private fun AccountProfilePaneV2(
     fields: List<Pair<String, String>>,
     editor: UserProfileEditor,
     isSaving: Boolean,
+    isEditTab: Boolean,
+    onTabChange: (Boolean) -> Unit,
     onEditorChange: ((UserProfileEditor) -> UserProfileEditor) -> Unit,
     onSave: () -> Unit,
     onSendEmailCode: () -> Unit,
-    onBindEmail: () -> Unit
+    onBindEmail: () -> Unit,
+    onUnbindEmail: () -> Unit
 ) {
-    val tabState = rememberSaveable { mutableStateOf(AccountProfileTab.Overview.name) }
-    val selectedTab = runCatching { AccountProfileTab.valueOf(tabState.value) }
-        .getOrDefault(AccountProfileTab.Overview)
+    val selectedTab = if (isEditTab) AccountProfileTab.Edit else AccountProfileTab.Overview
 
     when {
         isLoading -> LoadingPane("资料加载中...")
@@ -675,7 +679,7 @@ private fun AccountProfilePaneV2(
                     items(AccountProfileTab.entries.toList()) { tab ->
                         val selected = tab == selectedTab
                         AssistChip(
-                            onClick = { tabState.value = tab.name },
+                            onClick = { onTabChange(tab == AccountProfileTab.Edit) },
                             label = {
                                 Text(
                                     text = when (tab) {
@@ -787,6 +791,13 @@ private fun AccountProfilePaneV2(
                                 actionText = "已绑定",
                                 onAction = null
                             )
+                            OutlinedButton(
+                                onClick = onUnbindEmail,
+                                enabled = !isSaving,
+                                border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                            ) {
+                                Text(if (isSaving) "瑙ｇ粦涓?.." else "瑙ｇ粦閭")
+                            }
                         }
 
                         Text(
