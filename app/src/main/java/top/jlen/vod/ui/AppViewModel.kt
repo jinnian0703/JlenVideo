@@ -17,6 +17,7 @@ import top.jlen.vod.data.AppleCmsRepository
 import top.jlen.vod.data.AuthSession
 import top.jlen.vod.data.Episode
 import top.jlen.vod.data.FindPasswordEditor
+import top.jlen.vod.data.HomeSection
 import top.jlen.vod.data.MembershipInfo
 import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.PlaySource
@@ -93,8 +94,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val categories = listOf(allCategory) + payload.categories
                 homeState = HomeUiState(
                     isLoading = false,
+                    slides = payload.slides,
+                    hot = payload.hot,
                     featured = payload.featured,
                     latest = payload.latest,
+                    sections = payload.sections,
                     homeVisibleCount = payload.latest.size,
                     homePage = payload.latestPage,
                     homeTotalCount = payload.latestTotal,
@@ -1310,8 +1314,11 @@ data class HomeUiState(
     val isCategoryLoading: Boolean = false,
     val isCategoryAppending: Boolean = false,
     val error: String? = null,
+    val slides: List<VodItem> = emptyList(),
+    val hot: List<VodItem> = emptyList(),
     val featured: List<VodItem> = emptyList(),
     val latest: List<VodItem> = emptyList(),
+    val sections: List<HomeSection> = emptyList(),
     val homeVisibleCount: Int = 0,
     val homePage: Int = 1,
     val homeTotalCount: Int = 0,

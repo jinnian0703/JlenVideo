@@ -58,12 +58,29 @@ class AppleCmsRepository(
         }
 
         val categories = defaultCategories
-        val featured = runCatching { loadFeaturedFromHomePage() }
+        val slides = runCatching { loadLevelItems(level = "9", limit = 8) }
             .getOrDefault(emptyList())
+            .ifEmpty { runCatching { loadFeaturedFromHomePage().take(8) }.getOrDefault(emptyList()) }
+        val hot = runCatching { loadLevelItems(level = "8", limit = 16) }
+            .getOrDefault(emptyList())
+        val featured = runCatching { loadLevelItems(level = "1", limit = 16) }
+            .getOrDefault(emptyList())
+        val sections = categories.mapNotNull { category ->
+            runCatching {
+                HomeSection(
+                    title = category.typeName,
+                    typeId = category.typeId,
+                    items = loadCategoryPage(category.typeId, page = 1).items.take(16)
+                )
+            }.getOrNull()?.takeIf { it.items.isNotEmpty() }
+        }
 
         return HomePayload(
+            slides = slides,
+            hot = hot,
             featured = featured,
             latest = latest,
+            sections = sections,
             categories = categories,
             selectedCategory = categories.firstOrNull(),
             categoryVideos = latest,
@@ -641,6 +658,12 @@ class AppleCmsRepository(
             )
         }
     }
+
+    private suspend fun loadLevelItems(level: String, limit: Int): List<VodItem> =
+        api.getByLevel(level = level.trim(), page = 1)
+            .list
+            .distinctBy { it.vodId }
+            .take(limit)
 
     private suspend fun loadFeaturedFromHomePage(): List<VodItem> {
         val document = fetchDocument("$baseUrl/")
@@ -1571,8 +1594,11 @@ class AppleCmsRepository(
 }
 
 data class HomePayload(
+    val slides: List<VodItem>,
+    val hot: List<VodItem>,
     val featured: List<VodItem>,
     val latest: List<VodItem>,
+    val sections: List<HomeSection>,
     val categories: List<AppleCmsCategory>,
     val selectedCategory: AppleCmsCategory?,
     val categoryVideos: List<VodItem>,
@@ -1580,6 +1606,12 @@ data class HomePayload(
     val latestPageCount: Int,
     val latestTotal: Int,
     val latestHasNextPage: Boolean
+)
+
+data class HomeSection(
+    val title: String,
+    val typeId: String,
+    val items: List<VodItem>
 )
 
 data class PagedVodItems(

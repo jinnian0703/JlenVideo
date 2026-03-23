@@ -34,4 +34,11 @@ interface AppleCmsApi {
         @Query("ac") action: String = "detail",
         @Query("ids") vodId: String
     ): AppleCmsResponse
+
+    @GET("api.php/provide/vod/")
+    suspend fun getByLevel(
+        @Query("ac") action: String = "detail",
+        @Query("h") level: String,
+        @Query("pg") page: Int = 1
+    ): AppleCmsResponse
 }

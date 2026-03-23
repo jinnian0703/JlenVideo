@@ -105,6 +105,56 @@ fun HomeScreen(
         state.error?.let { message ->
             item { ErrorBanner(message = message, onRetry = onRefresh) }
         }
+        if (state.slides.isNotEmpty()) {
+            item {
+                SectionTitle(
+                    title = "轮播推荐",
+                    action = null,
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Rounded.Whatshot,
+                            contentDescription = null,
+                            tint = UiPalette.Accent,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    onAction = {}
+                )
+            }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    items(state.slides) { item ->
+                        FeaturedCard(item = item, onClick = onOpenDetail)
+                    }
+                }
+            }
+        }
+        if (state.hot.isNotEmpty()) {
+            item {
+                SectionTitle(
+                    title = "正在热播",
+                    action = null,
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Rounded.Whatshot,
+                            contentDescription = null,
+                            tint = UiPalette.Accent,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    onAction = {}
+                )
+            }
+            item {
+                PosterGridSection(
+                    items = state.hot,
+                    onOpenDetail = onOpenDetail
+                )
+            }
+        }
         if (state.featured.isNotEmpty()) {
             item {
                 SectionTitle(
@@ -158,6 +208,19 @@ fun HomeScreen(
                     hasMore = state.hasMoreLatest,
                     isLoading = state.isHomeAppending,
                     onLoadMore = onLoadMore
+                )
+            }
+        }
+        items(state.sections) { section ->
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SectionTitle(
+                    title = section.title,
+                    action = "更多",
+                    onAction = onOpenCategory
+                )
+                PosterGridSection(
+                    items = section.items,
+                    onOpenDetail = onOpenDetail
                 )
             }
         }
