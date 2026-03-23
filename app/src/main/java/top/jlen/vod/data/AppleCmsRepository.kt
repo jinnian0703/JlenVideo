@@ -117,6 +117,10 @@ class AppleCmsRepository(
         )
     }
 
+    fun clearSession() {
+        cookieJar.clear()
+    }
+
     suspend fun login(userName: String, password: String): AuthSession {
         val payload = FormBody.Builder()
             .add("user_name", userName.trim())

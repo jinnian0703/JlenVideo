@@ -344,6 +344,10 @@ fun AccountScreen(
     onBindEmail: () -> Unit,
     onUnbindEmail: () -> Unit
 ) {
+    val sessionExpired = state.error?.contains("请先登录") == true ||
+        state.error?.contains("登录已失效") == true
+    val showLoggedInContent = state.session.isLoggedIn && !sessionExpired
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -361,7 +365,7 @@ fun AccountScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = if (state.session.isLoggedIn) {
+                    text = if (showLoggedInContent) {
                         "当前账号已经登录，可以直接继续使用会员相关功能。"
                     } else {
                         "登录后可以同步站内账号状态和后续会员功能。"
@@ -372,7 +376,7 @@ fun AccountScreen(
             }
         }
 
-        if (!state.session.isLoggedIn) {
+        if (!showLoggedInContent) {
             state.message?.let { message ->
                 item {
                     Card(
@@ -399,7 +403,7 @@ fun AccountScreen(
             }
         }
 
-        if (state.session.isLoggedIn) {
+        if (showLoggedInContent) {
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
