@@ -112,6 +112,83 @@ buildConfigField("String", "APPLE_CMS_BASE_URL", "\"https://your-domain.com/\"")
 - [app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt)
 - [app/src/main/java/top/jlen/vod/data/AppleCmsApi.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/AppleCmsApi.kt)
 
+## 模板与路由配置
+
+当前这版客户端对接时，参考使用的站点模板文件为：
+
+- `d:/jinnian/Downloads/Compressed/v2.zip`
+
+如果你的站点也是基于这一套模板或相近结构，建议后台同时开启路由伪静态相关设置，否则搜索、详情、播放、专题、演员、文章等路径可能与客户端解析逻辑不一致。
+
+建议后台设置：
+
+- 隐藏后缀：开启
+- 路由状态：开启
+- 伪静态状态：开启
+
+推荐将下面这组规则配置到苹果 CMS 的“路由伪静态设置”里：
+
+```text
+map   => map/index
+rss/index   => rss/index
+rss/baidu => rss/baidu
+rss/google => rss/google
+rss/sogou => rss/sogou
+rss/so => rss/so
+rss/bing => rss/bing
+rss/sm => rss/sm
+
+index-<page?>   => index/index
+
+gbook-<page?>   => gbook/index
+gbook$   => gbook/index
+
+topic-<page?>   => topic/index
+topic$  => topic/index
+topicdetail-<id>   => topic/detail
+
+actor-<page?>   => actor/index
+actor$ => actor/index
+actordetail-<id>   => actor/detail
+actorshow/<area?>-<blood?>-<by?>-<letter?>-<level?>-<order?>-<page?>-<sex?>-<starsign?>   => actor/show
+
+role-<page?>   => role/index
+role$ => role/index
+roledetail-<id>   => role/detail
+roleshow/<by?>-<letter?>-<level?>-<order?>-<page?>-<rid?>   => role/show
+
+vodtype/<id>-<page?>   => vod/type
+vodtype/<id>   => vod/type
+voddetail/<id>   => vod/detail
+vodrss-<id>   => vod/rss
+vodplay/<id>-<sid>-<nid>   => vod/play
+voddown/<id>-<sid>-<nid>   => vod/down
+vodshow/<id>-<area?>-<by?>-<class?>-<lang?>-<letter?>-<level?>-<order?>-<page?>-<state?>-<tag?>-<year?>   => vod/show
+vodsearch/<wd?>-<actor?>-<area?>-<by?>-<class?>-<director?>-<lang?>-<letter?>-<level?>-<order?>-<page?>-<state?>-<tag?>-<year?>   => vod/search
+vodplot/<id>-<page?>   => vod/plot
+vodplot/<id>   => vod/plot
+
+arttype/<id>-<page?>   => art/type
+arttype/<id>   => art/type
+artshow-<id>   => art/show
+artdetail-<id>-<page?>   => art/detail
+artdetail-<id>   => art/detail
+artrss-<id>-<page>   => art/rss
+artshow/<id>-<by?>-<class?>-<level?>-<letter?>-<order?>-<page?>-<tag?>   => art/show
+artsearch/<wd?>-<by?>-<class?>-<level?>-<letter?>-<order?>-<page?>-<tag?>   => art/search
+
+label-<file> => label/index
+
+plotdetail/<id>-<page?>   => plot/plot
+plotdetail/<id>   => plot/detail
+```
+
+说明：
+
+- 这组规则会直接影响分类页、详情页、播放页、搜索页、专题页和文章页的访问路径。
+- 如果你使用的是别的模板，路由可以不同，但要同步检查客户端解析逻辑。
+- 播放页、搜索页、用户中心页如果打不开，优先先检查这里的配置是否和站点真实访问路径一致。
+
 ## 编译环境
 
 建议环境：
@@ -260,4 +337,3 @@ macOS / Linux：
 ## 仓库地址
 
 - GitHub: [https://github.com/jinnian0703/JlenVideo](https://github.com/jinnian0703/JlenVideo)
-
