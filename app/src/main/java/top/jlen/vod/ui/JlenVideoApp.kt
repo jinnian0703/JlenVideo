@@ -140,6 +140,11 @@ fun JlenVideoApp() {
                                 onProfileEditorChange = viewModel::updateProfileEditor,
                                 onProfileTabChange = viewModel::setProfileEditTab,
                                 onSaveProfile = viewModel::saveProfile,
+                                onToggleRegisterMode = viewModel::setRegisterMode,
+                                onRegisterEditorChange = viewModel::updateRegisterEditor,
+                                onRefreshRegisterCaptcha = viewModel::refreshRegisterCaptcha,
+                                onSendRegisterCode = viewModel::sendRegisterCode,
+                                onRegister = viewModel::register,
                                 onSendEmailCode = viewModel::sendEmailBindCode,
                                 onBindEmail = viewModel::bindEmail,
                                 onUnbindEmail = viewModel::unbindEmail

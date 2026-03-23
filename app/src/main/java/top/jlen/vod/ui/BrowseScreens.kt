@@ -1,6 +1,8 @@
 package top.jlen.vod.ui
 
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,11 +45,13 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -59,6 +63,7 @@ import coil.compose.AsyncImage
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.MembershipPlan
+import top.jlen.vod.data.RegisterEditor
 import top.jlen.vod.data.UserProfileEditor
 import top.jlen.vod.data.VodItem
 
@@ -340,6 +345,11 @@ fun AccountScreen(
     onProfileEditorChange: ((UserProfileEditor) -> UserProfileEditor) -> Unit,
     onProfileTabChange: (Boolean) -> Unit,
     onSaveProfile: () -> Unit,
+    onToggleRegisterMode: (Boolean) -> Unit,
+    onRegisterEditorChange: ((RegisterEditor) -> RegisterEditor) -> Unit,
+    onRefreshRegisterCaptcha: () -> Unit,
+    onSendRegisterCode: () -> Unit,
+    onRegister: () -> Unit,
     onSendEmailCode: () -> Unit,
     onBindEmail: () -> Unit,
     onUnbindEmail: () -> Unit
@@ -602,6 +612,56 @@ fun AccountScreen(
             }
         } else {
             item {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        item {
+                            AssistChip(
+                                onClick = { onToggleRegisterMode(false) },
+                                label = { Text("登录", fontWeight = FontWeight.SemiBold) },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = if (!state.isRegisterMode) UiPalette.Accent else UiPalette.Surface,
+                                    labelColor = if (!state.isRegisterMode) UiPalette.AccentText else UiPalette.Ink
+                                ),
+                                border = AssistChipDefaults.assistChipBorder(
+                                    borderColor = if (!state.isRegisterMode) UiPalette.Accent else UiPalette.BorderSoft,
+                                    enabled = true
+                                )
+                            )
+                        }
+                        item {
+                            AssistChip(
+                                onClick = { onToggleRegisterMode(true) },
+                                label = { Text("注册", fontWeight = FontWeight.SemiBold) },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = if (state.isRegisterMode) UiPalette.Accent else UiPalette.Surface,
+                                    labelColor = if (state.isRegisterMode) UiPalette.AccentText else UiPalette.Ink
+                                ),
+                                border = AssistChipDefaults.assistChipBorder(
+                                    borderColor = if (state.isRegisterMode) UiPalette.Accent else UiPalette.BorderSoft,
+                                    enabled = true
+                                )
+                            )
+                        }
+                    }
+
+                    if (state.isRegisterMode) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                            shape = RoundedCornerShape(24.dp),
+                            border = BorderStroke(1.dp, UiPalette.Border)
+                        ) {
+                            AccountRegisterPane(
+                                state = state,
+                                onEditorChange = onRegisterEditorChange,
+                                onRefreshCaptcha = onRefreshRegisterCaptcha,
+                                onSendCode = onSendRegisterCode,
+                                onSubmit = onRegister
+                            )
+                        }
+                        return@item
+                    }
+                }
+
                 Card(
                     colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
                     shape = RoundedCornerShape(24.dp),
@@ -668,6 +728,211 @@ fun AccountScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AccountRegisterPane(
+    state: AccountUiState,
+    onEditorChange: ((RegisterEditor) -> RegisterEditor) -> Unit,
+    onRefreshCaptcha: () -> Unit,
+    onSendCode: () -> Unit,
+    onSubmit: () -> Unit
+) {
+    val captchaBitmap = remember(state.registerCaptcha) {
+        state.registerCaptcha?.let { bytes ->
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        OutlinedTextField(
+            value = state.registerEditor.userName,
+            onValueChange = { value -> onEditorChange { it.copy(userName = value) } },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            singleLine = true,
+            label = { Text("用户名") },
+            placeholder = { Text("请输入注册用户名") },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = UiPalette.Accent,
+                unfocusedBorderColor = UiPalette.BorderSoft,
+                focusedTextColor = UiPalette.Ink,
+                unfocusedTextColor = UiPalette.Ink,
+                cursorColor = UiPalette.Accent,
+                focusedContainerColor = UiPalette.Surface,
+                unfocusedContainerColor = UiPalette.Surface
+            )
+        )
+        OutlinedTextField(
+            value = state.registerEditor.password,
+            onValueChange = { value -> onEditorChange { it.copy(password = value) } },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            singleLine = true,
+            label = { Text("密码") },
+            placeholder = { Text("请输入注册密码") },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = KeyboardType.Password
+            ),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = UiPalette.Accent,
+                unfocusedBorderColor = UiPalette.BorderSoft,
+                focusedTextColor = UiPalette.Ink,
+                unfocusedTextColor = UiPalette.Ink,
+                cursorColor = UiPalette.Accent,
+                focusedContainerColor = UiPalette.Surface,
+                unfocusedContainerColor = UiPalette.Surface
+            )
+        )
+        OutlinedTextField(
+            value = state.registerEditor.confirmPassword,
+            onValueChange = { value -> onEditorChange { it.copy(confirmPassword = value) } },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            singleLine = true,
+            label = { Text("确认密码") },
+            placeholder = { Text("请再次输入密码") },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = KeyboardType.Password
+            ),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = UiPalette.Accent,
+                unfocusedBorderColor = UiPalette.BorderSoft,
+                focusedTextColor = UiPalette.Ink,
+                unfocusedTextColor = UiPalette.Ink,
+                cursorColor = UiPalette.Accent,
+                focusedContainerColor = UiPalette.Surface,
+                unfocusedContainerColor = UiPalette.Surface
+            )
+        )
+        OutlinedTextField(
+            value = state.registerEditor.contact,
+            onValueChange = { value -> onEditorChange { it.copy(contact = value) } },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            singleLine = true,
+            label = { Text(state.registerContactLabel) },
+            placeholder = { Text("请输入${state.registerContactLabel}") },
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = if (state.registerChannel == "phone") KeyboardType.Phone else KeyboardType.Email
+            ),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = UiPalette.Accent,
+                unfocusedBorderColor = UiPalette.BorderSoft,
+                focusedTextColor = UiPalette.Ink,
+                unfocusedTextColor = UiPalette.Ink,
+                cursorColor = UiPalette.Accent,
+                focusedContainerColor = UiPalette.Surface,
+                unfocusedContainerColor = UiPalette.Surface
+            )
+        )
+        if (state.registerRequiresCode) {
+            OutlinedTextField(
+                value = state.registerEditor.code,
+                onValueChange = { value -> onEditorChange { it.copy(code = value) } },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                singleLine = true,
+                label = { Text(state.registerCodeLabel) },
+                placeholder = { Text("请输入${state.registerCodeLabel}") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = UiPalette.Accent,
+                    unfocusedBorderColor = UiPalette.BorderSoft,
+                    focusedTextColor = UiPalette.Ink,
+                    unfocusedTextColor = UiPalette.Ink,
+                    cursorColor = UiPalette.Accent,
+                    focusedContainerColor = UiPalette.Surface,
+                    unfocusedContainerColor = UiPalette.Surface
+                )
+            )
+            OutlinedButton(
+                onClick = onSendCode,
+                enabled = !state.isActionLoading,
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(1.dp, UiPalette.BorderSoft)
+            ) {
+                Text(if (state.isActionLoading) "发送中..." else "发送${state.registerCodeLabel}")
+            }
+        }
+
+        if (state.registerRequiresVerify) {
+            OutlinedTextField(
+                value = state.registerEditor.verify,
+                onValueChange = { value -> onEditorChange { it.copy(verify = value) } },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                singleLine = true,
+                label = { Text("图片验证码") },
+                placeholder = { Text("请输入图片验证码") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = UiPalette.Accent,
+                    unfocusedBorderColor = UiPalette.BorderSoft,
+                    focusedTextColor = UiPalette.Ink,
+                    unfocusedTextColor = UiPalette.Ink,
+                    cursorColor = UiPalette.Accent,
+                    focusedContainerColor = UiPalette.Surface,
+                    unfocusedContainerColor = UiPalette.Surface
+                )
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(UiPalette.SurfaceSoft),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (captchaBitmap != null) {
+                        Image(
+                            bitmap = captchaBitmap,
+                            contentDescription = "图片验证码",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clickable(onClick = onRefreshCaptcha),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        Text(
+                            text = if (state.isContentLoading) "加载中..." else "点击刷新验证码",
+                            color = UiPalette.TextSecondary
+                        )
+                    }
+                }
+                OutlinedButton(
+                    onClick = onRefreshCaptcha,
+                    enabled = !state.isContentLoading,
+                    border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                ) {
+                    Text("刷新")
+                }
+            }
+        }
+
+        Button(
+            onClick = onSubmit,
+            enabled = !state.isActionLoading,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = UiPalette.Accent,
+                contentColor = UiPalette.AccentText
+            )
+        ) {
+            Text(if (state.isActionLoading) "注册中..." else "立即注册", fontWeight = FontWeight.Bold)
         }
     }
 }

@@ -155,6 +155,74 @@ class AppleCmsRepository(
         }
     }
 
+    suspend fun loadRegisterPage(): RegisterPage {
+        val document = fetchDocument("$baseUrl/index.php/user/reg.html")
+        val channel = document.selectFirst("input[name=ac]")?.attr("value")?.trim().orEmpty()
+            .ifBlank { "email" }
+        val requiresCode = document.selectFirst("input[name=code]") != null
+        val requiresVerify = document.selectFirst("input[name=verify]") != null
+        val captchaUrl = document.selectFirst("img.ewave-verify-img, img[src*=/verify/]")
+            ?.attr("src")
+            .orEmpty()
+
+        return RegisterPage(
+            channel = channel,
+            contactLabel = if (channel == "phone") "手机号" else "邮箱",
+            codeLabel = if (channel == "phone") "手机验证码" else "邮箱验证码",
+            requiresCode = requiresCode,
+            requiresVerify = requiresVerify,
+            captchaUrl = resolveUrl(captchaUrl),
+            captchaBytes = if (requiresVerify && captchaUrl.isNotBlank()) {
+                loadRegisterCaptcha(resolveUrl(captchaUrl))
+            } else {
+                null
+            }
+        )
+    }
+
+    suspend fun loadRegisterCaptcha(captchaUrl: String): ByteArray {
+        val request = Request.Builder()
+            .url(appendTimestamp(captchaUrl))
+            .header("Referer", "$baseUrl/index.php/user/reg.html")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("加载验证码失败：HTTP ${response.code}")
+            }
+            return response.body?.bytes() ?: throw IOException("加载验证码失败")
+        }
+    }
+
+    suspend fun sendRegisterCode(channel: String, contact: String): String {
+        val form = FormBody.Builder()
+            .add("ac", channel.trim())
+            .add("to", contact.trim())
+            .build()
+        return submitPublicAction(
+            url = normalizeUrl("/user/reg_msg/"),
+            referer = "$baseUrl/index.php/user/reg.html",
+            formBody = form
+        )
+    }
+
+    suspend fun register(editor: RegisterEditor): String {
+        val form = FormBody.Builder()
+            .add("user_name", editor.userName.trim())
+            .add("user_pwd", editor.password)
+            .add("user_pwd2", editor.confirmPassword)
+            .add("ac", editor.channel.trim())
+            .add("to", editor.contact.trim())
+            .add("code", editor.code.trim())
+            .add("verify", editor.verify.trim())
+            .build()
+        return submitPublicAction(
+            url = normalizeUrl("/user/reg/"),
+            referer = "$baseUrl/index.php/user/reg.html",
+            formBody = form
+        )
+    }
+
     suspend fun logout() {
         val request = Request.Builder()
             .url("$baseUrl/index.php/user/logout")
@@ -748,6 +816,35 @@ class AppleCmsRepository(
         }
     }
 
+    private suspend fun submitPublicAction(
+        url: String,
+        referer: String,
+        formBody: FormBody
+    ): String {
+        val request = Request.Builder()
+            .url(url)
+            .header("Referer", referer)
+            .header("X-Requested-With", "XMLHttpRequest")
+            .post(formBody)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("请求失败：HTTP ${response.code}")
+            }
+
+            val body = response.body?.string().orEmpty()
+            val authResponse = runCatching { gson.fromJson(body, AuthResponse::class.java) }.getOrNull()
+            if (authResponse != null) {
+                if (authResponse.code == 1) {
+                    return authResponse.msg.ifBlank { "操作成功" }
+                }
+                throw IOException(authResponse.msg.ifBlank { "操作失败" })
+            }
+            throw IOException("操作失败")
+        }
+    }
+
     private fun readLabeledValue(document: Document, label: String): Pair<String, String>? {
         val value = readLabeledText(document, label)
         return value.takeIf { it.isNotBlank() }?.let { label to it }
@@ -1098,6 +1195,11 @@ class AppleCmsRepository(
         } else {
             Uri.parse("$baseUrl/").buildUpon().appendEncodedPath(value).build().toString()
         }
+    }
+
+    private fun appendTimestamp(url: String): String {
+        val separator = if (url.contains("?")) "&" else "?"
+        return "$url${separator}t=${System.currentTimeMillis()}"
     }
 
     private fun isDirectMediaUrl(url: String): Boolean {

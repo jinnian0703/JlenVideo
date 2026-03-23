@@ -16,6 +16,7 @@ import top.jlen.vod.data.Episode
 import top.jlen.vod.data.MembershipInfo
 import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.PlaySource
+import top.jlen.vod.data.RegisterEditor
 import top.jlen.vod.data.UserCenterItem
 import top.jlen.vod.data.UserProfileEditor
 import top.jlen.vod.data.VodItem
@@ -281,6 +282,50 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         accountState = accountState.copy(password = value, error = null, message = null)
     }
 
+    fun setRegisterMode(registerMode: Boolean) {
+        accountState = accountState.copy(
+            isRegisterMode = registerMode,
+            error = null,
+            message = null
+        )
+        if (registerMode) {
+            loadRegisterPage(forceRefresh = true)
+        }
+    }
+
+    fun updateRegisterEditor(transform: (RegisterEditor) -> RegisterEditor) {
+        accountState = accountState.copy(
+            registerEditor = transform(accountState.registerEditor),
+            error = null,
+            message = null
+        )
+    }
+
+    fun refreshRegisterCaptcha() {
+        val captchaUrl = accountState.registerCaptchaUrl
+        if (captchaUrl.isBlank()) {
+            loadRegisterPage(forceRefresh = true)
+            return
+        }
+
+        viewModelScope.launch {
+            accountState = accountState.copy(isContentLoading = true, error = null)
+            runCatching {
+                withContext(Dispatchers.IO) { repository.loadRegisterCaptcha(captchaUrl) }
+            }.onSuccess { bytes ->
+                accountState = accountState.copy(
+                    isContentLoading = false,
+                    registerCaptcha = bytes
+                )
+            }.onFailure { error ->
+                accountState = accountState.copy(
+                    isContentLoading = false,
+                    error = error.message ?: "验证码加载失败"
+                )
+            }
+        }
+    }
+
     fun updateProfileEditor(transform: (UserProfileEditor) -> UserProfileEditor) {
         accountState = accountState.copy(
             profileEditor = transform(accountState.profileEditor),
@@ -466,6 +511,69 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    fun sendRegisterCode() {
+        val editor = accountState.registerEditor
+        val contact = editor.contact.trim()
+        if (contact.isBlank()) {
+            accountState = accountState.copy(error = "请输入${accountState.registerContactLabel}")
+            return
+        }
+
+        if (editor.channel == "email" && !contact.contains("@")) {
+            accountState = accountState.copy(error = "请输入正确的邮箱地址")
+            return
+        }
+
+        runAccountAction(
+            block = { sendRegisterCode(editor.channel, contact) },
+            onSuccess = { }
+        )
+    }
+
+    fun register() {
+        val editor = accountState.registerEditor
+        if (editor.userName.isBlank()) {
+            accountState = accountState.copy(error = "请输入用户名")
+            return
+        }
+        if (editor.password.isBlank()) {
+            accountState = accountState.copy(error = "请输入密码")
+            return
+        }
+        if (editor.confirmPassword.isBlank()) {
+            accountState = accountState.copy(error = "请确认密码")
+            return
+        }
+        if (editor.password != editor.confirmPassword) {
+            accountState = accountState.copy(error = "两次输入的密码不一致")
+            return
+        }
+        if (editor.contact.isBlank()) {
+            accountState = accountState.copy(error = "请输入${accountState.registerContactLabel}")
+            return
+        }
+        if (accountState.registerRequiresCode && editor.code.isBlank()) {
+            accountState = accountState.copy(error = "请输入${accountState.registerCodeLabel}")
+            return
+        }
+        if (accountState.registerRequiresVerify && editor.verify.isBlank()) {
+            accountState = accountState.copy(error = "请输入图片验证码")
+            return
+        }
+
+        runAccountAction(
+            block = { register(editor.copy(channel = accountState.registerChannel)) },
+            onSuccess = {
+                accountState = accountState.copy(
+                    isRegisterMode = false,
+                    userName = editor.userName,
+                    password = "",
+                    registerEditor = RegisterEditor(channel = accountState.registerChannel)
+                )
+            }
+        )
+    }
+
     fun addCurrentDetailFavorite() {
         val item = detailState.item ?: return
         if (!accountState.session.isLoggedIn) {
@@ -546,6 +654,33 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 accountState = accountState.copy(
                     isLoading = false,
                     error = error.message ?: "退出登录失败"
+                )
+            }
+        }
+    }
+
+    private fun loadRegisterPage(forceRefresh: Boolean = false) {
+        if (accountState.isContentLoading && !forceRefresh) return
+        viewModelScope.launch {
+            accountState = accountState.copy(isContentLoading = true, error = null)
+            runCatching {
+                withContext(Dispatchers.IO) { repository.loadRegisterPage() }
+            }.onSuccess { page ->
+                accountState = accountState.copy(
+                    isContentLoading = false,
+                    registerChannel = page.channel,
+                    registerContactLabel = page.contactLabel,
+                    registerCodeLabel = page.codeLabel,
+                    registerRequiresCode = page.requiresCode,
+                    registerRequiresVerify = page.requiresVerify,
+                    registerCaptchaUrl = page.captchaUrl,
+                    registerCaptcha = page.captchaBytes,
+                    registerEditor = accountState.registerEditor.copy(channel = page.channel)
+                )
+            }.onFailure { error ->
+                accountState = accountState.copy(
+                    isContentLoading = false,
+                    error = error.message ?: "注册页面加载失败"
                 )
             }
         }
@@ -1068,6 +1203,15 @@ data class AccountUiState(
     val message: String? = null,
     val userName: String = "",
     val password: String = "",
+    val isRegisterMode: Boolean = false,
+    val registerChannel: String = "email",
+    val registerContactLabel: String = "邮箱",
+    val registerCodeLabel: String = "邮箱验证码",
+    val registerRequiresCode: Boolean = true,
+    val registerRequiresVerify: Boolean = true,
+    val registerCaptchaUrl: String = "",
+    val registerCaptcha: ByteArray? = null,
+    val registerEditor: RegisterEditor = RegisterEditor(),
     val session: AuthSession = AuthSession(),
     val selectedSection: AccountSection = AccountSection.Profile,
     val isProfileEditTab: Boolean = false,

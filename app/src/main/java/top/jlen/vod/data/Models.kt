@@ -163,6 +163,26 @@ data class UserProfileEditor(
     val confirmPassword: String = ""
 )
 
+data class RegisterPage(
+    val channel: String = "email",
+    val contactLabel: String = "邮箱",
+    val codeLabel: String = "邮箱验证码",
+    val requiresCode: Boolean = true,
+    val requiresVerify: Boolean = true,
+    val captchaUrl: String = "",
+    val captchaBytes: ByteArray? = null
+)
+
+data class RegisterEditor(
+    val userName: String = "",
+    val password: String = "",
+    val confirmPassword: String = "",
+    val channel: String = "email",
+    val contact: String = "",
+    val code: String = "",
+    val verify: String = ""
+)
+
 data class UserCenterItem(
     val recordId: String = "",
     val vodId: String = "",
