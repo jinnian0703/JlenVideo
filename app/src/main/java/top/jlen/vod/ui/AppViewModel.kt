@@ -17,12 +17,14 @@ import top.jlen.vod.data.MembershipInfo
 import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.PlaySource
 import top.jlen.vod.data.RegisterEditor
+import top.jlen.vod.data.SearchHistoryStore
 import top.jlen.vod.data.UserCenterItem
 import top.jlen.vod.data.UserProfileEditor
 import top.jlen.vod.data.VodItem
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = AppleCmsRepository(application)
+    private val searchHistoryStore = SearchHistoryStore(application)
     private val allCategory = AppleCmsCategory(typeId = "__all__", typeName = "全部分类")
 
     var homeState by mutableStateOf(HomeUiState())
@@ -41,6 +43,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     init {
+        searchState = searchState.copy(history = searchHistoryStore.load())
         refreshAccount()
         refreshHome()
     }
@@ -243,7 +246,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateQuery(query: String) {
-        searchState = searchState.copy(query = query)
+        searchState = searchState.copy(query = query, error = null)
+    }
+
+    fun searchHistory(keyword: String) {
+        val normalized = keyword.trim()
+        if (normalized.isBlank()) return
+        searchState = searchState.copy(query = normalized, error = null)
+        search()
+    }
+
+    fun clearSearchHistory() {
+        searchHistoryStore.clear()
+        searchState = searchState.copy(history = emptyList())
     }
 
     fun search() {
@@ -260,8 +275,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             runCatching {
                 withContext(Dispatchers.IO) { repository.search(query) }
             }.onSuccess { results ->
+                searchHistoryStore.save(query)
                 searchState = searchState.copy(
                     isLoading = false,
+                    history = searchHistoryStore.load(),
                     results = results,
                     error = if (results.isEmpty()) "没有找到相关结果" else null
                 )
@@ -1185,6 +1202,7 @@ data class SearchUiState(
     val query: String = "",
     val isLoading: Boolean = false,
     val error: String? = null,
+    val history: List<String> = emptyList(),
     val results: List<VodItem> = emptyList()
 )
 

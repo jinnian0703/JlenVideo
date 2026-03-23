@@ -112,6 +112,8 @@ fun JlenVideoApp() {
                                 state = viewModel.searchState,
                                 onQueryChange = viewModel::updateQuery,
                                 onSearch = viewModel::search,
+                                onSearchHistory = viewModel::searchHistory,
+                                onClearHistory = viewModel::clearSearchHistory,
                                 onOpenDetail = { navController.navigate("detail/$it") }
                             )
                         }

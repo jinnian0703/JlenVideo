@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Whatshot
@@ -255,6 +256,8 @@ fun SearchScreen(
     state: SearchUiState,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
+    onSearchHistory: (String) -> Unit,
+    onClearHistory: () -> Unit,
     onOpenDetail: (String) -> Unit
 ) {
     Column(
@@ -306,6 +309,52 @@ fun SearchScreen(
             }
         )
         Spacer(modifier = Modifier.height(16.dp))
+        if (state.history.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.History,
+                        contentDescription = null,
+                        tint = UiPalette.TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "鎼滅储鍘嗗彶",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = UiPalette.Ink
+                    )
+                }
+                TextButton(onClick = onClearHistory) {
+                    Text("娓呯┖")
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(state.history) { keyword ->
+                    AssistChip(
+                        onClick = { onSearchHistory(keyword) },
+                        label = { Text(keyword) },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = UiPalette.Surface,
+                            labelColor = UiPalette.Ink
+                        ),
+                        border = AssistChipDefaults.assistChipBorder(
+                            borderColor = UiPalette.BorderSoft,
+                            enabled = true
+                        )
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
         when {
             state.isLoading -> LoadingPane("搜索中...")
             !state.error.isNullOrBlank() && state.results.isEmpty() -> ErrorBanner(message = state.error, onRetry = onSearch)
