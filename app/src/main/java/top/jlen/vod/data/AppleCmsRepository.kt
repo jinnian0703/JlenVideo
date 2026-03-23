@@ -1133,11 +1133,18 @@ class AppleCmsRepository(
     private fun parseUserProfileEditor(document: Document): UserProfileEditor =
         UserProfileEditor(
             qq = decodeSiteText(document.selectFirst("input[name=user_qq]")?.attr("value").orEmpty()),
-            email = decodeSiteText(document.selectFirst("input[name=user_email]")?.attr("value").orEmpty()),
+            email = normalizeBoundEmail(
+                decodeSiteText(document.selectFirst("input[name=user_email]")?.attr("value").orEmpty())
+            ),
             phone = decodeSiteText(document.selectFirst("input[name=user_phone]")?.attr("value").orEmpty()),
             question = decodeSiteText(document.selectFirst("input[name=user_question]")?.attr("value").orEmpty()),
             answer = decodeSiteText(document.selectFirst("input[name=user_answer]")?.attr("value").orEmpty())
         )
+
+    private fun normalizeBoundEmail(value: String): String {
+        val trimmed = value.trim()
+        return if (trimmed.contains("@") && trimmed.contains(".")) trimmed else ""
+    }
 
     private fun extractLabeledValues(
         document: Document,

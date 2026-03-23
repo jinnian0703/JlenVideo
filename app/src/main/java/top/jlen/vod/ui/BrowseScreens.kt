@@ -746,7 +746,8 @@ private fun AccountProfilePaneV2(
                             onValueChange = { value -> onEditorChange { it.copy(answer = value) } }
                         )
 
-                        if (editor.email.isBlank()) {
+                        val hasBoundEmail = editor.email.contains("@") && editor.email.contains(".")
+                        if (!hasBoundEmail) {
                             ProfileEditorField(
                                 label = "邮箱",
                                 value = editor.pendingEmail,
