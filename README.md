@@ -1,26 +1,37 @@
 # JlenVideo
 
-`JlenVideo` 鏄竴涓熀浜庡師鐢?Android + Jetpack Compose 寮€鍙戠殑鑻规灉 CMS 褰辫瀹㈡埛绔紝褰撳墠鐗堟湰涓?`1.0.0` 姝ｅ紡鐗堛€?
-椤圭洰鐩爣涓嶆槸绠€鍗曞澹崇綉椤碉紝鑰屾槸鍥寸粫鑻规灉 CMS 绔欑偣鑳藉姏锛屾彁渚涙洿鎺ヨ繎鍘熺敓 App 鐨勬祻瑙堛€佹悳绱€佽鎯呫€佹挱鏀俱€佽处鍙枫€佹敹钘忋€佸巻鍙蹭笌浼氬憳浣撻獙銆?
-褰撳墠榛樿绔欑偣锛?
+`JlenVideo` 是一个基于原生 Android + Jetpack Compose 开发的苹果 CMS 影视客户端，当前版本为 `1.0.0` 正式版。
+
+项目目标不是简单套壳网页，而是围绕苹果 CMS 站点能力，提供更接近原生 App 的浏览、搜索、详情、播放、账号、收藏、历史与会员体验。
+
+当前默认站点：
+
 - `https://cms.jlen.top/`
 
-## 鐗堟湰淇℃伅
+## 版本信息
 
-- 褰撳墠鐗堟湰锛歚1.0.0`
-- `versionCode`锛歚1`
-- `versionName`锛歚1.0.0`
+- 当前版本：`1.0.0`
+- `versionCode`：`1`
+- `versionName`：`1.0.0`
 
-鐗堟湰瀹氫箟浣嶇疆锛?
+版本定义位置：
+
 - [app/build.gradle.kts](/F:/codex/1/app/build.gradle.kts)
 
-## 涓昏鍔熻兘
+## 主要功能
 
-- 棣栭〉鎺ㄨ崘銆佹渶杩戞洿鏂般€佺墖搴撳垎绫绘祻瑙?- 绔欏唴鎼滅储
-- 褰辫璇︽儏椤?- 鍘熺敓鎾斁鍣ㄦ帴绠℃挱鏀?- 鍏ㄥ睆銆佸€嶉€熴€佹殏鍋溿€佺户缁挱鏀?- 鑷姩璁板綍鍘嗗彶
-- 鏀惰棌銆佽鐪嬭褰?- 鐧诲綍銆佹敞鍐屻€佽祫鏂欎慨鏀?- 閭缁戝畾銆侀偖绠辫В缁?- 浼氬憳涓績鍩虹淇℃伅灞曠ず
+- 首页推荐、最近更新、片库分类浏览
+- 站内搜索
+- 影视详情页
+- 原生播放器接管播放
+- 全屏、倍速、暂停、继续播放
+- 自动记录历史
+- 收藏、观看记录
+- 登录、注册、资料修改
+- 邮箱绑定、邮箱解绑
+- 会员中心基础信息展示
 
-## 鎶€鏈爤
+## 技术栈
 
 - Kotlin
 - Jetpack Compose
@@ -33,9 +44,10 @@
 - Coil
 - Media3 ExoPlayer
 
-## 椤圭洰缁撴瀯
+## 项目结构
 
-鏍稿績鐩綍濡備笅锛?
+核心目录如下：
+
 - [app/src/main/java/top/jlen/vod/MainActivity.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/MainActivity.kt)
 - [app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt)
 - [app/src/main/java/top/jlen/vod/data/AppleCmsApi.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/AppleCmsApi.kt)
@@ -48,167 +60,204 @@
 - [app/src/main/java/top/jlen/vod/ui/NativeVideoPlayer.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/NativeVideoPlayer.kt)
 - [app/src/main/java/top/jlen/vod/ui/FullscreenPlayerActivity.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/FullscreenPlayerActivity.kt)
 
-璇存槑锛?
-- `data` 灞傝礋璐ｆ帴鍙ｈ闂€侀〉闈㈡姄鍙栥€丠TML 瑙ｆ瀽銆丆ookie 鎸佷箙鍖栥€?- `ui` 灞傝礋璐?Compose 椤甸潰銆佹挱鏀惧櫒銆佸鑸笌鐘舵€佸睍绀恒€?- `AppViewModel` 璐熻矗鎶婄珯鐐规暟鎹暣鍚堟垚 App 鍙洿鎺ユ秷璐圭殑鐘舵€併€?
-## 宸ヤ綔鍘熺悊
+说明：
 
-杩欎釜椤圭洰鍚屾椂浣跨敤浜嗕袱绫绘暟鎹潵婧愶細
+- `data` 层负责接口访问、页面抓取、HTML 解析、Cookie 持久化。
+- `ui` 层负责 Compose 页面、播放器、导航与状态展示。
+- `AppViewModel` 负责把站点数据整合成 App 可直接消费的状态。
 
-1. 鑻规灉 CMS JSON 鎺ュ彛
-- 鐢ㄤ簬鍒嗙被銆侀儴鍒嗗奖瑙嗗垪琛ㄧ瓑缁撴瀯鍖栨暟鎹媺鍙栥€?
-2. 绔欑偣 HTML 椤甸潰瑙ｆ瀽
-- 鐢ㄤ簬鎼滅储銆佽鎯呫€佺敤鎴蜂腑蹇冦€佹敹钘忋€佸巻鍙层€佷細鍛樸€佹敞鍐屻€侀偖绠辩粦瀹氱瓑鍔熻兘銆?
-鍥犱负涓嶅悓鑻规灉 CMS 涓婚瀵瑰墠绔粨鏋勬湁宸紓锛屾墍浠ヨ繖閲岄噰鐢ㄤ簡锛?
-- 鑳借蛋鎺ュ彛鐨勫湴鏂瑰敖閲忚蛋鎺ュ彛
-- 鎺ュ彛涓嶅鏃剁洿鎺ヨВ鏋愰〉闈?- 鎾斁椤典娇鐢ㄥ師鐢熸挱鏀惧櫒鎺ョ瀹為檯鎾斁鍦板潃
+## 工作原理
 
-## 濡備綍淇敼 API 鍦板潃
+这个项目同时使用了两类数据来源：
 
-褰撳墠绔欑偣鍦板潃閰嶇疆鍦細
+1. 苹果 CMS JSON 接口
+- 用于分类、部分影视列表等结构化数据拉取。
+
+2. 站点 HTML 页面解析
+- 用于搜索、详情、用户中心、收藏、历史、会员、注册、邮箱绑定等功能。
+
+因为不同苹果 CMS 主题对前端结构有差异，所以这里采用了：
+
+- 能走接口的地方尽量走接口
+- 接口不够时直接解析页面
+- 播放页使用原生播放器接管实际播放地址
+
+## 如何修改 API 地址
+
+当前站点地址配置在：
 
 - [app/build.gradle.kts](/F:/codex/1/app/build.gradle.kts)
 
-鎵惧埌杩欎竴琛岋細
+找到这一行：
 
 ```kotlin
 buildConfigField("String", "APPLE_CMS_BASE_URL", "\"https://cms.jlen.top/\"")
 ```
 
-鏀规垚浣犺嚜宸辩殑鑻规灉 CMS 绔欑偣锛屼緥濡傦細
+改成你自己的苹果 CMS 站点，例如：
 
 ```kotlin
 buildConfigField("String", "APPLE_CMS_BASE_URL", "\"https://your-domain.com/\"")
 ```
 
-娉ㄦ剰浜嬮」锛?
-- 蹇呴』甯﹀崗璁ご锛屼緥濡?`https://`
-- 鏈熬鏈€濂戒繚鐣?`/`
-- 濡傛灉浣犵殑绔欑偣寮€鍚簡 Cloudflare銆佷汉鏈洪獙璇佹垨棰濆鍙嶇埇锛岄儴鍒嗗姛鑳藉彲鑳介渶瑕侀澶栭€傞厤
-- 涓嶅悓涓婚妯℃澘鐨勭敤鎴蜂腑蹇?HTML 缁撴瀯涓嶅悓锛屾敞鍐屻€佺櫥褰曘€佹敹钘忋€佸巻鍙层€佷細鍛樺尯鍙兘闇€瑕佸井璋冭В鏋愯鍒?
-濡傛灉浣犳崲浜嗙珯鐐瑰悗鍔熻兘寮傚父锛屼紭鍏堟鏌ヨ繖浜涗綅缃細
+注意事项：
+
+- 必须带协议头，例如 `https://`
+- 末尾最好保留 `/`
+- 如果你的站点开启了 Cloudflare、人机验证或额外反爬，部分功能可能需要额外适配
+- 不同主题模板的用户中心 HTML 结构不同，注册、登录、收藏、历史、会员区可能需要微调解析规则
+
+如果你换了站点后功能异常，优先检查这些位置：
 
 - [app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt)
 - [app/src/main/java/top/jlen/vod/data/AppleCmsApi.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/AppleCmsApi.kt)
 
-## 缂栬瘧鐜
+## 编译环境
 
-寤鸿鐜锛?
-- Android Studio Hedgehog 浠ヤ笂
+建议环境：
+
+- Android Studio Hedgehog 以上
 - JDK `17`
 - Android SDK `34`
 - Gradle Wrapper
 
-鏈」鐩綋鍓嶉厤缃細
+本项目当前配置：
 
 - `minSdk = 24`
 - `targetSdk = 34`
 - `compileSdk = 34`
 - `jvmTarget = 17`
 
-## 缂栬瘧鏁欑▼
+## 编译教程
 
-### 1. 鍏嬮殕椤圭洰
+### 1. 克隆项目
 
 ```bash
 git clone https://github.com/jinnian0703/JlenVideo.git
 cd JlenVideo
 ```
 
-### 2. 浣跨敤 Android Studio 鎵撳紑
+### 2. 使用 Android Studio 打开
 
-- 鎵撳紑 Android Studio
-- 閫夋嫨椤圭洰鏍圭洰褰?- 绛夊緟 Gradle 鍚屾瀹屾垚
+- 打开 Android Studio
+- 选择项目根目录
+- 等待 Gradle 同步完成
 
-### 3. 淇敼绔欑偣 API
+### 3. 修改站点 API
 
-鎸変笂闈㈢殑鈥滃浣曚慨鏀?API 鍦板潃鈥濅竴鑺傦紝淇敼锛?
+按上面的“如何修改 API 地址”一节，修改：
+
 - [app/build.gradle.kts](/F:/codex/1/app/build.gradle.kts)
 
-### 4. 缂栬瘧璋冭瘯鍖?
-Windows锛?
+### 4. 编译调试包
+
+Windows：
+
 ```powershell
 .\gradlew.bat assembleDebug
 ```
 
-macOS / Linux锛?
+macOS / Linux：
+
 ```bash
 ./gradlew assembleDebug
 ```
 
-鐢熸垚鐨?APK 榛樿鍦細
+生成的 APK 默认在：
 
 - `app/build/outputs/apk/debug/app-debug.apk`
 
-### 5. 缂栬瘧鍙戝竷鍖?
+### 5. 编译发布包
+
 ```powershell
 .\gradlew.bat assembleRelease
 ```
 
-鐢熸垚鐨?APK 榛樿鍦細
+生成的 APK 默认在：
 
 - `app/build/outputs/apk/release/`
 
-娉ㄦ剰锛?
-- 褰撳墠 `release` 榛樿娌℃湁寮€鍚贩娣嗕紭鍖?- 姝ｅ紡鍒嗗彂鍓嶅缓璁嚜琛岄厤缃鍚嶃€佹贩娣嗐€佽祫婧愬帇缂╁拰瀹夊叏鍔犲浐
+注意：
 
-## 璋冭瘯寤鸿
+- 当前 `release` 默认没有开启混淆优化
+- 正式分发前建议自行配置签名、混淆、资源压缩和安全加固
 
-濡傛灉浣犳帴鍏ユ柊鐨勮嫻鏋?CMS 绔欑偣鍚庨亣鍒伴棶棰橈紝鍙互鎸変笅闈㈡帓鏌ワ細
+## 调试建议
 
-### 鎼滅储鏃犵粨鏋?
-- 妫€鏌ユ悳绱㈤〉璺緞鏄惁浠嶇劧鏄?`/vodsearch/-------------/?wd=鍏抽敭璇峘
-- 妫€鏌ユ悳绱㈢粨鏋?DOM 缁撴瀯鏄惁鍙樺寲
+如果你接入新的苹果 CMS 站点后遇到问题，可以按下面排查：
 
-### 鎾斁鍦板潃瑙ｆ瀽澶辫触
+### 搜索无结果
 
-- 妫€鏌ユ挱鏀鹃〉鐨?`player_aaaa` 鏁版嵁缁撴瀯
-- 妫€鏌ユ挱鏀惧櫒 iframe / m3u8 / mp4 閾炬帴鎻愬彇瑙勫垯
-- 妫€鏌ユ槸鍚﹂渶瑕侀澶?Referer 鎴?Origin
+- 检查搜索页路径是否仍然是 `/vodsearch/-------------/?wd=关键词`
+- 检查搜索结果 DOM 结构是否变化
 
-### 鏀惰棌銆佸巻鍙层€佷細鍛樸€佽祫鏂欏け璐?
-- 妫€鏌ョ敤鎴蜂腑蹇冭矾寰勬槸鍚︿粛涓?`/index.php/user/...`
-- 妫€鏌ラ〉闈㈠瓧娈垫爣棰樺拰 HTML 缁撴瀯鏄惁鍙樺寲
-- 妫€鏌ョ珯鐐规槸鍚﹀惎鐢ㄤ簡楠岃瘉鐮併€侀鎺ф垨鐧诲綍淇濇姢
+### 播放地址解析失败
 
-閲嶇偣鎺掓煡鏂囦欢锛?
+- 检查播放页的 `player_aaaa` 数据结构
+- 检查播放器 iframe / m3u8 / mp4 链接提取规则
+- 检查是否需要额外 Referer 或 Origin
+
+### 收藏、历史、会员、资料失败
+
+- 检查用户中心路径是否仍为 `/index.php/user/...`
+- 检查页面字段标题和 HTML 结构是否变化
+- 检查站点是否启用了验证码、风控或登录保护
+
+重点排查文件：
+
 - [app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt)
 - [app/src/main/java/top/jlen/vod/ui/AppViewModel.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/AppViewModel.kt)
 
-## 娉ㄥ唽绯荤粺璇存槑
+## 注册系统说明
 
-褰撳墠鐗堟湰宸茬粡鏀寔鍘熺敓娉ㄥ唽鍏ュ彛銆?
-娉ㄥ唽椤典細鍔ㄦ€佽鍙栫珯鐐圭湡瀹炴敞鍐岄厤缃紝骞舵牴鎹珯鐐硅姹傚姞杞斤細
+当前版本已经支持原生注册入口。
 
-- 鐢ㄦ埛鍚?- 瀵嗙爜
-- 纭瀵嗙爜
-- 閭鎴栨墜鏈哄彿
-- 鐭俊/閭欢楠岃瘉鐮?- 鍥剧墖楠岃瘉鐮?
-褰撳墠榛樿绔欑偣 `cms.jlen.top` 鐨勬敞鍐岃鍒欎负锛?
-- 閭娉ㄥ唽
-- 閭楠岃瘉鐮?- 鍥剧墖楠岃瘉鐮?
-## 寮€鍙戜笌鍙戝竷璇存槑
+注册页会动态读取站点真实注册配置，并根据站点要求加载：
 
-鏈粨搴撳綋鍓嶅彂甯冧负 `1.0.0` 姝ｅ紡鐗堬紝寤鸿鍚庣画鐗堟湰閬靛惊璇箟鍖栫増鏈細
+- 用户名
+- 密码
+- 确认密码
+- 邮箱或手机号
+- 短信/邮件验证码
+- 图片验证码
 
-- `1.0.1`锛氶棶棰樹慨澶?- `1.1.0`锛氭柊澧炲姛鑳?- `2.0.0`锛氶噸澶т笉鍏煎鍙樻洿
+当前默认站点 `cms.jlen.top` 的注册规则为：
 
-鎺ㄨ崘鍙戝竷娴佺▼锛?
-1. 淇敼浠ｇ爜骞惰嚜娴?2. 鎵ц `assembleDebug` 鎴?`assembleRelease`
-3. 鏇存柊 README 鎴栧彉鏇磋鏄?4. 鎻愪氦浠ｇ爜
-5. 鎵?tag锛屼緥濡?`v1.0.1`
-6. 鎺ㄩ€佸埌 GitHub
-7. 鍒涘缓 GitHub Release
+- 邮箱注册
+- 邮箱验证码
+- 图片验证码
 
-## 宸茬煡璇存槑
+## 开发与发布说明
 
-- 椤圭洰渚濊禆鐩爣鑻规灉 CMS 绔欑偣鐨勫墠绔粨鏋勶紝涓婚宸紓鍙兘瀵艰嚧閮ㄥ垎瑙ｆ瀽閫昏緫闇€瑕佽皟鏁?- 涓€浜涚涓夋柟鎾斁绾胯矾鍙兘瀛樺湪璺ㄥ煙銆丷eferer銆侀槻鐩楅摼绛夐檺鍒?- 鑻ョ珯鐐瑰惎鐢ㄥ鏉傞獙璇佺爜銆佷汉鏈洪獙璇佹垨鐧诲綍椋庢帶锛岄渶棰濆閫傞厤
+本仓库当前发布为 `1.0.0` 正式版，建议后续版本遵循语义化版本：
 
-## 寮€婧愬崗璁?
-鏈」鐩噰鐢?MIT License锛岃瑙侊細
+- `1.0.1`：问题修复
+- `1.1.0`：新增功能
+- `2.0.0`：重大不兼容变更
+
+推荐发布流程：
+
+1. 修改代码并自测
+2. 执行 `assembleDebug` 或 `assembleRelease`
+3. 更新 README 或变更说明
+4. 提交代码
+5. 打 tag，例如 `v1.0.1`
+6. 推送到 GitHub
+7. 创建 GitHub Release
+
+## 已知说明
+
+- 项目依赖目标苹果 CMS 站点的前端结构，主题差异可能导致部分解析逻辑需要调整
+- 一些第三方播放线路可能存在跨域、Referer、防盗链等限制
+- 若站点启用复杂验证码、人机验证或登录风控，需额外适配
+
+## 开源协议
+
+本项目采用 MIT License，详见：
 
 - [LICENSE](/F:/codex/1/LICENSE)
 
-## 浠撳簱鍦板潃
+## 仓库地址
 
 - GitHub: [https://github.com/jinnian0703/JlenVideo](https://github.com/jinnian0703/JlenVideo)
 
