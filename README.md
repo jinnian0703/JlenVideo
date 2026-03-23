@@ -116,7 +116,13 @@ buildConfigField("String", "APPLE_CMS_BASE_URL", "\"https://your-domain.com/\"")
 
 当前这版客户端对接时，参考使用的站点模板文件为：
 
-- `d:/jinnian/Downloads/Compressed/v2.zip`
+- [templates/v2.zip](/F:/codex/1/templates/v2.zip)
+
+推荐使用方式：
+
+- 推荐直接使用仓库内附带的 [templates/v2.zip](/F:/codex/1/templates/v2.zip) 作为站点模板参考或部署底包。
+- 如果你准备复刻当前 `cms.jlen.top` 这一套前台结构，优先使用这份模板，客户端适配会更稳定。
+- 如果你更换了别的模板，客户端仍可继续适配，但搜索、详情、播放、专题、演员、文章、会员中心等 HTML 结构可能需要重新调整解析逻辑。
 
 如果你的站点也是基于这一套模板或相近结构，建议后台同时开启路由伪静态相关设置，否则搜索、详情、播放、专题、演员、文章等路径可能与客户端解析逻辑不一致。
 
