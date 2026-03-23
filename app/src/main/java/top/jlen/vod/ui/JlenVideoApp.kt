@@ -1,5 +1,7 @@
 package top.jlen.vod.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -57,6 +59,11 @@ private val appColors = lightColorScheme(
 fun JlenVideoApp() {
     val viewModel: AppViewModel = viewModel()
     val navController = rememberNavController()
+    val portraitPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            viewModel.uploadPortrait(uri)
+        }
+    }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val showBottomBar = currentRoute in setOf("home", "categories", "search", "account")
@@ -128,6 +135,7 @@ fun JlenVideoApp() {
                                 onCheckUpdate = viewModel::checkAppUpdate,
                                 onSelectSection = viewModel::selectAccountSection,
                                 onRefreshSection = viewModel::refreshSelectedAccountSection,
+                                onChangePortrait = { portraitPicker.launch("image/*") },
                                 onOpenDetail = { navController.navigate("detail/$it") },
                                 onOpenHistoryRecord = { item ->
                                     viewModel.resumeHistoryRecord(item)

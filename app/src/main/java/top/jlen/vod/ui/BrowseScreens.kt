@@ -387,6 +387,7 @@ fun AccountScreen(
     onCheckUpdate: () -> Unit,
     onSelectSection: (AccountSection) -> Unit,
     onRefreshSection: () -> Unit,
+    onChangePortrait: () -> Unit,
     onOpenDetail: (String) -> Unit,
     onOpenHistoryRecord: (top.jlen.vod.data.UserCenterItem) -> Unit,
     onLoadMoreFavorites: () -> Unit,
@@ -576,7 +577,8 @@ fun AccountScreen(
                                     contentDescription = state.session.userName,
                                     modifier = Modifier
                                         .size(64.dp)
-                                        .clip(CircleShape),
+                                        .clip(CircleShape)
+                                        .clickable(onClick = onChangePortrait),
                                     contentScale = ContentScale.Crop
                                 )
                             } else {
@@ -584,7 +586,8 @@ fun AccountScreen(
                                     modifier = Modifier
                                         .size(64.dp)
                                         .clip(CircleShape)
-                                        .background(UiPalette.Accent.copy(alpha = 0.15f)),
+                                        .background(UiPalette.Accent.copy(alpha = 0.15f))
+                                        .clickable(onClick = onChangePortrait),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
@@ -593,6 +596,12 @@ fun AccountScreen(
                                         fontWeight = FontWeight.ExtraBold,
                                         color = UiPalette.Accent
                                     )
+                                }
+                                TextButton(
+                                    onClick = onChangePortrait,
+                                    colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
+                                ) {
+                                    Text("修改头像", fontWeight = FontWeight.Bold)
                                 }
                             }
 

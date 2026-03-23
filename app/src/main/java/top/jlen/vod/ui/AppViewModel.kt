@@ -1,6 +1,7 @@
 package top.jlen.vod.ui
 
 import android.app.Application
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -527,6 +528,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 selectAccountSection(AccountSection.Profile, forceRefresh = true)
                 refreshAccount()
+            }
+        )
+    }
+
+    fun uploadPortrait(uri: Uri) {
+        if (!accountState.session.isLoggedIn) {
+            accountState = accountState.copy(error = "璇峰厛鐧诲綍")
+            return
+        }
+        runAccountAction(
+            block = { uploadPortrait(uri) },
+            onSuccess = {
+                refreshAccount()
+                selectAccountSection(AccountSection.Profile, forceRefresh = true)
             }
         )
     }

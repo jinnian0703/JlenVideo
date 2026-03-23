@@ -2,6 +2,7 @@ package top.jlen.vod.data
 
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Base64
 import com.google.gson.Gson
 import com.google.gson.JsonParser
@@ -11,9 +12,12 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 import okhttp3.FormBody
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -28,6 +32,7 @@ class AppleCmsRepository(
     private val cookieJar: PersistentCookieJar = PersistentCookieJar(context),
     private val client: OkHttpClient = createClient(cookieJar)
 ) {
+    private val appContext = context.applicationContext
     private val allCategoryTypeIds = listOf("1", "2", "3", "4")
     private val defaultCategories = listOf(
         AppleCmsCategory(typeId = "1", typeName = "电影", parentId = "1"),
@@ -278,6 +283,59 @@ class AppleCmsRepository(
             referer = "$baseUrl/index.php/user/findpass.html",
             formBody = form
         )
+    }
+
+    suspend fun uploadPortrait(uri: Uri): String {
+        val resolver = appContext.contentResolver
+        val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: throw IOException("鏃犳硶璇诲彇澶村儚鏂囦欢")
+        if (bytes.isEmpty()) {
+            throw IOException("澶村儚鏂囦欢涓虹┖")
+        }
+
+        val mimeType = resolver.getType(uri).orEmpty().ifBlank { "image/jpeg" }
+        val fileName = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (nameIndex >= 0 && cursor.moveToFirst()) cursor.getString(nameIndex) else null
+            }
+            .orEmpty()
+            .ifBlank { "portrait.jpg" }
+
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart(
+                "file",
+                fileName,
+                bytes.toRequestBody(mimeType.toMediaTypeOrNull())
+            )
+            .build()
+
+        val request = Request.Builder()
+            .url("$baseUrl/index.php/user/portrait")
+            .header("Referer", "$baseUrl/index.php/user/head.html")
+            .header("X-Requested-With", "XMLHttpRequest")
+            .post(body)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("涓婁紶澶村儚澶辫触锛欻TTP ${response.code}")
+            }
+
+            val responseBody = response.body?.string().orEmpty()
+            val authResponse = runCatching { gson.fromJson(responseBody, AuthResponse::class.java) }.getOrNull()
+            if (authResponse != null && authResponse.msg.isNotBlank()) {
+                if (authResponse.code == 1) {
+                    return authResponse.msg
+                }
+                throw IOException(authResponse.msg)
+            }
+            if (responseBody.contains("user_portrait") || responseBody.contains("鎴愬姛")) {
+                return "澶村儚淇敼鎴愬姛"
+            }
+            return "澶村儚宸叉洿鏂?"
+        }
     }
 
     suspend fun sendRegisterCode(channel: String, contact: String): String {
