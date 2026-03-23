@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Base64
 import com.google.gson.Gson
+import com.google.gson.JsonParser
 import java.io.IOException
 import java.net.URI
 import java.net.URLDecoder
@@ -99,6 +100,43 @@ class AppleCmsRepository(
         return parseSearchResults(document)
             .distinctBy { it.vodId }
             .take(60)
+    }
+
+    suspend fun loadLatestRelease(currentVersion: String): AppUpdateInfo {
+        val request = Request.Builder()
+            .url("https://api.github.com/repos/jinnian0703/JlenVideo/releases/latest")
+            .header("Accept", "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("妫€鏌ユ洿鏂板け璐ワ細HTTP ${response.code}")
+            }
+
+            val body = response.body?.string().orEmpty()
+            val json = JsonParser.parseString(body).asJsonObject
+            val latestVersion = json.get("tag_name")?.asString.orEmpty()
+                .removePrefix("v")
+                .trim()
+            val releasePageUrl = json.get("html_url")?.asString.orEmpty().trim()
+            val notes = json.get("body")?.asString.orEmpty().trim()
+            val downloadUrl = json.getAsJsonArray("assets")
+                ?.firstOrNull()
+                ?.asJsonObject
+                ?.get("browser_download_url")
+                ?.asString
+                .orEmpty()
+
+            return AppUpdateInfo(
+                currentVersion = currentVersion.trim(),
+                latestVersion = latestVersion,
+                releasePageUrl = releasePageUrl,
+                downloadUrl = downloadUrl,
+                notes = notes,
+                hasUpdate = compareVersionNames(latestVersion, currentVersion) > 0
+            )
+        }
     }
 
     fun currentSession(): AuthSession {
@@ -1504,3 +1542,18 @@ private data class PlayRoute(
     val sid: String,
     val nid: String
 )
+
+private fun compareVersionNames(left: String, right: String): Int {
+    val leftParts = left.removePrefix("v").split('.', '-', '_')
+    val rightParts = right.removePrefix("v").split('.', '-', '_')
+    val maxSize = maxOf(leftParts.size, rightParts.size)
+
+    for (index in 0 until maxSize) {
+        val leftPart = leftParts.getOrNull(index)?.toIntOrNull() ?: 0
+        val rightPart = rightParts.getOrNull(index)?.toIntOrNull() ?: 0
+        if (leftPart != rightPart) {
+            return leftPart.compareTo(rightPart)
+        }
+    }
+    return 0
+}

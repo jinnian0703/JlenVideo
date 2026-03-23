@@ -233,3 +233,12 @@ data class MembershipPage(
     val info: MembershipInfo = MembershipInfo(),
     val plans: List<MembershipPlan> = emptyList()
 )
+
+data class AppUpdateInfo(
+    val currentVersion: String = "",
+    val latestVersion: String = "",
+    val releasePageUrl: String = "",
+    val downloadUrl: String = "",
+    val notes: String = "",
+    val hasUpdate: Boolean = false
+)

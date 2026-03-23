@@ -1,6 +1,8 @@
 package top.jlen.vod.ui
 
+import android.content.Intent
 import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -68,6 +70,7 @@ import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.RegisterEditor
 import top.jlen.vod.data.UserProfileEditor
 import top.jlen.vod.data.VodItem
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun HomeScreen(
@@ -381,6 +384,7 @@ fun AccountScreen(
     onLogin: () -> Unit,
     onLogout: () -> Unit,
     onRefresh: () -> Unit,
+    onCheckUpdate: () -> Unit,
     onSelectSection: (AccountSection) -> Unit,
     onRefreshSection: () -> Unit,
     onOpenDetail: (String) -> Unit,
@@ -407,6 +411,7 @@ fun AccountScreen(
     onBindEmail: () -> Unit,
     onUnbindEmail: () -> Unit
 ) {
+    val context = LocalContext.current
     val sessionExpired = state.error?.contains("请先登录") == true ||
         state.error?.contains("登录已失效") == true
     val showLoggedInContent = state.session.isLoggedIn && !sessionExpired
@@ -436,6 +441,88 @@ fun AccountScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = UiPalette.TextSecondary
                 )
+            }
+        }
+
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                shape = RoundedCornerShape(24.dp),
+                border = BorderStroke(1.dp, UiPalette.Border)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "版本更新",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = UiPalette.Ink
+                    )
+                    Text(
+                        text = buildString {
+                            append("当前版本：")
+                            append(state.updateInfo?.currentVersion?.ifBlank { BuildConfig.VERSION_NAME } ?: BuildConfig.VERSION_NAME)
+                            val latest = state.updateInfo?.latestVersion.orEmpty()
+                            if (latest.isNotBlank()) {
+                                append("  ·  最新版本：")
+                                append(latest)
+                            }
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = UiPalette.TextSecondary
+                    )
+                    Text(
+                        text = when {
+                            state.isUpdateLoading -> "正在检查最新版本..."
+                            state.updateInfo?.hasUpdate == true -> "检测到新版本，可以前往 Release 下载。"
+                            state.updateInfo != null -> "当前已经是最新版本。"
+                            else -> "点击下方按钮检查最新版本。"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = UiPalette.Ink
+                    )
+                    if (!state.updateInfo?.notes.isNullOrBlank()) {
+                        Text(
+                            text = state.updateInfo?.notes.orEmpty(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = UiPalette.TextSecondary,
+                            maxLines = 6,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(
+                            onClick = onCheckUpdate,
+                            enabled = !state.isUpdateLoading,
+                            modifier = Modifier.weight(1f),
+                            border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                        ) {
+                            Text(if (state.isUpdateLoading) "检查中..." else "检查更新")
+                        }
+                        Button(
+                            onClick = {
+                                val targetUrl = state.updateInfo?.downloadUrl
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?: state.updateInfo?.releasePageUrl
+                                if (!targetUrl.isNullOrBlank()) {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
+                                }
+                            },
+                            enabled = !state.updateInfo?.releasePageUrl.isNullOrBlank(),
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = UiPalette.Accent,
+                                contentColor = UiPalette.AccentText
+                            )
+                        ) {
+                            Text(if (state.updateInfo?.hasUpdate == true) "前往下载" else "查看发布")
+                        }
+                    }
+                }
             }
         }
 

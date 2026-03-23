@@ -125,6 +125,7 @@ fun JlenVideoApp() {
                                 onLogin = viewModel::login,
                                 onLogout = viewModel::logout,
                                 onRefresh = viewModel::refreshAccount,
+                                onCheckUpdate = viewModel::checkAppUpdate,
                                 onSelectSection = viewModel::selectAccountSection,
                                 onRefreshSection = viewModel::refreshSelectedAccountSection,
                                 onOpenDetail = { navController.navigate("detail/$it") },

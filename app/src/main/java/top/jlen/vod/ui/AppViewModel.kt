@@ -9,6 +9,8 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.jlen.vod.BuildConfig
+import top.jlen.vod.data.AppUpdateInfo
 import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.AppleCmsRepository
 import top.jlen.vod.data.AuthSession
@@ -47,6 +49,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         searchState = searchState.copy(history = searchHistoryStore.load())
         refreshAccount()
         refreshHome()
+        checkAppUpdate()
     }
 
     fun refreshAccount() {
@@ -58,6 +61,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
         if (session.isLoggedIn) {
             selectAccountSection(accountState.selectedSection, forceRefresh = true)
+        }
+    }
+
+    fun checkAppUpdate() {
+        if (accountState.isUpdateLoading) return
+        viewModelScope.launch {
+            accountState = accountState.copy(isUpdateLoading = true)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    repository.loadLatestRelease(BuildConfig.VERSION_NAME)
+                }
+            }.onSuccess { updateInfo ->
+                accountState = accountState.copy(
+                    isUpdateLoading = false,
+                    updateInfo = updateInfo
+                )
+            }.onFailure {
+                accountState = accountState.copy(isUpdateLoading = false)
+            }
         }
     }
 
@@ -1325,6 +1347,7 @@ data class AccountUiState(
     val isLoading: Boolean = false,
     val isContentLoading: Boolean = false,
     val isActionLoading: Boolean = false,
+    val isUpdateLoading: Boolean = false,
     val error: String? = null,
     val message: String? = null,
     val userName: String = "",
@@ -1352,7 +1375,8 @@ data class AccountUiState(
     val historyItems: List<UserCenterItem> = emptyList(),
     val historyNextPageUrl: String? = null,
     val membershipInfo: MembershipInfo = MembershipInfo(),
-    val membershipPlans: List<MembershipPlan> = emptyList()
+    val membershipPlans: List<MembershipPlan> = emptyList(),
+    val updateInfo: AppUpdateInfo? = null
 )
 
 data class DetailUiState(
