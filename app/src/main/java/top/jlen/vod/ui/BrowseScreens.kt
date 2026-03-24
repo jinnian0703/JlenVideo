@@ -2365,21 +2365,44 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
 @Composable
 private fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String) -> Unit) {
     val actualCount = items.size
-    val pagerState = rememberPagerState(pageCount = { actualCount })
-    val currentIndex = pagerState.currentPage
-    val settledIndex = pagerState.settledPage
+    val loopItems = remember(items) {
+        when {
+            items.isEmpty() -> emptyList()
+            items.size == 1 -> items
+            else -> listOf(items.last()) + items + listOf(items.first())
+        }
+    }
+    val pagerState = rememberPagerState(
+        initialPage = if (actualCount > 1) 1 else 0,
+        pageCount = { loopItems.size }
+    )
+    val currentIndex = when {
+        actualCount <= 1 -> 0
+        pagerState.currentPage <= 0 -> actualCount - 1
+        pagerState.currentPage >= loopItems.lastIndex -> 0
+        else -> pagerState.currentPage - 1
+    }
+    val settledIndex = when {
+        actualCount <= 1 -> 0
+        pagerState.settledPage <= 0 -> actualCount - 1
+        pagerState.settledPage >= loopItems.lastIndex -> 0
+        else -> pagerState.settledPage - 1
+    }
+
+    LaunchedEffect(actualCount, pagerState.settledPage) {
+        if (actualCount <= 1) return@LaunchedEffect
+        when (pagerState.settledPage) {
+            0 -> pagerState.scrollToPage(actualCount)
+            loopItems.lastIndex -> pagerState.scrollToPage(1)
+        }
+    }
 
     LaunchedEffect(actualCount, pagerState.settledPage, pagerState.isScrollInProgress) {
         if (actualCount <= 1) return@LaunchedEffect
         if (pagerState.isScrollInProgress) return@LaunchedEffect
         delay(3500)
         if (pagerState.isScrollInProgress) return@LaunchedEffect
-        val nextPage = if (pagerState.settledPage >= actualCount - 1) 0 else pagerState.settledPage + 1
-        if (nextPage == 0) {
-            pagerState.scrollToPage(0)
-        } else {
-            pagerState.animateScrollToPage(nextPage)
-        }
+        pagerState.animateScrollToPage(pagerState.settledPage + 1)
     }
 
     Column(
@@ -2391,10 +2414,10 @@ private fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String)
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(horizontal = 16.dp),
             pageSpacing = 12.dp,
-            key = { page -> items[page].vodId.ifBlank { "featured_$page" } }
+            key = { page -> loopItems[page].vodId.ifBlank { "featured_$page" } + "_$page" }
         ) { page ->
             FeaturedCard(
-                item = items[page],
+                item = loopItems[page],
                 onClick = onOpenDetail
             )
         }
