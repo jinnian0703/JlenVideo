@@ -27,6 +27,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -176,7 +179,7 @@ fun HomeScreen(
                 )
             }
             item {
-                FeaturedGridSection(
+                FeaturedCarouselSection(
                     items = state.featured,
                     onOpenDetail = onOpenDetail
                 )
@@ -2349,91 +2352,44 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FeaturedGridSection(items: List<VodItem>, onOpenDetail: (String) -> Unit) {
-    Column(
-        modifier = Modifier.padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        items.chunked(2).forEach { rowItems ->
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                rowItems.forEach { item ->
-                    FeaturedGridCard(
-                        item = item,
-                        onClick = onOpenDetail,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                repeat(2 - rowItems.size) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
-            }
-        }
-    }
-}
+private fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String) -> Unit) {
+    val pagerState = rememberPagerState(pageCount = { items.size })
 
-@Composable
-private fun FeaturedGridCard(
-    item: VodItem,
-    onClick: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier.clickable { onClick(item.vodId) },
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface)
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column {
-            Box {
-                AsyncImage(
-                    model = item.vodPic,
-                    contentDescription = item.displayTitle,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(164.dp),
-                    contentScale = ContentScale.Crop
-                )
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color(0x22000000), Color(0x88000000))
-                            )
-                        )
-                )
-                if (item.badgeText.isNotBlank()) {
-                    Text(
-                        text = item.badgeText,
-                        color = UiPalette.Surface,
-                        style = MaterialTheme.typography.labelSmall,
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            pageSpacing = 12.dp
+        ) { page ->
+            FeaturedCard(
+                item = items[page],
+                onClick = onOpenDetail
+            )
+        }
+
+        if (items.size > 1) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                repeat(items.size) { index ->
+                    Box(
                         modifier = Modifier
-                            .padding(12.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(UiPalette.Accent.copy(alpha = 0.92f))
-                            .padding(horizontal = 9.dp, vertical = 5.dp)
+                            .padding(horizontal = 4.dp)
+                            .size(if (index == pagerState.currentPage) 18.dp else 8.dp, 8.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (index == pagerState.currentPage) UiPalette.Accent
+                                else UiPalette.BorderSoft
+                            )
                     )
                 }
-            }
-            Column(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = item.displayTitle,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = UiPalette.Ink,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = item.subtitle.ifBlank { "绔欏唴璧勬簮" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = UiPalette.TextSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
         }
     }
