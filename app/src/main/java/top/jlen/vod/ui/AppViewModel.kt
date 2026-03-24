@@ -1422,7 +1422,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         playerState = playerState.copy(
             isResolving = false,
             useWebPlayer = false,
-            resolveError = message.ifBlank { "接管播放器失败，请切换线路重试" }
+            resolveError = message.ifBlank { "这条线路暂时还没完成原生接管，建议切换其他线路继续观看" }
         )
     }
 
@@ -1504,7 +1504,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     isResolving = false,
                     resolvedUrl = episodePageUrl,
                     useWebPlayer = true,
-                    resolveError = "解析线路失败，请切换线路重试"
+                    resolveError = "这条线路暂时还没完成原生接管，建议切换其他线路继续观看"
                 )
             }
         }

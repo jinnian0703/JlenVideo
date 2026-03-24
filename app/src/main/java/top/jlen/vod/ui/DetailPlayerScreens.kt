@@ -42,6 +42,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -220,6 +221,9 @@ fun PlayerScreen(
     var isFullscreen by remember {
         mutableStateOf(false)
     }
+    var fullscreenTransitionLabel by remember {
+        mutableStateOf("")
+    }
 
     fun setFullscreen(fullscreen: Boolean, snapshot: PlaybackSnapshot? = null, isLandscapeVideo: Boolean? = null) {
         snapshot?.let(onPlaybackSnapshotChange)
@@ -229,6 +233,19 @@ fun PlayerScreen(
 
     BackHandler(enabled = isFullscreen) {
         isFullscreen = false
+    }
+
+    LaunchedEffect(isFullscreen, state.selectedEpisodeIndex, state.episodeName, state.sourceName) {
+        if (isFullscreen) {
+            fullscreenTransitionLabel = when {
+                state.episodeName.isNotBlank() && state.sourceName.isNotBlank() -> "${state.sourceName} · ${state.episodeName}"
+                state.episodeName.isNotBlank() -> state.episodeName
+                state.sourceName.isNotBlank() -> state.sourceName
+                else -> state.title
+            }
+        } else {
+            fullscreenTransitionLabel = ""
+        }
     }
 
     DisposableEffect(activity, isFullscreen, detectedLandscapeVideo) {
@@ -325,7 +342,9 @@ fun PlayerScreen(
                             darkMode = true
                         )
                         when {
-                            state.isResolving && !isFullscreen -> ResolveLoadingSurface()
+                            state.isResolving && !isFullscreen -> ResolveLoadingSurface(
+                                message = "正在接入这一集的真实视频地址..."
+                            )
                             state.useWebPlayer && !isFullscreen -> ResolveUnavailableSurface()
                             directPlayable && !isFullscreen -> playerContent(false)
                             directPlayable -> Spacer(modifier = Modifier.height(0.dp))
@@ -361,8 +380,8 @@ fun PlayerScreen(
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = when {
-                            state.isResolving -> "正在解析真实播放地址..."
-                            state.useWebPlayer -> "当前线路正在后台接管，拿到视频流后会自动切到原生播放器。"
+                            state.isResolving -> "正在接入这一集的真实视频地址，准备好后会直接继续播放。"
+                            state.useWebPlayer -> "这条线路暂时还没完成原生接管，建议切换其他线路继续观看。"
                             else -> "当前线路已直连视频源，加载和全屏会更稳定。"
                         },
                         style = MaterialTheme.typography.bodyMedium,
@@ -420,7 +439,11 @@ fun PlayerScreen(
                     .fillMaxSize()
                     .background(Color.Black)
             ) {
-                ResolveLoadingSurface()
+                ResolveLoadingSurface(
+                    message = "正在切换到 $fullscreenTransitionLabel",
+                    fullscreenMode = true,
+                    subtitle = "视频准备好后会无缝继续播放"
+                )
             }
         } else if (state.useWebPlayer && isFullscreen) {
             Box(
@@ -428,7 +451,11 @@ fun PlayerScreen(
                     .fillMaxSize()
                     .background(Color.Black)
             ) {
-                ResolveUnavailableSurface()
+                ResolveUnavailableSurface(
+                    fullscreenMode = true,
+                    title = "这条线路暂时还没完成原生接管",
+                    message = "建议返回后切换其他线路继续观看，避免中断当前观影体验。"
+                )
             }
         }
     }
@@ -619,7 +646,39 @@ private fun EpisodePanel(
 }
 
 @Composable
-private fun ResolveLoadingSurface(message: String = "正在解析播放地址...") {
+private fun ResolveLoadingSurface(
+    message: String = "正在解析播放地址...",
+    fullscreenMode: Boolean = false,
+    subtitle: String = "请稍候，马上就好"
+) {
+    if (fullscreenMode) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                CircularProgressIndicator(color = Color.White, strokeWidth = 3.dp)
+                Text(
+                    text = message,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = subtitle,
+                    color = Color.White.copy(alpha = 0.72f),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+        return
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -639,7 +698,39 @@ private fun ResolveLoadingSurface(message: String = "正在解析播放地址...
 }
 
 @Composable
-private fun ResolveUnavailableSurface() {
+private fun ResolveUnavailableSurface(
+    fullscreenMode: Boolean = false,
+    title: String = "这条线路暂时还没完成原生接管",
+    message: String = "你可以先切换其他线路继续观看，我会继续补齐这类线路的适配。"
+) {
+    if (fullscreenMode) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(horizontal = 28.dp)
+            ) {
+                Text(
+                    text = title,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = message,
+                    color = Color.White.copy(alpha = 0.74f),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+        }
+        return
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -650,9 +741,9 @@ private fun ResolveUnavailableSurface() {
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("这条线路暂时没有接管成功", color = UiPalette.Ink, fontWeight = FontWeight.Bold)
+                Text(title, color = UiPalette.Ink, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(10.dp))
-                Text("请先切换其他线路，我继续把这类线路补齐。", color = UiPalette.TextSecondary)
+                Text(message, color = UiPalette.TextSecondary)
             }
         }
     }
