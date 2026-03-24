@@ -2357,12 +2357,25 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String) -> Unit) {
-    val pagerState = rememberPagerState(pageCount = { items.size })
+    val actualCount = items.size
+    val virtualCount = if (actualCount > 1) Int.MAX_VALUE else actualCount
+    val initialPage = if (actualCount > 1) {
+        val midpoint = Int.MAX_VALUE / 2
+        midpoint - (midpoint % actualCount)
+    } else {
+        0
+    }
+    val pagerState = rememberPagerState(
+        initialPage = initialPage,
+        pageCount = { virtualCount }
+    )
+    val currentIndex = if (actualCount == 0) 0 else pagerState.currentPage % actualCount
+    val settledIndex = if (actualCount == 0) 0 else pagerState.settledPage % actualCount
 
-    LaunchedEffect(items.size, pagerState.settledPage) {
-        if (items.size <= 1) return@LaunchedEffect
+    LaunchedEffect(actualCount, pagerState.settledPage) {
+        if (actualCount <= 1) return@LaunchedEffect
         delay(3500)
-        pagerState.animateScrollToPage((pagerState.settledPage + 1) % items.size)
+        pagerState.animateScrollToPage(pagerState.settledPage + 1)
     }
 
     Column(
@@ -2376,24 +2389,24 @@ private fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String)
             pageSpacing = 12.dp
         ) { page ->
             FeaturedCard(
-                item = items[page],
+                item = items[page % actualCount],
                 onClick = onOpenDetail
             )
         }
 
-        if (items.size > 1) {
+        if (actualCount > 1) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center
             ) {
-                repeat(items.size) { index ->
+                repeat(actualCount) { index ->
                     Box(
                         modifier = Modifier
                             .padding(horizontal = 4.dp)
-                            .size(if (index == pagerState.currentPage) 18.dp else 8.dp, 8.dp)
+                            .size(if (index == currentIndex) 18.dp else 8.dp, 8.dp)
                             .clip(CircleShape)
                             .background(
-                                if (index == pagerState.currentPage) UiPalette.Accent
+                                if (index == settledIndex || index == currentIndex) UiPalette.Accent
                                 else UiPalette.BorderSoft
                             )
                     )
