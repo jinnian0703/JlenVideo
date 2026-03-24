@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -48,7 +50,6 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -80,7 +81,6 @@ fun NativeVideoPlayer(
     onPlaybackEnded: (() -> Unit)? = null,
     onClose: (() -> Unit)? = null
 ) {
-    val configuration = LocalConfiguration.current
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val playbackIdentity = remember(url, episodeName) { "$url|$episodeName" }
@@ -320,11 +320,13 @@ fun NativeVideoPlayer(
                 playbackState == Player.STATE_BUFFERING ||
                     (player.playWhenReady && !hasStartedPlaybackOnce)
                 )
-    val isPortraitLayout = configuration.screenHeightDp >= configuration.screenWidthDp
-    val embeddedPlayerHeight = when {
-        !isPortraitLayout -> 228.dp
-        lastReportedLandscape == false -> 420.dp
-        else -> 228.dp
+    val embeddedAspectRatio = if (lastReportedLandscape == false) 9f / 16f else 16f / 9f
+    val embeddedPlayerModifier = when {
+        fullscreenMode -> Modifier.fillMaxSize()
+        lastReportedLandscape == false -> Modifier
+            .heightIn(min = 420.dp)
+            .height(420.dp)
+        else -> Modifier.aspectRatio(embeddedAspectRatio)
     }
     val embeddedResizeMode = if (lastReportedLandscape == false) {
         AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -334,6 +336,8 @@ fun NativeVideoPlayer(
     val pillHorizontalPadding = if (fullscreenMode) 10.dp else 8.dp
     val pillVerticalPadding = if (fullscreenMode) 6.dp else 5.dp
     val controlPillTextStyle = if (fullscreenMode) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.labelLarge
+    val controlChipMinHeight = if (fullscreenMode) 36.dp else 34.dp
+    val controlChipMinWidth = if (fullscreenMode) 68.dp else 58.dp
 
     Card(
         modifier = Modifier
@@ -350,8 +354,7 @@ fun NativeVideoPlayer(
             modifier = Modifier
                 .fillMaxWidth()
                 .then(
-                    if (fullscreenMode) Modifier.fillMaxSize()
-                    else Modifier.heightIn(min = embeddedPlayerHeight).height(embeddedPlayerHeight)
+                    embeddedPlayerModifier
                 )
                 .background(Color.Black)
                 .clickableWithoutRipple {
@@ -682,6 +685,8 @@ fun NativeVideoPlayer(
                                             color = Color.White.copy(alpha = 0.14f),
                                             shape = RoundedCornerShape(999.dp)
                                         )
+                                        .heightIn(min = controlChipMinHeight)
+                                        .widthIn(min = controlChipMinWidth)
                                         .clickableWithoutRipple {
                                             fullscreenResizeMode = nextResizeMode(fullscreenResizeMode)
                                             controlsVersion++
@@ -704,6 +709,8 @@ fun NativeVideoPlayer(
                                         color = Color.White.copy(alpha = 0.14f),
                                         shape = RoundedCornerShape(999.dp)
                                     )
+                                    .heightIn(min = controlChipMinHeight)
+                                    .widthIn(min = controlChipMinWidth)
                                     .clickableWithoutRipple {
                                         speed = nextSpeed(speed)
                                         player.playbackParameters = PlaybackParameters(speed)
@@ -726,6 +733,8 @@ fun NativeVideoPlayer(
                                             color = Color.White.copy(alpha = 0.14f),
                                             shape = RoundedCornerShape(999.dp)
                                         )
+                                        .heightIn(min = controlChipMinHeight)
+                                        .widthIn(min = controlChipMinWidth)
                                         .clickableWithoutRipple {
                                             controlsVersion++
                                             onNextEpisode()
@@ -748,6 +757,8 @@ fun NativeVideoPlayer(
                                             color = Color.White.copy(alpha = 0.14f),
                                             shape = RoundedCornerShape(999.dp)
                                         )
+                                        .heightIn(min = controlChipMinHeight)
+                                        .widthIn(min = controlChipMinWidth)
                                         .clickableWithoutRipple {
                                             val snapshot = currentSnapshot()
                                             lastReportedSnapshot = snapshot
