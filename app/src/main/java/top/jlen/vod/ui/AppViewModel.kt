@@ -123,11 +123,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun refreshHome() {
+    fun refreshHome(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             homeState = homeState.copy(isLoading = true, error = null)
             runCatching {
-                withContext(Dispatchers.IO) { repository.loadHome() }
+                withContext(Dispatchers.IO) { repository.loadHome(forceRefresh = forceRefresh) }
             }.onSuccess { payload ->
                 val localizedAllCategory = allCategory.copy(typeName = "\u5168\u90e8\u5206\u7c7b")
                 val categories = listOf(localizedAllCategory) + payload.categories

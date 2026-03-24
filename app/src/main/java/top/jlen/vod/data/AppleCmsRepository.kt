@@ -13,6 +13,7 @@ import java.io.IOException
 import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -45,6 +46,11 @@ class AppleCmsRepository(
     )
     private val baseUrl = BuildConfig.APPLE_CMS_BASE_URL.trimEnd('/')
     private val gson = Gson()
+    private val categoryPageCache = ConcurrentHashMap<String, CachedValue<PagedVodItems>>()
+    private val detailCache = ConcurrentHashMap<String, CachedValue<VodItem?>>()
+    private val searchCache = ConcurrentHashMap<String, CachedValue<List<VodItem>>>()
+    @Volatile
+    private var homeCache: CachedValue<HomePayload>? = null
     private val api: AppleCmsApi = Retrofit.Builder()
         .baseUrl("$baseUrl/")
         .client(client)
@@ -58,8 +64,20 @@ class AppleCmsRepository(
         val mimeType: String
     )
 
-    suspend fun loadHome(): HomePayload {
-        val latestPage = loadAllCategoryPage(page = 1)
+    private data class CachedValue<T>(
+        val value: T,
+        val timestampMs: Long
+    )
+
+    suspend fun loadHome(forceRefresh: Boolean = false): HomePayload {
+        if (!forceRefresh) {
+            homeCache
+                ?.takeIf { isCacheValid(it.timestampMs, HOME_CACHE_TTL_MS) }
+                ?.value
+                ?.let { return it }
+        }
+
+        val latestPage = loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
         val latest = latestPage.items
 
         if (latest.isEmpty()) {
@@ -84,22 +102,12 @@ class AppleCmsRepository(
                 runCatching { loadLevelItemsFromHomePage(limit = 16) }
                     .getOrDefault(emptyList())
             }
-        val sections = categories.mapNotNull { category ->
-            runCatching {
-                HomeSection(
-                    title = category.typeName,
-                    typeId = category.typeId,
-                    items = loadCategoryPage(category.typeId, page = 1).items.take(16)
-                )
-            }.getOrNull()?.takeIf { it.items.isNotEmpty() }
-        }
-
         return HomePayload(
             slides = emptyList(),
             hot = emptyList(),
             featured = featured,
             latest = latest,
-            sections = sections,
+            sections = emptyList(),
             categories = categories,
             selectedCategory = categories.firstOrNull(),
             categoryVideos = latest,
@@ -107,14 +115,26 @@ class AppleCmsRepository(
             latestPageCount = latestPage.pageCount,
             latestTotal = latestPage.totalItems,
             latestHasNextPage = latestPage.hasNextPage
-        )
+        ).also { payload ->
+            homeCache = CachedValue(
+                value = payload,
+                timestampMs = System.currentTimeMillis()
+            )
+        }
     }
 
     suspend fun loadByCategory(typeId: String): List<VodItem> =
         loadCategoryPage(typeId = typeId, page = 1).items
 
-    suspend fun loadAllCategoryPage(page: Int): PagedVodItems {
+    suspend fun loadAllCategoryPage(page: Int, forceRefresh: Boolean = false): PagedVodItems {
         val safePage = page.coerceAtLeast(1)
+        val cacheKey = "all:$safePage"
+        if (!forceRefresh) {
+            categoryPageCache[cacheKey]
+                ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
+                ?.value
+                ?.let { return it }
+        }
         val responses = allCategoryTypeIds
             .map { typeId -> api.getByType(typeId = typeId, page = safePage) }
 
@@ -126,18 +146,46 @@ class AppleCmsRepository(
             totalItems = responses.sumOf { it.safeTotal },
             limit = responses.sumOf { it.safeLimit }.takeIf { it > 0 } ?: mergedItems.size,
             hasNextPage = responses.any { it.hasNextPage }
-        )
+        ).also { payload ->
+            categoryPageCache[cacheKey] = CachedValue(
+                value = payload,
+                timestampMs = System.currentTimeMillis()
+            )
+        }
     }
 
     suspend fun loadLatestPage(page: Int): PagedVodItems =
         api.getLatest(page = page.coerceAtLeast(1)).toPagedVodItems()
 
-    suspend fun loadCategoryPage(typeId: String, page: Int): PagedVodItems =
-        api.getByType(typeId = typeId, page = page.coerceAtLeast(1)).toPagedVodItems()
+    suspend fun loadCategoryPage(typeId: String, page: Int, forceRefresh: Boolean = false): PagedVodItems {
+        val safePage = page.coerceAtLeast(1)
+        val cacheKey = "$typeId:$safePage"
+        if (!forceRefresh) {
+            categoryPageCache[cacheKey]
+                ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
+                ?.value
+                ?.let { return it }
+        }
+        return api.getByType(typeId = typeId, page = safePage)
+            .toPagedVodItems()
+            .also { payload ->
+                categoryPageCache[cacheKey] = CachedValue(
+                    value = payload,
+                    timestampMs = System.currentTimeMillis()
+                )
+            }
+    }
 
-    suspend fun search(keyword: String): List<VodItem> {
+    suspend fun search(keyword: String, forceRefresh: Boolean = false): List<VodItem> {
         val normalizedKeyword = keyword.trim()
         if (normalizedKeyword.isBlank()) return emptyList()
+        val cacheKey = normalizedKeyword.lowercase()
+        if (!forceRefresh) {
+            searchCache[cacheKey]
+                ?.takeIf { isCacheValid(it.timestampMs, SEARCH_CACHE_TTL_MS) }
+                ?.value
+                ?.let { return it }
+        }
 
         val encodedKeyword = Uri.encode(normalizedKeyword)
         val htmlResults = runCatching {
@@ -149,6 +197,12 @@ class AppleCmsRepository(
             return htmlResults
                 .distinctBy { it.vodId }
                 .take(60)
+                .also { results ->
+                    searchCache[cacheKey] = CachedValue(
+                        value = results,
+                        timestampMs = System.currentTimeMillis()
+                    )
+                }
         }
 
         return runCatching {
@@ -156,7 +210,12 @@ class AppleCmsRepository(
                 .list
                 .distinctBy { it.vodId }
                 .take(60)
-        }.getOrDefault(emptyList())
+        }.getOrDefault(emptyList()).also { results ->
+            searchCache[cacheKey] = CachedValue(
+                value = results,
+                timestampMs = System.currentTimeMillis()
+            )
+        }
     }
 
     suspend fun loadLatestRelease(currentVersion: String): AppUpdateInfo {
@@ -651,9 +710,15 @@ class AppleCmsRepository(
         )
     }
 
-    suspend fun loadDetail(vodId: String): VodItem? {
+    suspend fun loadDetail(vodId: String, forceRefresh: Boolean = false): VodItem? {
         val normalizedId = vodId.trim()
         if (normalizedId.isBlank()) return null
+        if (!forceRefresh) {
+            detailCache[normalizedId]
+                ?.takeIf { isCacheValid(it.timestampMs, DETAIL_CACHE_TTL_MS) }
+                ?.value
+                ?.let { return it }
+        }
 
         if (normalizedId.all(Char::isDigit)) {
             val apiItem = runCatching {
@@ -662,11 +727,20 @@ class AppleCmsRepository(
                     .firstOrNull()
             }.getOrNull()
             if (apiItem != null) {
+                detailCache[normalizedId] = CachedValue(
+                    value = apiItem,
+                    timestampMs = System.currentTimeMillis()
+                )
                 return apiItem
             }
         }
 
-        return parseDetail(fetchDocument("$baseUrl/voddetail/$normalizedId/"))
+        return parseDetail(fetchDocument("$baseUrl/voddetail/$normalizedId/")).also { item ->
+            detailCache[normalizedId] = CachedValue(
+                value = item,
+                timestampMs = System.currentTimeMillis()
+            )
+        }
     }
 
     suspend fun resolvePlayUrl(playPageUrl: String): ResolvedPlayUrl {
@@ -1645,7 +1719,7 @@ class AppleCmsRepository(
         labels: List<String>,
         stopPhrases: List<String> = emptyList()
     ): Map<String, String> {
-        val bodyText = decodeSiteText(document.body()?.text().orEmpty())
+        val bodyText = decodeSiteText(document.body().text())
             .replace('\u00A0', ' ')
             .replace(Regex("\\s+"), " ")
             .trim()
@@ -1786,6 +1860,14 @@ class AppleCmsRepository(
         get() = siteVodId.ifBlank { vodId.takeIf { it.all(Char::isDigit) }.orEmpty() }
 
     companion object {
+        private const val HOME_CACHE_TTL_MS = 10_000L
+        private const val PAGE_CACHE_TTL_MS = 10_000L
+        private const val SEARCH_CACHE_TTL_MS = 15_000L
+        private const val DETAIL_CACHE_TTL_MS = 10_000L
+
+        private fun isCacheValid(timestampMs: Long, ttlMs: Long): Boolean =
+            System.currentTimeMillis() - timestampMs <= ttlMs
+
         private fun createClient(cookieJar: PersistentCookieJar): OkHttpClient {
             val logging = HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BASIC

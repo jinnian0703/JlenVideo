@@ -194,7 +194,7 @@ fun JlenVideoApp() {
                         composable("home") {
                             HomeScreen(
                                 state = viewModel.homeState,
-                                onRefresh = viewModel::refreshHome,
+                                onRefresh = { viewModel.refreshHome(forceRefresh = true) },
                                 onLoadMore = viewModel::loadMoreHome,
                                 onOpenDetail = { navController.navigate("detail/$it") },
                                 onOpenCategory = { navController.navigate("categories") },

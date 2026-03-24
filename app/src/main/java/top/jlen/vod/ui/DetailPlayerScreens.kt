@@ -26,10 +26,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -304,120 +303,106 @@ fun PlayerScreen(
             .fillMaxSize()
             .background(UiPalette.BackgroundBottom)
     ) {
-        Column(
+        val listState = rememberLazyListState()
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
                 .padding(bottom = 24.dp),
+            state = listState,
+            contentPadding = PaddingValues(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(UiPalette.PlayerBackground)
-            ) {
-                Column {
-                    DetailTopBar(
-                        title = state.title.ifBlank { "播放器" },
-                        onBack = onBack,
-                        darkMode = true
-                    )
-                    when {
-                        state.isResolving && !isFullscreen -> ResolveLoadingSurface()
-                        state.useWebPlayer && !isFullscreen -> ResolveUnavailableSurface()
-                        directPlayable && !isFullscreen -> playerContent(false)
-                        directPlayable -> Spacer(modifier = Modifier.height(0.dp))
-                        else -> EmptyPane("暂无可播放地址")
+            item(key = "player_header") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(UiPalette.PlayerBackground)
+                ) {
+                    Column {
+                        DetailTopBar(
+                            title = state.title.ifBlank { "播放器" },
+                            onBack = onBack,
+                            darkMode = true
+                        )
+                        when {
+                            state.isResolving && !isFullscreen -> ResolveLoadingSurface()
+                            state.useWebPlayer && !isFullscreen -> ResolveUnavailableSurface()
+                            directPlayable && !isFullscreen -> playerContent(false)
+                            directPlayable -> Spacer(modifier = Modifier.height(0.dp))
+                            else -> EmptyPane("暂无可播放地址")
+                        }
                     }
                 }
             }
-            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                Text(
-                    text = state.title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = UiPalette.Ink
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = buildString {
-                        append("正在播放")
-                        if (state.sourceName.isNotBlank()) {
-                            append(" · ")
-                            append(state.sourceName)
-                        }
-                        if (state.episodeName.isNotBlank()) {
-                            append(" · ")
-                            append(state.episodeName)
-                        }
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = UiPalette.TextSecondary
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = when {
-                        state.isResolving -> "正在解析真实播放地址..."
-                        state.useWebPlayer -> "当前线路正在后台接管，拿到视频流后会自动切到原生播放器。"
-                        else -> "当前线路已直连视频源，加载和全屏会更稳定。"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = UiPalette.TextMuted
-                )
-                if (!state.resolveError.isNullOrBlank()) {
+            item(key = "player_meta") {
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Text(
+                        text = state.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = UiPalette.Ink
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = state.resolveError,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = UiPalette.DangerText
+                        text = buildString {
+                            append("正在播放")
+                            if (state.sourceName.isNotBlank()) {
+                                append(" · ")
+                                append(state.sourceName)
+                            }
+                            if (state.episodeName.isNotBlank()) {
+                                append(" · ")
+                                append(state.episodeName)
+                            }
+                        },
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = UiPalette.TextSecondary
                     )
-                }
-                if (false) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedButton(
-                            onClick = {
-                                setFullscreen(
-                                    fullscreen = true,
-                                    isLandscapeVideo = detectedLandscapeVideo
-                                )
-                            },
-                            enabled = !state.isResolving,
-                            shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, UiPalette.BorderSoft),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = UiPalette.Ink)
-                        ) {
-                            Text("全屏播放")
-                        }
-                        OutlinedButton(
-                            onClick = { openExternal(context, playUrl) },
-                            enabled = !state.isResolving,
-                            shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, UiPalette.BorderSoft),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = UiPalette.Ink)
-                        ) {
-                            Text("外部打开")
-                        }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = when {
+                            state.isResolving -> "正在解析真实播放地址..."
+                            state.useWebPlayer -> "当前线路正在后台接管，拿到视频流后会自动切到原生播放器。"
+                            else -> "当前线路已直连视频源，加载和全屏会更稳定。"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = UiPalette.TextMuted
+                    )
+                    if (!state.resolveError.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = state.resolveError,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = UiPalette.DangerText
+                        )
                     }
                 }
             }
 
             if (state.sources.isNotEmpty()) {
-                SectionTitle(title = "切换线路", action = state.sourceName, onAction = {})
-                SourceRow(
-                    sourceNames = state.sources.map { it.name },
-                    selectedIndex = state.selectedSourceIndex,
-                    onSelectSource = onSelectSource
-                )
+                item(key = "source_title") {
+                    SectionTitle(title = "切换线路", action = state.sourceName, onAction = {})
+                }
+                item(key = "source_row") {
+                    SourceRow(
+                        sourceNames = state.sources.map { it.name },
+                        selectedIndex = state.selectedSourceIndex,
+                        onSelectSource = onSelectSource
+                    )
+                }
             }
 
             if (state.episodes.isNotEmpty()) {
-                SectionTitle(title = "切换选集", action = null, onAction = {})
-                EpisodePanel(
-                    episodes = state.episodes,
-                    selectedIndex = state.selectedEpisodeIndex,
-                    onEpisodeClick = onSelectEpisode
-                )
+                item(key = "episode_title") {
+                    SectionTitle(title = "切换选集", action = null, onAction = {})
+                }
+                item(key = "episode_panel") {
+                    EpisodePanel(
+                        episodes = state.episodes,
+                        selectedIndex = state.selectedEpisodeIndex,
+                        onEpisodeClick = onSelectEpisode
+                    )
+                }
             }
         }
 
