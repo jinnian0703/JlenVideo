@@ -52,7 +52,7 @@ fun HiddenStreamResolver(
                     view.postDelayed({ inspectVideoElement(view, delivered, onDetected) }, 2500)
                     view.postDelayed({
                         if (!delivered.get()) {
-                            onFailed("这条线路还没成功接管，建议先换源试试")
+                            onFailed("该线路暂不支持，请换个线路试试")
                         }
                     }, 12000)
                 }

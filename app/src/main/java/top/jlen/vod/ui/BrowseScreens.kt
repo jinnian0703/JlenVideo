@@ -206,7 +206,7 @@ fun HomeScreen(
         if (state.latest.isEmpty()) {
             item {
                 ErrorBanner(
-                    message = "首页暂时没有内容，点刷新再试试。",
+                    message = "暂无内容",
                     onRetry = onRefresh
                 )
             }
@@ -250,12 +250,6 @@ fun CategoryScreen(
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold,
                     color = UiPalette.Ink
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "默认先显示全部分类，下方可以切换其他分类。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = UiPalette.TextSecondary
                 )
             }
         }
@@ -303,7 +297,7 @@ fun CategoryScreen(
         item {
             when {
                 state.isCategoryLoading -> LoadingPane("分类加载中...")
-                state.categoryVideos.isEmpty() -> EmptyPane("这个分类暂时没有内容")
+                state.categoryVideos.isEmpty() -> EmptyPane("暂无内容")
                 else -> PosterGridSection(
                     items = state.visibleCategoryVideos,
                     onOpenDetail = onOpenDetail
@@ -500,16 +494,6 @@ fun AccountScreen(
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold,
                     color = UiPalette.Ink
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = if (showLoggedInContent) {
-                        "当前账号已经登录，可以直接继续使用会员相关功能。"
-                    } else {
-                        "登录后可以同步站内账号状态和后续会员功能。"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = UiPalette.TextSecondary
                 )
             }
         }
@@ -995,10 +979,10 @@ private fun AboutPane(
             )
             Text(
                 text = when {
-                    isUpdateLoading -> "正在检查最新版本..."
-                    hasUpdate -> "检测到新版本，可以在这里查看发布说明并下载。"
-                    latestVersion.isNotBlank() -> "当前已经是最新版本。"
-                    else -> "可以在这里检查更新和查看版本发布说明。"
+                    isUpdateLoading -> "检查中"
+                    hasUpdate -> "发现新版本"
+                    latestVersion.isNotBlank() -> "已是最新版本"
+                    else -> "检查更新"
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = UiPalette.Ink
@@ -1577,7 +1561,7 @@ private fun AccountProfilePaneV2(
                     AccountProfileTab.Overview -> {
                         if (fields.isEmpty()) {
                             Text(
-                                text = "暂时没有解析到基础资料。",
+                                text = "暂无资料",
                                 color = UiPalette.TextSecondary,
                                 style = MaterialTheme.typography.bodyMedium
                             )
@@ -1730,7 +1714,7 @@ private fun AccountProfilePane(
 ) {
     when {
         isLoading -> LoadingPane("资料加载中...")
-        fields.isEmpty() -> EmptyPane("暂时没有资料信息")
+        fields.isEmpty() -> EmptyPane("暂无资料")
         else -> Card(
             colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
             shape = RoundedCornerShape(24.dp),
@@ -2021,7 +2005,7 @@ private fun MembershipPaneV2(
             }
 
             if (plans.isEmpty()) {
-                EmptyPane("当前没有可用的升级方案")
+                EmptyPane("暂无套餐")
             } else {
                 plans.forEach { plan ->
                     Card(
@@ -2101,7 +2085,7 @@ private fun MembershipPane(
             }
 
             if (plans.isEmpty()) {
-                EmptyPane("当前没有可用的升级方案")
+                EmptyPane("暂无套餐")
             } else {
                 plans.forEach { plan ->
                     Card(
@@ -2212,7 +2196,7 @@ private fun SearchDock(onClick: () -> Unit) {
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = "搜索影片、剧集、综艺、动漫",
+                text = "搜影片",
                 style = MaterialTheme.typography.bodyMedium,
                 color = UiPalette.TextSecondary
             )
@@ -2479,7 +2463,7 @@ private fun LoadMoreFooter(
                 color = UiPalette.Accent
             )
             Text(
-                text = "正在加载...",
+                text = "加载中",
                 style = MaterialTheme.typography.bodySmall,
                 color = UiPalette.TextMuted
             )
@@ -2492,7 +2476,7 @@ private fun LoadMoreFooter(
             }
         } else {
             Text(
-                text = "已经全部加载完了",
+                text = "到底了",
                 style = MaterialTheme.typography.bodySmall,
                 color = UiPalette.TextMuted
             )
