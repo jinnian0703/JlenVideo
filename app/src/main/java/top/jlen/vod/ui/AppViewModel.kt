@@ -91,7 +91,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadHome() }
             }.onSuccess { payload ->
-                val categories = listOf(allCategory) + payload.categories
+                val localizedAllCategory = allCategory.copy(typeName = "\u5168\u90e8\u5206\u7c7b")
+                val categories = listOf(localizedAllCategory) + payload.categories
                 homeState = HomeUiState(
                     isLoading = false,
                     slides = payload.slides,
@@ -104,7 +105,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     homeTotalCount = payload.latestTotal,
                     hasMoreHomePages = payload.latestHasNextPage,
                     categories = categories,
-                    selectedCategory = allCategory,
+                    selectedCategory = localizedAllCategory,
                     categoryVideos = payload.latest,
                     categoryVisibleCount = payload.latest.size,
                     categoryPage = payload.latestPage,
@@ -442,6 +443,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     loadMembership()
                 }
             }
+            AccountSection.About -> Unit
         }
     }
 
@@ -1356,7 +1358,8 @@ enum class AccountSection {
     Profile,
     Favorites,
     History,
-    Member
+    Member,
+    About
 }
 
 enum class AccountAuthMode {

@@ -393,14 +393,14 @@ fun SearchScreen(
                         modifier = Modifier.size(18.dp)
                     )
                     Text(
-                        text = "鎼滅储鍘嗗彶",
+                        text = "搜索历史",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = UiPalette.Ink
                     )
                 }
                 TextButton(onClick = onClearHistory) {
-                    Text("娓呯┖")
+                    Text("清空")
                 }
             }
             Spacer(modifier = Modifier.height(10.dp))
@@ -505,88 +505,6 @@ fun AccountScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = UiPalette.TextSecondary
                 )
-            }
-        }
-
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-                shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, UiPalette.Border)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "版本更新",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = UiPalette.Ink
-                    )
-                    Text(
-                        text = buildString {
-                            append("当前版本：")
-                            append(state.updateInfo?.currentVersion?.ifBlank { BuildConfig.VERSION_NAME } ?: BuildConfig.VERSION_NAME)
-                            val latest = state.updateInfo?.latestVersion.orEmpty()
-                            if (latest.isNotBlank()) {
-                                append("  ·  最新版本：")
-                                append(latest)
-                            }
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = UiPalette.TextSecondary
-                    )
-                    Text(
-                        text = when {
-                            state.isUpdateLoading -> "正在检查最新版本..."
-                            state.updateInfo?.hasUpdate == true -> "检测到新版本，可以前往 Release 下载。"
-                            state.updateInfo != null -> "当前已经是最新版本。"
-                            else -> "点击下方按钮检查最新版本。"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = UiPalette.Ink
-                    )
-                    if (!state.updateInfo?.notes.isNullOrBlank()) {
-                        Text(
-                            text = state.updateInfo?.notes.orEmpty(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = UiPalette.TextSecondary,
-                            maxLines = 6,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedButton(
-                            onClick = onCheckUpdate,
-                            enabled = !state.isUpdateLoading,
-                            modifier = Modifier.weight(1f),
-                            border = BorderStroke(1.dp, UiPalette.BorderSoft)
-                        ) {
-                            Text(if (state.isUpdateLoading) "检查中..." else "检查更新")
-                        }
-                        Button(
-                            onClick = {
-                                val targetUrl = state.updateInfo?.downloadUrl
-                                    ?.takeIf { it.isNotBlank() }
-                                    ?: state.updateInfo?.releasePageUrl
-                                if (!targetUrl.isNullOrBlank()) {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
-                                }
-                            },
-                            enabled = !state.updateInfo?.releasePageUrl.isNullOrBlank(),
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = UiPalette.Accent,
-                                contentColor = UiPalette.AccentText
-                            )
-                        ) {
-                            Text(if (state.updateInfo?.hasUpdate == true) "前往下载" else "查看发布")
-                        }
-                    }
-                }
             }
         }
 
@@ -730,6 +648,7 @@ fun AccountScreen(
                                         AccountSection.Favorites -> "收藏"
                                         AccountSection.History -> "记录"
                                         AccountSection.Member -> "会员"
+                                        AccountSection.About -> "关于"
                                     },
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -819,6 +738,23 @@ fun AccountScreen(
                         plans = state.membershipPlans,
                         isActionLoading = state.isActionLoading,
                         onUpgrade = onUpgradeMembership
+                    )
+                    AccountSection.About -> AboutPane(
+                        currentVersion = state.updateInfo?.currentVersion?.ifBlank { BuildConfig.VERSION_NAME }
+                            ?: BuildConfig.VERSION_NAME,
+                        latestVersion = state.updateInfo?.latestVersion.orEmpty(),
+                        notes = state.updateInfo?.notes.orEmpty(),
+                        hasUpdate = state.updateInfo?.hasUpdate == true,
+                        isUpdateLoading = state.isUpdateLoading,
+                        onCheckUpdate = onCheckUpdate,
+                        onOpenRelease = {
+                            val targetUrl = state.updateInfo?.downloadUrl
+                                ?.takeIf { it.isNotBlank() }
+                                ?: state.updateInfo?.releasePageUrl
+                            if (!targetUrl.isNullOrBlank()) {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
+                            }
+                        }
                     )
                 }
             }
@@ -967,6 +903,88 @@ fun AccountScreen(
                             Text(if (state.isLoading) "正在登录..." else "立即登录", fontWeight = FontWeight.Bold)
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AboutPane(
+    currentVersion: String,
+    latestVersion: String,
+    notes: String,
+    hasUpdate: Boolean,
+    isUpdateLoading: Boolean,
+    onCheckUpdate: () -> Unit,
+    onOpenRelease: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, UiPalette.Border)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "关于",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = UiPalette.Ink
+            )
+            Text(
+                text = buildString {
+                    append("当前版本：")
+                    append(currentVersion)
+                    if (latestVersion.isNotBlank()) {
+                        append("  ·  最新版本：")
+                        append(latestVersion)
+                    }
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = UiPalette.TextSecondary
+            )
+            Text(
+                text = when {
+                    isUpdateLoading -> "正在检查最新版本..."
+                    hasUpdate -> "检测到新版本，可以在这里查看发布说明并下载。"
+                    latestVersion.isNotBlank() -> "当前已经是最新版本。"
+                    else -> "可以在这里检查更新和查看版本发布说明。"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = UiPalette.Ink
+            )
+            if (notes.isNotBlank()) {
+                Text(
+                    text = notes,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = UiPalette.TextSecondary,
+                    maxLines = 8,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(
+                    onClick = onCheckUpdate,
+                    enabled = !isUpdateLoading,
+                    modifier = Modifier.weight(1f),
+                    border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                ) {
+                    Text(if (isUpdateLoading) "检查中..." else "检查更新")
+                }
+                Button(
+                    onClick = onOpenRelease,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = UiPalette.Accent,
+                        contentColor = UiPalette.AccentText
+                    )
+                ) {
+                    Text(if (hasUpdate) "前往下载" else "查看发布")
                 }
             }
         }

@@ -57,7 +57,15 @@ class AppleCmsRepository(
             throw IOException("首页内容解析失败")
         }
 
-        val categories = defaultCategories
+        val categories = defaultCategories.map { category ->
+            when (category.typeId) {
+                "1" -> category.copy(typeName = "\u7535\u5f71")
+                "2" -> category.copy(typeName = "\u7535\u89c6\u5267")
+                "3" -> category.copy(typeName = "\u7efc\u827a")
+                "4" -> category.copy(typeName = "\u52a8\u6f2b")
+                else -> category
+            }
+        }
         val featured = runCatching { loadLevelItems(level = "1", limit = 16) }
             .getOrDefault(emptyList())
         val sections = categories.mapNotNull { category ->
