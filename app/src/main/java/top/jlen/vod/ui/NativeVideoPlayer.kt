@@ -23,6 +23,7 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -298,6 +299,15 @@ fun NativeVideoPlayer(
         return
     }
 
+    val showLoadingOverlay =
+        playbackState != Player.STATE_ENDED &&
+            !showPausedOverlay &&
+            !isUserPaused &&
+            (
+                playbackState == Player.STATE_BUFFERING ||
+                    (player.playWhenReady && !hasStartedPlaybackOnce)
+                )
+
     Card(
         modifier = Modifier
             .then(
@@ -344,6 +354,25 @@ fun NativeVideoPlayer(
                         .fillMaxSize()
                         .clip(RoundedCornerShape(if (fullscreenMode) 0.dp else 24.dp))
                 )
+            }
+
+            if (showLoadingOverlay) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(if (fullscreenMode) 86.dp else 78.dp)
+                        .clip(RoundedCornerShape(999.dp)),
+                    shape = RoundedCornerShape(999.dp),
+                    color = Color.Black.copy(alpha = 0.56f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(if (fullscreenMode) 34.dp else 30.dp),
+                            color = Color.White,
+                            strokeWidth = 3.dp
+                        )
+                    }
+                }
             }
 
             if (playbackState != Player.STATE_ENDED && showPausedOverlay) {
