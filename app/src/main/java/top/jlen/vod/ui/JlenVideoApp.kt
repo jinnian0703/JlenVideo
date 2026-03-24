@@ -161,7 +161,9 @@ fun JlenVideoApp() {
                                 onFindPassword = viewModel::findPassword,
                                 onSendEmailCode = viewModel::sendEmailBindCode,
                                 onBindEmail = viewModel::bindEmail,
-                                onUnbindEmail = viewModel::unbindEmail
+                                onUnbindEmail = viewModel::unbindEmail,
+                                onRefreshCrashLog = viewModel::refreshCrashLog,
+                                onClearCrashLog = viewModel::clearCrashLog
                             )
                         }
                         composable(

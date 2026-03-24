@@ -1,8 +1,12 @@
 package top.jlen.vod.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -473,7 +477,9 @@ fun AccountScreen(
     onFindPassword: () -> Unit,
     onSendEmailCode: () -> Unit,
     onBindEmail: () -> Unit,
-    onUnbindEmail: () -> Unit
+    onUnbindEmail: () -> Unit,
+    onRefreshCrashLog: () -> Unit,
+    onClearCrashLog: () -> Unit
 ) {
     val context = LocalContext.current
     val sessionExpired = state.error?.contains("请先登录") == true ||
@@ -530,6 +536,16 @@ fun AccountScreen(
                     ErrorBanner(
                         message = message,
                         onRetry = onRefresh
+                    )
+                }
+            }
+
+            if (state.hasCrashLog) {
+                item {
+                    CrashLogCard(
+                        logText = state.latestCrashLog,
+                        onRefresh = onRefreshCrashLog,
+                        onClear = onClearCrashLog
                     )
                 }
             }
@@ -746,7 +762,11 @@ fun AccountScreen(
                         notes = state.updateInfo?.notes.orEmpty(),
                         hasUpdate = state.updateInfo?.hasUpdate == true,
                         isUpdateLoading = state.isUpdateLoading,
+                        crashLogText = state.latestCrashLog,
+                        hasCrashLog = state.hasCrashLog,
                         onCheckUpdate = onCheckUpdate,
+                        onRefreshCrashLog = onRefreshCrashLog,
+                        onClearCrashLog = onClearCrashLog,
                         onOpenRelease = {
                             val targetUrl = state.updateInfo?.downloadUrl
                                 ?.takeIf { it.isNotBlank() }
@@ -916,7 +936,11 @@ private fun AboutPane(
     notes: String,
     hasUpdate: Boolean,
     isUpdateLoading: Boolean,
+    crashLogText: String,
+    hasCrashLog: Boolean,
     onCheckUpdate: () -> Unit,
+    onRefreshCrashLog: () -> Unit,
+    onClearCrashLog: () -> Unit,
     onOpenRelease: () -> Unit
 ) {
     Card(
@@ -985,6 +1009,84 @@ private fun AboutPane(
                     )
                 ) {
                     Text(if (hasUpdate) "前往下载" else "查看发布")
+                }
+            }
+            if (hasCrashLog) {
+                CrashLogCard(
+                    logText = crashLogText,
+                    onRefresh = onRefreshCrashLog,
+                    onClear = onClearCrashLog
+                )
+            } else {
+                Text(
+                    text = "暂无崩溃日志",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = UiPalette.TextSecondary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CrashLogCard(
+    logText: String,
+    onRefresh: () -> Unit,
+    onClear: () -> Unit
+) {
+    val context = LocalContext.current
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, UiPalette.BorderSoft)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "最近一次崩溃日志",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = UiPalette.Ink
+            )
+            Text(
+                text = logText.ifBlank { "暂无崩溃日志" },
+                style = MaterialTheme.typography.bodySmall,
+                color = UiPalette.TextSecondary,
+                maxLines = 12,
+                overflow = TextOverflow.Ellipsis
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = onRefresh,
+                    modifier = Modifier.weight(1f),
+                    border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                ) {
+                    Text("刷新日志")
+                }
+                OutlinedButton(
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("crash_log", logText))
+                        Toast.makeText(context, "崩溃日志已复制", Toast.LENGTH_SHORT).show()
+                    },
+                    enabled = logText.isNotBlank(),
+                    modifier = Modifier.weight(1f),
+                    border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                ) {
+                    Text("复制日志")
+                }
+                OutlinedButton(
+                    onClick = onClear,
+                    enabled = logText.isNotBlank(),
+                    modifier = Modifier.weight(1f),
+                    border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                ) {
+                    Text("清空日志")
                 }
             }
         }

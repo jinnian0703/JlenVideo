@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.jlen.vod.BuildConfig
+import top.jlen.vod.CrashLogger
 import top.jlen.vod.data.AppUpdateInfo
 import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.AppleCmsRepository
@@ -49,6 +50,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         searchState = searchState.copy(history = searchHistoryStore.load())
+        refreshCrashLog()
         refreshAccount()
         refreshHome()
         checkAppUpdate()
@@ -59,11 +61,35 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         accountState = if (session.isLoggedIn) {
             accountState.copy(session = session, error = null)
         } else {
-            AccountUiState(userName = accountState.userName, session = session)
+            AccountUiState(
+                userName = accountState.userName,
+                session = session,
+                updateInfo = accountState.updateInfo,
+                hasCrashLog = accountState.hasCrashLog,
+                latestCrashLog = accountState.latestCrashLog
+            )
         }
         if (session.isLoggedIn) {
             selectAccountSection(accountState.selectedSection, forceRefresh = true)
         }
+    }
+
+    fun refreshCrashLog() {
+        val latestCrashLog = CrashLogger.readLatest(getApplication())
+        accountState = accountState.copy(
+            hasCrashLog = latestCrashLog.isNotBlank(),
+            latestCrashLog = latestCrashLog
+        )
+    }
+
+    fun clearCrashLog() {
+        CrashLogger.clear(getApplication())
+        accountState = accountState.copy(
+            hasCrashLog = false,
+            latestCrashLog = "",
+            message = "已清空崩溃日志",
+            error = null
+        )
     }
 
     fun checkAppUpdate() {
@@ -443,7 +469,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     loadMembership()
                 }
             }
-            AccountSection.About -> Unit
+            AccountSection.About -> refreshCrashLog()
         }
     }
 
@@ -788,7 +814,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 accountState = AccountUiState(
                     userName = accountState.userName,
                     session = AuthSession(),
-                    message = "已退出登录"
+                    message = "已退出登录",
+                    updateInfo = accountState.updateInfo,
+                    hasCrashLog = accountState.hasCrashLog,
+                    latestCrashLog = accountState.latestCrashLog
                 )
             }.onFailure { error ->
                 accountState = accountState.copy(
@@ -1407,7 +1436,9 @@ data class AccountUiState(
     val historyNextPageUrl: String? = null,
     val membershipInfo: MembershipInfo = MembershipInfo(),
     val membershipPlans: List<MembershipPlan> = emptyList(),
-    val updateInfo: AppUpdateInfo? = null
+    val updateInfo: AppUpdateInfo? = null,
+    val hasCrashLog: Boolean = false,
+    val latestCrashLog: String = ""
 )
 
 data class DetailUiState(
