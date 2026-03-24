@@ -724,7 +724,7 @@ fun AccountScreen(
                             val targetUrl = state.updateInfo?.releasePageUrl
                                 ?.takeIf { it.isNotBlank() }
                                 ?: "https://github.com/jinnian0703/JlenVideo/releases"
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
+                            openExternalUrl(context, targetUrl)
                         },
                         onDownloadUpdate = {
                             val targetUrl = state.updateInfo?.downloadUrl
@@ -732,7 +732,7 @@ fun AccountScreen(
                                 ?: state.updateInfo?.releasePageUrl
                                 ?.takeIf { it.isNotBlank() }
                                 ?: "https://github.com/jinnian0703/JlenVideo/releases"
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
+                            openExternalUrl(context, targetUrl)
                         }
                     )
                 }
@@ -848,7 +848,7 @@ fun AccountScreen(
                                     val targetUrl = state.updateInfo?.releasePageUrl
                                         ?.takeIf { it.isNotBlank() }
                                         ?: "https://github.com/jinnian0703/JlenVideo/releases"
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
+                                    openExternalUrl(context, targetUrl)
                                 },
                                 onDownloadUpdate = {
                                     val targetUrl = state.updateInfo?.downloadUrl
@@ -856,7 +856,7 @@ fun AccountScreen(
                                         ?: state.updateInfo?.releasePageUrl
                                         ?.takeIf { it.isNotBlank() }
                                         ?: "https://github.com/jinnian0703/JlenVideo/releases"
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
+                                    openExternalUrl(context, targetUrl)
                                 }
                             )
                         }

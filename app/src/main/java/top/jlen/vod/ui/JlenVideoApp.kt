@@ -1,8 +1,4 @@
 package top.jlen.vod.ui
-
-import android.content.Intent
-import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -88,13 +84,7 @@ fun JlenVideoApp() {
             ?: updateInfo?.releasePageUrl
             ?.takeIf { it.isNotBlank() }
             ?: "https://github.com/jinnian0703/JlenVideo/releases"
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl))
-        runCatching {
-            intent.resolveActivity(context.packageManager) ?: error("no activity")
-            context.startActivity(intent)
-        }.onFailure {
-            Toast.makeText(context, "无法打开更新链接，请稍后重试", Toast.LENGTH_SHORT).show()
-        }
+        openExternalUrl(context, targetUrl)
     }
 
     MaterialTheme(colorScheme = appColors) {

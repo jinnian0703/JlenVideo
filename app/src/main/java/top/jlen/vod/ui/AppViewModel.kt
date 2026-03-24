@@ -10,6 +10,11 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.InterruptedIOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import javax.net.ssl.SSLException
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.CrashLogger
 import top.jlen.vod.data.AppUpdateInfo
@@ -148,7 +153,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure { error ->
                 homeState = homeState.copy(
                     isLoading = false,
-                    error = error.message ?: "首页加载失败"
+                    error = toUserFacingMessage(error, "首页加载失败")
                 )
             }
         }
@@ -195,7 +200,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 homeState = homeState.copy(
                     isCategoryAppending = false,
                     isCategoryLoading = false,
-                    error = error.message ?: "分类加载失败"
+                    error = toUserFacingMessage(error, "分类加载失败")
                 )
             }
         }
@@ -235,7 +240,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure { error ->
                 homeState = homeState.copy(
                     isHomeAppending = false,
-                    error = error.message ?: "继续加载首页失败"
+                    error = toUserFacingMessage(error, "继续加载首页失败")
                 )
             }
         }
@@ -271,7 +276,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }.onFailure { error ->
                     homeState = homeState.copy(
                         isCategoryAppending = false,
-                        error = error.message ?: "继续加载全部分类失败"
+                        error = toUserFacingMessage(error, "继续加载全部分类失败")
                     )
                 }
             }
@@ -301,7 +306,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure { error ->
                 homeState = homeState.copy(
                     isCategoryAppending = false,
-                    error = error.message ?: "继续加载分类失败"
+                    error = toUserFacingMessage(error, "继续加载分类失败")
                 )
             }
         }
@@ -347,7 +352,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure { error ->
                 searchState = searchState.copy(
                     isLoading = false,
-                    error = error.message ?: "搜索失败"
+                    error = toUserFacingMessage(error, "搜索失败")
                 )
             }
         }
@@ -403,7 +408,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isContentLoading = false,
-                    error = error.message ?: "验证码加载失败"
+                    error = toUserFacingMessage(error, "验证码加载失败")
                 )
             }
         }
@@ -437,7 +442,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isContentLoading = false,
-                    error = error.message ?: "楠岃瘉鐮佸姞杞藉け璐?"
+                    error = toUserFacingMessage(error, "验证码加载失败")
                 )
             }
         }
@@ -807,7 +812,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure { error ->
                 accountState = accountState.copy(
                     isLoading = false,
-                    error = error.message ?: "登录失败"
+                    error = toUserFacingMessage(error, "登录失败")
                 )
             }
         }
@@ -832,7 +837,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isLoading = false,
-                    error = error.message ?: "退出登录失败"
+                    error = toUserFacingMessage(error, "退出登录失败")
                 )
             }
         }
@@ -863,7 +868,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isContentLoading = false,
-                    error = error.message ?: "注册页面加载失败"
+                    error = toUserFacingMessage(error, "注册页面加载失败")
                 )
             }
         }
@@ -889,7 +894,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isContentLoading = false,
-                    error = error.message ?: "鎵惧洖瀵嗙爜椤甸潰鍔犺浇澶辫触"
+                    error = toUserFacingMessage(error, "找回密码页面加载失败")
                 )
             }
         }
@@ -911,7 +916,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isContentLoading = false,
-                    error = error.message ?: "加载资料失败"
+                    error = toUserFacingMessage(error, "加载资料失败")
                 )
             }
         }
@@ -935,7 +940,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isContentLoading = false,
-                    error = error.message ?: "加载收藏失败"
+                    error = toUserFacingMessage(error, "加载收藏失败")
                 )
             }
         }
@@ -963,7 +968,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isContentLoading = false,
-                    error = error.message ?: "加载播放记录失败"
+                    error = toUserFacingMessage(error, "加载播放记录失败")
                 )
             }
         }
@@ -988,7 +993,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isContentLoading = false,
-                    error = error.message ?: "加载会员信息失败"
+                    error = toUserFacingMessage(error, "加载会员信息失败")
                 )
             }
         }
@@ -1013,7 +1018,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isActionLoading = false,
-                    error = error.message ?: "操作失败"
+                    error = toUserFacingMessage(error, "操作失败")
                 )
             }
         }
@@ -1041,6 +1046,40 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             latestCrashLog = accountState.latestCrashLog
         )
         return true
+    }
+
+    private fun toUserFacingMessage(error: Throwable, fallback: String): String {
+        val host = BuildConfig.APPLE_CMS_BASE_URL
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .trimEnd('/')
+            .ifBlank { "站点" }
+        val rawMessage = error.message.orEmpty().trim()
+
+        return when {
+            error is UnknownHostException || rawMessage.contains("Unable to resolve host", ignoreCase = true) ->
+                "无法连接到 $host，请检查网络或站点状态"
+
+            error is SocketTimeoutException ||
+                error is InterruptedIOException ||
+                rawMessage.contains("timeout", ignoreCase = true) ||
+                rawMessage.contains("timed out", ignoreCase = true) ->
+                "连接 $host 超时，请稍后重试"
+
+            error is ConnectException ||
+                rawMessage.contains("failed to connect", ignoreCase = true) ||
+                rawMessage.contains("connection refused", ignoreCase = true) ->
+                "无法连接到 $host，请稍后重试"
+
+            error is SSLException || rawMessage.contains("ssl", ignoreCase = true) ->
+                "与 $host 的安全连接失败，请稍后重试"
+
+            rawMessage.any { it in '\u4e00'..'\u9fff' } -> rawMessage
+
+            fallback.isNotBlank() -> "$fallback，请稍后重试"
+
+            else -> "请求失败，请稍后重试"
+        }
     }
 
     private fun mergeAccountItems(
@@ -1228,7 +1267,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure { error ->
                 detailState = DetailUiState(
                     isLoading = false,
-                    error = error.message ?: "详情加载失败"
+                    error = toUserFacingMessage(error, "详情加载失败")
                 )
             }
         }

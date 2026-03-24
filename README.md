@@ -1,6 +1,6 @@
 # JlenVideo
 
-`JlenVideo` 是一个基于原生 Android + Jetpack Compose 开发的苹果 CMS 影视客户端，当前版本为 `1.1.3` 正式版。
+`JlenVideo` 是一个基于原生 Android + Jetpack Compose 开发的苹果 CMS 影视客户端，当前版本为 `1.1.4` 正式版。
 
 项目目标不是简单网页套壳，而是围绕苹果 CMS 站点能力，提供更接近原生 App 的浏览、搜索、详情、播放、账号、收藏、历史与会员体验。
 
@@ -10,17 +10,17 @@
 
 ## 版本信息
 
-- 当前版本：`1.1.3`
-- `versionCode`：`5`
-- `versionName`：`1.1.3`
+- 当前版本：`1.1.4`
+- `versionCode`：`6`
+- `versionName`：`1.1.4`
 
 版本定义位置：
 
 - [app/build.gradle.kts](app/build.gradle.kts)
 
-## 1.1.3 更新内容
+## 1.1.4 更新内容
 
-这是当前 `1.1.3` 的整合版更新内容，已经包含最新几轮稳定性修复。
+这是当前 `1.1.4` 的整合版更新内容，已经包含最新几轮稳定性修复。
 
 - 首页推荐横幅轮播继续保留
 - 首页推荐支持自动轮播、手动滑动循环
@@ -30,10 +30,12 @@
 - 移除首页推荐右侧刷新按钮
 - App 启动时自动检查更新，发现新版本后弹窗提示
 - GitHub 更新链接打不开时不再闪退
+- 修复网络异常时首页直接显示英文报错的问题
+- 修复部分机型打开 GitHub 更新链接时被误判失败的问题
 - 被顶号或登录态失效时，会稳定回到登录态，不再在页面间来回跳
 - 登录页提示不会再频繁打断输入法
 - 头像上传改为压缩后上传，并增加头像缓存刷新，便于同步最新头像
-- `v1.1.3` 发布与当前仓库源码保持同步
+- `v1.1.4` 发布与当前仓库源码保持同步
 
 ## 主要功能
 
@@ -241,7 +243,7 @@ macOS / Linux：
 
 当前版本的“检查更新”功能基于 GitHub Release：
 
-- 版本号读取自 Release 的 `tag_name`，默认支持 `v1.1.3` 这种格式，进入 App 后会自动去掉前面的 `v`
+- 版本号读取自 Release 的 `tag_name`，默认支持 `v1.1.4` 这种格式，进入 App 后会自动去掉前面的 `v`
 - 发布说明读取自 Release 的 `body`
 - “查看发布”打开 Release 页面 `html_url`
 - “前往下载”优先打开 Release 资产里的 APK 下载地址 `browser_download_url`
@@ -251,20 +253,20 @@ macOS / Linux：
 1. 修改 [app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt](app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt) 里的 GitHub Release 接口地址
 2. 修改同文件里的 Release 页面兜底地址
 3. 修改 `app/build.gradle.kts` 中的 `versionCode` 和 `versionName`
-4. 打 tag，例如 `v1.1.3`
+4. 打 tag，例如 `v1.1.4`
 5. 创建 GitHub Release 并上传 APK
 
 注意事项：
 
-- `versionName` 要和 GitHub Release 的 `tag_name` 对应，例如本地是 `1.1.3`，Release 标签建议用 `v1.1.3`
+- `versionName` 要和 GitHub Release 的 `tag_name` 对应，例如本地是 `1.1.4`，Release 标签建议用 `v1.1.4`
 - 如果没有上传 APK 资产，“前往下载”会自动退回到 Release 页面
 - 如果 Release 还是 Draft，GitHub 最新发布接口可能不会返回它
 
 ## 开发与发布说明
 
-本仓库当前发布为 `1.1.3` 正式版，建议后续版本遵循语义化版本：
+本仓库当前发布为 `1.1.4` 正式版，建议后续版本遵循语义化版本：
 
-- `1.1.3`：问题修复
+- `1.1.4`：问题修复
 - `1.2.0`：新增功能
 - `2.0.0`：重大不兼容变更
 
@@ -274,7 +276,7 @@ macOS / Linux：
 2. 执行 `assembleDebug` 或 `assembleRelease`
 3. 更新 README 或变更说明
 4. 提交代码
-5. 打 tag，例如 `v1.1.3`
+5. 打 tag，例如 `v1.1.4`
 6. 推送到 GitHub
 7. 创建 GitHub Release
 
