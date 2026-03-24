@@ -102,7 +102,11 @@ fun DetailScreen(
                         if (item.tags.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(14.dp))
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                itemsIndexed(item.tags) { _, tag ->
+                                itemsIndexed(
+                                    items = item.tags,
+                                    key = { index, tag -> "$tag-$index" },
+                                    contentType = { _, _ -> "tag" }
+                                ) { _, tag ->
                                     AssistChip(
                                         onClick = {},
                                         label = { Text(tag) },
@@ -461,7 +465,11 @@ private fun SourceRow(
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        itemsIndexed(sourceNames) { index, name ->
+        itemsIndexed(
+            items = sourceNames,
+            key = { index, name -> "$name-$index" },
+            contentType = { _, _ -> "source" }
+        ) { index, name ->
             val selected = index == selectedIndex
             AssistChip(
                 onClick = { onSelectSource(index) },
@@ -487,7 +495,11 @@ private fun DetailHero(item: VodItem, onBack: () -> Unit) {
             .height(392.dp)
     ) {
         AsyncImage(
-            model = item.vodPic,
+            model = rememberPosterRequest(
+                data = item.vodPic,
+                width = 1280,
+                height = 720
+            ),
             contentDescription = item.displayTitle,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
@@ -515,7 +527,11 @@ private fun DetailHero(item: VodItem, onBack: () -> Unit) {
             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f))
         ) {
             AsyncImage(
-                model = item.vodPic,
+                model = rememberPosterRequest(
+                    data = item.vodPic,
+                    width = 516,
+                    height = 732
+                ),
                 contentDescription = item.displayTitle,
                 modifier = Modifier
                     .width(172.dp)

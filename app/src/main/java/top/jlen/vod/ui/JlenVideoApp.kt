@@ -1,6 +1,9 @@
 package top.jlen.vod.ui
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -158,7 +161,35 @@ fun JlenVideoApp() {
                     NavHost(
                         navController = navController,
                         startDestination = "home",
-                        modifier = Modifier.padding(innerPadding)
+                        modifier = Modifier.padding(innerPadding),
+                        enterTransition = {
+                            if (initialState.destination.route == targetState.destination.route) {
+                                EnterTransition.None
+                            } else {
+                                screenEnterTransition()
+                            }
+                        },
+                        exitTransition = {
+                            if (initialState.destination.route == targetState.destination.route) {
+                                ExitTransition.None
+                            } else {
+                                screenExitTransition()
+                            }
+                        },
+                        popEnterTransition = {
+                            if (initialState.destination.route == targetState.destination.route) {
+                                EnterTransition.None
+                            } else {
+                                screenPopEnterTransition()
+                            }
+                        },
+                        popExitTransition = {
+                            if (initialState.destination.route == targetState.destination.route) {
+                                ExitTransition.None
+                            } else {
+                                screenPopExitTransition()
+                            }
+                        }
                     ) {
                         composable("home") {
                             HomeScreen(
@@ -195,7 +226,6 @@ fun JlenVideoApp() {
                                 onPasswordChange = viewModel::updateLoginPassword,
                                 onLogin = viewModel::login,
                                 onLogout = viewModel::logout,
-                                onRefresh = viewModel::refreshAccount,
                                 onCheckUpdate = viewModel::checkAppUpdate,
                                 onSelectSection = viewModel::selectAccountSection,
                                 onRefreshSection = viewModel::refreshSelectedAccountSection,

@@ -26,8 +26,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -73,6 +75,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import coil.size.Precision
+import coil.size.Scale
 import kotlinx.coroutines.delay
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.data.AppleCmsCategory
@@ -81,7 +85,6 @@ import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.RegisterEditor
 import top.jlen.vod.data.UserProfileEditor
 import top.jlen.vod.data.VodItem
-import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun HomeScreen(
@@ -137,7 +140,11 @@ fun HomeScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    items(state.slides) { item ->
+                    items(
+                        items = state.slides,
+                        key = { it.stableKey() },
+                        contentType = { "slide" }
+                    ) { item ->
                         FeaturedCard(item = item, onClick = onOpenDetail)
                     }
                 }
@@ -257,7 +264,11 @@ fun CategoryScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(state.categories) { category ->
+                items(
+                    items = state.categories,
+                    key = { it.typeId.ifBlank { it.typeName } },
+                    contentType = { "category" }
+                ) { category ->
                     val selected = category.typeId == state.selectedCategory?.typeId
                     AssistChip(
                         onClick = { onSelectCategory(category) },
@@ -399,7 +410,11 @@ fun SearchScreen(
             }
             Spacer(modifier = Modifier.height(10.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(state.history) { keyword ->
+                items(
+                    items = state.history,
+                    key = { it },
+                    contentType = { "history" }
+                ) { keyword ->
                     AssistChip(
                         onClick = { onSearchHistory(keyword) },
                         label = { Text(keyword) },
@@ -424,7 +439,11 @@ fun SearchScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {
-                items(state.results) { item ->
+                items(
+                    items = state.results,
+                    key = { it.stableKey() },
+                    contentType = { "search_result" }
+                ) { item ->
                     ListCard(item = item, onClick = onOpenDetail)
                 }
             }
@@ -440,7 +459,6 @@ fun AccountScreen(
     onPasswordChange: (String) -> Unit,
     onLogin: () -> Unit,
     onLogout: () -> Unit,
-    onRefresh: () -> Unit,
     onCheckUpdate: () -> Unit,
     onSelectSection: (AccountSection) -> Unit,
     onRefreshSection: () -> Unit,
@@ -472,8 +490,6 @@ fun AccountScreen(
     onClearCrashLog: () -> Unit
 ) {
     val context = LocalContext.current
-    val sessionExpired = state.error?.contains("请先登录") == true ||
-        state.error?.contains("登录已失效") == true
     val showLoggedInContent = state.session.isLoggedIn
 
     LazyColumn(
@@ -606,7 +622,11 @@ fun AccountScreen(
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(AccountSection.entries.toList()) { section ->
+                    items(
+                        items = AccountSection.entries.toList(),
+                        key = { it.name },
+                        contentType = { "account_section" }
+                    ) { section ->
                         val selected = state.selectedSection == section
                         AssistChip(
                             onClick = { onSelectSection(section) },
@@ -2265,7 +2285,6 @@ fun SectionTitle(
 
 @Composable
 fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
-    val context = LocalContext.current
     Card(
         modifier = Modifier
             .width(312.dp)
@@ -2275,11 +2294,11 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
     ) {
         Box {
             AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(item.vodPic)
-                    .size(960, 576)
-                    .crossfade(false)
-                    .build(),
+                model = rememberPosterRequest(
+                    data = item.vodPic,
+                    width = 960,
+                    height = 576
+                ),
                 contentDescription = item.displayTitle,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2372,9 +2391,12 @@ private fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String)
     LaunchedEffect(actualCount) {
         if (actualCount <= 1) return@LaunchedEffect
         while (true) {
-            delay(3500)
+            delay(UiMotion.CarouselAutoScrollMillis)
             if (!pagerState.isScrollInProgress) {
-                pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                pagerState.animateScrollToPage(
+                    page = pagerState.currentPage + 1,
+                    animationSpec = tween(UiMotion.CarouselSlideMillis)
+                )
             }
         }
     }
@@ -2388,6 +2410,7 @@ private fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String)
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(horizontal = 16.dp),
             pageSpacing = 12.dp,
+            userScrollEnabled = actualCount > 1,
             key = { page -> loopItems[page].vodId.ifBlank { "featured_$page" } + "_$page" }
         ) { page ->
             FeaturedCard(
@@ -2420,11 +2443,12 @@ private fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String)
 
 @Composable
 private fun PosterGridSection(items: List<VodItem>, onOpenDetail: (String) -> Unit) {
+    val rows = remember(items) { items.chunked(3) }
     Column(
         modifier = Modifier.padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        items.chunked(3).forEach { rowItems ->
+        rows.forEach { rowItems ->
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 rowItems.forEach { item ->
                     CompactPosterCard(
@@ -2491,7 +2515,11 @@ private fun CompactPosterCard(
     Column(modifier = modifier.clickable { onClick(item.vodId) }) {
         Box {
             AsyncImage(
-                model = item.vodPic,
+                model = rememberPosterRequest(
+                    data = item.vodPic,
+                    width = 360,
+                    height = 540
+                ),
                 contentDescription = item.displayTitle,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2550,7 +2578,11 @@ private fun ListCard(item: VodItem, onClick: (String) -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             AsyncImage(
-                model = item.vodPic,
+                model = rememberPosterRequest(
+                    data = item.vodPic,
+                    width = 312,
+                    height = 414
+                ),
                 contentDescription = item.displayTitle,
                 modifier = Modifier
                     .size(width = 104.dp, height = 138.dp)
@@ -2584,3 +2616,26 @@ private fun ListCard(item: VodItem, onClick: (String) -> Unit) {
         }
     }
 }
+
+@Composable
+internal fun rememberPosterRequest(
+    data: String?,
+    width: Int,
+    height: Int
+): ImageRequest {
+    val context = LocalContext.current
+    return remember(context, data, width, height) {
+        ImageRequest.Builder(context)
+            .data(data.orEmpty())
+            .size(width, height)
+            .precision(Precision.INEXACT)
+            .scale(Scale.FILL)
+            .allowHardware(true)
+            .crossfade(false)
+            .diskCacheKey(data.orEmpty())
+            .memoryCacheKey("${data.orEmpty()}@$width@$height")
+            .build()
+    }
+}
+
+internal fun VodItem.stableKey(): String = vodId.ifBlank { "$displayTitle|${vodPic.orEmpty()}" }

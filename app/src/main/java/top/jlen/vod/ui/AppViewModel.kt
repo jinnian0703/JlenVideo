@@ -1427,6 +1427,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updatePlaybackSnapshot(snapshot: PlaybackSnapshot) {
+        val currentSnapshot = playerState.playbackSnapshot
+        val hasMeaningfulChange =
+            kotlin.math.abs(snapshot.positionMs - currentSnapshot.positionMs) >= UiMotion.SnapshotPositionThresholdMillis ||
+                kotlin.math.abs(snapshot.speed - currentSnapshot.speed) > 0.01f ||
+                snapshot.playWhenReady != currentSnapshot.playWhenReady
+        if (!hasMeaningfulChange) return
         playerState = playerState.copy(playbackSnapshot = snapshot)
     }
 

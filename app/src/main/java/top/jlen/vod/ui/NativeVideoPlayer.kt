@@ -1,5 +1,7 @@
 package top.jlen.vod.ui
 
+import android.os.SystemClock
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -113,12 +115,33 @@ fun NativeVideoPlayer(
     var showPausedOverlay by remember(playbackIdentity) { mutableStateOf(false) }
     var isUserPaused by remember(playbackIdentity) { mutableStateOf(false) }
     var lastReportedSnapshot by remember(playbackIdentity) { mutableStateOf<PlaybackSnapshot?>(null) }
+    var lastSnapshotDispatchAt by remember(playbackIdentity) { mutableLongStateOf(0L) }
 
     fun currentSnapshot(): PlaybackSnapshot = PlaybackSnapshot(
         positionMs = player?.currentPosition?.coerceAtLeast(0L) ?: 0L,
         speed = player?.playbackParameters?.speed ?: speed,
         playWhenReady = player?.playWhenReady == true
     )
+
+    fun dispatchSnapshot(force: Boolean = false): PlaybackSnapshot {
+        val snapshot = currentSnapshot()
+        val previous = lastReportedSnapshot
+        val now = SystemClock.elapsedRealtime()
+        val shouldDispatch = force || previous == null || (
+            now - lastSnapshotDispatchAt >= UiMotion.SnapshotDispatchIntervalMillis &&
+                (
+                    kotlin.math.abs(snapshot.positionMs - previous.positionMs) >= UiMotion.SnapshotPositionThresholdMillis ||
+                        kotlin.math.abs(snapshot.speed - previous.speed) > 0.01f ||
+                        snapshot.playWhenReady != previous.playWhenReady
+                    )
+            )
+        if (shouldDispatch) {
+            lastReportedSnapshot = snapshot
+            lastSnapshotDispatchAt = now
+            latestSnapshotCallback.value?.invoke(snapshot)
+        }
+        return snapshot
+    }
 
     DisposableEffect(player) {
         onDispose { player?.release() }
@@ -246,16 +269,8 @@ fun NativeVideoPlayer(
                     0f
                 }
             }
-            val snapshot = PlaybackSnapshot(
-                positionMs = player.currentPosition.coerceAtLeast(0L),
-                speed = player.playbackParameters.speed,
-                playWhenReady = player.playWhenReady
-            )
-            lastReportedSnapshot = snapshot
-            latestSnapshotCallback.value?.invoke(
-                snapshot
-            )
-            delay(300)
+            dispatchSnapshot(force = false)
+            delay(UiMotion.PlayerUiRefreshMillis)
         }
     }
 
@@ -475,15 +490,7 @@ fun NativeVideoPlayer(
                         if (onClose != null) {
                             IconButton(
                                 onClick = {
-                                    val snapshot = PlaybackSnapshot(
-                                        positionMs = player.currentPosition.coerceAtLeast(0L),
-                                        speed = player.playbackParameters.speed,
-                                        playWhenReady = player.playWhenReady
-                                    )
-                                    lastReportedSnapshot = snapshot
-                                    latestSnapshotCallback.value?.invoke(
-                                        snapshot
-                                    )
+                                    dispatchSnapshot(force = true)
                                     onClose()
                                 }
                             ) {
@@ -554,9 +561,7 @@ fun NativeVideoPlayer(
                                             shape = RoundedCornerShape(999.dp)
                                         )
                                         .clickableWithoutRipple {
-                                            val snapshot = currentSnapshot()
-                                            lastReportedSnapshot = snapshot
-                                            latestSnapshotCallback.value?.invoke(snapshot)
+                                            val snapshot = dispatchSnapshot(force = true)
                                             latestFullscreenToggleCallback.value?.invoke(snapshot, lastReportedLandscape)
                                             controlsVersion++
                                         }
@@ -582,9 +587,7 @@ fun NativeVideoPlayer(
                                             shape = RoundedCornerShape(999.dp)
                                         )
                                         .clickableWithoutRipple {
-                                            val snapshot = currentSnapshot()
-                                            lastReportedSnapshot = snapshot
-                                            latestSnapshotCallback.value?.invoke(snapshot)
+                                            val snapshot = dispatchSnapshot(force = true)
                                             latestFullscreenToggleCallback.value?.invoke(snapshot, lastReportedLandscape)
                                             controlsVersion++
                                         }
@@ -622,6 +625,7 @@ fun NativeVideoPlayer(
                             isUserPaused = false
                             currentPosition = target
                             isDragging = false
+                            dispatchSnapshot(force = true)
                             controlsVersion++
                         },
                         modifier = Modifier.fillMaxWidth()
@@ -750,9 +754,7 @@ fun NativeVideoPlayer(
                                         .height(controlChipHeight)
                                         .wrapContentHeight(Alignment.CenterVertically)
                                         .clickableWithoutRipple {
-                                            val snapshot = currentSnapshot()
-                                            lastReportedSnapshot = snapshot
-                                            latestSnapshotCallback.value?.invoke(snapshot)
+                                            val snapshot = dispatchSnapshot(force = true)
                                             latestFullscreenToggleCallback.value?.invoke(snapshot, lastReportedLandscape)
                                             controlsVersion++
                                         }
