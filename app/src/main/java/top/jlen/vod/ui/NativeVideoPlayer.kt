@@ -420,10 +420,21 @@ fun NativeVideoPlayer(
             }
 
             if (!fullscreenMode || controlsVisible) {
+                Text(
+                    text = "视频来源于第三方，切勿相信任何广告信息",
+                    color = Color.White.copy(alpha = 0.88f),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 16.dp)
+                        .background(Color.Black.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+
                 Column(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(16.dp)
+                        .padding(start = 16.dp, top = 16.dp, end = 16.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -451,11 +462,11 @@ fun NativeVideoPlayer(
                                 )
                             }
                         }
-                        Column {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
                                 text = title.ifBlank { "姝ｅ湪鎾斁" },
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.ExtraBold,
                                 color = Color.White
                             )
                             Text(
@@ -470,8 +481,28 @@ fun NativeVideoPlayer(
                                     if (isNotEmpty()) append("\n")
                                     append("${formatMillis(currentPosition)} / ${formatMillis(duration)}")
                                 },
-                                color = Color.White.copy(alpha = 0.92f)
+                                color = Color.Transparent,
+                                modifier = Modifier.height(0.dp)
                             )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (sourceName.isNotBlank()) {
+                                    Text(
+                                        text = sourceName,
+                                        color = Color.White.copy(alpha = 0.92f),
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                }
+                                if (episodeName.isNotBlank()) {
+                                    Text(
+                                        text = episodeName,
+                                        color = Color.White.copy(alpha = 0.92f),
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                }
+                            }
                         }
                     }
                 }
