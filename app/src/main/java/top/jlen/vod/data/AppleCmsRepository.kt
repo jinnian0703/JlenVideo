@@ -58,11 +58,6 @@ class AppleCmsRepository(
         }
 
         val categories = defaultCategories
-        val slides = runCatching { loadLevelItems(level = "9", limit = 8) }
-            .getOrDefault(emptyList())
-            .ifEmpty { runCatching { loadFeaturedFromHomePage().take(8) }.getOrDefault(emptyList()) }
-        val hot = runCatching { loadLevelItems(level = "8", limit = 16) }
-            .getOrDefault(emptyList())
         val featured = runCatching { loadLevelItems(level = "1", limit = 16) }
             .getOrDefault(emptyList())
         val sections = categories.mapNotNull { category ->
@@ -76,8 +71,8 @@ class AppleCmsRepository(
         }
 
         return HomePayload(
-            slides = slides,
-            hot = hot,
+            slides = emptyList(),
+            hot = emptyList(),
             featured = featured,
             latest = latest,
             sections = sections,
