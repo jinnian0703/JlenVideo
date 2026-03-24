@@ -24,6 +24,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -91,6 +92,7 @@ fun NativeVideoPlayer(
     var controlsVisible by remember(fullscreenMode, playbackIdentity) { mutableStateOf(true) }
     var controlsVersion by remember(fullscreenMode, playbackIdentity) { mutableLongStateOf(0L) }
     var hasHandledEnded by remember(playbackIdentity) { mutableStateOf(false) }
+    var playbackState by remember(player) { mutableStateOf(player?.playbackState ?: Player.STATE_IDLE) }
 
     DisposableEffect(player) {
         onDispose { player?.release() }
@@ -119,11 +121,12 @@ fun NativeVideoPlayer(
             onDispose { }
         } else {
             val listener = object : Player.Listener {
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == Player.STATE_ENDED && !hasHandledEnded) {
+                override fun onPlaybackStateChanged(newPlaybackState: Int) {
+                    playbackState = newPlaybackState
+                    if (newPlaybackState == Player.STATE_ENDED && !hasHandledEnded) {
                         hasHandledEnded = true
                         onPlaybackEnded()
-                    } else if (playbackState != Player.STATE_ENDED) {
+                    } else if (newPlaybackState != Player.STATE_ENDED) {
                         hasHandledEnded = false
                     }
                 }
@@ -176,6 +179,7 @@ fun NativeVideoPlayer(
         if (player == null) return@LaunchedEffect
         while (true) {
             isPlaying = player.isPlaying
+            playbackState = player.playbackState
             duration = player.duration.coerceAtLeast(0L)
             if (!isDragging) {
                 currentPosition = player.currentPosition.coerceAtLeast(0L)
@@ -278,6 +282,39 @@ fun NativeVideoPlayer(
                         .fillMaxSize()
                         .clip(RoundedCornerShape(if (fullscreenMode) 0.dp else 24.dp))
                 )
+            }
+
+            if (playbackState != Player.STATE_ENDED && !isPlaying) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .clip(RoundedCornerShape(26.dp))
+                        .clickableWithoutRipple {
+                            player.play()
+                            isPlaying = true
+                            controlsVersion++
+                        },
+                    shape = RoundedCornerShape(26.dp),
+                    color = Color.Black.copy(alpha = 0.68f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White
+                        )
+                        Text(
+                            text = "继续播放",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                }
             }
 
             if (!fullscreenMode || controlsVisible) {
