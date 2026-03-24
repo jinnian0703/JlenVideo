@@ -210,7 +210,7 @@ fun NativeVideoPlayer(
 
     LaunchedEffect(playbackIdentity, player, initialSnapshot.playWhenReady) {
         hasCompletedInitialOverlayDelay = false
-        delay(3_000)
+        delay(1_500)
         if (
             player != null &&
             initialSnapshot.playWhenReady &&
