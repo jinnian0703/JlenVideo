@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -285,35 +287,38 @@ fun NativeVideoPlayer(
             }
 
             if (playbackState != Player.STATE_ENDED && !isPlaying) {
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .clip(RoundedCornerShape(26.dp))
-                        .clickableWithoutRipple {
-                            player.play()
-                            isPlaying = true
-                            controlsVersion++
-                        },
-                    shape = RoundedCornerShape(26.dp),
-                    color = Color.Black.copy(alpha = 0.68f)
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Surface(
+                        modifier = Modifier
+                            .size(if (fullscreenMode) 92.dp else 84.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .clickableWithoutRipple {
+                                player.play()
+                                isPlaying = true
+                                controlsVersion++
+                            },
+                        shape = RoundedCornerShape(999.dp),
+                        color = Color.Black.copy(alpha = 0.62f)
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.PlayArrow,
-                            contentDescription = null,
-                            tint = Color.White
-                        )
-                        Text(
-                            text = "继续播放",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Rounded.PlayArrow,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(if (fullscreenMode) 42.dp else 38.dp)
+                            )
+                        }
                     }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "继续播放",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
                 }
             }
 
