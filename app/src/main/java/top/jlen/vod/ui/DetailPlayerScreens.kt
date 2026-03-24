@@ -1,10 +1,12 @@
 package top.jlen.vod.ui
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -37,7 +39,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,6 +55,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import coil.compose.AsyncImage
 import top.jlen.vod.data.Episode
 import top.jlen.vod.data.VodItem
@@ -197,48 +203,107 @@ fun PlayerScreen(
     onSelectEpisode: (Int) -> Unit,
     onSelectSource: (Int) -> Unit,
     onPlayNext: () -> Unit,
-    onPlaybackSnapshotChange: (PlaybackSnapshot) -> Unit,
-    onFullscreenResult: (FullscreenPlaybackResult) -> Unit
+    onPlaybackSnapshotChange: (PlaybackSnapshot) -> Unit
 ) {
     val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
     val playUrl = state.playUrl
     val directPlayable = playUrl.isNotBlank() && isDirectVideoUrl(playUrl)
     var detectedLandscapeVideo by remember(playUrl, state.episodeName, state.sourceName) {
         mutableStateOf<Boolean?>(null)
     }
-    val fullscreenLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        FullscreenPlayerActivity.extractResult(result.data)?.let(onFullscreenResult)
+    var isFullscreen by remember(playUrl, state.episodeName, state.sourceName) {
+        mutableStateOf(false)
     }
 
-    fun openFullscreen(snapshot: PlaybackSnapshot, isLandscapeVideo: Boolean?) {
-        val preferredOrientation = isLandscapeVideo ?: detectedLandscapeVideo
-        onPlaybackSnapshotChange(snapshot)
-        fullscreenLauncher.launch(
-            FullscreenPlayerActivity.createIntent(
-                context = context,
+    fun setFullscreen(fullscreen: Boolean, snapshot: PlaybackSnapshot? = null, isLandscapeVideo: Boolean? = null) {
+        snapshot?.let(onPlaybackSnapshotChange)
+        detectedLandscapeVideo = isLandscapeVideo ?: detectedLandscapeVideo
+        isFullscreen = fullscreen
+    }
+
+    BackHandler(enabled = isFullscreen) {
+        isFullscreen = false
+    }
+
+    DisposableEffect(activity, isFullscreen, detectedLandscapeVideo) {
+        if (activity == null) {
+            onDispose { }
+        } else {
+            val controller = WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+            if (isFullscreen) {
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                activity.requestedOrientation = if (detectedLandscapeVideo == false) {
+                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                } else {
+                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                }
+            } else {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+                controller.isAppearanceLightStatusBars = true
+                controller.isAppearanceLightNavigationBars = true
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
+            onDispose {
+                if (isFullscreen) {
+                    controller.show(WindowInsetsCompat.Type.systemBars())
+                    controller.isAppearanceLightStatusBars = true
+                    controller.isAppearanceLightNavigationBars = true
+                    activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                }
+            }
+        }
+    }
+
+    val playerContent = remember(
+        playUrl,
+        state.title,
+        state.sourceName,
+        state.episodeName,
+        state.hasNextEpisode
+    ) {
+        movableContentOf<Boolean> { fullscreen ->
+            NativeVideoPlayer(
                 url = playUrl,
                 title = state.title,
                 sourceName = state.sourceName,
                 episodeName = state.episodeName,
-                episodeNames = ArrayList(state.episodes.map { it.name }),
-                episodePageUrls = ArrayList(state.episodes.map { it.url }),
-                selectedEpisodeIndex = state.selectedEpisodeIndex,
-                snapshot = snapshot,
-                isLandscapeVideo = preferredOrientation
+                hasNextEpisode = state.hasNextEpisode,
+                onNextEpisode = onPlayNext,
+                onToggleFullscreen = { snapshot, isLandscapeVideo ->
+                    setFullscreen(!fullscreen, snapshot, isLandscapeVideo)
+                },
+                fullscreenMode = fullscreen,
+                onVideoOrientationDetected = { detectedLandscapeVideo = it },
+                initialSnapshot = state.playbackSnapshot,
+                onPlaybackSnapshotChanged = onPlaybackSnapshotChange,
+                onPlaybackEnded = {
+                    if (state.hasNextEpisode) {
+                        onPlayNext()
+                    }
+                },
+                onClose = if (fullscreen) {
+                    { isFullscreen = false }
+                } else {
+                    null
+                }
             )
-        )
+        }
     }
 
-    LazyColumn(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(UiPalette.BackgroundBottom),
-        contentPadding = PaddingValues(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+            .background(UiPalette.BackgroundBottom)
     ) {
-        item {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -253,23 +318,8 @@ fun PlayerScreen(
                     when {
                         state.isResolving -> ResolveLoadingSurface()
                         state.useWebPlayer -> ResolveUnavailableSurface()
-                        directPlayable -> NativeVideoPlayer(
-                            url = playUrl,
-                            title = state.title,
-                            sourceName = state.sourceName,
-                            episodeName = state.episodeName,
-                            hasNextEpisode = state.hasNextEpisode,
-                            onNextEpisode = onPlayNext,
-                            onToggleFullscreen = ::openFullscreen,
-                            onVideoOrientationDetected = { detectedLandscapeVideo = it },
-                            initialSnapshot = state.playbackSnapshot,
-                            onPlaybackSnapshotChanged = onPlaybackSnapshotChange,
-                            onPlaybackEnded = {
-                                if (state.hasNextEpisode) {
-                                    onPlayNext()
-                                }
-                            }
-                        )
+                        directPlayable && !isFullscreen -> playerContent(false)
+                        directPlayable -> Spacer(modifier = Modifier.height(0.dp))
                         else -> EmptyPane("暂无可播放地址")
                     }
                 }
@@ -321,7 +371,12 @@ fun PlayerScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedButton(
-                            onClick = { openFullscreen(state.playbackSnapshot, detectedLandscapeVideo) },
+                            onClick = {
+                                setFullscreen(
+                                    fullscreen = true,
+                                    isLandscapeVideo = detectedLandscapeVideo
+                                )
+                            },
                             enabled = !state.isResolving,
                             shape = RoundedCornerShape(16.dp),
                             border = BorderStroke(1.dp, UiPalette.BorderSoft),
@@ -364,7 +419,25 @@ fun PlayerScreen(
                 )
             }
         }
+
+        }
+
+        if (directPlayable && isFullscreen) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            ) {
+                playerContent(true)
+            }
+        }
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 @Composable

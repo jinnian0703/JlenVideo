@@ -266,8 +266,7 @@ fun JlenVideoApp() {
                                 onSelectEpisode = viewModel::selectPlayerEpisode,
                                 onSelectSource = viewModel::selectPlayerSource,
                                 onPlayNext = viewModel::playNextEpisode,
-                                onPlaybackSnapshotChange = viewModel::updatePlaybackSnapshot,
-                                onFullscreenResult = viewModel::syncFromFullscreen
+                                onPlaybackSnapshotChange = viewModel::updatePlaybackSnapshot
                             )
                         }
                     }
