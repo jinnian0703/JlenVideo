@@ -176,14 +176,10 @@ fun HomeScreen(
                 )
             }
             item {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    items(state.featured) { item ->
-                        FeaturedCard(item = item, onClick = onOpenDetail)
-                    }
-                }
+                FeaturedGridSection(
+                    items = state.featured,
+                    onOpenDetail = onOpenDetail
+                )
             }
         }
         item {
@@ -2358,6 +2354,96 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
                     text = item.subtitle.ifBlank { "站内资源" },
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.86f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeaturedGridSection(items: List<VodItem>, onOpenDetail: (String) -> Unit) {
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        items.chunked(2).forEach { rowItems ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                rowItems.forEach { item ->
+                    FeaturedGridCard(
+                        item = item,
+                        onClick = onOpenDetail,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                repeat(2 - rowItems.size) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeaturedGridCard(
+    item: VodItem,
+    onClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.clickable { onClick(item.vodId) },
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface)
+    ) {
+        Column {
+            Box {
+                AsyncImage(
+                    model = item.vodPic,
+                    contentDescription = item.displayTitle,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(164.dp),
+                    contentScale = ContentScale.Crop
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color(0x22000000), Color(0x88000000))
+                            )
+                        )
+                )
+                if (item.badgeText.isNotBlank()) {
+                    Text(
+                        text = item.badgeText,
+                        color = UiPalette.Surface,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier
+                            .padding(12.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(UiPalette.Accent.copy(alpha = 0.92f))
+                            .padding(horizontal = 9.dp, vertical = 5.dp)
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = item.displayTitle,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Ink,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = item.subtitle.ifBlank { "绔欏唴璧勬簮" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = UiPalette.TextSecondary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )

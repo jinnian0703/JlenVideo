@@ -57,6 +57,8 @@ class AppleCmsRepository(
             throw IOException("首页内容解析失败")
         }
 
+        val homeDocument = runCatching { fetchDocument("$baseUrl/") }.getOrNull()
+
         val categories = defaultCategories.map { category ->
             when (category.typeId) {
                 "1" -> category.copy(typeName = "\u7535\u5f71")
@@ -66,8 +68,9 @@ class AppleCmsRepository(
                 else -> category
             }
         }
-        val featured = runCatching { loadLevelItems(level = "1", limit = 16) }
-            .getOrDefault(emptyList())
+        val featured = homeDocument
+            ?.let { parseLevelOneItemsFromHomePage(it, limit = 16) }
+            .orEmpty()
             .ifEmpty {
                 runCatching { loadLevelItemsFromHomePage(limit = 16) }
                     .getOrDefault(emptyList())
@@ -674,12 +677,6 @@ class AppleCmsRepository(
         }
     }
 
-    private suspend fun loadLevelItems(level: String, limit: Int): List<VodItem> =
-        api.getByLevel(level = level.trim(), page = 1)
-            .list
-            .distinctBy { it.vodId }
-            .take(limit)
-
     private suspend fun loadLevelItemsFromHomePage(limit: Int): List<VodItem> {
         val document = fetchDocument("$baseUrl/")
         val bannerItems = parseBannerItems(document)
@@ -728,6 +725,27 @@ class AppleCmsRepository(
                 )
             }
             .distinctBy { it.vodId }
+
+    private fun parseLevelOneItemsFromHomePage(document: Document, limit: Int): List<VodItem> {
+        val bannerItems = parseBannerItems(document)
+            .distinctBy { it.vodId }
+        if (bannerItems.isNotEmpty()) {
+            return bannerItems.take(limit)
+        }
+
+        val featuredSection = document.select(".layout-box .vod-list")
+            .firstOrNull { section ->
+                section.selectFirst("h2")?.text()
+                    ?.replace(Regex("\\s+"), "")
+                    ?.contains("鎺ㄨ崘") == true
+            }
+
+        return featuredSection
+            ?.let(::parseVodCards)
+            .orEmpty()
+            .distinctBy { it.vodId }
+            .take(limit)
+    }
 
     private fun parseVodCards(root: Element): List<VodItem> =
         root.select("div.pic")
