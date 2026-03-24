@@ -2358,26 +2358,21 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
 @Composable
 private fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String) -> Unit) {
     val actualCount = items.size
-    val virtualCount = if (actualCount > 1) Int.MAX_VALUE else actualCount
-    val initialPage = if (actualCount > 1) {
-        val midpoint = Int.MAX_VALUE / 2
-        midpoint - (midpoint % actualCount)
-    } else {
-        0
-    }
-    val pagerState = rememberPagerState(
-        initialPage = initialPage,
-        pageCount = { virtualCount }
-    )
-    val currentIndex = if (actualCount == 0) 0 else pagerState.currentPage % actualCount
-    val settledIndex = if (actualCount == 0) 0 else pagerState.settledPage % actualCount
+    val pagerState = rememberPagerState(pageCount = { actualCount })
+    val currentIndex = pagerState.currentPage
+    val settledIndex = pagerState.settledPage
 
     LaunchedEffect(actualCount, pagerState.settledPage, pagerState.isScrollInProgress) {
         if (actualCount <= 1) return@LaunchedEffect
         if (pagerState.isScrollInProgress) return@LaunchedEffect
         delay(3500)
         if (pagerState.isScrollInProgress) return@LaunchedEffect
-        pagerState.animateScrollToPage(pagerState.settledPage + 1)
+        val nextPage = if (pagerState.settledPage >= actualCount - 1) 0 else pagerState.settledPage + 1
+        if (nextPage == 0) {
+            pagerState.scrollToPage(0)
+        } else {
+            pagerState.animateScrollToPage(nextPage)
+        }
     }
 
     Column(
@@ -2391,7 +2386,7 @@ private fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String)
             pageSpacing = 12.dp
         ) { page ->
             FeaturedCard(
-                item = items[page % actualCount],
+                item = items[page],
                 onClick = onOpenDetail
             )
         }

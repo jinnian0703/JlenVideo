@@ -103,10 +103,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onSuccess { updateInfo ->
                 accountState = accountState.copy(
                     isUpdateLoading = false,
-                    updateInfo = updateInfo
+                    updateInfo = updateInfo,
+                    error = null
                 )
             }.onFailure {
-                accountState = accountState.copy(isUpdateLoading = false)
+                accountState = accountState.copy(
+                    isUpdateLoading = false,
+                    message = "检查更新失败，请稍后重试"
+                )
             }
         }
     }
