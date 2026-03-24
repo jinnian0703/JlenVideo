@@ -692,6 +692,18 @@ fun NativeVideoPlayer(
                                 }
                             )
                             if (hasNextEpisode && onNextEpisode != null) {
+                                ControlChip(
+                                    text = ">>",
+                                    width = controlChipWidth,
+                                    height = controlChipHeight,
+                                    textStyle = controlPillTextStyle,
+                                    onClick = {
+                                        controlsVersion++
+                                        onNextEpisode()
+                                    }
+                                )
+                            }
+                            if (false && hasNextEpisode && onNextEpisode != null) {
                                 Text(
                                     text = "≫",
                                     color = Color.White,
