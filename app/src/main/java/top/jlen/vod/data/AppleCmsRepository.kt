@@ -255,11 +255,7 @@ class AppleCmsRepository(
             requiresCode = requiresCode,
             requiresVerify = requiresVerify,
             captchaUrl = resolveUrl(captchaUrl),
-            captchaBytes = if (requiresVerify && captchaUrl.isNotBlank()) {
-                loadRegisterCaptcha(resolveUrl(captchaUrl))
-            } else {
-                null
-            }
+            captchaBytes = null
         )
     }
 
@@ -287,11 +283,7 @@ class AppleCmsRepository(
         return FindPasswordPage(
             requiresVerify = requiresVerify,
             captchaUrl = resolveUrl(captchaUrl),
-            captchaBytes = if (requiresVerify && captchaUrl.isNotBlank()) {
-                loadFindPasswordCaptcha(resolveUrl(captchaUrl))
-            } else {
-                null
-            }
+            captchaBytes = null
         )
     }
 

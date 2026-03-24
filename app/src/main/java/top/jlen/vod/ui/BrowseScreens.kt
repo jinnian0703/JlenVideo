@@ -1000,9 +1000,11 @@ private fun AccountRegisterPane(
     onSubmit: () -> Unit
 ) {
     val captchaBitmap = remember(state.registerCaptcha) {
-        state.registerCaptcha?.let { bytes ->
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-        }
+        runCatching {
+            state.registerCaptcha?.let { bytes ->
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            }
+        }.getOrNull()
     }
 
     Column(
@@ -1204,9 +1206,11 @@ private fun AccountFindPasswordPane(
     onSubmit: () -> Unit
 ) {
     val captchaBitmap = remember(state.findPasswordCaptcha) {
-        state.findPasswordCaptcha?.let { bytes ->
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-        }
+        runCatching {
+            state.findPasswordCaptcha?.let { bytes ->
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            }
+        }.getOrNull()
     }
 
     Column(

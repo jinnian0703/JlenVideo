@@ -817,6 +817,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     registerCaptcha = page.captchaBytes,
                     registerEditor = accountState.registerEditor.copy(channel = page.channel)
                 )
+                if (page.requiresVerify && page.captchaUrl.isNotBlank()) {
+                    refreshRegisterCaptcha()
+                }
             }.onFailure { error ->
                 accountState = accountState.copy(
                     isContentLoading = false,
@@ -839,6 +842,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     findPasswordCaptchaUrl = page.captchaUrl,
                     findPasswordCaptcha = page.captchaBytes
                 )
+                if (page.requiresVerify && page.captchaUrl.isNotBlank()) {
+                    refreshFindPasswordCaptcha()
+                }
             }.onFailure { error ->
                 accountState = accountState.copy(
                     isContentLoading = false,
