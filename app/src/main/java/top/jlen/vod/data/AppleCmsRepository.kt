@@ -1,11 +1,14 @@
 package top.jlen.vod.data
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Base64
 import com.google.gson.Gson
 import com.google.gson.JsonParser
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.URI
 import java.net.URLDecoder
@@ -48,6 +51,12 @@ class AppleCmsRepository(
         .addConverterFactory(GsonConverterFactory.create())
         .build()
         .create(AppleCmsApi::class.java)
+
+    private data class PortraitUploadPayload(
+        val bytes: ByteArray,
+        val fileName: String,
+        val mimeType: String
+    )
 
     suspend fun loadHome(): HomePayload {
         val latestPage = loadAllCategoryPage(page = 1)
@@ -373,6 +382,48 @@ class AppleCmsRepository(
         }
     }
 
+    suspend fun uploadPortraitOptimized(uri: Uri): String {
+        val payload = preparePortraitUpload(uri)
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart(
+                "file",
+                payload.fileName,
+                payload.bytes.toRequestBody(payload.mimeType.toMediaTypeOrNull())
+            )
+            .build()
+
+        val request = Request.Builder()
+            .url("$baseUrl/index.php/user/portrait")
+            .header("Referer", "$baseUrl/index.php/user/head.html")
+            .header("X-Requested-With", "XMLHttpRequest")
+            .header("Accept", "application/json, text/plain, */*")
+            .post(body)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("上传头像失败：HTTP ${response.code}")
+            }
+
+            val responseBody = response.body?.string().orEmpty()
+            val authResponse = runCatching { gson.fromJson(responseBody, AuthResponse::class.java) }.getOrNull()
+            if (authResponse != null && authResponse.msg.isNotBlank()) {
+                if (authResponse.code == 1) {
+                    return authResponse.msg
+                }
+                throw IOException(authResponse.msg)
+            }
+            if (responseBody.contains("未登录")) {
+                throw IOException("请先登录")
+            }
+            if (responseBody.contains("user_portrait") || responseBody.contains("成功")) {
+                return "头像更新成功"
+            }
+            throw IOException("头像上传失败，请换一张图片重试")
+        }
+    }
+
     suspend fun sendRegisterCode(channel: String, contact: String): String {
         val form = FormBody.Builder()
             .add("ac", channel.trim())
@@ -422,7 +473,8 @@ class AppleCmsRepository(
         val editorDocument = fetchUserDocument("/index.php/user/info.html")
         return UserProfilePage(
             fields = parseUserProfileFields(profileDocument),
-            editor = parseUserProfileEditor(editorDocument)
+            editor = parseUserProfileEditor(editorDocument),
+            session = parseUserProfileSession(profileDocument)
         )
     }
 
@@ -1462,6 +1514,90 @@ class AppleCmsRepository(
         val value = raw.trim()
         if (value.isBlank() || value == "deleted") return ""
         return normalizeUrl(value)
+    }
+
+    private fun parseUserProfileSession(document: Document): AuthSession {
+        val cookieSession = currentSession()
+        val portraitUrl = normalizePortraitUrl(
+            document.selectFirst(".dyxs-user__name img.face, img.face, .face")
+                ?.attr("src")
+                .orEmpty()
+        )
+        val userName = decodeSiteText(
+            document.selectFirst(".dyxs-user__name h3 a, .dyxs-user__name h3, h3 a")
+                ?.text()
+                .orEmpty()
+        )
+        val groupName = decodeSiteText(
+            document.selectFirst(".dyxs-user__head .pull-right")
+                ?.text()
+                .orEmpty()
+        )
+        return cookieSession.copy(
+            isLoggedIn = cookieSession.isLoggedIn || userName.isNotBlank(),
+            userName = userName.ifBlank { cookieSession.userName },
+            groupName = groupName.ifBlank { cookieSession.groupName },
+            portraitUrl = portraitUrl.ifBlank { cookieSession.portraitUrl }
+        )
+    }
+
+    private fun preparePortraitUpload(uri: Uri): PortraitUploadPayload {
+        val resolver = appContext.contentResolver
+        val displayName = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (nameIndex >= 0 && cursor.moveToFirst()) cursor.getString(nameIndex) else null
+            }
+            .orEmpty()
+            .substringBeforeLast('.', "")
+            .ifBlank { "portrait" }
+
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+
+        val bitmap = resolver.openInputStream(uri)?.use { stream ->
+            BitmapFactory.decodeStream(
+                stream,
+                null,
+                BitmapFactory.Options().apply {
+                    inSampleSize = calculateInSampleSize(bounds.outWidth, bounds.outHeight, 1280)
+                    inPreferredConfig = Bitmap.Config.ARGB_8888
+                }
+            )
+        } ?: throw IOException("无法读取头像图片")
+
+        val output = ByteArrayOutputStream()
+        try {
+            if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 88, output)) {
+                throw IOException("头像图片处理失败")
+            }
+        } finally {
+            bitmap.recycle()
+        }
+
+        val bytes = output.toByteArray()
+        if (bytes.isEmpty()) {
+            throw IOException("头像图片处理失败")
+        }
+
+        return PortraitUploadPayload(
+            bytes = bytes,
+            fileName = "$displayName.jpg",
+            mimeType = "image/jpeg"
+        )
+    }
+
+    private fun calculateInSampleSize(width: Int, height: Int, maxDimension: Int): Int {
+        if (width <= 0 || height <= 0) return 1
+        var sampleSize = 1
+        var currentWidth = width
+        var currentHeight = height
+        while (currentWidth > maxDimension || currentHeight > maxDimension) {
+            sampleSize *= 2
+            currentWidth /= 2
+            currentHeight /= 2
+        }
+        return sampleSize.coerceAtLeast(1)
     }
 
     private fun parseUserProfileFields(document: Document): List<Pair<String, String>> {

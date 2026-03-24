@@ -474,7 +474,7 @@ fun AccountScreen(
     val context = LocalContext.current
     val sessionExpired = state.error?.contains("请先登录") == true ||
         state.error?.contains("登录已失效") == true
-    val showLoggedInContent = state.session.isLoggedIn && !sessionExpired
+    val showLoggedInContent = state.session.isLoggedIn
 
     LazyColumn(
         modifier = Modifier

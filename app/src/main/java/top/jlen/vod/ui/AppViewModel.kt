@@ -59,7 +59,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshAccount() {
         val session = repository.currentSession()
         accountState = if (session.isLoggedIn) {
-            accountState.copy(session = session, error = null)
+            accountState.copy(
+                session = mergeAccountSession(session),
+                error = null
+            )
         } else {
             AccountUiState(
                 userName = accountState.userName,
@@ -397,6 +400,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     registerCaptcha = bytes
                 )
             }.onFailure { error ->
+                if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isContentLoading = false,
                     error = error.message ?: "验证码加载失败"
@@ -430,6 +434,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     findPasswordCaptcha = bytes
                 )
             }.onFailure { error ->
+                if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isContentLoading = false,
                     error = error.message ?: "楠岃瘉鐮佸姞杞藉け璐?"
@@ -575,9 +580,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         runAccountAction(
-            block = { uploadPortrait(uri) },
+            block = { uploadPortraitOptimized(uri) },
             onSuccess = {
-                refreshAccount()
                 selectAccountSection(AccountSection.Profile, forceRefresh = true)
             }
         )
@@ -825,6 +829,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     latestCrashLog = accountState.latestCrashLog
                 )
             }.onFailure { error ->
+                if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isLoading = false,
                     error = error.message ?: "退出登录失败"
@@ -855,6 +860,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     refreshRegisterCaptcha()
                 }
             }.onFailure { error ->
+                if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isContentLoading = false,
                     error = error.message ?: "注册页面加载失败"
@@ -880,6 +886,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     refreshFindPasswordCaptcha()
                 }
             }.onFailure { error ->
+                if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isContentLoading = false,
                     error = error.message ?: "鎵惧洖瀵嗙爜椤甸潰鍔犺浇澶辫触"
@@ -897,9 +904,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 accountState = accountState.copy(
                     isContentLoading = false,
                     profileFields = page.fields,
-                    profileEditor = page.editor
+                    profileEditor = page.editor,
+                    session = mergeAccountSession(page.session)
                 )
             }.onFailure { error ->
+                if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isContentLoading = false,
                     error = error.message ?: "加载资料失败"
@@ -923,6 +932,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     favoriteNextPageUrl = page.nextPageUrl
                 )
             }.onFailure { error ->
+                if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isContentLoading = false,
                     error = error.message ?: "加载收藏失败"
@@ -950,6 +960,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     historyNextPageUrl = page.nextPageUrl
                 )
             }.onFailure { error ->
+                if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isContentLoading = false,
                     error = error.message ?: "加载播放记录失败"
@@ -974,6 +985,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     membershipPlans = page.plans
                 )
             }.onFailure { error ->
+                if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isContentLoading = false,
                     error = error.message ?: "加载会员信息失败"
@@ -998,12 +1010,37 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 onSuccess()
             }.onFailure { error ->
+                if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
                     isActionLoading = false,
                     error = error.message ?: "操作失败"
                 )
             }
         }
+    }
+
+    private fun mergeAccountSession(session: AuthSession): AuthSession =
+        session.copy(
+            userName = session.userName.ifBlank { accountState.session.userName },
+            groupName = session.groupName.ifBlank { accountState.session.groupName },
+            portraitUrl = session.portraitUrl.ifBlank { accountState.session.portraitUrl }
+        )
+
+    private fun handleAccountSessionExpired(error: Throwable): Boolean {
+        val message = error.message.orEmpty()
+        val isExpired = message.contains("请先登录") || message.contains("登录已失效")
+        if (!isExpired) return false
+
+        repository.clearSession()
+        accountState = AccountUiState(
+            userName = accountState.userName,
+            authMode = AccountAuthMode.Login,
+            message = "登录已失效，请重新登录",
+            updateInfo = accountState.updateInfo,
+            hasCrashLog = accountState.hasCrashLog,
+            latestCrashLog = accountState.latestCrashLog
+        )
+        return true
     }
 
     private fun mergeAccountItems(

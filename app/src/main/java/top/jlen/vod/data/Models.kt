@@ -147,7 +147,8 @@ data class AuthSession(
 
 data class UserProfilePage(
     val fields: List<Pair<String, String>> = emptyList(),
-    val editor: UserProfileEditor = UserProfileEditor()
+    val editor: UserProfileEditor = UserProfileEditor(),
+    val session: AuthSession = AuthSession()
 )
 
 data class UserProfileEditor(
