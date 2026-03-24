@@ -676,10 +676,11 @@ private fun openExternal(context: Context, url: String) {
 fun DetailTopBar(title: String, onBack: () -> Unit, darkMode: Boolean = false) {
     val background = if (darkMode) Color(0x66000000) else Color.White.copy(alpha = 0.82f)
     val contentColor = if (darkMode) Color.White else UiPalette.Ink
+    val showTitle = title.isNotBlank() && !darkMode
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 18.dp),
+            .padding(horizontal = 16.dp, vertical = if (showTitle) 18.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -697,15 +698,17 @@ fun DetailTopBar(title: String, onBack: () -> Unit, darkMode: Boolean = false) {
                 color = contentColor
             )
         }
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = contentColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        if (showTitle) {
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = contentColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
