@@ -2372,9 +2372,11 @@ private fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String)
     val currentIndex = if (actualCount == 0) 0 else pagerState.currentPage % actualCount
     val settledIndex = if (actualCount == 0) 0 else pagerState.settledPage % actualCount
 
-    LaunchedEffect(actualCount, pagerState.settledPage) {
+    LaunchedEffect(actualCount, pagerState.settledPage, pagerState.isScrollInProgress) {
         if (actualCount <= 1) return@LaunchedEffect
+        if (pagerState.isScrollInProgress) return@LaunchedEffect
         delay(3500)
+        if (pagerState.isScrollInProgress) return@LaunchedEffect
         pagerState.animateScrollToPage(pagerState.settledPage + 1)
     }
 
