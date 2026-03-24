@@ -47,6 +47,7 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -78,6 +79,7 @@ fun NativeVideoPlayer(
     onPlaybackEnded: (() -> Unit)? = null,
     onClose: (() -> Unit)? = null
 ) {
+    val configuration = LocalConfiguration.current
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val playbackIdentity = remember(url, episodeName) { "$url|$episodeName" }
@@ -308,6 +310,12 @@ fun NativeVideoPlayer(
                 playbackState == Player.STATE_BUFFERING ||
                     (player.playWhenReady && !hasStartedPlaybackOnce)
                 )
+    val isPortraitLayout = configuration.screenHeightDp >= configuration.screenWidthDp
+    val embeddedPlayerHeight = when {
+        !isPortraitLayout -> 248.dp
+        lastReportedLandscape == false -> 420.dp
+        else -> 300.dp
+    }
 
     Card(
         modifier = Modifier
@@ -325,7 +333,7 @@ fun NativeVideoPlayer(
                 .fillMaxWidth()
                 .then(
                     if (fullscreenMode) Modifier.fillMaxSize()
-                    else Modifier.heightIn(min = 248.dp).height(248.dp)
+                    else Modifier.heightIn(min = embeddedPlayerHeight).height(embeddedPlayerHeight)
                 )
                 .background(Color.Black)
                 .clickableWithoutRipple {
