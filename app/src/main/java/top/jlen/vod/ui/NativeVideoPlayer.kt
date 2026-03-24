@@ -208,17 +208,22 @@ fun NativeVideoPlayer(
         }
     }
 
-    LaunchedEffect(playbackIdentity, player, initialSnapshot.playWhenReady) {
+    LaunchedEffect(playbackIdentity, player, initialSnapshot.playWhenReady, fullscreenMode) {
         hasCompletedInitialOverlayDelay = false
-        delay(1_500)
+        delay(if (fullscreenMode) 450L else 1_500L)
         if (
             player != null &&
             initialSnapshot.playWhenReady &&
             !hasStartedPlaybackOnce &&
             playbackState != Player.STATE_ENDED
         ) {
-            player.play()
-            delay(1_200)
+            repeat(if (fullscreenMode) 3 else 1) {
+                player.play()
+                delay(if (fullscreenMode) 450L else 1_200L)
+                if (hasStartedPlaybackOnce || player.isPlaying) {
+                    return@LaunchedEffect
+                }
+            }
         }
         hasCompletedInitialOverlayDelay = true
     }
