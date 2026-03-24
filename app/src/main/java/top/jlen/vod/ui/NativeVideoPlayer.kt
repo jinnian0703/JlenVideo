@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -329,7 +330,7 @@ fun NativeVideoPlayer(
     val embeddedResizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
     val controlPillTextStyle = if (fullscreenMode) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelMedium
     val controlChipHeight = if (fullscreenMode) 36.dp else 32.dp
-    val controlChipWidth = if (fullscreenMode) 74.dp else 66.dp
+    val controlChipWidth = if (fullscreenMode) 76.dp else 64.dp
 
     Card(
         modifier = Modifier
@@ -602,6 +603,7 @@ fun NativeVideoPlayer(
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
+                    Spacer(modifier = Modifier.height(4.dp))
                     Slider(
                         value = sliderPosition,
                         onValueChange = {
@@ -631,7 +633,7 @@ fun NativeVideoPlayer(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             IconButton(
                                 onClick = {
@@ -667,59 +669,31 @@ fun NativeVideoPlayer(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             if (fullscreenMode) {
-                                Text(
+                                ControlChip(
                                     text = resizeModeLabel(fullscreenResizeMode),
-                                    color = Color.White,
-                                    style = controlPillTextStyle,
-                                    fontWeight = FontWeight.Medium,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(999.dp))
-                                        .background(Color.Black.copy(alpha = 0.28f))
-                                        .border(
-                                            width = 1.dp,
-                                            color = Color.White.copy(alpha = 0.14f),
-                                            shape = RoundedCornerShape(999.dp)
-                                        )
-                                        .width(controlChipWidth)
-                                        .height(controlChipHeight)
-                                        .wrapContentHeight(Alignment.CenterVertically)
-                                        .clickableWithoutRipple {
-                                            fullscreenResizeMode = nextResizeMode(fullscreenResizeMode)
-                                            controlsVersion++
-                                        }
-                                )
-                            }
-                            Text(
-                                text = speedLabel(speed),
-                                color = Color.White,
-                                style = controlPillTextStyle,
-                                fontWeight = FontWeight.Medium,
-                                textAlign = TextAlign.Center,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .background(Color.Black.copy(alpha = 0.28f))
-                                    .border(
-                                        width = 1.dp,
-                                        color = Color.White.copy(alpha = 0.14f),
-                                        shape = RoundedCornerShape(999.dp)
-                                    )
-                                    .width(controlChipWidth)
-                                    .height(controlChipHeight)
-                                    .wrapContentHeight(Alignment.CenterVertically)
-                                    .clickableWithoutRipple {
-                                        speed = nextSpeed(speed)
-                                        player.playbackParameters = PlaybackParameters(speed)
+                                    width = controlChipWidth,
+                                    height = controlChipHeight,
+                                    textStyle = controlPillTextStyle,
+                                    onClick = {
+                                        fullscreenResizeMode = nextResizeMode(fullscreenResizeMode)
                                         controlsVersion++
                                     }
+                                )
+                            }
+                            ControlChip(
+                                text = speedLabel(speed),
+                                width = controlChipWidth,
+                                height = controlChipHeight,
+                                textStyle = controlPillTextStyle,
+                                onClick = {
+                                    speed = nextSpeed(speed)
+                                    player.playbackParameters = PlaybackParameters(speed)
+                                    controlsVersion++
+                                }
                             )
                             if (hasNextEpisode && onNextEpisode != null) {
                                 Text(
-                                    text = "下一集",
+                                    text = "≫",
                                     color = Color.White,
                                     style = controlPillTextStyle,
                                     fontWeight = FontWeight.Medium,
@@ -745,7 +719,7 @@ fun NativeVideoPlayer(
                             }
                             if (!fullscreenMode && onToggleFullscreen != null) {
                                 Text(
-                                    text = "全屏",
+                                    text = "⛶",
                                     color = Color.White,
                                     style = controlPillTextStyle,
                                     fontWeight = FontWeight.Medium,
@@ -777,6 +751,40 @@ fun NativeVideoPlayer(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ControlChip(
+    text: String,
+    width: androidx.compose.ui.unit.Dp,
+    height: androidx.compose.ui.unit.Dp,
+    textStyle: TextStyle,
+    onClick: () -> Unit
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(Color.Black.copy(alpha = 0.28f))
+            .border(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.14f),
+                shape = RoundedCornerShape(999.dp)
+            )
+            .width(width)
+            .height(height)
+            .clickableWithoutRipple(onClick)
+    ) {
+        Text(
+            text = text,
+            color = Color.White,
+            style = textStyle,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
