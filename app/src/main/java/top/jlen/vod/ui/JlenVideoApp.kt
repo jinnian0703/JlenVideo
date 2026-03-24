@@ -1,5 +1,7 @@
 package top.jlen.vod.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -18,16 +20,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -59,6 +67,7 @@ private val appColors = lightColorScheme(
 fun JlenVideoApp() {
     val viewModel: AppViewModel = viewModel()
     val navController = rememberNavController()
+    val context = LocalContext.current
     val portraitPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             viewModel.uploadPortrait(uri)
@@ -67,10 +76,65 @@ fun JlenVideoApp() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val showBottomBar = currentRoute in setOf("home", "categories", "search", "account")
+    val updateInfo = viewModel.accountState.updateInfo
+    var dismissedUpdateVersion by rememberSaveable { mutableStateOf("") }
+    val shouldShowUpdateDialog = updateInfo?.hasUpdate == true &&
+        updateInfo.latestVersion.isNotBlank() &&
+        dismissedUpdateVersion != updateInfo.latestVersion
 
     MaterialTheme(colorScheme = appColors) {
         Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
             Box(modifier = Modifier.fillMaxSize().background(appBackground)) {
+                if (shouldShowUpdateDialog) {
+                    AlertDialog(
+                        onDismissRequest = {
+                            dismissedUpdateVersion = updateInfo?.latestVersion.orEmpty()
+                        },
+                        title = {
+                            Text("发现新版本")
+                        },
+                        text = {
+                            Text(
+                                buildString {
+                                    append("当前版本：")
+                                    append(updateInfo?.currentVersion.orEmpty().ifBlank { "未知" })
+                                    append("\n最新版本：")
+                                    append(updateInfo?.latestVersion.orEmpty())
+                                    updateInfo?.notes
+                                        ?.takeIf { it.isNotBlank() }
+                                        ?.let {
+                                            append("\n\n更新说明：\n")
+                                            append(it)
+                                        }
+                                }
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    dismissedUpdateVersion = updateInfo?.latestVersion.orEmpty()
+                                    val targetUrl = updateInfo?.downloadUrl
+                                        ?.takeIf { it.isNotBlank() }
+                                        ?: updateInfo?.releasePageUrl
+                                        ?.takeIf { it.isNotBlank() }
+                                        ?: "https://github.com/jinnian0703/JlenVideo/releases"
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
+                                }
+                            ) {
+                                Text("立即更新")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = {
+                                    dismissedUpdateVersion = updateInfo?.latestVersion.orEmpty()
+                                }
+                            ) {
+                                Text("稍后再说")
+                            }
+                        }
+                    )
+                }
                 Scaffold(
                     containerColor = Color.Transparent,
                     contentWindowInsets = WindowInsets.statusBars,
