@@ -168,7 +168,7 @@ fun HomeScreen(
             item {
                 SectionTitle(
                     title = "推荐",
-                    action = "刷新",
+                    action = null,
                     icon = {
                         Icon(
                             imageVector = Icons.Rounded.Whatshot,
@@ -177,7 +177,7 @@ fun HomeScreen(
                             modifier = Modifier.size(20.dp)
                         )
                     },
-                    onAction = onRefresh
+                    onAction = {}
                 )
             }
             item {
