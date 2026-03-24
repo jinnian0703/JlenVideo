@@ -37,6 +37,7 @@ class FullscreenPlayerActivity : ComponentActivity() {
     private var currentEpisodeName by mutableStateOf("")
     private var episodeNames: List<String> = emptyList()
     private var episodePageUrls: List<String> = emptyList()
+    private var lastAppliedOrientation: Int? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -131,11 +132,16 @@ class FullscreenPlayerActivity : ComponentActivity() {
     }
 
     private fun applyVideoOrientation(isLandscapeVideo: Boolean) {
-        requestedOrientation = if (isLandscapeVideo) {
+        val targetOrientation = if (isLandscapeVideo) {
             ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         } else {
             ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
         }
+        if (lastAppliedOrientation == targetOrientation && requestedOrientation == targetOrientation) {
+            return
+        }
+        lastAppliedOrientation = targetOrientation
+        requestedOrientation = targetOrientation
     }
 
     override fun finish() {

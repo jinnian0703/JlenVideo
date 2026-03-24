@@ -95,6 +95,7 @@ fun NativeVideoPlayer(
     var controlsVersion by remember(fullscreenMode, playbackIdentity) { mutableLongStateOf(0L) }
     var hasHandledEnded by remember(playbackIdentity) { mutableStateOf(false) }
     var playbackState by remember(player) { mutableStateOf(player?.playbackState ?: Player.STATE_IDLE) }
+    var lastReportedLandscape by remember(playbackIdentity) { mutableStateOf<Boolean?>(null) }
 
     DisposableEffect(player) {
         onDispose { player?.release() }
@@ -106,10 +107,10 @@ fun NativeVideoPlayer(
         } else {
             val listener = object : Player.Listener {
                 override fun onVideoSizeChanged(videoSize: VideoSize) {
-                    val width = videoSize.width
-                    val height = videoSize.height
-                    if (width > 0 && height > 0) {
-                        latestOrientationCallback.value?.invoke(width >= height)
+                    val orientation = videoSize.isLandscapeVideo() ?: return
+                    if (lastReportedLandscape != orientation) {
+                        lastReportedLandscape = orientation
+                        latestOrientationCallback.value?.invoke(orientation)
                     }
                 }
             }
@@ -287,38 +288,27 @@ fun NativeVideoPlayer(
             }
 
             if (playbackState != Player.STATE_ENDED && !isPlaying) {
-                Column(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(if (fullscreenMode) 92.dp else 84.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .clickableWithoutRipple {
+                            player.play()
+                            isPlaying = true
+                            controlsVersion++
+                        },
+                    shape = RoundedCornerShape(999.dp),
+                    color = Color.Black.copy(alpha = 0.62f)
                 ) {
-                    Surface(
-                        modifier = Modifier
-                            .size(if (fullscreenMode) 92.dp else 84.dp)
-                            .clip(RoundedCornerShape(999.dp))
-                            .clickableWithoutRipple {
-                                player.play()
-                                isPlaying = true
-                                controlsVersion++
-                            },
-                        shape = RoundedCornerShape(999.dp),
-                        color = Color.Black.copy(alpha = 0.62f)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Rounded.PlayArrow,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(if (fullscreenMode) 42.dp else 38.dp)
-                            )
-                        }
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(if (fullscreenMode) 42.dp else 38.dp)
+                        )
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "继续播放",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleMedium
-                    )
                 }
             }
 
@@ -536,4 +526,17 @@ private fun speedLabel(speed: Float): String = when (speed) {
     1.5f -> "1.5x"
     2f -> "2.0x"
     else -> "${speed}x"
+}
+
+private fun VideoSize.isLandscapeVideo(): Boolean? {
+    if (width <= 0 || height <= 0) return null
+    val rotated = unappliedRotationDegrees == 90 || unappliedRotationDegrees == 270
+    val displayWidth = if (rotated) height else width
+    val displayHeight = if (rotated) width else height
+    val ratio = displayWidth.toFloat() / displayHeight.toFloat()
+    return when {
+        ratio > 1.02f -> true
+        ratio < 0.98f -> false
+        else -> displayWidth >= displayHeight
+    }
 }
