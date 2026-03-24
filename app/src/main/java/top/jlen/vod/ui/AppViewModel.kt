@@ -354,11 +354,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateLoginUserName(value: String) {
-        accountState = accountState.copy(userName = value, error = null, message = null)
+        accountState = accountState.copy(userName = value)
     }
 
     fun updateLoginPassword(value: String) {
-        accountState = accountState.copy(password = value, error = null, message = null)
+        accountState = accountState.copy(password = value)
     }
 
     fun setAccountAuthMode(mode: AccountAuthMode) {

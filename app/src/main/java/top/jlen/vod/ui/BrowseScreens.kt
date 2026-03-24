@@ -504,34 +504,6 @@ fun AccountScreen(
             }
         }
 
-        if (!showLoggedInContent) {
-            state.message?.let { message ->
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = UiPalette.AccentSoft.copy(alpha = 0.25f)),
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Text(
-                            text = message,
-                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                            color = UiPalette.Ink,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-
-            state.error?.let { message ->
-                item {
-                    ErrorBanner(
-                        message = message,
-                        onRetry = onRefresh
-                    )
-                }
-            }
-
-        }
-
         if (showLoggedInContent) {
             item {
                 Card(
@@ -2397,12 +2369,14 @@ private fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String)
         }
     }
 
-    LaunchedEffect(actualCount, pagerState.settledPage, pagerState.isScrollInProgress) {
+    LaunchedEffect(actualCount) {
         if (actualCount <= 1) return@LaunchedEffect
-        if (pagerState.isScrollInProgress) return@LaunchedEffect
-        delay(3500)
-        if (pagerState.isScrollInProgress) return@LaunchedEffect
-        pagerState.animateScrollToPage(pagerState.settledPage + 1)
+        while (true) {
+            delay(3500)
+            if (!pagerState.isScrollInProgress) {
+                pagerState.animateScrollToPage(pagerState.currentPage + 1)
+            }
+        }
     }
 
     Column(
