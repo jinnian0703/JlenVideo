@@ -483,12 +483,14 @@ fun NativeVideoPlayer(
                             }
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(
+                            if (fullscreenMode) {
+                                Text(
                                 text = title.ifBlank { "姝ｅ湪鎾斁" },
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Color.White
-                            )
+                                )
+                            }
                             Text(
                                 text = buildString {
                                     if (sourceName.isNotBlank()) {
