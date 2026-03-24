@@ -84,6 +84,7 @@ fun NativeVideoPlayer(
     }
     val latestOrientationCallback = rememberUpdatedState(onVideoOrientationDetected)
     val latestSnapshotCallback = rememberUpdatedState(onPlaybackSnapshotChanged)
+    val latestFullscreenToggleCallback = rememberUpdatedState(onToggleFullscreen)
     var isPlaying by remember(player) { mutableStateOf(player?.isPlaying == true) }
     var currentPosition by remember(player) { mutableLongStateOf(0L) }
     var duration by remember(player) { mutableLongStateOf(0L) }
@@ -106,10 +107,17 @@ fun NativeVideoPlayer(
         onDispose { player?.release() }
     }
 
-    DisposableEffect(player, fullscreenMode) {
-        if (player == null || !fullscreenMode || latestOrientationCallback.value == null) {
+    DisposableEffect(player, fullscreenMode, latestOrientationCallback.value, latestFullscreenToggleCallback.value) {
+        if (
+            player == null ||
+            (!fullscreenMode && latestOrientationCallback.value == null && latestFullscreenToggleCallback.value == null)
+        ) {
             onDispose { }
         } else {
+            player.videoSize.isLandscapeVideo()?.let { orientation ->
+                lastReportedLandscape = orientation
+                latestOrientationCallback.value?.invoke(orientation)
+            }
             val listener = object : Player.Listener {
                 override fun onVideoSizeChanged(videoSize: VideoSize) {
                     val orientation = videoSize.isLandscapeVideo() ?: return

@@ -40,6 +40,7 @@ class FullscreenPlayerActivity : ComponentActivity() {
     private var lastAppliedOrientation: Int? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        intent.initialVideoOrientation()?.let(::applyInitialOrientation)
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         hideSystemBars()
@@ -57,9 +58,7 @@ class FullscreenPlayerActivity : ComponentActivity() {
             speed = intent.getFloatExtra(EXTRA_SPEED, 1f),
             playWhenReady = intent.getBooleanExtra(EXTRA_PLAY_WHEN_READY, true)
         )
-        if (intent.getBooleanExtra(EXTRA_HAS_INITIAL_ORIENTATION, false)) {
-            applyVideoOrientation(intent.getBooleanExtra(EXTRA_IS_LANDSCAPE_VIDEO, true))
-        }
+        intent.initialVideoOrientation()?.let(::applyVideoOrientation)
 
         setContent {
             Surface(
@@ -134,18 +133,27 @@ class FullscreenPlayerActivity : ComponentActivity() {
         }
     }
 
+    private fun applyInitialOrientation(isLandscapeVideo: Boolean) {
+        val targetOrientation = resolveVideoOrientation(isLandscapeVideo)
+        lastAppliedOrientation = targetOrientation
+        requestedOrientation = targetOrientation
+    }
+
     private fun applyVideoOrientation(isLandscapeVideo: Boolean) {
-        val targetOrientation = if (isLandscapeVideo) {
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-        }
+        val targetOrientation = resolveVideoOrientation(isLandscapeVideo)
         if (lastAppliedOrientation == targetOrientation && requestedOrientation == targetOrientation) {
             return
         }
         lastAppliedOrientation = targetOrientation
         requestedOrientation = targetOrientation
     }
+
+    private fun resolveVideoOrientation(isLandscapeVideo: Boolean): Int =
+        if (isLandscapeVideo) {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+        }
 
     override fun finish() {
         setResult(
@@ -215,6 +223,13 @@ class FullscreenPlayerActivity : ComponentActivity() {
         }
     }
 }
+
+private fun Intent.initialVideoOrientation(): Boolean? =
+    if (getBooleanExtra("extra_has_initial_orientation", false)) {
+        getBooleanExtra("extra_is_landscape_video", true)
+    } else {
+        null
+    }
 
 @Composable
 private fun FullscreenPlayerContent(

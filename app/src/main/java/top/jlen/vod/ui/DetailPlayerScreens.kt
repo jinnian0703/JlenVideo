@@ -37,6 +37,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -199,6 +203,9 @@ fun PlayerScreen(
     val context = LocalContext.current
     val playUrl = state.playUrl
     val directPlayable = playUrl.isNotBlank() && isDirectVideoUrl(playUrl)
+    var detectedLandscapeVideo by remember(playUrl, state.episodeName, state.sourceName) {
+        mutableStateOf<Boolean?>(null)
+    }
     val fullscreenLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -206,6 +213,7 @@ fun PlayerScreen(
     }
 
     fun openFullscreen(snapshot: PlaybackSnapshot, isLandscapeVideo: Boolean?) {
+        val preferredOrientation = isLandscapeVideo ?: detectedLandscapeVideo
         onPlaybackSnapshotChange(snapshot)
         fullscreenLauncher.launch(
             FullscreenPlayerActivity.createIntent(
@@ -218,7 +226,7 @@ fun PlayerScreen(
                 episodePageUrls = ArrayList(state.episodes.map { it.url }),
                 selectedEpisodeIndex = state.selectedEpisodeIndex,
                 snapshot = snapshot,
-                isLandscapeVideo = isLandscapeVideo
+                isLandscapeVideo = preferredOrientation
             )
         )
     }
@@ -253,6 +261,7 @@ fun PlayerScreen(
                             hasNextEpisode = state.hasNextEpisode,
                             onNextEpisode = onPlayNext,
                             onToggleFullscreen = ::openFullscreen,
+                            onVideoOrientationDetected = { detectedLandscapeVideo = it },
                             initialSnapshot = state.playbackSnapshot,
                             onPlaybackSnapshotChanged = onPlaybackSnapshotChange,
                             onPlaybackEnded = {
@@ -312,7 +321,7 @@ fun PlayerScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedButton(
-                            onClick = { openFullscreen(state.playbackSnapshot, null) },
+                            onClick = { openFullscreen(state.playbackSnapshot, detectedLandscapeVideo) },
                             enabled = !state.isResolving,
                             shape = RoundedCornerShape(16.dp),
                             border = BorderStroke(1.dp, UiPalette.BorderSoft),
