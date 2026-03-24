@@ -131,12 +131,6 @@ fun DetailScreen(
                             ) {
                                 Text("返回")
                             }
-                        }
-                    }
-                }
-                item {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             OutlinedButton(
                                 onClick = onFavorite,
                                 enabled = isLoggedIn && !state.isActionLoading,
@@ -151,8 +145,11 @@ fun DetailScreen(
                                 )
                             }
                         }
+                    }
+                }
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         state.actionMessage?.takeIf { it.isNotBlank() }?.let { message ->
-                            Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 text = message,
                                 style = MaterialTheme.typography.bodyMedium,
@@ -208,7 +205,7 @@ fun PlayerScreen(
         FullscreenPlayerActivity.extractResult(result.data)?.let(onFullscreenResult)
     }
 
-    fun openFullscreen(snapshot: PlaybackSnapshot) {
+    fun openFullscreen(snapshot: PlaybackSnapshot, isLandscapeVideo: Boolean?) {
         onPlaybackSnapshotChange(snapshot)
         fullscreenLauncher.launch(
             FullscreenPlayerActivity.createIntent(
@@ -220,7 +217,8 @@ fun PlayerScreen(
                 episodeNames = ArrayList(state.episodes.map { it.name }),
                 episodePageUrls = ArrayList(state.episodes.map { it.url }),
                 selectedEpisodeIndex = state.selectedEpisodeIndex,
-                snapshot = snapshot
+                snapshot = snapshot,
+                isLandscapeVideo = isLandscapeVideo
             )
         )
     }
@@ -314,7 +312,7 @@ fun PlayerScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedButton(
-                            onClick = { openFullscreen(state.playbackSnapshot) },
+                            onClick = { openFullscreen(state.playbackSnapshot, null) },
                             enabled = !state.isResolving,
                             shape = RoundedCornerShape(16.dp),
                             border = BorderStroke(1.dp, UiPalette.BorderSoft),

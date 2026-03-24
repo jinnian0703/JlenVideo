@@ -68,7 +68,7 @@ fun NativeVideoPlayer(
     episodeName: String,
     hasNextEpisode: Boolean,
     onNextEpisode: (() -> Unit)?,
-    onToggleFullscreen: ((PlaybackSnapshot) -> Unit)?,
+    onToggleFullscreen: ((PlaybackSnapshot, Boolean?) -> Unit)?,
     fullscreenMode: Boolean = false,
     onVideoOrientationDetected: ((Boolean) -> Unit)? = null,
     initialSnapshot: PlaybackSnapshot = PlaybackSnapshot(),
@@ -462,6 +462,8 @@ fun NativeVideoPlayer(
                             if (onToggleFullscreen != null) {
                                 IconButton(
                                     onClick = {
+                                        val isLandscapeVideo = player.videoSize.isLandscapeVideo() ?: lastReportedLandscape
+                                        val shouldAutoPlay = player.isPlaying
                                         shouldResumeOnStart = false
                                         player.pause()
                                         isPlaying = false
@@ -470,8 +472,9 @@ fun NativeVideoPlayer(
                                             PlaybackSnapshot(
                                                 positionMs = player.currentPosition.coerceAtLeast(0L),
                                                 speed = player.playbackParameters.speed,
-                                                playWhenReady = true
-                                            )
+                                                playWhenReady = shouldAutoPlay
+                                            ),
+                                            isLandscapeVideo
                                         )
                                     }
                                 ) {

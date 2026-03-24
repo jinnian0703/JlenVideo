@@ -57,6 +57,9 @@ class FullscreenPlayerActivity : ComponentActivity() {
             speed = intent.getFloatExtra(EXTRA_SPEED, 1f),
             playWhenReady = intent.getBooleanExtra(EXTRA_PLAY_WHEN_READY, true)
         )
+        if (intent.getBooleanExtra(EXTRA_HAS_INITIAL_ORIENTATION, false)) {
+            applyVideoOrientation(intent.getBooleanExtra(EXTRA_IS_LANDSCAPE_VIDEO, true))
+        }
 
         setContent {
             Surface(
@@ -169,6 +172,8 @@ class FullscreenPlayerActivity : ComponentActivity() {
         private const val EXTRA_POSITION_MS = "extra_position_ms"
         private const val EXTRA_SPEED = "extra_speed"
         private const val EXTRA_PLAY_WHEN_READY = "extra_play_when_ready"
+        private const val EXTRA_HAS_INITIAL_ORIENTATION = "extra_has_initial_orientation"
+        private const val EXTRA_IS_LANDSCAPE_VIDEO = "extra_is_landscape_video"
 
         fun createIntent(
             context: Context,
@@ -179,7 +184,8 @@ class FullscreenPlayerActivity : ComponentActivity() {
             episodeNames: ArrayList<String>,
             episodePageUrls: ArrayList<String>,
             selectedEpisodeIndex: Int,
-            snapshot: PlaybackSnapshot
+            snapshot: PlaybackSnapshot,
+            isLandscapeVideo: Boolean?
         ): Intent = Intent(context, FullscreenPlayerActivity::class.java).apply {
             putExtra(EXTRA_URL, url)
             putExtra(EXTRA_TITLE, title)
@@ -191,6 +197,8 @@ class FullscreenPlayerActivity : ComponentActivity() {
             putExtra(EXTRA_POSITION_MS, snapshot.positionMs)
             putExtra(EXTRA_SPEED, snapshot.speed)
             putExtra(EXTRA_PLAY_WHEN_READY, snapshot.playWhenReady)
+            putExtra(EXTRA_HAS_INITIAL_ORIENTATION, isLandscapeVideo != null)
+            putExtra(EXTRA_IS_LANDSCAPE_VIDEO, isLandscapeVideo ?: true)
         }
 
         fun extractResult(intent: Intent?): FullscreenPlaybackResult? {
