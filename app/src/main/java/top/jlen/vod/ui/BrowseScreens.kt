@@ -759,12 +759,18 @@ fun AccountScreen(
                         onRefreshCrashLog = onRefreshCrashLog,
                         onClearCrashLog = onClearCrashLog,
                         onOpenRelease = {
+                            val targetUrl = state.updateInfo?.releasePageUrl
+                                ?.takeIf { it.isNotBlank() }
+                                ?: "https://github.com/jinnian0703/JlenVideo/releases"
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
+                        },
+                        onDownloadUpdate = {
                             val targetUrl = state.updateInfo?.downloadUrl
                                 ?.takeIf { it.isNotBlank() }
                                 ?: state.updateInfo?.releasePageUrl
-                            if (!targetUrl.isNullOrBlank()) {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
-                            }
+                                ?.takeIf { it.isNotBlank() }
+                                ?: "https://github.com/jinnian0703/JlenVideo/releases"
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
                         }
                     )
                 }
@@ -877,12 +883,18 @@ fun AccountScreen(
                                 onRefreshCrashLog = onRefreshCrashLog,
                                 onClearCrashLog = onClearCrashLog,
                                 onOpenRelease = {
+                                    val targetUrl = state.updateInfo?.releasePageUrl
+                                        ?.takeIf { it.isNotBlank() }
+                                        ?: "https://github.com/jinnian0703/JlenVideo/releases"
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
+                                },
+                                onDownloadUpdate = {
                                     val targetUrl = state.updateInfo?.downloadUrl
                                         ?.takeIf { it.isNotBlank() }
                                         ?: state.updateInfo?.releasePageUrl
-                                    if (!targetUrl.isNullOrBlank()) {
-                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
-                                    }
+                                        ?.takeIf { it.isNotBlank() }
+                                        ?: "https://github.com/jinnian0703/JlenVideo/releases"
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
                                 }
                             )
                         }
@@ -973,7 +985,8 @@ private fun AboutPane(
     onCheckUpdate: () -> Unit,
     onRefreshCrashLog: () -> Unit,
     onClearCrashLog: () -> Unit,
-    onOpenRelease: () -> Unit
+    onOpenRelease: () -> Unit,
+    onDownloadUpdate: () -> Unit
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
@@ -1033,7 +1046,7 @@ private fun AboutPane(
                     Text(if (isUpdateLoading) "检查中..." else "检查更新")
                 }
                 Button(
-                    onClick = onOpenRelease,
+                    onClick = if (hasUpdate) onDownloadUpdate else onOpenRelease,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = UiPalette.Accent,
