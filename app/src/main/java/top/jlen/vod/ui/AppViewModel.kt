@@ -1244,11 +1244,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadDetail(vodId: String) {
-        if (detailState.item?.vodId == vodId && detailState.sources.isNotEmpty()) {
-            return
-        }
         viewModelScope.launch {
-            detailState = DetailUiState(isLoading = true, error = null)
+            val keepCurrentContent = detailState.item?.vodId == vodId
+            detailState = if (keepCurrentContent) {
+                detailState.copy(isLoading = true, error = null)
+            } else {
+                DetailUiState(isLoading = true, error = null)
+            }
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadDetail(vodId) }
             }.onSuccess { item ->
@@ -1269,6 +1271,84 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     isLoading = false,
                     error = toUserFacingMessage(error, "详情加载失败")
                 )
+            }
+        }
+    }
+
+    fun refreshPlayerSources() {
+        val currentItem = playerState.item ?: return
+        val vodId = currentItem.vodId
+        if (vodId.isBlank()) return
+
+        val currentSourceName = playerState.currentSource?.name.orEmpty()
+        val currentEpisodeUrl = playerState.currentEpisode?.url.orEmpty()
+        val currentEpisodeName = playerState.currentEpisode?.name.orEmpty()
+
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { repository.loadDetail(vodId) }
+            }.onSuccess { detailItem ->
+                if (detailItem == null || playerState.item?.vodId != vodId) {
+                    return@onSuccess
+                }
+
+                val refreshedSources = repository.parseSources(detailItem)
+                val previousSources = playerState.sources
+                val resolvedSourceIndex = when {
+                    refreshedSources.isEmpty() -> 0
+                    else -> {
+                        val matchedByName = refreshedSources.indexOfFirst { it.name == currentSourceName }
+                        when {
+                            matchedByName >= 0 -> matchedByName
+                            else -> playerState.selectedSourceIndex.coerceIn(0, refreshedSources.lastIndex)
+                        }
+                    }
+                }
+                val resolvedEpisodes = refreshedSources.getOrNull(resolvedSourceIndex)?.episodes.orEmpty()
+                val resolvedEpisodeIndex = when {
+                    resolvedEpisodes.isEmpty() -> 0
+                    else -> {
+                        val matchedByUrl = resolvedEpisodes.indexOfFirst { it.url == currentEpisodeUrl }
+                        val matchedByName = resolvedEpisodes.indexOfFirst { it.name == currentEpisodeName }
+                        when {
+                            matchedByUrl >= 0 -> matchedByUrl
+                            matchedByName >= 0 -> matchedByName
+                            else -> playerState.selectedEpisodeIndex.coerceIn(0, resolvedEpisodes.lastIndex)
+                        }
+                    }
+                }
+                val refreshedEpisodeUrl = resolvedEpisodes.getOrNull(resolvedEpisodeIndex)?.url.orEmpty()
+                val sourcesChanged = previousSources != refreshedSources
+                val episodeChanged = refreshedEpisodeUrl != currentEpisodeUrl
+
+                playerState = playerState.copy(
+                    title = detailItem.displayTitle,
+                    item = detailItem,
+                    sources = refreshedSources,
+                    selectedSourceIndex = resolvedSourceIndex,
+                    selectedEpisodeIndex = resolvedEpisodeIndex,
+                    playbackSnapshot = if (episodeChanged) PlaybackSnapshot() else playerState.playbackSnapshot,
+                    resolveError = if (refreshedSources.isEmpty()) "暂无可播放线路" else null
+                )
+
+                if (refreshedSources.isEmpty()) {
+                    playerState = playerState.copy(
+                        isResolving = false,
+                        resolvedUrl = "",
+                        useWebPlayer = false
+                    )
+                    return@onSuccess
+                }
+
+                if (episodeChanged || playerState.resolvedUrl.isBlank()) {
+                    resolveCurrentPlayerUrl()
+                } else if (sourcesChanged) {
+                    playerState = playerState.copy(
+                        isResolving = false,
+                        useWebPlayer = false,
+                        resolveError = null
+                    )
+                }
             }
         }
     }

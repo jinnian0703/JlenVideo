@@ -257,6 +257,9 @@ fun JlenVideoApp() {
                             )
                         }
                         composable("player") {
+                            LaunchedEffect(viewModel.playerState.item?.vodId) {
+                                viewModel.refreshPlayerSources()
+                            }
                             PlayerScreen(
                                 state = viewModel.playerState,
                                 onBack = { navController.popBackStack() },
