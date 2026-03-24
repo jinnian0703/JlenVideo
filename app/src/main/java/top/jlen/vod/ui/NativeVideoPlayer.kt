@@ -562,39 +562,13 @@ fun NativeVideoPlayer(
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(12.dp))
+                                        .background(Color.White.copy(alpha = 0.14f))
                                         .clickableWithoutRipple {
                                             controlsVersion++
                                             onNextEpisode()
                                         }
-                                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                                        .padding(horizontal = 12.dp, vertical = 8.dp)
                                 )
-                            }
-                            if (onToggleFullscreen != null) {
-                                IconButton(
-                                    onClick = {
-                                        val isLandscapeVideo = player.videoSize.isLandscapeVideo() ?: lastReportedLandscape
-                                        val shouldAutoPlay = player.playWhenReady
-                                        shouldResumeOnStart = false
-                                        player.pause()
-                                        isPlaying = false
-                                        showPausedOverlay = false
-                                        isUserPaused = false
-                                        controlsVersion++
-                                        val snapshot = PlaybackSnapshot(
-                                            positionMs = player.currentPosition.coerceAtLeast(0L),
-                                            speed = player.playbackParameters.speed,
-                                            playWhenReady = shouldAutoPlay
-                                        )
-                                        lastReportedSnapshot = snapshot
-                                        onToggleFullscreen(snapshot, isLandscapeVideo)
-                                    }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Fullscreen,
-                                        contentDescription = null,
-                                        tint = Color.White
-                                    )
-                                }
                             }
                         }
                     }
