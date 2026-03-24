@@ -208,9 +208,18 @@ fun NativeVideoPlayer(
         }
     }
 
-    LaunchedEffect(playbackIdentity) {
+    LaunchedEffect(playbackIdentity, player, initialSnapshot.playWhenReady) {
         hasCompletedInitialOverlayDelay = false
         delay(3_000)
+        if (
+            player != null &&
+            initialSnapshot.playWhenReady &&
+            !hasStartedPlaybackOnce &&
+            playbackState != Player.STATE_ENDED
+        ) {
+            player.play()
+            delay(1_200)
+        }
         hasCompletedInitialOverlayDelay = true
     }
 
