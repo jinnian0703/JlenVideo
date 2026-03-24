@@ -99,6 +99,7 @@ fun NativeVideoPlayer(
     var hasCompletedInitialOverlayDelay by remember(playbackIdentity) { mutableStateOf(false) }
     var hasStartedPlaybackOnce by remember(playbackIdentity) { mutableStateOf(false) }
     var showPausedOverlay by remember(playbackIdentity) { mutableStateOf(false) }
+    var isUserPaused by remember(playbackIdentity) { mutableStateOf(false) }
 
     DisposableEffect(player) {
         onDispose { player?.release() }
@@ -153,6 +154,7 @@ fun NativeVideoPlayer(
                         player.pause()
                         isPlaying = false
                         showPausedOverlay = false
+                        isUserPaused = false
                     }
 
                     Lifecycle.Event.ON_START -> {
@@ -160,6 +162,7 @@ fun NativeVideoPlayer(
                             player.play()
                             isPlaying = true
                             showPausedOverlay = false
+                            isUserPaused = false
                         }
                     }
 
@@ -182,6 +185,10 @@ fun NativeVideoPlayer(
         player.playWhenReady = initialSnapshot.playWhenReady
         isPlaying = initialSnapshot.playWhenReady
         showPausedOverlay = false
+        isUserPaused = false
+        if (initialSnapshot.playWhenReady) {
+            player.play()
+        }
     }
 
     LaunchedEffect(player) {
@@ -192,7 +199,12 @@ fun NativeVideoPlayer(
             if (player.isPlaying || player.currentPosition > 1_000L) {
                 hasStartedPlaybackOnce = true
             }
-            if (player.isPlaying || playbackState == Player.STATE_BUFFERING) {
+            if (player.isPlaying) {
+                isUserPaused = false
+                showPausedOverlay = false
+            } else if (!isUserPaused && playbackState == Player.STATE_BUFFERING) {
+                showPausedOverlay = false
+            } else if (!isUserPaused && playbackState == Player.STATE_READY && !initialSnapshot.playWhenReady) {
                 showPausedOverlay = false
             }
             duration = player.duration.coerceAtLeast(0L)
@@ -224,9 +236,9 @@ fun NativeVideoPlayer(
             !hasStartedPlaybackOnce &&
             playbackState != Player.STATE_ENDED
         ) {
-            repeat(if (fullscreenMode) 3 else 1) {
+            repeat(if (fullscreenMode) 4 else 3) {
                 player.play()
-                delay(if (fullscreenMode) 450L else 1_200L)
+                delay(if (fullscreenMode) 350L else 500L)
                 if (hasStartedPlaybackOnce || player.isPlaying) {
                     return@LaunchedEffect
                 }
@@ -329,6 +341,7 @@ fun NativeVideoPlayer(
                             player.play()
                             isPlaying = true
                             showPausedOverlay = false
+                            isUserPaused = false
                             controlsVersion++
                         },
                     shape = RoundedCornerShape(999.dp),
@@ -433,6 +446,7 @@ fun NativeVideoPlayer(
                                 isPlaying = true
                             }
                             showPausedOverlay = false
+                            isUserPaused = false
                             currentPosition = target
                             isDragging = false
                             controlsVersion++
@@ -449,9 +463,11 @@ fun NativeVideoPlayer(
                                 onClick = {
                                     if (player.isPlaying) {
                                         player.pause()
+                                        isUserPaused = true
                                         showPausedOverlay = true
                                     } else {
                                         player.play()
+                                        isUserPaused = false
                                         showPausedOverlay = false
                                     }
                                     isPlaying = player.isPlaying
@@ -512,6 +528,7 @@ fun NativeVideoPlayer(
                                         player.pause()
                                         isPlaying = false
                                         showPausedOverlay = false
+                                        isUserPaused = false
                                         controlsVersion++
                                         onToggleFullscreen(
                                             PlaybackSnapshot(
