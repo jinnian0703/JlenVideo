@@ -322,12 +322,18 @@ fun NativeVideoPlayer(
                 )
     val isPortraitLayout = configuration.screenHeightDp >= configuration.screenWidthDp
     val embeddedPlayerHeight = when {
-        !isPortraitLayout -> 248.dp
+        !isPortraitLayout -> 228.dp
         lastReportedLandscape == false -> 420.dp
-        else -> 300.dp
+        else -> 228.dp
+    }
+    val embeddedResizeMode = if (lastReportedLandscape == false) {
+        AspectRatioFrameLayout.RESIZE_MODE_FIT
+    } else {
+        AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     }
     val pillHorizontalPadding = if (fullscreenMode) 10.dp else 8.dp
     val pillVerticalPadding = if (fullscreenMode) 6.dp else 5.dp
+    val controlPillTextStyle = if (fullscreenMode) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.labelLarge
 
     Card(
         modifier = Modifier
@@ -363,7 +369,7 @@ fun NativeVideoPlayer(
                             resizeMode = if (fullscreenMode) {
                                 fullscreenResizeMode
                             } else {
-                                AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                embeddedResizeMode
                             }
                             this.player = player
                         }
@@ -373,7 +379,7 @@ fun NativeVideoPlayer(
                         playerView.resizeMode = if (fullscreenMode) {
                             fullscreenResizeMode
                         } else {
-                            AspectRatioFrameLayout.RESIZE_MODE_FIT
+                            embeddedResizeMode
                         }
                         if (playerView.player !== player) {
                             playerView.player = player
@@ -538,6 +544,7 @@ fun NativeVideoPlayer(
                                 Text(
                                     text = "全屏",
                                     color = Color.White,
+                                    style = controlPillTextStyle,
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -648,9 +655,11 @@ fun NativeVideoPlayer(
                                 )
                             }
                             Text(
-                                text = "${formatMillis(currentPosition)} / ${formatMillis(duration)}",
+                                text = "${formatMillis(currentPosition)}/${formatMillis(duration)}",
                                 color = Color.White,
-                                style = if (fullscreenMode) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium
+                                style = if (fullscreenMode) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip
                             )
                         }
                         Row(
@@ -661,6 +670,7 @@ fun NativeVideoPlayer(
                                 Text(
                                     text = resizeModeLabel(fullscreenResizeMode),
                                     color = Color.White,
+                                    style = controlPillTextStyle,
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -682,6 +692,7 @@ fun NativeVideoPlayer(
                             Text(
                                 text = speedLabel(speed),
                                 color = Color.White,
+                                style = controlPillTextStyle,
                                 fontWeight = FontWeight.Medium,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,

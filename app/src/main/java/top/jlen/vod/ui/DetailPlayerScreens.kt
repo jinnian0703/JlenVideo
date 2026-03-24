@@ -676,7 +676,7 @@ private fun openExternal(context: Context, url: String) {
 fun DetailTopBar(title: String, onBack: () -> Unit, darkMode: Boolean = false) {
     val background = if (darkMode) Color(0x66000000) else Color.White.copy(alpha = 0.82f)
     val contentColor = if (darkMode) Color.White else UiPalette.Ink
-    val showTitle = title.isNotBlank() && !darkMode
+    val showTitle = title.isNotBlank()
     Row(
         modifier = Modifier
             .fillMaxWidth()
