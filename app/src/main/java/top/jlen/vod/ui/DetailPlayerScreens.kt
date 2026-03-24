@@ -26,8 +26,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -298,12 +300,13 @@ fun PlayerScreen(
             .fillMaxSize()
             .background(UiPalette.BackgroundBottom)
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 24.dp),
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -324,8 +327,6 @@ fun PlayerScreen(
                     }
                 }
             }
-        }
-        item {
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text(
                     text = state.title,
@@ -396,30 +397,24 @@ fun PlayerScreen(
                     }
                 }
             }
-        }
 
-        if (state.sources.isNotEmpty()) {
-            item { SectionTitle(title = "切换线路", action = state.sourceName, onAction = {}) }
-            item {
+            if (state.sources.isNotEmpty()) {
+                SectionTitle(title = "切换线路", action = state.sourceName, onAction = {})
                 SourceRow(
                     sourceNames = state.sources.map { it.name },
                     selectedIndex = state.selectedSourceIndex,
                     onSelectSource = onSelectSource
                 )
             }
-        }
 
-        if (state.episodes.isNotEmpty()) {
-            item { SectionTitle(title = "切换选集", action = null, onAction = {}) }
-            item {
+            if (state.episodes.isNotEmpty()) {
+                SectionTitle(title = "切换选集", action = null, onAction = {})
                 EpisodePanel(
                     episodes = state.episodes,
                     selectedIndex = state.selectedEpisodeIndex,
                     onEpisodeClick = onSelectEpisode
                 )
             }
-        }
-
         }
 
         if (directPlayable && isFullscreen) {
