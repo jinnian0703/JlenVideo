@@ -1,6 +1,6 @@
 # JlenVideo
 
-`JlenVideo` 是一个基于原生 Android + Jetpack Compose 开发的苹果 CMS 影视客户端，当前版本为 `1.1.2` 正式版。
+`JlenVideo` 是一个基于原生 Android + Jetpack Compose 开发的苹果 CMS 影视客户端，当前版本为 `1.1.3` 正式版。
 
 项目目标不是简单网页套壳，而是围绕苹果 CMS 站点能力，提供更接近原生 App 的浏览、搜索、详情、播放、账号、收藏、历史与会员体验。
 
@@ -10,26 +10,30 @@
 
 ## 版本信息
 
-- 当前版本：`1.1.2`
-- `versionCode`：`4`
-- `versionName`：`1.1.2`
+- 当前版本：`1.1.3`
+- `versionCode`：`5`
+- `versionName`：`1.1.3`
 
 版本定义位置：
 
 - [app/build.gradle.kts](app/build.gradle.kts)
 
-## 1.1.2 更新内容
+## 1.1.3 更新内容
 
-这是当前 `1.1.2` 的整合版更新内容，已经包含后续补充修复，而不是只有最初发版时的那一版说明。
+这是当前 `1.1.3` 的整合版更新内容，已经包含最新几轮稳定性修复。
 
-- 首页推荐改为横幅轮播样式
-- 首页推荐支持自动轮播，并在拖动时暂停自动切换
-- 首页推荐轮播修复为稳定循环方案，避免手动滑动异常
-- 首页推荐区移除了右侧“刷新”按钮
-- App 启动时会自动检查更新，发现新版本后弹窗提示
-- 打不开 GitHub 更新链接时不再闪退，会改为提示稍后重试
-- 首页不再显示原来的底部分类区块，界面更简洁
-- `v1.1.2` 发布与当前仓库源码保持同步
+- 首页推荐横幅轮播继续保留
+- 首页推荐支持自动轮播、手动滑动循环
+- 修复首页推荐自动轮播失效问题
+- 修复首页推荐手动循环时的稳定性问题
+- 修复首页推荐图片内存压力过高导致的闪退风险
+- 移除首页推荐右侧刷新按钮
+- App 启动时自动检查更新，发现新版本后弹窗提示
+- GitHub 更新链接打不开时不再闪退
+- 被顶号或登录态失效时，会稳定回到登录态，不再在页面间来回跳
+- 登录页提示不会再频繁打断输入法
+- 头像上传改为压缩后上传，并增加头像缓存刷新，便于同步最新头像
+- `v1.1.3` 发布与当前仓库源码保持同步
 
 ## 主要功能
 
@@ -43,6 +47,7 @@
 - 登录、注册、找回密码、资料修改
 - 邮箱绑定、解绑、验证码处理
 - 关于页与崩溃日志查看
+- GitHub Release 检查更新
 
 ## 首页推荐说明
 
@@ -80,12 +85,6 @@
 - [app/src/main/java/top/jlen/vod/ui/DetailPlayerScreens.kt](app/src/main/java/top/jlen/vod/ui/DetailPlayerScreens.kt)
 - [app/src/main/java/top/jlen/vod/ui/NativeVideoPlayer.kt](app/src/main/java/top/jlen/vod/ui/NativeVideoPlayer.kt)
 - [app/src/main/java/top/jlen/vod/ui/FullscreenPlayerActivity.kt](app/src/main/java/top/jlen/vod/ui/FullscreenPlayerActivity.kt)
-
-说明：
-
-- `data` 层负责接口访问、页面抓取、HTML 解析、Cookie 持久化
-- `ui` 层负责 Compose 页面、播放器、导航与状态展示
-- `AppViewModel` 负责把站点数据整合成 App 可直接消费的状态
 
 ## 工作原理
 
@@ -130,11 +129,6 @@ buildConfigField("String", "APPLE_CMS_BASE_URL", "\"https://your-domain.com/\"")
 - 如果站点开启了 Cloudflare、人机验证或额外反爬，部分功能可能需要额外适配
 - 如果站点模板结构变化较大，搜索、详情、收藏、历史、账号等 HTML 解析规则也要同步调整
 
-重点排查文件：
-
-- [app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt](app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt)
-- [app/src/main/java/top/jlen/vod/data/AppleCmsApi.kt](app/src/main/java/top/jlen/vod/data/AppleCmsApi.kt)
-
 ## 模板与路由配置
 
 当前客户端对接时，参考使用的模板文件为：
@@ -146,12 +140,6 @@ buildConfigField("String", "APPLE_CMS_BASE_URL", "\"https://your-domain.com/\"")
 - 推荐直接使用仓库内附带的 [templates/v2.zip](templates/v2.zip) 作为模板参考或部署底包
 - 如果准备复刻 `cms.jlen.top` 当前结构，优先使用这份模板，客户端适配会更稳定
 - 如果更换了别的模板，也可以继续适配，但搜索、详情、播放、专题、演员、文章、用户中心等页面的解析逻辑可能需要重新调整
-
-首页推荐位适配说明：
-
-- 当前客户端首页推荐区默认抓取苹果 CMS 的 `level=1`
-- 也就是说，后台需要把想展示到首页推荐区的内容设置为 `level=1`
-- 如果后台没有设置 `level=1`，首页推荐区可能为空，但“最近更新”和“片库分类”仍会正常加载
 
 如果你的站点同样基于这套模板或相近结构，建议同时开启苹果 CMS 后台的路由伪静态配置：
 
@@ -216,28 +204,6 @@ plotdetail/<id>-<page?>   => plot/plot
 plotdetail/<id>   => plot/detail
 ```
 
-说明：
-
-- 这组规则会直接影响分类页、详情页、播放页、搜索页、专题页和文章页的访问路径
-- 如果你使用的是别的模板，路由可以不同，但要同步检查客户端解析逻辑
-- 如果播放页、搜索页、用户中心打不开，优先确认这些路由配置是否与站点真实访问路径一致
-
-## 编译环境
-
-建议环境：
-
-- Android Studio Hedgehog 或更高版本
-- JDK `17`
-- Android SDK `34`
-- Gradle Wrapper
-
-当前项目配置：
-
-- `minSdk = 24`
-- `targetSdk = 34`
-- `compileSdk = 34`
-- `jvmTarget = 17`
-
 ## 编译教程
 
 ### 1. 克隆项目
@@ -247,19 +213,13 @@ git clone https://github.com/jinnian0703/JlenVideo.git
 cd JlenVideo
 ```
 
-### 2. 用 Android Studio 打开
+### 2. 使用 Android Studio 打开
 
 - 打开 Android Studio
 - 选择项目根目录
 - 等待 Gradle 同步完成
 
-### 3. 修改站点 API
-
-根据上面的“如何修改 API 地址”一节，修改：
-
-- [app/build.gradle.kts](app/build.gradle.kts)
-
-### 4. 编译调试包
+### 3. 编译调试包
 
 Windows：
 
@@ -273,125 +233,38 @@ macOS / Linux：
 ./gradlew assembleDebug
 ```
 
-生成的 APK 默认路径：
+生成路径：
 
 - `app/build/outputs/apk/debug/app-debug.apk`
-
-### 5. 编译发布包
-
-```powershell
-.\gradlew.bat assembleRelease
-```
-
-生成的 APK 默认路径：
-
-- `app/build/outputs/apk/release/`
-
-注意：
-
-- 当前 `release` 默认没有开启混淆
-- 正式分发前建议自行配置签名、混淆、资源压缩与安全加固
-
-## 调试建议
-
-如果你接入新的苹果 CMS 站点后遇到问题，可以按下面排查：
-
-### 搜索无结果
-
-- 检查搜索页路径是否仍然是 `/vodsearch/-------------/?wd=关键词`
-- 检查搜索结果 DOM 结构是否变化
-
-### 播放地址解析失败
-
-- 检查播放页的 `player_aaaa` 数据结构
-- 检查播放器 iframe、m3u8、mp4 链接提取规则
-- 检查是否需要额外的 `Referer` 或 `Origin`
-
-### 收藏、历史、会员、资料失败
-
-- 检查用户中心路径是否仍是 `/index.php/user/...`
-- 检查页面字段标题和 HTML 结构是否变化
-- 检查站点是否启用了验证码、风控或登录保护
-
-重点排查文件：
-
-- [app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt](app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt)
-- [app/src/main/java/top/jlen/vod/ui/AppViewModel.kt](app/src/main/java/top/jlen/vod/ui/AppViewModel.kt)
 
 ## 检查更新说明
 
 当前版本的“检查更新”功能基于 GitHub Release：
 
-- 版本号读取自 Release 的 `tag_name`，默认支持 `v1.1.2` 这种格式，进入 App 后会自动去掉前面的 `v`
+- 版本号读取自 Release 的 `tag_name`，默认支持 `v1.1.3` 这种格式，进入 App 后会自动去掉前面的 `v`
 - 发布说明读取自 Release 的 `body`
 - “查看发布”打开 Release 页面 `html_url`
 - “前往下载”优先打开 Release 资产里的 APK 下载地址 `browser_download_url`
 
-相关实现位置：
-
-- [app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt](app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt)
-- [app/src/main/java/top/jlen/vod/ui/AppViewModel.kt](app/src/main/java/top/jlen/vod/ui/AppViewModel.kt)
-- [app/src/main/java/top/jlen/vod/ui/JlenVideoApp.kt](app/src/main/java/top/jlen/vod/ui/JlenVideoApp.kt)
-
 如果你要改成自己的仓库更新：
 
-### 1. 修改更新接口仓库地址
-
-打开：
-
-- [app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt](app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt)
-
-找到 GitHub Release 接口地址，例如：
-
-```kotlin
-https://api.github.com/repos/jinnian0703/JlenVideo/releases/latest
-```
-
-改成你自己的仓库：
-
-```kotlin
-https://api.github.com/repos/your-name/your-repo/releases/latest
-```
-
-### 2. 修改 Release 页面兜底地址
-
-同样在：
-
-- [app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt](app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt)
-
-找到类似：
-
-```kotlin
-https://github.com/jinnian0703/JlenVideo/releases
-```
-
-改成你自己的 Release 页面，例如：
-
-```kotlin
-https://github.com/your-name/your-repo/releases
-```
-
-### 3. 发布你自己的新版本
-
-- 先修改 `app/build.gradle.kts` 中的 `versionCode` 和 `versionName`
-- 提交并推送代码
-- 打版本标签，例如 `v1.1.2`
-- 创建 GitHub Release，并确保这个标签对应的 Release 已发布，不是草稿
-- 上传 APK 文件到 Release 资产
-- 在 Release 说明里填写更新内容，App 会直接读取这里的文本
+1. 修改 [app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt](app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt) 里的 GitHub Release 接口地址
+2. 修改同文件里的 Release 页面兜底地址
+3. 修改 `app/build.gradle.kts` 中的 `versionCode` 和 `versionName`
+4. 打 tag，例如 `v1.1.3`
+5. 创建 GitHub Release 并上传 APK
 
 注意事项：
 
-- `versionName` 要和 GitHub Release 的 `tag_name` 对应，例如本地是 `1.1.2`，Release 标签建议用 `v1.1.2`
+- `versionName` 要和 GitHub Release 的 `tag_name` 对应，例如本地是 `1.1.3`，Release 标签建议用 `v1.1.3`
 - 如果没有上传 APK 资产，“前往下载”会自动退回到 Release 页面
 - 如果 Release 还是 Draft，GitHub 最新发布接口可能不会返回它
-- 如果你改成私有仓库，未登录的普通请求可能无法正常读取最新 Release，需要改成带鉴权的更新接口
 
 ## 开发与发布说明
 
-本仓库当前发布为 `1.1.2` 正式版，建议后续版本遵循语义化版本：
+本仓库当前发布为 `1.1.3` 正式版，建议后续版本遵循语义化版本：
 
-- `1.1.2`：问题修复
+- `1.1.3`：问题修复
 - `1.2.0`：新增功能
 - `2.0.0`：重大不兼容变更
 
@@ -401,15 +274,9 @@ https://github.com/your-name/your-repo/releases
 2. 执行 `assembleDebug` 或 `assembleRelease`
 3. 更新 README 或变更说明
 4. 提交代码
-5. 打 tag，例如 `v1.1.2`
+5. 打 tag，例如 `v1.1.3`
 6. 推送到 GitHub
 7. 创建 GitHub Release
-
-## 已知说明
-
-- 项目依赖目标苹果 CMS 站点的前端结构，模板差异可能导致部分解析逻辑需要调整
-- 一些第三方播放线路可能存在跨域、Referer、防盗链等限制
-- 如果站点启用了复杂验证码、人机验证或额外风控，还需要继续做定制适配
 
 ## 开源协议
 
