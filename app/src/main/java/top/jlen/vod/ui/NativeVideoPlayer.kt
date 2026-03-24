@@ -100,6 +100,7 @@ fun NativeVideoPlayer(
     var hasStartedPlaybackOnce by remember(playbackIdentity) { mutableStateOf(false) }
     var showPausedOverlay by remember(playbackIdentity) { mutableStateOf(false) }
     var isUserPaused by remember(playbackIdentity) { mutableStateOf(false) }
+    var lastReportedSnapshot by remember(playbackIdentity) { mutableStateOf<PlaybackSnapshot?>(null) }
 
     DisposableEffect(player) {
         onDispose { player?.release() }
@@ -176,6 +177,10 @@ fun NativeVideoPlayer(
 
     LaunchedEffect(player, initialSnapshot.positionMs, initialSnapshot.speed, initialSnapshot.playWhenReady) {
         if (player == null) return@LaunchedEffect
+        val reportedSnapshot = lastReportedSnapshot
+        if (reportedSnapshot != null && initialSnapshot.matchesReportedSnapshot(reportedSnapshot)) {
+            return@LaunchedEffect
+        }
         player.playbackParameters = PlaybackParameters(initialSnapshot.speed)
         speed = initialSnapshot.speed
         if (kotlin.math.abs(player.currentPosition - initialSnapshot.positionMs) > 900L) {
@@ -216,12 +221,14 @@ fun NativeVideoPlayer(
                     0f
                 }
             }
+            val snapshot = PlaybackSnapshot(
+                positionMs = player.currentPosition.coerceAtLeast(0L),
+                speed = player.playbackParameters.speed,
+                playWhenReady = player.playWhenReady
+            )
+            lastReportedSnapshot = snapshot
             latestSnapshotCallback.value?.invoke(
-                PlaybackSnapshot(
-                    positionMs = player.currentPosition.coerceAtLeast(0L),
-                    speed = player.playbackParameters.speed,
-                    playWhenReady = player.isPlaying
-                )
+                snapshot
             )
             delay(300)
         }
@@ -387,12 +394,14 @@ fun NativeVideoPlayer(
                         if (onClose != null) {
                             IconButton(
                                 onClick = {
+                                    val snapshot = PlaybackSnapshot(
+                                        positionMs = player.currentPosition.coerceAtLeast(0L),
+                                        speed = player.playbackParameters.speed,
+                                        playWhenReady = player.playWhenReady
+                                    )
+                                    lastReportedSnapshot = snapshot
                                     latestSnapshotCallback.value?.invoke(
-                                        PlaybackSnapshot(
-                                            positionMs = player.currentPosition.coerceAtLeast(0L),
-                                            speed = player.playbackParameters.speed,
-                                            playWhenReady = player.isPlaying
-                                        )
+                                        snapshot
                                     )
                                     onClose()
                                 }
@@ -527,21 +536,20 @@ fun NativeVideoPlayer(
                                 IconButton(
                                     onClick = {
                                         val isLandscapeVideo = player.videoSize.isLandscapeVideo() ?: lastReportedLandscape
-                                        val shouldAutoPlay = player.isPlaying
+                                        val shouldAutoPlay = player.playWhenReady
                                         shouldResumeOnStart = false
                                         player.pause()
                                         isPlaying = false
                                         showPausedOverlay = false
                                         isUserPaused = false
                                         controlsVersion++
-                                        onToggleFullscreen(
-                                            PlaybackSnapshot(
-                                                positionMs = player.currentPosition.coerceAtLeast(0L),
-                                                speed = player.playbackParameters.speed,
-                                                playWhenReady = shouldAutoPlay
-                                            ),
-                                            isLandscapeVideo
+                                        val snapshot = PlaybackSnapshot(
+                                            positionMs = player.currentPosition.coerceAtLeast(0L),
+                                            speed = player.playbackParameters.speed,
+                                            playWhenReady = shouldAutoPlay
                                         )
+                                        lastReportedSnapshot = snapshot
+                                        onToggleFullscreen(snapshot, isLandscapeVideo)
                                     }
                                 ) {
                                     Icon(
@@ -609,3 +617,8 @@ private fun VideoSize.isLandscapeVideo(): Boolean? {
         else -> displayWidth >= displayHeight
     }
 }
+
+private fun PlaybackSnapshot.matchesReportedSnapshot(reported: PlaybackSnapshot): Boolean =
+    kotlin.math.abs(positionMs - reported.positionMs) <= 900L &&
+        kotlin.math.abs(speed - reported.speed) <= 0.01f &&
+        playWhenReady == reported.playWhenReady
