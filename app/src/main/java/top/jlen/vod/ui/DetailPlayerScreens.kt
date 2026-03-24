@@ -368,7 +368,7 @@ fun PlayerScreen(
                         color = UiPalette.DangerText
                     )
                 }
-                if (directPlayable) {
+                if (false) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedButton(

@@ -111,6 +111,12 @@ fun NativeVideoPlayer(
     var isUserPaused by remember(playbackIdentity) { mutableStateOf(false) }
     var lastReportedSnapshot by remember(playbackIdentity) { mutableStateOf<PlaybackSnapshot?>(null) }
 
+    fun currentSnapshot(): PlaybackSnapshot = PlaybackSnapshot(
+        positionMs = player?.currentPosition?.coerceAtLeast(0L) ?: 0L,
+        speed = player?.playbackParameters?.speed ?: speed,
+        playWhenReady = player?.playWhenReady == true
+    )
+
     DisposableEffect(player) {
         onDispose { player?.release() }
     }
@@ -320,6 +326,8 @@ fun NativeVideoPlayer(
         lastReportedLandscape == false -> 420.dp
         else -> 300.dp
     }
+    val pillHorizontalPadding = if (fullscreenMode) 10.dp else 8.dp
+    val pillVerticalPadding = if (fullscreenMode) 6.dp else 5.dp
 
     Card(
         modifier = Modifier
@@ -443,15 +451,16 @@ fun NativeVideoPlayer(
                 Text(
                     text = "视频来源于第三方，切勿相信任何广告信息",
                     color = Color.White.copy(alpha = 0.88f),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = if (fullscreenMode) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelSmall,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = 16.dp)
+                        .padding(top = if (fullscreenMode) 16.dp else 10.dp)
                         .background(Color.Black.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .padding(horizontal = if (fullscreenMode) 12.dp else 10.dp, vertical = if (fullscreenMode) 6.dp else 4.dp)
                 )
 
-                Column(
+                if (fullscreenMode) {
+                    Column(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(start = 16.dp, top = 16.dp, end = 16.dp)
@@ -525,7 +534,58 @@ fun NativeVideoPlayer(
                                     )
                                 }
                             }
+                            if (false) {
+                                Text(
+                                    text = "全屏",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(Color.Black.copy(alpha = 0.28f))
+                                        .border(
+                                            width = 1.dp,
+                                            color = Color.White.copy(alpha = 0.14f),
+                                            shape = RoundedCornerShape(999.dp)
+                                        )
+                                        .clickableWithoutRipple {
+                                            val snapshot = currentSnapshot()
+                                            lastReportedSnapshot = snapshot
+                                            latestSnapshotCallback.value?.invoke(snapshot)
+                                            latestFullscreenToggleCallback.value?.invoke(snapshot, lastReportedLandscape)
+                                            controlsVersion++
+                                        }
+                                        .padding(horizontal = pillHorizontalPadding, vertical = pillVerticalPadding)
+                                )
+                            }
+                            if (!fullscreenMode && onToggleFullscreen != null) {
+                                Text(
+                                    text = "全屏",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(Color.Black.copy(alpha = 0.28f))
+                                        .border(
+                                            width = 1.dp,
+                                            color = Color.White.copy(alpha = 0.14f),
+                                            shape = RoundedCornerShape(999.dp)
+                                        )
+                                        .clickableWithoutRipple {
+                                            val snapshot = currentSnapshot()
+                                            lastReportedSnapshot = snapshot
+                                            latestSnapshotCallback.value?.invoke(snapshot)
+                                            latestFullscreenToggleCallback.value?.invoke(snapshot, lastReportedLandscape)
+                                            controlsVersion++
+                                        }
+                                        .padding(horizontal = pillHorizontalPadding, vertical = pillVerticalPadding)
+                                )
+                            }
                         }
+                    }
                     }
                 }
 
@@ -533,7 +593,7 @@ fun NativeVideoPlayer(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Slider(
                         value = sliderPosition,
@@ -564,7 +624,7 @@ fun NativeVideoPlayer(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             IconButton(
                                 onClick = {
@@ -589,12 +649,13 @@ fun NativeVideoPlayer(
                             }
                             Text(
                                 text = "${formatMillis(currentPosition)} / ${formatMillis(duration)}",
-                                color = Color.White
+                                color = Color.White,
+                                style = if (fullscreenMode) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium
                             )
                         }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             if (fullscreenMode) {
                                 Text(
@@ -615,7 +676,7 @@ fun NativeVideoPlayer(
                                             fullscreenResizeMode = nextResizeMode(fullscreenResizeMode)
                                             controlsVersion++
                                         }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                        .padding(horizontal = pillHorizontalPadding, vertical = pillVerticalPadding)
                                 )
                             }
                             Text(
@@ -637,7 +698,7 @@ fun NativeVideoPlayer(
                                         player.playbackParameters = PlaybackParameters(speed)
                                         controlsVersion++
                                     }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .padding(horizontal = pillHorizontalPadding, vertical = pillVerticalPadding)
                             )
                             if (hasNextEpisode && onNextEpisode != null) {
                                 Text(
@@ -658,7 +719,32 @@ fun NativeVideoPlayer(
                                             controlsVersion++
                                             onNextEpisode()
                                         }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                        .padding(horizontal = pillHorizontalPadding, vertical = pillVerticalPadding)
+                                )
+                            }
+                            if (!fullscreenMode && onToggleFullscreen != null) {
+                                Text(
+                                    text = "全屏",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(Color.Black.copy(alpha = 0.28f))
+                                        .border(
+                                            width = 1.dp,
+                                            color = Color.White.copy(alpha = 0.14f),
+                                            shape = RoundedCornerShape(999.dp)
+                                        )
+                                        .clickableWithoutRipple {
+                                            val snapshot = currentSnapshot()
+                                            lastReportedSnapshot = snapshot
+                                            latestSnapshotCallback.value?.invoke(snapshot)
+                                            latestFullscreenToggleCallback.value?.invoke(snapshot, lastReportedLandscape)
+                                            controlsVersion++
+                                        }
+                                        .padding(horizontal = pillHorizontalPadding, vertical = pillVerticalPadding)
                                 )
                             }
                         }
