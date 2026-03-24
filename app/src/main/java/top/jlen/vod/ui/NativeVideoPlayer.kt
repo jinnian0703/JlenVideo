@@ -1,6 +1,7 @@
 package top.jlen.vod.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -49,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -539,35 +541,49 @@ fun NativeVideoPlayer(
                         }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
                                 text = speedLabel(speed),
                                 color = Color.White,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color.White.copy(alpha = 0.14f))
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .background(Color.Black.copy(alpha = 0.28f))
+                                    .border(
+                                        width = 1.dp,
+                                        color = Color.White.copy(alpha = 0.14f),
+                                        shape = RoundedCornerShape(999.dp)
+                                    )
                                     .clickableWithoutRipple {
                                         speed = nextSpeed(speed)
                                         player.playbackParameters = PlaybackParameters(speed)
                                         controlsVersion++
                                     }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
                             )
                             if (hasNextEpisode && onNextEpisode != null) {
                                 Text(
                                     text = "下一集",
                                     color = Color.White,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(Color.White.copy(alpha = 0.14f))
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(Color.Black.copy(alpha = 0.28f))
+                                        .border(
+                                            width = 1.dp,
+                                            color = Color.White.copy(alpha = 0.14f),
+                                            shape = RoundedCornerShape(999.dp)
+                                        )
                                         .clickableWithoutRipple {
                                             controlsVersion++
                                             onNextEpisode()
                                         }
-                                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
                                 )
                             }
                         }

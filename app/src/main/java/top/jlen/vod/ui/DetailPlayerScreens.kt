@@ -209,10 +209,10 @@ fun PlayerScreen(
     val activity = remember(context) { context.findActivity() }
     val playUrl = state.playUrl
     val directPlayable = playUrl.isNotBlank() && isDirectVideoUrl(playUrl)
-    var detectedLandscapeVideo by remember(playUrl, state.episodeName, state.sourceName) {
+    var detectedLandscapeVideo by remember {
         mutableStateOf<Boolean?>(null)
     }
-    var isFullscreen by remember(playUrl, state.episodeName, state.sourceName) {
+    var isFullscreen by remember {
         mutableStateOf(false)
     }
 
@@ -316,8 +316,8 @@ fun PlayerScreen(
                         darkMode = true
                     )
                     when {
-                        state.isResolving -> ResolveLoadingSurface()
-                        state.useWebPlayer -> ResolveUnavailableSurface()
+                        state.isResolving && !isFullscreen -> ResolveLoadingSurface()
+                        state.useWebPlayer && !isFullscreen -> ResolveUnavailableSurface()
                         directPlayable && !isFullscreen -> playerContent(false)
                         directPlayable -> Spacer(modifier = Modifier.height(0.dp))
                         else -> EmptyPane("暂无可播放地址")
@@ -429,6 +429,22 @@ fun PlayerScreen(
                     .background(Color.Black)
             ) {
                 playerContent(true)
+            }
+        } else if (state.isResolving && isFullscreen) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            ) {
+                ResolveLoadingSurface()
+            }
+        } else if (state.useWebPlayer && isFullscreen) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            ) {
+                ResolveUnavailableSurface()
             }
         }
     }
