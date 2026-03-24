@@ -343,7 +343,7 @@ fun PlayerScreen(
                         )
                         when {
                             state.isResolving && !isFullscreen -> ResolveLoadingSurface(
-                                message = "正在接入这一集的真实视频地址..."
+                                message = "正在获取播放地址..."
                             )
                             state.useWebPlayer && !isFullscreen -> ResolveUnavailableSurface()
                             directPlayable && !isFullscreen -> playerContent(false)
@@ -377,24 +377,6 @@ fun PlayerScreen(
                         style = MaterialTheme.typography.bodyLarge,
                         color = UiPalette.TextSecondary
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = when {
-                            state.isResolving -> "正在接入这一集的真实视频地址，准备好后会直接继续播放。"
-                            state.useWebPlayer -> "这条线路暂时还没完成原生接管，建议切换其他线路继续观看。"
-                            else -> "当前线路已直连视频源，加载和全屏会更稳定。"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = UiPalette.TextMuted
-                    )
-                    if (!state.resolveError.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = state.resolveError,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = UiPalette.DangerText
-                        )
-                    }
                 }
             }
 
@@ -442,7 +424,7 @@ fun PlayerScreen(
                 ResolveLoadingSurface(
                     message = "正在切换到 $fullscreenTransitionLabel",
                     fullscreenMode = true,
-                    subtitle = "视频准备好后会无缝继续播放"
+                    subtitle = "请稍候"
                 )
             }
         } else if (state.useWebPlayer && isFullscreen) {
@@ -453,8 +435,8 @@ fun PlayerScreen(
             ) {
                 ResolveUnavailableSurface(
                     fullscreenMode = true,
-                    title = "这条线路暂时还没完成原生接管",
-                    message = "建议返回后切换其他线路继续观看，避免中断当前观影体验。"
+                    title = "该线路暂不支持",
+                    message = "请换个线路试试"
                 )
             }
         }
@@ -649,7 +631,7 @@ private fun EpisodePanel(
 private fun ResolveLoadingSurface(
     message: String = "正在解析播放地址...",
     fullscreenMode: Boolean = false,
-    subtitle: String = "请稍候，马上就好"
+    subtitle: String = "请稍候"
 ) {
     if (fullscreenMode) {
         Box(
@@ -700,8 +682,8 @@ private fun ResolveLoadingSurface(
 @Composable
 private fun ResolveUnavailableSurface(
     fullscreenMode: Boolean = false,
-    title: String = "这条线路暂时还没完成原生接管",
-    message: String = "你可以先切换其他线路继续观看，我会继续补齐这类线路的适配。"
+    title: String = "该线路暂不支持",
+    message: String = "请换个线路试试"
 ) {
     if (fullscreenMode) {
         Box(

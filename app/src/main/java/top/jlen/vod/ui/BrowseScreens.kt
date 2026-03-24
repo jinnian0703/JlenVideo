@@ -344,12 +344,6 @@ fun SearchScreen(
             fontWeight = FontWeight.ExtraBold,
             color = UiPalette.Ink
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "直接搜索站内影片、剧集、综艺和动漫",
-            style = MaterialTheme.typography.bodyMedium,
-            color = UiPalette.TextSecondary
-        )
         Spacer(modifier = Modifier.height(16.dp))
         OutlinedTextField(
             value = state.query,
@@ -370,7 +364,7 @@ fun SearchScreen(
                 focusedPlaceholderColor = UiPalette.TextMuted,
                 unfocusedPlaceholderColor = UiPalette.TextMuted
             ),
-            placeholder = { Text("输入影片名称开始搜索") },
+            placeholder = { Text("搜片名") },
             trailingIcon = {
                 TextButton(
                     onClick = onSearch,
@@ -434,7 +428,7 @@ fun SearchScreen(
         when {
             state.isLoading -> LoadingPane("搜索中...")
             !state.error.isNullOrBlank() && state.results.isEmpty() -> ErrorBanner(message = state.error, onRetry = onSearch)
-            state.results.isEmpty() -> EmptyPane("搜索结果会显示在这里")
+            state.results.isEmpty() -> EmptyPane(if (state.query.isBlank()) "输入片名搜索" else "暂无结果")
             else -> LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 contentPadding = PaddingValues(bottom = 24.dp)
