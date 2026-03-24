@@ -55,6 +55,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,6 +71,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.FindPasswordEditor
@@ -2356,6 +2358,12 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
 @Composable
 private fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String) -> Unit) {
     val pagerState = rememberPagerState(pageCount = { items.size })
+
+    LaunchedEffect(items.size, pagerState.settledPage) {
+        if (items.size <= 1) return@LaunchedEffect
+        delay(3500)
+        pagerState.animateScrollToPage((pagerState.settledPage + 1) % items.size)
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
