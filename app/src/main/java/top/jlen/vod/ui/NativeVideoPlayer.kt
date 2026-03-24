@@ -96,6 +96,8 @@ fun NativeVideoPlayer(
     var hasHandledEnded by remember(playbackIdentity) { mutableStateOf(false) }
     var playbackState by remember(player) { mutableStateOf(player?.playbackState ?: Player.STATE_IDLE) }
     var lastReportedLandscape by remember(playbackIdentity) { mutableStateOf<Boolean?>(null) }
+    var hasCompletedInitialOverlayDelay by remember(playbackIdentity) { mutableStateOf(false) }
+    var hasStartedPlaybackOnce by remember(playbackIdentity) { mutableStateOf(false) }
 
     DisposableEffect(player) {
         onDispose { player?.release() }
@@ -183,6 +185,9 @@ fun NativeVideoPlayer(
         while (true) {
             isPlaying = player.isPlaying
             playbackState = player.playbackState
+            if (player.isPlaying || player.currentPosition > 1_000L) {
+                hasStartedPlaybackOnce = true
+            }
             duration = player.duration.coerceAtLeast(0L)
             if (!isDragging) {
                 currentPosition = player.currentPosition.coerceAtLeast(0L)
@@ -201,6 +206,12 @@ fun NativeVideoPlayer(
             )
             delay(300)
         }
+    }
+
+    LaunchedEffect(playbackIdentity) {
+        hasCompletedInitialOverlayDelay = false
+        delay(3_000)
+        hasCompletedInitialOverlayDelay = true
     }
 
     LaunchedEffect(fullscreenMode, controlsVisible, controlsVersion, isPlaying) {
@@ -287,7 +298,11 @@ fun NativeVideoPlayer(
                 )
             }
 
-            if (playbackState != Player.STATE_ENDED && !isPlaying) {
+            if (
+                playbackState != Player.STATE_ENDED &&
+                !isPlaying &&
+                (hasStartedPlaybackOnce || hasCompletedInitialOverlayDelay)
+            ) {
                 Surface(
                     modifier = Modifier
                         .align(Alignment.Center)
