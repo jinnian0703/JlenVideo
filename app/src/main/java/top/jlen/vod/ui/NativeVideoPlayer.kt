@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -52,6 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -324,11 +327,9 @@ fun NativeVideoPlayer(
         else -> 228.dp
     }
     val embeddedResizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-    val pillHorizontalPadding = if (fullscreenMode) 10.dp else 8.dp
-    val pillVerticalPadding = if (fullscreenMode) 6.dp else 5.dp
-    val controlPillTextStyle = if (fullscreenMode) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.labelLarge
-    val controlChipMinHeight = if (fullscreenMode) 36.dp else 34.dp
-    val controlChipMinWidth = if (fullscreenMode) 68.dp else 58.dp
+    val controlPillTextStyle = if (fullscreenMode) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelMedium
+    val controlChipHeight = if (fullscreenMode) 36.dp else 32.dp
+    val controlChipWidth = if (fullscreenMode) 74.dp else 66.dp
 
     Card(
         modifier = Modifier
@@ -336,7 +337,7 @@ fun NativeVideoPlayer(
                 if (fullscreenMode) Modifier.fillMaxSize()
                 else Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)
+                    .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 12.dp)
             ),
         shape = RoundedCornerShape(if (fullscreenMode) 0.dp else 24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Black)
@@ -558,14 +559,17 @@ fun NativeVideoPlayer(
                                             latestFullscreenToggleCallback.value?.invoke(snapshot, lastReportedLandscape)
                                             controlsVersion++
                                         }
-                                        .padding(horizontal = pillHorizontalPadding, vertical = pillVerticalPadding)
+                                        .width(controlChipWidth)
+                                        .height(controlChipHeight)
                                 )
                             }
                             if (!fullscreenMode && onToggleFullscreen != null) {
                                 Text(
                                     text = "全屏",
                                     color = Color.White,
+                                    style = controlPillTextStyle,
                                     fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier
@@ -583,7 +587,8 @@ fun NativeVideoPlayer(
                                             latestFullscreenToggleCallback.value?.invoke(snapshot, lastReportedLandscape)
                                             controlsVersion++
                                         }
-                                        .padding(horizontal = pillHorizontalPadding, vertical = pillVerticalPadding)
+                                        .width(controlChipWidth)
+                                        .height(controlChipHeight)
                                 )
                             }
                         }
@@ -667,6 +672,7 @@ fun NativeVideoPlayer(
                                     color = Color.White,
                                     style = controlPillTextStyle,
                                     fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier
@@ -677,13 +683,13 @@ fun NativeVideoPlayer(
                                             color = Color.White.copy(alpha = 0.14f),
                                             shape = RoundedCornerShape(999.dp)
                                         )
-                                        .heightIn(min = controlChipMinHeight)
-                                        .widthIn(min = controlChipMinWidth)
+                                        .width(controlChipWidth)
+                                        .height(controlChipHeight)
+                                        .wrapContentHeight(Alignment.CenterVertically)
                                         .clickableWithoutRipple {
                                             fullscreenResizeMode = nextResizeMode(fullscreenResizeMode)
                                             controlsVersion++
                                         }
-                                        .padding(horizontal = pillHorizontalPadding, vertical = pillVerticalPadding)
                                 )
                             }
                             Text(
@@ -691,6 +697,7 @@ fun NativeVideoPlayer(
                                 color = Color.White,
                                 style = controlPillTextStyle,
                                 fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
@@ -701,20 +708,22 @@ fun NativeVideoPlayer(
                                         color = Color.White.copy(alpha = 0.14f),
                                         shape = RoundedCornerShape(999.dp)
                                     )
-                                    .heightIn(min = controlChipMinHeight)
-                                    .widthIn(min = controlChipMinWidth)
+                                    .width(controlChipWidth)
+                                    .height(controlChipHeight)
+                                    .wrapContentHeight(Alignment.CenterVertically)
                                     .clickableWithoutRipple {
                                         speed = nextSpeed(speed)
                                         player.playbackParameters = PlaybackParameters(speed)
                                         controlsVersion++
                                     }
-                                    .padding(horizontal = pillHorizontalPadding, vertical = pillVerticalPadding)
                             )
                             if (hasNextEpisode && onNextEpisode != null) {
                                 Text(
                                     text = "下一集",
                                     color = Color.White,
+                                    style = controlPillTextStyle,
                                     fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier
@@ -725,20 +734,22 @@ fun NativeVideoPlayer(
                                             color = Color.White.copy(alpha = 0.14f),
                                             shape = RoundedCornerShape(999.dp)
                                         )
-                                        .heightIn(min = controlChipMinHeight)
-                                        .widthIn(min = controlChipMinWidth)
+                                        .width(controlChipWidth)
+                                        .height(controlChipHeight)
+                                        .wrapContentHeight(Alignment.CenterVertically)
                                         .clickableWithoutRipple {
                                             controlsVersion++
                                             onNextEpisode()
                                         }
-                                        .padding(horizontal = pillHorizontalPadding, vertical = pillVerticalPadding)
                                 )
                             }
                             if (!fullscreenMode && onToggleFullscreen != null) {
                                 Text(
                                     text = "全屏",
                                     color = Color.White,
+                                    style = controlPillTextStyle,
                                     fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier
@@ -749,8 +760,9 @@ fun NativeVideoPlayer(
                                             color = Color.White.copy(alpha = 0.14f),
                                             shape = RoundedCornerShape(999.dp)
                                         )
-                                        .heightIn(min = controlChipMinHeight)
-                                        .widthIn(min = controlChipMinWidth)
+                                        .width(controlChipWidth)
+                                        .height(controlChipHeight)
+                                        .wrapContentHeight(Alignment.CenterVertically)
                                         .clickableWithoutRipple {
                                             val snapshot = currentSnapshot()
                                             lastReportedSnapshot = snapshot
@@ -758,7 +770,6 @@ fun NativeVideoPlayer(
                                             latestFullscreenToggleCallback.value?.invoke(snapshot, lastReportedLandscape)
                                             controlsVersion++
                                         }
-                                        .padding(horizontal = pillHorizontalPadding, vertical = pillVerticalPadding)
                                 )
                             }
                         }

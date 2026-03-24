@@ -680,7 +680,7 @@ fun DetailTopBar(title: String, onBack: () -> Unit, darkMode: Boolean = false) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = if (darkMode) 8.dp else if (showTitle) 18.dp else 10.dp),
+            .padding(horizontal = 16.dp, vertical = if (darkMode) 4.dp else if (showTitle) 18.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
