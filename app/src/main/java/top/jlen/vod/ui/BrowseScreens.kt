@@ -211,19 +211,6 @@ fun HomeScreen(
                 )
             }
         }
-        items(state.sections) { section ->
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SectionTitle(
-                    title = section.title,
-                    action = "更多",
-                    onAction = onOpenCategory
-                )
-                PosterGridSection(
-                    items = section.items,
-                    onOpenDetail = onOpenDetail
-                )
-            }
-        }
     }
 }
 
