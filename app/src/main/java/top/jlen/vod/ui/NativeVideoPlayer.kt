@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -508,7 +507,10 @@ fun NativeVideoPlayer(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
                             IconButton(
                                 onClick = {
                                     if (player.isPlaying) {
@@ -535,32 +537,30 @@ fun NativeVideoPlayer(
                                 color = Color.White
                             )
                         }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
                             Text(
                                 text = speedLabel(speed),
                                 color = Color.White,
-                                modifier = Modifier.padding(end = 4.dp)
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color.White.copy(alpha = 0.14f))
+                                    .clickableWithoutRipple {
+                                        speed = nextSpeed(speed)
+                                        player.playbackParameters = PlaybackParameters(speed)
+                                        controlsVersion++
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
                             )
-                            IconButton(
-                                onClick = {
-                                    speed = nextSpeed(speed)
-                                    player.playbackParameters = PlaybackParameters(speed)
-                                    controlsVersion++
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.FastForward,
-                                    contentDescription = null,
-                                    tint = Color.White
-                                )
-                            }
                             if (hasNextEpisode && onNextEpisode != null) {
                                 Text(
                                     text = "下一集",
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier
-                                        .padding(start = 8.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .clickableWithoutRipple {
                                             controlsVersion++
