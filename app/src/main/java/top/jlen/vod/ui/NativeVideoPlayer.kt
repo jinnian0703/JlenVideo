@@ -275,8 +275,8 @@ fun NativeVideoPlayer(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("播放器初始化失败", color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("这条线路暂时无法原生播放", color = Color.White.copy(alpha = 0.78f))
+                    Text("閹绢厽鏂侀崳銊ュ灥婵瀵叉径杈Е", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("鏉╂瑦娼痪鑳熅閺嗗倹妞傞弮鐘崇《閸樼喓鏁撻幘顓熸杹", color = Color.White.copy(alpha = 0.78f))
                 }
             }
         }
@@ -406,19 +406,23 @@ fun NativeVideoPlayer(
                         }
                         Column {
                             Text(
-                                text = buildString {
-                                    append(sourceName.ifBlank { title })
-                                    if (episodeName.isNotBlank()) {
-                                        append(" · ")
-                                        append(episodeName)
-                                    }
-                                },
+                                text = title.ifBlank { "姝ｅ湪鎾斁" },
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
                             )
                             Text(
-                                text = "${formatMillis(currentPosition)} / ${formatMillis(duration)}",
+                                text = buildString {
+                                    if (sourceName.isNotBlank()) {
+                                        append(sourceName)
+                                    }
+                                    if (episodeName.isNotBlank()) {
+                                        if (isNotEmpty()) append(" 路 ")
+                                        append(episodeName)
+                                    }
+                                    if (isNotEmpty()) append("\n")
+                                    append("${formatMillis(currentPosition)} / ${formatMillis(duration)}")
+                                },
                                 color = Color.White.copy(alpha = 0.92f)
                             )
                         }
