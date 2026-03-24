@@ -89,6 +89,15 @@ fun JlenVideoApp() {
             ?: "https://github.com/jinnian0703/JlenVideo/releases"
         openExternalUrl(context, targetUrl)
     }
+    val navigateToTopLevel: (String) -> Unit = { route ->
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     MaterialTheme(colorScheme = appColors) {
         Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
@@ -145,15 +154,7 @@ fun JlenVideoApp() {
                         if (showBottomBar) {
                             AppBottomBar(
                                 currentRoute = currentRoute.orEmpty(),
-                                onNavigate = { route ->
-                                    navController.navigate(route) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            saveState = true
-                                        }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                }
+                                onNavigate = navigateToTopLevel
                             )
                         }
                     }
@@ -197,8 +198,8 @@ fun JlenVideoApp() {
                                 onRefresh = { viewModel.refreshHome(forceRefresh = true) },
                                 onLoadMore = viewModel::loadMoreHome,
                                 onOpenDetail = { navController.navigate("detail/$it") },
-                                onOpenCategory = { navController.navigate("categories") },
-                                onOpenSearch = { navController.navigate("search") }
+                                onOpenCategory = { navigateToTopLevel("categories") },
+                                onOpenSearch = { navigateToTopLevel("search") }
                             )
                         }
                         composable("categories") {
