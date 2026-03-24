@@ -68,6 +68,10 @@ class AppleCmsRepository(
         }
         val featured = runCatching { loadLevelItems(level = "1", limit = 16) }
             .getOrDefault(emptyList())
+            .ifEmpty {
+                runCatching { loadLevelItemsFromHomePage(limit = 16) }
+                    .getOrDefault(emptyList())
+            }
         val sections = categories.mapNotNull { category ->
             runCatching {
                 HomeSection(
@@ -120,11 +124,27 @@ class AppleCmsRepository(
         api.getByType(typeId = typeId, page = page.coerceAtLeast(1)).toPagedVodItems()
 
     suspend fun search(keyword: String): List<VodItem> {
-        val encodedKeyword = Uri.encode(keyword.trim())
-        val document = fetchDocument("$baseUrl/vodsearch/-------------/?wd=$encodedKeyword")
-        return parseSearchResults(document)
-            .distinctBy { it.vodId }
-            .take(60)
+        val normalizedKeyword = keyword.trim()
+        if (normalizedKeyword.isBlank()) return emptyList()
+
+        val encodedKeyword = Uri.encode(normalizedKeyword)
+        val htmlResults = runCatching {
+            val document = fetchDocument("$baseUrl/vodsearch/-------------/?wd=$encodedKeyword")
+            parseSearchResults(document, normalizedKeyword)
+        }.getOrDefault(emptyList())
+
+        if (htmlResults.isNotEmpty()) {
+            return htmlResults
+                .distinctBy { it.vodId }
+                .take(60)
+        }
+
+        return runCatching {
+            api.search(keyword = normalizedKeyword, page = 1)
+                .list
+                .distinctBy { it.vodId }
+                .take(60)
+        }.getOrDefault(emptyList())
     }
 
     suspend fun loadLatestRelease(currentVersion: String): AppUpdateInfo {
@@ -668,6 +688,28 @@ class AppleCmsRepository(
             .distinctBy { it.vodId }
             .take(limit)
 
+    private suspend fun loadLevelItemsFromHomePage(limit: Int): List<VodItem> {
+        val document = fetchDocument("$baseUrl/")
+        val bannerItems = parseBannerItems(document)
+            .distinctBy { it.vodId }
+        if (bannerItems.isNotEmpty()) {
+            return bannerItems.take(limit)
+        }
+
+        val featuredSection = document.select(".layout-box .vod-list")
+            .firstOrNull { section ->
+                section.selectFirst("h2")?.text()
+                    ?.replace(Regex("\\s+"), "")
+                    ?.contains("推荐") == true
+            }
+
+        return featuredSection
+            ?.let(::parseVodCards)
+            .orEmpty()
+            .distinctBy { it.vodId }
+            .take(limit)
+    }
+
     private suspend fun loadFeaturedFromHomePage(): List<VodItem> {
         val document = fetchDocument("$baseUrl/")
         val hotItems = document.select(".slide-list.vod-list, .slide-list")
@@ -734,19 +776,38 @@ class AppleCmsRepository(
             }
             .distinctBy { it.vodId }
 
-    private fun parseSearchResults(document: Document): List<VodItem> =
-        document.select(".vod-list ul.row li")
+    private fun parseSearchResults(document: Document, keyword: String = ""): List<VodItem> {
+        val pageTitle = document.title()
+        val keywordValue = document.selectFirst("input[name=wd]")?.attr("value").orEmpty().trim()
+        val isSearchPage = pageTitle.contains("搜索") ||
+            keywordValue.isNotBlank() ||
+            document.select(".layout-box .vod-list h2").any { it.text().contains("搜索") }
+
+        if (!isSearchPage) return emptyList()
+
+        val searchSection = document.select(".layout-box .vod-list")
+            .firstOrNull { section ->
+                val heading = section.selectFirst("h2")?.text().orEmpty()
+                heading.contains("搜索") ||
+                    keywordValue.isNotBlank() && heading.contains(keywordValue) ||
+                    keyword.isNotBlank() && heading.contains(keyword)
+            }
+
+        val items = (searchSection ?: document).select(".vod-list ul.row > li, ul.row > li.col-xs-4, ul.row > li")
             .mapNotNull { item ->
                 val anchor = item.selectFirst(".pic a[href*=/voddetail/]") ?: return@mapNotNull null
                 createVodItem(
                     detailHref = anchor.attr("href"),
                     title = item.selectFirst("h3 a")?.text().orEmpty().ifBlank { anchor.attr("title") },
                     imageUrl = item.selectFirst("[data-original]")?.attr("data-original")
+                        ?: item.selectFirst("img")?.attr("data-original")
                         ?: item.selectFirst("img")?.attr("src").orEmpty(),
                     remarks = item.selectFirst(".item-status")?.text().orEmpty()
                 )
             }
-            .distinctBy { it.vodId }
+
+        return items.distinctBy { it.vodId }
+    }
 
     private fun parseUserCenterPage(document: Document): UserCenterPage {
         val items = document.select("input[name='ids[]']")
