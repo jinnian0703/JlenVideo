@@ -540,15 +540,6 @@ fun AccountScreen(
                 }
             }
 
-            if (state.hasCrashLog) {
-                item {
-                    CrashLogCard(
-                        logText = state.latestCrashLog,
-                        onRefresh = onRefreshCrashLog,
-                        onClear = onClearCrashLog
-                    )
-                }
-            }
         }
 
         if (showLoggedInContent) {
@@ -824,103 +815,144 @@ fun AccountScreen(
                                 )
                             )
                         }
-                    }
-
-                    if (state.authMode == AccountAuthMode.Register) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-                            shape = RoundedCornerShape(24.dp),
-                            border = BorderStroke(1.dp, UiPalette.Border)
-                        ) {
-                            AccountRegisterPane(
-                                state = state,
-                                onEditorChange = onRegisterEditorChange,
-                                onRefreshCaptcha = onRefreshRegisterCaptcha,
-                                onSendCode = onSendRegisterCode,
-                                onSubmit = onRegister
+                        item {
+                            AssistChip(
+                                onClick = { onAuthModeChange(AccountAuthMode.About) },
+                                label = { Text("关于", fontWeight = FontWeight.SemiBold) },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = if (state.authMode == AccountAuthMode.About) UiPalette.Accent else UiPalette.Surface,
+                                    labelColor = if (state.authMode == AccountAuthMode.About) UiPalette.AccentText else UiPalette.Ink
+                                ),
+                                border = AssistChipDefaults.assistChipBorder(
+                                    borderColor = if (state.authMode == AccountAuthMode.About) UiPalette.Accent else UiPalette.BorderSoft,
+                                    enabled = true
+                                )
                             )
                         }
-                        return@item
                     }
-                    if (state.authMode == AccountAuthMode.FindPassword) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-                            shape = RoundedCornerShape(24.dp),
-                            border = BorderStroke(1.dp, UiPalette.Border)
-                        ) {
-                            AccountFindPasswordPane(
-                                state = state,
-                                onEditorChange = onFindPasswordEditorChange,
-                                onRefreshCaptcha = onRefreshFindPasswordCaptcha,
-                                onSubmit = onFindPassword
+
+                    when (state.authMode) {
+                        AccountAuthMode.Register -> {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                                shape = RoundedCornerShape(24.dp),
+                                border = BorderStroke(1.dp, UiPalette.Border)
+                            ) {
+                                AccountRegisterPane(
+                                    state = state,
+                                    onEditorChange = onRegisterEditorChange,
+                                    onRefreshCaptcha = onRefreshRegisterCaptcha,
+                                    onSendCode = onSendRegisterCode,
+                                    onSubmit = onRegister
+                                )
+                            }
+                        }
+
+                        AccountAuthMode.FindPassword -> {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                                shape = RoundedCornerShape(24.dp),
+                                border = BorderStroke(1.dp, UiPalette.Border)
+                            ) {
+                                AccountFindPasswordPane(
+                                    state = state,
+                                    onEditorChange = onFindPasswordEditorChange,
+                                    onRefreshCaptcha = onRefreshFindPasswordCaptcha,
+                                    onSubmit = onFindPassword
+                                )
+                            }
+                        }
+
+                        AccountAuthMode.About -> {
+                            AboutPane(
+                                currentVersion = state.updateInfo?.currentVersion?.ifBlank { BuildConfig.VERSION_NAME }
+                                    ?: BuildConfig.VERSION_NAME,
+                                latestVersion = state.updateInfo?.latestVersion.orEmpty(),
+                                notes = state.updateInfo?.notes.orEmpty(),
+                                hasUpdate = state.updateInfo?.hasUpdate == true,
+                                isUpdateLoading = state.isUpdateLoading,
+                                crashLogText = state.latestCrashLog,
+                                hasCrashLog = state.hasCrashLog,
+                                onCheckUpdate = onCheckUpdate,
+                                onRefreshCrashLog = onRefreshCrashLog,
+                                onClearCrashLog = onClearCrashLog,
+                                onOpenRelease = {
+                                    val targetUrl = state.updateInfo?.downloadUrl
+                                        ?.takeIf { it.isNotBlank() }
+                                        ?: state.updateInfo?.releasePageUrl
+                                    if (!targetUrl.isNullOrBlank()) {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)))
+                                    }
+                                }
                             )
                         }
-                        return@item
-                    }
-                }
 
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-                    shape = RoundedCornerShape(24.dp),
-                    border = BorderStroke(1.dp, UiPalette.Border)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = state.userName,
-                            onValueChange = onUserNameChange,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            singleLine = true,
-                            label = { Text("用户名") },
-                            placeholder = { Text("请输入站内用户名") },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = UiPalette.Accent,
-                                unfocusedBorderColor = UiPalette.BorderSoft,
-                                focusedTextColor = UiPalette.Ink,
-                                unfocusedTextColor = UiPalette.Ink,
-                                cursorColor = UiPalette.Accent,
-                                focusedContainerColor = UiPalette.Surface,
-                                unfocusedContainerColor = UiPalette.Surface
-                            )
-                        )
-                        OutlinedTextField(
-                            value = state.password,
-                            onValueChange = onPasswordChange,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            singleLine = true,
-                            label = { Text("密码") },
-                            placeholder = { Text("请输入密码") },
-                            visualTransformation = PasswordVisualTransformation(),
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                keyboardType = KeyboardType.Password
-                            ),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = UiPalette.Accent,
-                                unfocusedBorderColor = UiPalette.BorderSoft,
-                                focusedTextColor = UiPalette.Ink,
-                                unfocusedTextColor = UiPalette.Ink,
-                                cursorColor = UiPalette.Accent,
-                                focusedContainerColor = UiPalette.Surface,
-                                unfocusedContainerColor = UiPalette.Surface
-                            )
-                        )
-                        Button(
-                            onClick = onLogin,
-                            enabled = !state.isLoading,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(18.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = UiPalette.Accent,
-                                contentColor = UiPalette.AccentText
-                            )
-                        ) {
-                            Text(if (state.isLoading) "正在登录..." else "立即登录", fontWeight = FontWeight.Bold)
+                        AccountAuthMode.Login -> {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                                shape = RoundedCornerShape(24.dp),
+                                border = BorderStroke(1.dp, UiPalette.Border)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(20.dp),
+                                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                                ) {
+                                    OutlinedTextField(
+                                        value = state.userName,
+                                        onValueChange = onUserNameChange,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(20.dp),
+                                        singleLine = true,
+                                        label = { Text("用户名") },
+                                        placeholder = { Text("请输入站内用户名") },
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = UiPalette.Accent,
+                                            unfocusedBorderColor = UiPalette.BorderSoft,
+                                            focusedTextColor = UiPalette.Ink,
+                                            unfocusedTextColor = UiPalette.Ink,
+                                            cursorColor = UiPalette.Accent,
+                                            focusedContainerColor = UiPalette.Surface,
+                                            unfocusedContainerColor = UiPalette.Surface
+                                        )
+                                    )
+                                    OutlinedTextField(
+                                        value = state.password,
+                                        onValueChange = onPasswordChange,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(20.dp),
+                                        singleLine = true,
+                                        label = { Text("密码") },
+                                        placeholder = { Text("请输入密码") },
+                                        visualTransformation = PasswordVisualTransformation(),
+                                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                            keyboardType = KeyboardType.Password
+                                        ),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = UiPalette.Accent,
+                                            unfocusedBorderColor = UiPalette.BorderSoft,
+                                            focusedTextColor = UiPalette.Ink,
+                                            unfocusedTextColor = UiPalette.Ink,
+                                            cursorColor = UiPalette.Accent,
+                                            focusedContainerColor = UiPalette.Surface,
+                                            unfocusedContainerColor = UiPalette.Surface
+                                        )
+                                    )
+                                    Button(
+                                        onClick = onLogin,
+                                        enabled = !state.isLoading,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(18.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = UiPalette.Accent,
+                                            contentColor = UiPalette.AccentText
+                                        )
+                                    ) {
+                                        Text(if (state.isLoading) "正在登录..." else "立即登录", fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
                         }
                     }
                 }

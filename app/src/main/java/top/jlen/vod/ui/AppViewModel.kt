@@ -364,6 +364,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             AccountAuthMode.Login -> Unit
             AccountAuthMode.Register -> loadRegisterPage(forceRefresh = true)
             AccountAuthMode.FindPassword -> loadFindPasswordPage(forceRefresh = true)
+            AccountAuthMode.About -> refreshCrashLog()
         }
     }
 
@@ -1400,7 +1401,8 @@ enum class AccountSection {
 enum class AccountAuthMode {
     Login,
     Register,
-    FindPassword
+    FindPassword,
+    About
 }
 
 data class AccountUiState(
