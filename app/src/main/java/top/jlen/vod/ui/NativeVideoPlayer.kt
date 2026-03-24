@@ -36,6 +36,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -101,6 +102,9 @@ fun NativeVideoPlayer(
     var hasHandledEnded by remember(playbackIdentity) { mutableStateOf(false) }
     var playbackState by remember(player) { mutableStateOf(player?.playbackState ?: Player.STATE_IDLE) }
     var lastReportedLandscape by remember(playbackIdentity) { mutableStateOf<Boolean?>(null) }
+    var fullscreenResizeMode by remember(playbackIdentity) {
+        mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT)
+    }
     var hasCompletedInitialOverlayDelay by remember(playbackIdentity) { mutableStateOf(false) }
     var hasStartedPlaybackOnce by remember(playbackIdentity) { mutableStateOf(false) }
     var showPausedOverlay by remember(playbackIdentity) { mutableStateOf(false) }
@@ -348,13 +352,21 @@ fun NativeVideoPlayer(
                     factory = { viewContext ->
                         PlayerView(viewContext).apply {
                             useController = false
-                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                            resizeMode = if (fullscreenMode) {
+                                fullscreenResizeMode
+                            } else {
+                                AspectRatioFrameLayout.RESIZE_MODE_FIT
+                            }
                             this.player = player
                         }
                     },
                     update = { playerView ->
                         playerView.useController = false
-                        playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        playerView.resizeMode = if (fullscreenMode) {
+                            fullscreenResizeMode
+                        } else {
+                            AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        }
                         if (playerView.player !== player) {
                             playerView.player = player
                         }
@@ -582,6 +594,28 @@ fun NativeVideoPlayer(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            if (fullscreenMode) {
+                                Text(
+                                    text = resizeModeLabel(fullscreenResizeMode),
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(Color.Black.copy(alpha = 0.28f))
+                                        .border(
+                                            width = 1.dp,
+                                            color = Color.White.copy(alpha = 0.14f),
+                                            shape = RoundedCornerShape(999.dp)
+                                        )
+                                        .clickableWithoutRipple {
+                                            fullscreenResizeMode = nextResizeMode(fullscreenResizeMode)
+                                            controlsVersion++
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
                             Text(
                                 text = speedLabel(speed),
                                 color = Color.White,
@@ -661,6 +695,19 @@ private fun nextSpeed(current: Float): Float = when (current) {
     1.25f -> 1.5f
     1.5f -> 2f
     else -> 1f
+}
+
+private fun nextResizeMode(current: Int): Int = when (current) {
+    AspectRatioFrameLayout.RESIZE_MODE_FIT -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+    AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+    else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+}
+
+private fun resizeModeLabel(mode: Int): String = when (mode) {
+    AspectRatioFrameLayout.RESIZE_MODE_FIT -> "适应"
+    AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> "裁剪"
+    AspectRatioFrameLayout.RESIZE_MODE_FILL -> "拉伸"
+    else -> "适应"
 }
 
 private fun speedLabel(speed: Float): String = when (speed) {
