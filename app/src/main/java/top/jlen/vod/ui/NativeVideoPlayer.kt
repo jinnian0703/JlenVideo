@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -320,19 +319,11 @@ fun NativeVideoPlayer(
                 playbackState == Player.STATE_BUFFERING ||
                     (player.playWhenReady && !hasStartedPlaybackOnce)
                 )
-    val embeddedAspectRatio = if (lastReportedLandscape == false) 9f / 16f else 16f / 9f
-    val embeddedPlayerModifier = when {
-        fullscreenMode -> Modifier.fillMaxSize()
-        lastReportedLandscape == false -> Modifier
-            .heightIn(min = 420.dp)
-            .height(420.dp)
-        else -> Modifier.aspectRatio(embeddedAspectRatio)
+    val embeddedPlayerHeight = when {
+        lastReportedLandscape == false -> 420.dp
+        else -> 228.dp
     }
-    val embeddedResizeMode = if (lastReportedLandscape == false) {
-        AspectRatioFrameLayout.RESIZE_MODE_FIT
-    } else {
-        AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-    }
+    val embeddedResizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
     val pillHorizontalPadding = if (fullscreenMode) 10.dp else 8.dp
     val pillVerticalPadding = if (fullscreenMode) 6.dp else 5.dp
     val controlPillTextStyle = if (fullscreenMode) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.labelLarge
@@ -345,7 +336,7 @@ fun NativeVideoPlayer(
                 if (fullscreenMode) Modifier.fillMaxSize()
                 else Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)
             ),
         shape = RoundedCornerShape(if (fullscreenMode) 0.dp else 24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Black)
@@ -354,7 +345,8 @@ fun NativeVideoPlayer(
             modifier = Modifier
                 .fillMaxWidth()
                 .then(
-                    embeddedPlayerModifier
+                    if (fullscreenMode) Modifier.fillMaxSize()
+                    else Modifier.heightIn(min = embeddedPlayerHeight).height(embeddedPlayerHeight)
                 )
                 .background(Color.Black)
                 .clickableWithoutRipple {
