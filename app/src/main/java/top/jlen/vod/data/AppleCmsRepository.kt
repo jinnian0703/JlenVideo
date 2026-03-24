@@ -1513,7 +1513,7 @@ class AppleCmsRepository(
     private fun normalizePortraitUrl(raw: String): String {
         val value = raw.trim()
         if (value.isBlank() || value == "deleted") return ""
-        return normalizeUrl(value)
+        return appendTimestamp(normalizeUrl(value))
     }
 
     private fun parseUserProfileSession(document: Document): AuthSession {
