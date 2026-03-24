@@ -65,12 +65,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import kotlinx.coroutines.delay
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.data.AppleCmsCategory
@@ -2291,6 +2293,7 @@ fun SectionTitle(
 
 @Composable
 fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
+    val context = LocalContext.current
     Card(
         modifier = Modifier
             .width(312.dp)
@@ -2300,7 +2303,11 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
     ) {
         Box {
             AsyncImage(
-                model = item.vodPic,
+                model = ImageRequest.Builder(context)
+                    .data(item.vodPic)
+                    .size(960, 576)
+                    .crossfade(false)
+                    .build(),
                 contentDescription = item.displayTitle,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2383,7 +2390,8 @@ private fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String)
             state = pagerState,
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(horizontal = 16.dp),
-            pageSpacing = 12.dp
+            pageSpacing = 12.dp,
+            key = { page -> items[page].vodId.ifBlank { "featured_$page" } }
         ) { page ->
             FeaturedCard(
                 item = items[page],
