@@ -98,6 +98,7 @@ fun NativeVideoPlayer(
     var lastReportedLandscape by remember(playbackIdentity) { mutableStateOf<Boolean?>(null) }
     var hasCompletedInitialOverlayDelay by remember(playbackIdentity) { mutableStateOf(false) }
     var hasStartedPlaybackOnce by remember(playbackIdentity) { mutableStateOf(false) }
+    var showPausedOverlay by remember(playbackIdentity) { mutableStateOf(false) }
 
     DisposableEffect(player) {
         onDispose { player?.release() }
@@ -151,12 +152,14 @@ fun NativeVideoPlayer(
                         shouldResumeOnStart = player.isPlaying
                         player.pause()
                         isPlaying = false
+                        showPausedOverlay = false
                     }
 
                     Lifecycle.Event.ON_START -> {
                         if (shouldResumeOnStart) {
                             player.play()
                             isPlaying = true
+                            showPausedOverlay = false
                         }
                     }
 
@@ -178,6 +181,7 @@ fun NativeVideoPlayer(
         }
         player.playWhenReady = initialSnapshot.playWhenReady
         isPlaying = initialSnapshot.playWhenReady
+        showPausedOverlay = false
     }
 
     LaunchedEffect(player) {
@@ -187,6 +191,9 @@ fun NativeVideoPlayer(
             playbackState = player.playbackState
             if (player.isPlaying || player.currentPosition > 1_000L) {
                 hasStartedPlaybackOnce = true
+            }
+            if (player.isPlaying || playbackState == Player.STATE_BUFFERING) {
+                showPausedOverlay = false
             }
             duration = player.duration.coerceAtLeast(0L)
             if (!isDragging) {
@@ -312,11 +319,7 @@ fun NativeVideoPlayer(
                 )
             }
 
-            if (
-                playbackState != Player.STATE_ENDED &&
-                !isPlaying &&
-                (hasStartedPlaybackOnce || hasCompletedInitialOverlayDelay)
-            ) {
+            if (playbackState != Player.STATE_ENDED && showPausedOverlay) {
                 Surface(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -325,6 +328,7 @@ fun NativeVideoPlayer(
                         .clickableWithoutRipple {
                             player.play()
                             isPlaying = true
+                            showPausedOverlay = false
                             controlsVersion++
                         },
                     shape = RoundedCornerShape(999.dp),
@@ -424,6 +428,11 @@ fun NativeVideoPlayer(
                         onValueChangeFinished = {
                             val target = (duration * sliderPosition).toLong()
                             player.seekTo(target)
+                            if (playbackState != Player.STATE_ENDED) {
+                                player.play()
+                                isPlaying = true
+                            }
+                            showPausedOverlay = false
                             currentPosition = target
                             isDragging = false
                             controlsVersion++
@@ -438,7 +447,13 @@ fun NativeVideoPlayer(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(
                                 onClick = {
-                                    if (player.isPlaying) player.pause() else player.play()
+                                    if (player.isPlaying) {
+                                        player.pause()
+                                        showPausedOverlay = true
+                                    } else {
+                                        player.play()
+                                        showPausedOverlay = false
+                                    }
                                     isPlaying = player.isPlaying
                                     controlsVersion++
                                 }
@@ -496,6 +511,7 @@ fun NativeVideoPlayer(
                                         shouldResumeOnStart = false
                                         player.pause()
                                         isPlaying = false
+                                        showPausedOverlay = false
                                         controlsVersion++
                                         onToggleFullscreen(
                                             PlaybackSnapshot(
