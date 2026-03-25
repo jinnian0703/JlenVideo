@@ -474,7 +474,7 @@ fun NativeVideoPlayer(
                     style = if (fullscreenMode) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelSmall,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = if (fullscreenMode) 16.dp else 10.dp)
+                        .padding(top = if (fullscreenMode) 60.dp else 24.dp)
                         .background(Color.Black.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
                         .padding(horizontal = if (fullscreenMode) 12.dp else 10.dp, vertical = if (fullscreenMode) 6.dp else 4.dp)
                 )
