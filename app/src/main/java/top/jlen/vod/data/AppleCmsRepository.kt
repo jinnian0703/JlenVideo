@@ -40,7 +40,6 @@ class AppleCmsRepository(
     private val client: OkHttpClient = createClient(cookieJar)
 ) {
     private val appContext = context.applicationContext
-    private val allCategoryTypeIds = listOf("1", "2", "3", "4")
     private val defaultCategories = listOf(
         AppleCmsCategory(typeId = "1", typeName = "电影", parentId = "1"),
         AppleCmsCategory(typeId = "2", typeName = "连续剧", parentId = "2"),
@@ -82,7 +81,7 @@ class AppleCmsRepository(
                 ?.let { return it }
         }
 
-        val (latestPage, featured) = coroutineScope {
+        val (latestPage, homeDocument) = coroutineScope {
             val latestDeferred = async {
                 runCatching {
                     loadLatestUpdatesFromLabelPage()
@@ -90,28 +89,19 @@ class AppleCmsRepository(
                     loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
                 }
             }
-            val featuredDeferred = async {
+            val homeDocumentDeferred = async {
                 runCatching { fetchDocument("$baseUrl/") }
                     .getOrNull()
-                    ?.let { parseLevelOneItemsFromHomePage(it, limit = 16) }
-                    .orEmpty()
             }
-            latestDeferred.await() to featuredDeferred.await()
+            latestDeferred.await() to homeDocumentDeferred.await()
         }
         val latest = latestPage.items
+        val featured = homeDocument?.let { parseLevelOneItemsFromHomePage(it, limit = 16) }.orEmpty()
 
         if (latest.isEmpty()) {
             throw IOException("首页内容解析失败")
         }
-        val categories = defaultCategories.map { category ->
-            when (category.typeId) {
-                "1" -> category.copy(typeName = "\u7535\u5f71")
-                "2" -> category.copy(typeName = "\u7535\u89c6\u5267")
-                "3" -> category.copy(typeName = "\u7efc\u827a")
-                "4" -> category.copy(typeName = "\u52a8\u6f2b")
-                else -> category
-            }
-        }
+        val categories = loadBrowsableCategories(homeDocument = homeDocument)
         return HomePayload(
             slides = emptyList(),
             hot = emptyList(),
@@ -149,6 +139,9 @@ class AppleCmsRepository(
                 ?.value
                 ?.let { return it }
         }
+        val allCategoryTypeIds = loadBrowsableCategories()
+            .map { it.typeId }
+            .filter { it.isNotBlank() }
         val responses = coroutineScope {
             allCategoryTypeIds
                 .map { typeId -> async { api.getByType(typeId = typeId, page = safePage) } }
@@ -1427,10 +1420,34 @@ class AppleCmsRepository(
     }
 
     private fun isBrowsableCategory(category: AppleCmsCategory): Boolean {
-        val parentId = category.parentId.orEmpty()
+        val parentId = category.parentId.orEmpty().trim()
         return category.typeId.isNotBlank() &&
             category.typeName.isNotBlank() &&
-            parentId in allCategoryTypeIds
+            (parentId.isBlank() || parentId == "0" || parentId == category.typeId)
+    }
+
+    private suspend fun loadBrowsableCategories(homeDocument: Document? = null): List<AppleCmsCategory> {
+        val resolvedHomeDocument = homeDocument ?: runCatching { fetchDocument("$baseUrl/") }.getOrNull()
+        val mapDocument = runCatching { fetchDocument("$baseUrl/map/") }.getOrNull()
+
+        val parsedCategories = resolvedHomeDocument
+            ?.let { parseCategories(it, mapDocument) }
+            .orEmpty()
+            .map(::normalizeCategory)
+            .filter(::isBrowsableCategory)
+            .distinctBy { it.typeId }
+
+        if (parsedCategories.isNotEmpty()) return parsedCategories
+
+        val apiCategories = runCatching { api.getCategories().categories }
+            .getOrDefault(emptyList())
+            .map(::normalizeCategory)
+            .filter(::isBrowsableCategory)
+            .distinctBy { it.typeId }
+
+        if (apiCategories.isNotEmpty()) return apiCategories
+
+        return defaultCategories.map(::normalizeCategory)
     }
 
     private suspend fun fetchUserDocument(pathOrUrl: String): Document {
@@ -1868,6 +1885,22 @@ class AppleCmsRepository(
             .removeSuffix("/")
             .substringAfterLast("/vodtype/", typeId.trim().removeSuffix("/"))
             .substringAfterLast('/')
+
+    private fun normalizeCategory(category: AppleCmsCategory): AppleCmsCategory {
+        val normalizedTypeId = extractCategorySlug(category.typeId)
+            .ifBlank { category.typeId.trim().removeSuffix("/") }
+        val rawParentId = category.parentId.orEmpty().trim()
+        val normalizedParentId = when {
+            rawParentId.isBlank() -> null
+            rawParentId == "0" -> "0"
+            else -> extractCategorySlug(rawParentId).ifBlank { rawParentId.removeSuffix("/") }
+        }
+        return category.copy(
+            typeId = normalizedTypeId,
+            typeName = category.typeName.trim(),
+            parentId = normalizedParentId
+        )
+    }
 
     private fun extractVodIdFromUserUrl(pathOrUrl: String): String {
         val normalized = resolveUrl(pathOrUrl)
