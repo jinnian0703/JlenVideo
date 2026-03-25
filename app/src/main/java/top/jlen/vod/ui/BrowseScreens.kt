@@ -206,7 +206,7 @@ fun HomeScreen(
         }
         item {
             SectionTitle(
-                title = "片库更新",
+                title = "最近更新",
                 action = "进入片库",
                 onAction = onOpenCategory
             )

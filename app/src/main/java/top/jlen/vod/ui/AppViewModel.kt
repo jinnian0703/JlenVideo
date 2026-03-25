@@ -192,7 +192,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 runCatching {
                     withContext(Dispatchers.IO) {
-                        repository.loadAllCategoryPage(page = 1, forceRefresh = true)
+                        repository.loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
                     }
                 }.onSuccess { payload ->
                     homeState = homeState.copy(
