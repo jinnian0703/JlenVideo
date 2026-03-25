@@ -211,6 +211,22 @@ class AppleCmsRepository(
         return null
     }
 
+    suspend fun prewarmCategoryFirstPages(forceRefresh: Boolean = false) {
+        coroutineScope {
+            defaultCategories.map { category ->
+                async {
+                    runCatching {
+                        loadCategoryPage(
+                            typeId = category.typeId,
+                            page = 1,
+                            forceRefresh = forceRefresh
+                        )
+                    }
+                }
+            }.awaitAll()
+        }
+    }
+
     suspend fun loadLatestPage(page: Int): PagedVodItems =
         api.getLatest(page = page.coerceAtLeast(1)).toPagedVodItems()
 

@@ -158,6 +158,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     categoryTotalCount = cachedSelectedPage?.totalItems ?: payload.categoryTotal,
                     hasMoreCategoryPages = cachedSelectedPage?.hasNextPage ?: payload.categoryHasNextPage
                 )
+                viewModelScope.launch(Dispatchers.IO) {
+                    repository.prewarmCategoryFirstPages(forceRefresh = false)
+                }
                 if (defaultSelected != null && (cachedSelectedPage == null || forceRefresh)) {
                     selectCategory(defaultSelected, forceRefresh = forceRefresh)
                 }
@@ -174,10 +177,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (!forceRefresh && category.typeId == homeState.selectedCategory?.typeId && homeState.categoryVideos.isNotEmpty()) {
             return
         }
+        val cachedPayload = if (!forceRefresh) {
+            repository.peekCategoryPage(typeId = category.typeId, page = 1)
+        } else {
+            null
+        }
+        if (cachedPayload != null && cachedPayload.items.isNotEmpty()) {
+            homeState = homeState.copy(
+                selectedCategory = category,
+                categoryVideos = cachedPayload.items,
+                categoryVisibleCount = cachedPayload.items.size,
+                categoryPage = cachedPayload.page,
+                categoryTotalCount = cachedPayload.totalItems,
+                hasMoreCategoryPages = cachedPayload.hasNextPage,
+                isCategoryAppending = false,
+                isCategoryLoading = false,
+                error = null
+            )
+        }
         viewModelScope.launch {
             homeState = homeState.copy(
                 selectedCategory = category,
-                isCategoryLoading = true,
+                isCategoryLoading = cachedPayload == null || forceRefresh,
                 isCategoryAppending = false,
                 error = null
             )
