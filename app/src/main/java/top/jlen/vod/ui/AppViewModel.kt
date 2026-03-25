@@ -184,10 +184,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 return
             }
+            val cachedPayload = if (!forceRefresh) repository.peekAllCategoryPage(page = 1) else null
+            if (cachedPayload != null && cachedPayload.items.isNotEmpty()) {
+                homeState = homeState.copy(
+                    selectedCategory = category,
+                    categoryVideos = cachedPayload.items,
+                    categoryVisibleCount = cachedPayload.items.size,
+                    categoryPage = cachedPayload.page,
+                    categoryTotalCount = cachedPayload.totalItems,
+                    hasMoreCategoryPages = cachedPayload.hasNextPage,
+                    isCategoryAppending = false,
+                    isCategoryLoading = false,
+                    error = null
+                )
+            }
             viewModelScope.launch {
                 homeState = homeState.copy(
                     selectedCategory = category,
-                    isCategoryLoading = true,
+                    isCategoryLoading = homeState.categoryVideos.isEmpty() || forceRefresh,
                     isCategoryAppending = false,
                     error = null
                 )

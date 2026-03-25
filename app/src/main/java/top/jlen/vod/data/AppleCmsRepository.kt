@@ -150,28 +150,29 @@ class AppleCmsRepository(
                 .map { category -> async { loadCategoryPage(category.typeId, safePage, forceRefresh = forceRefresh) } }
                 .awaitAll()
         }
-        val mergedItems = interleaveCategoryItems(pages.map { pagePayload ->
-            AppleCmsResponse(
-                page = pagePayload.page,
-                pageCount = pagePayload.pageCount,
-                limit = pagePayload.limit,
-                total = pagePayload.totalItems,
-                list = pagePayload.items
-            )
-        })
-        return PagedVodItems(
-            items = mergedItems,
-            page = safePage,
-            pageCount = pages.maxOfOrNull { it.pageCount } ?: safePage,
-            totalItems = pages.sumOf { it.totalItems },
-            limit = pages.sumOf { it.limit }.takeIf { it > 0 } ?: mergedItems.size,
-            hasNextPage = pages.any { it.hasNextPage }
-        ).also { payload ->
+        return buildMergedCategoryPage(pages, safePage).also { payload ->
             categoryPageCache[cacheKey] = CachedValue(
                 value = payload,
                 timestampMs = System.currentTimeMillis()
             )
         }
+    }
+
+    fun peekAllCategoryPage(page: Int): PagedVodItems? {
+        val safePage = page.coerceAtLeast(1)
+        val allCacheKey = "all:$safePage"
+        categoryPageCache[allCacheKey]
+            ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
+            ?.value
+            ?.let { return it }
+
+        val cachedPages = defaultCategories.mapNotNull { category ->
+            categoryPageCache["${category.typeId}:$safePage"]
+                ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
+                ?.value
+        }
+        if (cachedPages.isEmpty()) return null
+        return buildMergedCategoryPage(cachedPages, safePage)
     }
 
     suspend fun loadLatestPage(page: Int): PagedVodItems =
@@ -1441,6 +1442,29 @@ class AppleCmsRepository(
         }
 
         return mergedItems
+    }
+
+    private fun buildMergedCategoryPage(
+        pages: List<PagedVodItems>,
+        page: Int
+    ): PagedVodItems {
+        val mergedItems = interleaveCategoryItems(pages.map { pagePayload ->
+            AppleCmsResponse(
+                page = pagePayload.page,
+                pageCount = pagePayload.pageCount,
+                limit = pagePayload.limit,
+                total = pagePayload.totalItems,
+                list = pagePayload.items
+            )
+        })
+        return PagedVodItems(
+            items = mergedItems,
+            page = page,
+            pageCount = pages.maxOfOrNull { it.pageCount } ?: page,
+            totalItems = pages.sumOf { it.totalItems },
+            limit = pages.sumOf { it.limit }.takeIf { it > 0 } ?: mergedItems.size,
+            hasNextPage = pages.any { it.hasNextPage }
+        )
     }
 
     private fun isBrowsableCategory(category: AppleCmsCategory): Boolean {
