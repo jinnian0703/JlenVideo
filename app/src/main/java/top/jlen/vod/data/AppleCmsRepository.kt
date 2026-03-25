@@ -82,6 +82,7 @@ class AppleCmsRepository(
         }.getOrElse {
             loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
         }
+        val allCategoryPage = loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
         val latest = latestPage.items
 
         if (latest.isEmpty()) {
@@ -114,11 +115,15 @@ class AppleCmsRepository(
             sections = emptyList(),
             categories = categories,
             selectedCategory = categories.firstOrNull(),
-            categoryVideos = latest,
+            categoryVideos = allCategoryPage.items,
             latestPage = latestPage.page,
             latestPageCount = latestPage.pageCount,
             latestTotal = latestPage.totalItems,
-            latestHasNextPage = latestPage.hasNextPage
+            latestHasNextPage = latestPage.hasNextPage,
+            categoryPage = allCategoryPage.page,
+            categoryPageCount = allCategoryPage.pageCount,
+            categoryTotal = allCategoryPage.totalItems,
+            categoryHasNextPage = allCategoryPage.hasNextPage
         ).also { payload ->
             homeCache = CachedValue(
                 value = payload,
@@ -1950,7 +1955,11 @@ data class HomePayload(
     val latestPage: Int,
     val latestPageCount: Int,
     val latestTotal: Int,
-    val latestHasNextPage: Boolean
+    val latestHasNextPage: Boolean,
+    val categoryPage: Int,
+    val categoryPageCount: Int,
+    val categoryTotal: Int,
+    val categoryHasNextPage: Boolean
 )
 
 data class HomeSection(

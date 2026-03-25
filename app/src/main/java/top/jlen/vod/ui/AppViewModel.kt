@@ -144,11 +144,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     hasMoreHomePages = payload.latestHasNextPage,
                     categories = categories,
                     selectedCategory = localizedAllCategory,
-                    categoryVideos = payload.latest,
-                    categoryVisibleCount = payload.latest.size,
-                    categoryPage = payload.latestPage,
-                    categoryTotalCount = payload.latestTotal,
-                    hasMoreCategoryPages = payload.latestHasNextPage
+                    categoryVideos = payload.categoryVideos,
+                    categoryVisibleCount = payload.categoryVideos.size,
+                    categoryPage = payload.categoryPage,
+                    categoryTotalCount = payload.categoryTotal,
+                    hasMoreCategoryPages = payload.categoryHasNextPage
                 )
             }.onFailure { error ->
                 homeState = homeState.copy(
@@ -164,11 +164,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (!forceRefresh) {
                 homeState = homeState.copy(
                     selectedCategory = category,
-                    categoryVideos = homeState.latest,
-                    categoryVisibleCount = homeState.latest.size,
-                    categoryPage = homeState.homePage,
-                    categoryTotalCount = homeState.homeTotalCount,
-                    hasMoreCategoryPages = homeState.hasMoreHomePages,
+                    categoryVideos = homeState.categoryVideos,
+                    categoryVisibleCount = homeState.categoryVideos.size,
+                    categoryPage = homeState.categoryPage,
+                    categoryTotalCount = homeState.categoryTotalCount,
+                    hasMoreCategoryPages = homeState.hasMoreCategoryPages,
                     isCategoryAppending = false,
                     isCategoryLoading = false,
                     error = null
@@ -188,11 +188,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }.onSuccess { payload ->
                     homeState = homeState.copy(
-                        latest = payload.items,
-                        homeVisibleCount = payload.items.size,
-                        homePage = payload.page,
-                        homeTotalCount = payload.totalItems,
-                        hasMoreHomePages = payload.hasNextPage,
                         categoryVideos = payload.items,
                         categoryVisibleCount = payload.items.size,
                         categoryPage = payload.page,
@@ -299,11 +294,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }.onSuccess { payload ->
                     val mergedVideos = (homeState.categoryVideos + payload.items).distinctBy { it.vodId }
                     homeState = homeState.copy(
-                        latest = mergedVideos,
-                        homeVisibleCount = mergedVideos.size,
-                        homePage = payload.page,
-                        homeTotalCount = payload.totalItems,
-                        hasMoreHomePages = payload.hasNextPage,
                         categoryVideos = mergedVideos,
                         categoryVisibleCount = mergedVideos.size,
                         categoryPage = payload.page,
