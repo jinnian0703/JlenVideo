@@ -213,6 +213,20 @@ fun JlenVideoApp() {
                             )
                         }
                         composable("categories") {
+                            LaunchedEffect(
+                                viewModel.homeState.selectedCategory?.typeId,
+                                viewModel.homeState.categoryVideos.isEmpty(),
+                                viewModel.homeState.isCategoryLoading
+                            ) {
+                                val categoryState = viewModel.homeState
+                                val selectedAll = categoryState.selectedCategory?.typeId == "__all__"
+                                if (selectedAll &&
+                                    categoryState.categoryVideos.isEmpty() &&
+                                    !categoryState.isCategoryLoading
+                                ) {
+                                    viewModel.refreshCategoryTab()
+                                }
+                            }
                             CategoryScreen(
                                 state = viewModel.homeState,
                                 onSelectCategory = viewModel::selectCategory,
