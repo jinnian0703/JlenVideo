@@ -15,6 +15,9 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -77,20 +80,27 @@ class AppleCmsRepository(
                 ?.let { return it }
         }
 
-        val latestPage = runCatching {
-            loadLatestUpdatesFromLabelPage()
-        }.getOrElse {
-            loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
+        val (latestPage, featured) = coroutineScope {
+            val latestDeferred = async {
+                runCatching {
+                    loadLatestUpdatesFromLabelPage()
+                }.getOrElse {
+                    loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
+                }
+            }
+            val featuredDeferred = async {
+                runCatching { fetchDocument("$baseUrl/") }
+                    .getOrNull()
+                    ?.let { parseLevelOneItemsFromHomePage(it, limit = 16) }
+                    .orEmpty()
+            }
+            latestDeferred.await() to featuredDeferred.await()
         }
-        val allCategoryPage = loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
         val latest = latestPage.items
 
         if (latest.isEmpty()) {
             throw IOException("首页内容解析失败")
         }
-
-        val homeDocument = runCatching { fetchDocument("$baseUrl/") }.getOrNull()
-
         val categories = defaultCategories.map { category ->
             when (category.typeId) {
                 "1" -> category.copy(typeName = "\u7535\u5f71")
@@ -100,13 +110,6 @@ class AppleCmsRepository(
                 else -> category
             }
         }
-        val featured = homeDocument
-            ?.let { parseLevelOneItemsFromHomePage(it, limit = 16) }
-            .orEmpty()
-            .ifEmpty {
-                runCatching { loadLevelItemsFromHomePage(limit = 16) }
-                    .getOrDefault(emptyList())
-            }
         return HomePayload(
             slides = emptyList(),
             hot = emptyList(),
@@ -115,15 +118,15 @@ class AppleCmsRepository(
             sections = emptyList(),
             categories = categories,
             selectedCategory = categories.firstOrNull(),
-            categoryVideos = allCategoryPage.items,
+            categoryVideos = emptyList(),
             latestPage = latestPage.page,
             latestPageCount = latestPage.pageCount,
             latestTotal = latestPage.totalItems,
             latestHasNextPage = latestPage.hasNextPage,
-            categoryPage = allCategoryPage.page,
-            categoryPageCount = allCategoryPage.pageCount,
-            categoryTotal = allCategoryPage.totalItems,
-            categoryHasNextPage = allCategoryPage.hasNextPage
+            categoryPage = 1,
+            categoryPageCount = 1,
+            categoryTotal = 0,
+            categoryHasNextPage = true
         ).also { payload ->
             homeCache = CachedValue(
                 value = payload,
@@ -144,8 +147,11 @@ class AppleCmsRepository(
                 ?.value
                 ?.let { return it }
         }
-        val responses = allCategoryTypeIds
-            .map { typeId -> api.getByType(typeId = typeId, page = safePage) }
+        val responses = coroutineScope {
+            allCategoryTypeIds
+                .map { typeId -> async { api.getByType(typeId = typeId, page = safePage) } }
+                .awaitAll()
+        }
 
         val mergedItems = interleaveCategoryItems(responses)
         return PagedVodItems(
