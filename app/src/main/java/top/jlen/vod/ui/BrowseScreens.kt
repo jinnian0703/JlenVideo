@@ -35,6 +35,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.History
@@ -81,6 +82,7 @@ import kotlinx.coroutines.delay
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.FindPasswordEditor
+import top.jlen.vod.data.HotSearchGroup
 import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.RegisterEditor
 import top.jlen.vod.data.UserProfileEditor
@@ -321,11 +323,23 @@ fun CategoryScreen(
 fun SearchScreen(
     state: SearchUiState,
     onQueryChange: (String) -> Unit,
-    onSearch: () -> Unit,
+    onOpenSearchResults: (String) -> Unit,
     onSearchHistory: (String) -> Unit,
     onClearHistory: () -> Unit,
-    onOpenDetail: (String) -> Unit
+    onLoadHotSearches: () -> Unit
 ) {
+    LaunchedEffect(Unit) {
+        onLoadHotSearches()
+    }
+    SearchLandingContent(
+        state = state,
+        onQueryChange = onQueryChange,
+        onOpenSearchResults = onOpenSearchResults,
+        onSearchHistory = onSearchHistory,
+        onClearHistory = onClearHistory,
+        onLoadHotSearches = onLoadHotSearches
+    )
+    return
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -361,7 +375,7 @@ fun SearchScreen(
             placeholder = { Text("搜片名") },
             trailingIcon = {
                 TextButton(
-                    onClick = onSearch,
+                    onClick = { onOpenSearchResults(state.query.trim()) },
                     colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
                 ) {
                     Text("搜索", fontWeight = FontWeight.Bold)
@@ -421,7 +435,8 @@ fun SearchScreen(
         }
         when {
             state.isLoading -> LoadingPane("搜索中...")
-            !state.error.isNullOrBlank() && state.results.isEmpty() -> ErrorBanner(message = state.error, onRetry = onSearch)
+            !state.error.isNullOrBlank() && state.results.isEmpty() ->
+                ErrorBanner(message = state.error, onRetry = { onOpenSearchResults(state.query.trim()) })
             state.results.isEmpty() -> EmptyPane(if (state.query.isBlank()) "输入片名搜索" else "暂无结果")
             else -> LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -432,7 +447,346 @@ fun SearchScreen(
                     key = { it.stableKey() },
                     contentType = { "search_result" }
                 ) { item ->
-                    ListCard(item = item, onClick = onOpenDetail)
+                    ListCard(item = item, onClick = {})
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SearchLandingContent(
+    state: SearchUiState,
+    onQueryChange: (String) -> Unit,
+    onOpenSearchResults: (String) -> Unit,
+    onSearchHistory: (String) -> Unit,
+    onClearHistory: () -> Unit,
+    onLoadHotSearches: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
+    ) {
+        item {
+            Text(
+                text = "搜索",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = UiPalette.Ink
+            )
+        }
+        item {
+            SearchInputCard(
+                query = state.query,
+                onQueryChange = onQueryChange,
+                onSearch = { onOpenSearchResults(state.query.trim()) }
+            )
+        }
+        if (state.history.isNotEmpty()) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.History,
+                            contentDescription = null,
+                            tint = UiPalette.TextSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "搜索记录",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = UiPalette.Ink
+                        )
+                    }
+                    TextButton(onClick = onClearHistory) {
+                        Text("清空")
+                    }
+                }
+            }
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(
+                        items = state.history,
+                        key = { it },
+                        contentType = { "history" }
+                    ) { keyword ->
+                        AssistChip(
+                            onClick = {
+                                onSearchHistory(keyword)
+                                onOpenSearchResults(keyword)
+                            },
+                            label = { Text(keyword) },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = UiPalette.Surface,
+                                labelColor = UiPalette.Ink
+                            ),
+                            border = AssistChipDefaults.assistChipBorder(
+                                borderColor = UiPalette.BorderSoft,
+                                enabled = true
+                            )
+                        )
+                    }
+                }
+            }
+        }
+        item {
+            SectionTitle(
+                title = "热搜榜",
+                action = null,
+                icon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Whatshot,
+                        contentDescription = null,
+                        tint = UiPalette.Accent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                onAction = {}
+            )
+        }
+        item {
+            when {
+                state.isHotSearchLoading && state.hotSearchGroups.isEmpty() -> LoadingPane("热搜加载中..")
+                !state.hotSearchError.isNullOrBlank() && state.hotSearchGroups.isEmpty() ->
+                    ErrorBanner(message = state.hotSearchError, onRetry = onLoadHotSearches)
+                state.hotSearchGroups.isEmpty() -> EmptyPane("暂无热搜")
+                else -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    state.hotSearchGroups.forEach { group ->
+                        HotSearchBoard(
+                            group = group,
+                            onPickKeyword = { keyword ->
+                                onSearchHistory(keyword)
+                                onOpenSearchResults(keyword)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/*
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SearchResultsScreen(
+    state: SearchUiState,
+    onBack: () -> Unit,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    onOpenDetail: (String) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
+    ) {
+        item {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                CircleActionButton(icon = Icons.AutoMirrored.Rounded.ArrowBack, onClick = onBack)
+                Text(
+                    text = "搜索结果",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Ink
+                )
+            }
+        }
+        item {
+            SearchInputCard(
+                query = state.query,
+                onQueryChange = onQueryChange,
+                onSearch = onSearch
+            )
+        }
+        item {
+            Text(
+                text = if (state.submittedQuery.isBlank()) "输入片名开始搜索" else "“${state.submittedQuery}” 的结果",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = UiPalette.Ink
+            )
+        }
+        when {
+            state.isLoading -> item { LoadingPane("搜索中..") }
+            !state.error.isNullOrBlank() && state.results.isEmpty() ->
+                item { ErrorBanner(message = state.error, onRetry = onSearch) }
+            state.results.isEmpty() ->
+                item { EmptyPane(if (state.submittedQuery.isBlank()) "输入片名搜索" else "暂无结果") }
+            else -> items(
+                items = state.results,
+                key = { it.stableKey() },
+                contentType = { "search_result" }
+            ) { item ->
+                ListCard(item = item, onClick = onOpenDetail)
+            }
+        }
+    }
+}
+*/
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SearchResultsScreen(
+    state: SearchUiState,
+    onBack: () -> Unit,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    onOpenDetail: (String) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
+    ) {
+        item {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                CircleActionButton(icon = Icons.AutoMirrored.Rounded.ArrowBack, onClick = onBack)
+                Text(
+                    text = "搜索结果",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Ink
+                )
+            }
+        }
+        item {
+            SearchInputCard(
+                query = state.query,
+                onQueryChange = onQueryChange,
+                onSearch = onSearch
+            )
+        }
+        item {
+            Text(
+                text = if (state.submittedQuery.isBlank()) "输入片名开始搜索" else "\"${state.submittedQuery}\" 的结果",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = UiPalette.Ink
+            )
+        }
+        when {
+            state.isLoading -> item { LoadingPane("搜索中..") }
+            !state.error.isNullOrBlank() && state.results.isEmpty() ->
+                item { ErrorBanner(message = state.error, onRetry = onSearch) }
+            state.results.isEmpty() ->
+                item { EmptyPane(if (state.submittedQuery.isBlank()) "输入片名搜索" else "暂无结果") }
+            else -> items(
+                items = state.results,
+                key = { it.stableKey() },
+                contentType = { "search_result" }
+            ) { item ->
+                ListCard(item = item, onClick = onOpenDetail)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SearchInputCard(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = UiPalette.Accent,
+            unfocusedBorderColor = UiPalette.BorderSoft,
+            focusedTextColor = UiPalette.Ink,
+            unfocusedTextColor = UiPalette.Ink,
+            cursorColor = UiPalette.Accent,
+            focusedTrailingIconColor = UiPalette.Accent,
+            unfocusedTrailingIconColor = UiPalette.TextSecondary,
+            focusedContainerColor = UiPalette.Surface,
+            unfocusedContainerColor = UiPalette.Surface,
+            focusedPlaceholderColor = UiPalette.TextMuted,
+            unfocusedPlaceholderColor = UiPalette.TextMuted
+        ),
+        placeholder = { Text("搜片名") },
+        trailingIcon = {
+            TextButton(
+                onClick = onSearch,
+                colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
+            ) {
+                Text("搜索", fontWeight = FontWeight.Bold)
+            }
+        }
+    )
+}
+
+@Composable
+private fun HotSearchBoard(
+    group: HotSearchGroup,
+    onPickKeyword: (String) -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        shape = RoundedCornerShape(22.dp),
+        border = BorderStroke(1.dp, UiPalette.Border)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = group.platform,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = UiPalette.Ink
+            )
+            group.items.forEach { item ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onPickKeyword(item.keyword) }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = item.rank.toString().padStart(2, '0'),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (item.rank <= 3) UiPalette.Accent else UiPalette.TextSecondary
+                    )
+                    Text(
+                        text = item.keyword,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = UiPalette.Ink,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }

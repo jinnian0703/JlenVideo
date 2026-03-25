@@ -243,3 +243,15 @@ data class AppUpdateInfo(
     val notes: String = "",
     val hasUpdate: Boolean = false
 )
+
+data class HotSearchItem(
+    val rank: Int = 0,
+    val keyword: String = "",
+    val platform: String = "",
+    val sourceUrl: String = ""
+)
+
+data class HotSearchGroup(
+    val platform: String = "",
+    val items: List<HotSearchItem> = emptyList()
+)

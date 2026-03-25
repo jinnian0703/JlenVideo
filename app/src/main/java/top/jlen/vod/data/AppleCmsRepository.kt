@@ -54,6 +54,8 @@ class AppleCmsRepository(
     private val searchCache = ConcurrentHashMap<String, CachedValue<List<VodItem>>>()
     @Volatile
     private var homeCache: CachedValue<HomePayload>? = null
+    @Volatile
+    private var hotSearchCache: CachedValue<List<HotSearchGroup>>? = null
     private val api: AppleCmsApi = Retrofit.Builder()
         .baseUrl("$baseUrl/")
         .client(client)
@@ -247,6 +249,36 @@ class AppleCmsRepository(
                 timestampMs = System.currentTimeMillis()
             )
         }
+    }
+
+    suspend fun loadHotSearchGroups(forceRefresh: Boolean = false): List<HotSearchGroup> {
+        if (!forceRefresh) {
+            hotSearchCache
+                ?.takeIf { isCacheValid(it.timestampMs, HOT_SEARCH_CACHE_TTL_MS) }
+                ?.value
+                ?.let { return it }
+        }
+
+        val groups = coroutineScope {
+            listOf(
+                async {
+                    runCatching { loadTencentHotSearchGroup(limit = 10) }
+                        .getOrNull()
+                },
+                async {
+                    runCatching { loadIqiyiHotSearchGroup(limit = 10) }
+                        .getOrNull()
+                }
+            ).awaitAll()
+                .filterNotNull()
+                .filter { it.items.isNotEmpty() }
+        }
+
+        hotSearchCache = CachedValue(
+            value = groups,
+            timestampMs = System.currentTimeMillis()
+        )
+        return groups
     }
 
     suspend fun loadLatestRelease(currentVersion: String): AppUpdateInfo {
@@ -902,6 +934,56 @@ class AppleCmsRepository(
             .orEmpty()
             .distinctBy { it.vodId }
             .take(limit)
+    }
+
+    private fun loadTencentHotSearchGroup(limit: Int): HotSearchGroup {
+        val sourceUrl = "https://v.qq.com/biu/ranks/?t=hotsearch"
+        val document = fetchDocument(sourceUrl)
+        val items = document.select(".mod_rank_search_list .hotlist li a")
+            .mapIndexedNotNull { index, anchor ->
+                val keyword = decodeSiteText(
+                    anchor.selectFirst(".name")?.text().orEmpty()
+                        .ifBlank { anchor.attr("title") }
+                )
+                if (keyword.isBlank()) return@mapIndexedNotNull null
+                HotSearchItem(
+                    rank = anchor.selectFirst(".num")?.text()?.toIntOrNull() ?: (index + 1),
+                    keyword = keyword,
+                    platform = "腾讯视频",
+                    sourceUrl = normalizeAgainst(anchor.attr("href"), sourceUrl)
+                )
+            }
+            .distinctBy { it.keyword }
+            .take(limit)
+        return HotSearchGroup(
+            platform = "腾讯视频",
+            items = items
+        )
+    }
+
+    private fun loadIqiyiHotSearchGroup(limit: Int): HotSearchGroup {
+        val sourceUrl = "https://www.iqiyi.com/ranks1PCW/home"
+        val document = fetchDocument(sourceUrl)
+        val items = document.select("a.rvi__box")
+            .mapIndexedNotNull { index, anchor ->
+                val titleNode = anchor.selectFirst(".rvi__tit1") ?: return@mapIndexedNotNull null
+                val keyword = decodeSiteText(
+                    titleNode.attr("title").ifBlank { titleNode.ownText() }
+                ).replace(Regex("^\\d+"), "").trim()
+                if (keyword.isBlank()) return@mapIndexedNotNull null
+                HotSearchItem(
+                    rank = titleNode.selectFirst(".rvi__num")?.text()?.toIntOrNull() ?: (index + 1),
+                    keyword = keyword,
+                    platform = "爱奇艺",
+                    sourceUrl = normalizeAgainst(anchor.attr("href"), sourceUrl)
+                )
+            }
+            .distinctBy { it.keyword }
+            .take(limit)
+        return HotSearchGroup(
+            platform = "爱奇艺",
+            items = items
+        )
     }
 
     private fun parseVodCards(root: Element): List<VodItem> =
@@ -1928,6 +2010,7 @@ class AppleCmsRepository(
         private const val PAGE_CACHE_TTL_MS = 0L
         private const val SEARCH_CACHE_TTL_MS = 15_000L
         private const val DETAIL_CACHE_TTL_MS = 10_000L
+        private const val HOT_SEARCH_CACHE_TTL_MS = 300_000L
 
         private fun isCacheValid(timestampMs: Long, ttlMs: Long): Boolean =
             System.currentTimeMillis() - timestampMs <= ttlMs

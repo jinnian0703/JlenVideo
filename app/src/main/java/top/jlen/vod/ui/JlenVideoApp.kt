@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -96,6 +97,15 @@ fun JlenVideoApp() {
             }
             launchSingleTop = true
             restoreState = true
+        }
+    }
+    val openSearchResults: (String) -> Unit = { query ->
+        val normalized = query.trim()
+        if (normalized.isBlank()) {
+            viewModel.updateQuery(normalized)
+        } else {
+            viewModel.updateQuery(normalized)
+            navController.navigate("search/results/${Uri.encode(normalized)}")
         }
     }
 
@@ -214,9 +224,32 @@ fun JlenVideoApp() {
                             SearchScreen(
                                 state = viewModel.searchState,
                                 onQueryChange = viewModel::updateQuery,
-                                onSearch = viewModel::search,
+                                onOpenSearchResults = openSearchResults,
                                 onSearchHistory = viewModel::searchHistory,
                                 onClearHistory = viewModel::clearSearchHistory,
+                                onLoadHotSearches = viewModel::refreshHotSearches
+                            )
+                        }
+                        composable(
+                            route = "search/results/{query}",
+                            arguments = listOf(navArgument("query") { type = NavType.StringType })
+                        ) { entry ->
+                            val query = entry.arguments?.getString("query").orEmpty()
+                            LaunchedEffect(query) {
+                                viewModel.search(query)
+                            }
+                            SearchResultsScreen(
+                                state = viewModel.searchState,
+                                onBack = { navController.popBackStack() },
+                                onQueryChange = viewModel::updateQuery,
+                                onSearch = {
+                                    val normalized = viewModel.searchState.query.trim()
+                                    if (normalized == query.trim()) {
+                                        viewModel.search()
+                                    } else {
+                                        openSearchResults(normalized)
+                                    }
+                                },
                                 onOpenDetail = { navController.navigate("detail/$it") }
                             )
                         }

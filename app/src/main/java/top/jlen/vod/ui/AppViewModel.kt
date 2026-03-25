@@ -23,6 +23,7 @@ import top.jlen.vod.data.AppleCmsRepository
 import top.jlen.vod.data.AuthSession
 import top.jlen.vod.data.Episode
 import top.jlen.vod.data.FindPasswordEditor
+import top.jlen.vod.data.HotSearchGroup
 import top.jlen.vod.data.HomeSection
 import top.jlen.vod.data.MembershipInfo
 import top.jlen.vod.data.MembershipPlan
@@ -349,7 +350,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val normalized = keyword.trim()
         if (normalized.isBlank()) return
         searchState = searchState.copy(query = normalized, error = null)
-        search()
     }
 
     fun clearSearchHistory() {
@@ -357,17 +357,56 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         searchState = searchState.copy(history = emptyList())
     }
 
+    fun search(keyword: String) {
+        val normalized = keyword.trim()
+        searchState = searchState.copy(query = normalized, error = null)
+        performSearch(normalized)
+    }
+
+    fun refreshHotSearches(forceRefresh: Boolean = false) {
+        if (!forceRefresh && (searchState.hotSearchGroups.isNotEmpty() || searchState.isHotSearchLoading)) {
+            return
+        }
+        viewModelScope.launch {
+            searchState = searchState.copy(isHotSearchLoading = true, hotSearchError = null)
+            runCatching {
+                withContext(Dispatchers.IO) { repository.loadHotSearchGroups(forceRefresh = forceRefresh) }
+            }.onSuccess { groups ->
+                searchState = searchState.copy(
+                    isHotSearchLoading = false,
+                    hotSearchGroups = groups,
+                    hotSearchError = null
+                )
+            }.onFailure { error ->
+                searchState = searchState.copy(
+                    isHotSearchLoading = false,
+                    hotSearchError = toUserFacingMessage(error, "热搜加载失败")
+                )
+            }
+        }
+    }
+
     fun search() {
-        val query = searchState.query.trim()
+        performSearch(searchState.query)
+    }
+
+    private fun performSearch(keyword: String) {
+        val query = keyword.trim()
         if (query.isBlank()) {
             searchState = searchState.copy(
+                submittedQuery = "",
                 results = emptyList(),
                 error = "请输入影片名称"
             )
             return
         }
         viewModelScope.launch {
-            searchState = searchState.copy(isLoading = true, error = null)
+            searchState = searchState.copy(
+                query = query,
+                submittedQuery = query,
+                isLoading = true,
+                error = null
+            )
             runCatching {
                 withContext(Dispatchers.IO) { repository.search(query) }
             }.onSuccess { results ->
@@ -1614,9 +1653,13 @@ data class HomeUiState(
 
 data class SearchUiState(
     val query: String = "",
+    val submittedQuery: String = "",
     val isLoading: Boolean = false,
+    val isHotSearchLoading: Boolean = false,
     val error: String? = null,
+    val hotSearchError: String? = null,
     val history: List<String> = emptyList(),
+    val hotSearchGroups: List<HotSearchGroup> = emptyList(),
     val results: List<VodItem> = emptyList()
 )
 
