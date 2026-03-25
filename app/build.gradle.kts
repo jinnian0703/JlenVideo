@@ -57,6 +57,40 @@ android {
     }
 }
 
+afterEvaluate {
+    android.applicationVariants.all {
+        val variant = this
+        val assembleTaskName = "assemble" + name.replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase() else it.toString()
+        }
+
+        tasks.named(assembleTaskName).configure {
+            doLast {
+                val outputDir = layout.buildDirectory.dir("outputs/apk/${variant.name}").get().asFile
+                val sourceApk = outputDir.listFiles()
+                    ?.filter { file ->
+                        file.isFile &&
+                            file.extension.equals("apk", ignoreCase = true) &&
+                            !file.name.startsWith("JlenVideo-")
+                    }
+                    ?.maxByOrNull { it.lastModified() }
+                    ?: return@doLast
+
+                val targetName = "JlenVideo-${variant.versionName ?: "dev"}-${variant.name}.apk"
+                val targetApk = outputDir.resolve(targetName)
+                if (targetApk.exists()) {
+                    targetApk.delete()
+                }
+                copy {
+                    from(sourceApk)
+                    into(outputDir)
+                    rename { targetName }
+                }
+            }
+        }
+    }
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.06.00")
 
