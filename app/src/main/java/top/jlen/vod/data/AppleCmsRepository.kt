@@ -268,6 +268,14 @@ class AppleCmsRepository(
                 async {
                     runCatching { loadIqiyiHotSearchGroup(limit = 10) }
                         .getOrNull()
+                },
+                async {
+                    runCatching { loadYoukuHotSearchGroup(limit = 10) }
+                        .getOrNull()
+                },
+                async {
+                    runCatching { loadMgtvHotSearchGroup(limit = 10) }
+                        .getOrNull()
                 }
             ).awaitAll()
                 .filterNotNull()
@@ -972,7 +980,7 @@ class AppleCmsRepository(
                 ).replace(Regex("^\\d+"), "").trim()
                 if (keyword.isBlank()) return@mapIndexedNotNull null
                 HotSearchItem(
-                    rank = titleNode.selectFirst(".rvi__num")?.text()?.toIntOrNull() ?: (index + 1),
+                    rank = index + 1,
                     keyword = keyword,
                     platform = "爱奇艺",
                     sourceUrl = normalizeAgainst(anchor.attr("href"), sourceUrl)
@@ -982,6 +990,121 @@ class AppleCmsRepository(
             .take(limit)
         return HotSearchGroup(
             platform = "爱奇艺",
+            items = items
+        )
+    }
+
+    private fun loadYoukuHotSearchGroup(limit: Int): HotSearchGroup {
+        val sourceUrl = "https://m.youku.com/"
+        val html = fetchHtml(
+            url = sourceUrl,
+            referer = sourceUrl,
+            userAgent = HOT_SEARCH_MOBILE_UA
+        )
+        val layoutJson = Regex(
+            """window\.layoutData\s*=\s*(\{.*?\});\s*window\._SSRERR_=""",
+            setOf(RegexOption.DOT_MATCHES_ALL)
+        ).find(html)
+            ?.groupValues
+            ?.getOrNull(1)
+            .orEmpty()
+
+        if (layoutJson.isBlank()) {
+            return HotSearchGroup(platform = "\u4f18\u9177")
+        }
+
+        val root = JsonParser.parseString(layoutJson).asJsonObject
+        val moduleList = root.getAsJsonObject("__INITIAL_DATA__")
+            ?.getAsJsonObject("data")
+            ?.getAsJsonArray("moduleList")
+            ?: return HotSearchGroup(platform = "\u4f18\u9177")
+
+        var fallbackComponent: com.google.gson.JsonObject? = null
+        var hotComponent: com.google.gson.JsonObject? = null
+        for (moduleElement in moduleList) {
+            val components = moduleElement.asJsonObject.getAsJsonArray("components") ?: continue
+            for (componentElement in components) {
+                val component = componentElement.asJsonObject
+                val tag = component.getAsJsonObject("template")
+                    ?.get("tag")
+                    ?.asString
+                    .orEmpty()
+                if (fallbackComponent == null && tag == "PHONE_BASE_B") {
+                    fallbackComponent = component
+                }
+
+                val itemMap = component.getAsJsonArray("itemMap") ?: continue
+                if (itemMap.size() == 0) continue
+                val previewItem = itemMap[0].asJsonObject
+                val trackInfo = previewItem.getAsJsonObject("trackInfo")
+                val objectTitle = trackInfo?.get("object_title")?.asString.orEmpty()
+                val resourceId = trackInfo?.get("ucd_res_id")?.asString.orEmpty()
+                if (objectTitle.contains("\u70ed\u64ad") ||
+                    resourceId.contains("_HOT", ignoreCase = true)
+                ) {
+                    hotComponent = component
+                    break
+                }
+            }
+            if (hotComponent != null) break
+        }
+
+        val items = buildList {
+            val itemMap = (hotComponent ?: fallbackComponent)
+                ?.getAsJsonArray("itemMap")
+                ?: return@buildList
+            for ((index, itemElement) in itemMap.withIndex()) {
+                val item = itemElement.asJsonObject
+                val keyword = decodeSiteText(item.get("title")?.asString.orEmpty())
+                if (keyword.isBlank()) continue
+                add(
+                    HotSearchItem(
+                        rank = index + 1,
+                        keyword = keyword,
+                        platform = "\u4f18\u9177",
+                        sourceUrl = sourceUrl
+                    )
+                )
+                if (size >= limit) break
+            }
+        }.distinctBy { it.keyword }
+
+        return HotSearchGroup(
+            platform = "\u4f18\u9177",
+            items = items
+        )
+    }
+
+    private fun loadMgtvHotSearchGroup(limit: Int): HotSearchGroup {
+        val sourceUrl = "https://www.mgtv.com/"
+        val document = fetchDocument(sourceUrl)
+        val section = document.select(".m-list-single")
+            .firstOrNull { element ->
+                element.selectFirst(".title span")
+                    ?.text()
+                    ?.contains("\u70ed\u64ad") == true
+            }
+            ?: document.selectFirst(".m-list-single")
+
+        val items = section?.select(".hitv_horizontal-title a")
+            ?.mapIndexedNotNull { index, anchor ->
+                val keyword = decodeSiteText(
+                    anchor.attr("title").ifBlank { anchor.text() }
+                )
+                if (keyword.isBlank()) return@mapIndexedNotNull null
+                HotSearchItem(
+                    rank = index + 1,
+                    keyword = keyword,
+                    platform = "\u8292\u679cTV",
+                    sourceUrl = normalizeAgainst(anchor.attr("href"), sourceUrl)
+                )
+            }
+            .orEmpty()
+            .distinctBy { it.keyword }
+            .take(limit)
+
+        return HotSearchGroup(
+            platform = "\u8292\u679cTV",
             items = items
         )
     }
@@ -1525,11 +1648,12 @@ class AppleCmsRepository(
     private fun fetchHtml(
         url: String,
         postBody: FormBody? = null,
-        referer: String = "$baseUrl/"
+        referer: String = "$baseUrl/",
+        userAgent: String = PLAYER_DESKTOP_UA
     ): String {
         val request = Request.Builder()
             .url(url)
-            .header("User-Agent", PLAYER_DESKTOP_UA)
+            .header("User-Agent", userAgent)
             .header("Referer", referer)
             .header("Accept-Language", "zh-CN,zh;q=0.9")
             .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
@@ -2011,6 +2135,10 @@ class AppleCmsRepository(
         private const val SEARCH_CACHE_TTL_MS = 15_000L
         private const val DETAIL_CACHE_TTL_MS = 10_000L
         private const val HOT_SEARCH_CACHE_TTL_MS = 300_000L
+        private const val HOT_SEARCH_MOBILE_UA =
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) " +
+                "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 " +
+                "Mobile/15E148 Safari/604.1"
 
         private fun isCacheValid(timestampMs: Long, ttlMs: Long): Boolean =
             System.currentTimeMillis() - timestampMs <= ttlMs
