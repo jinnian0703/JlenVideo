@@ -220,27 +220,26 @@ class AppleCmsRepository(
                 ?.let { return it }
         }
 
-        val encodedKeyword = Uri.encode(normalizedKeyword)
-        val htmlResults = runCatching {
-            val document = fetchDocument("$baseUrl/vodsearch/-------------/?wd=$encodedKeyword")
-            parseSearchResults(document, normalizedKeyword)
-        }.getOrDefault(emptyList())
-
-        if (htmlResults.isNotEmpty()) {
-            return htmlResults
-                .distinctBy { it.vodId }
-                .take(60)
-                .also { results ->
-                    searchCache[cacheKey] = CachedValue(
-                        value = results,
-                        timestampMs = System.currentTimeMillis()
-                    )
-                }
-        }
-
-        return runCatching {
+        val apiResults = runCatching {
             api.search(keyword = normalizedKeyword, page = 1)
                 .list
+                .distinctBy { it.vodId }
+                .take(60)
+        }.getOrDefault(emptyList())
+
+        if (apiResults.isNotEmpty()) {
+            return apiResults.also { results ->
+                searchCache[cacheKey] = CachedValue(
+                    value = results,
+                    timestampMs = System.currentTimeMillis()
+                )
+            }
+        }
+
+        val encodedKeyword = Uri.encode(normalizedKeyword)
+        return runCatching {
+            val document = fetchDocument("$baseUrl/vodsearch/-------------/?wd=$encodedKeyword")
+            parseSearchResults(document, normalizedKeyword)
                 .distinctBy { it.vodId }
                 .take(60)
         }.getOrDefault(emptyList()).also { results ->
@@ -1165,13 +1164,33 @@ class AppleCmsRepository(
         val items = (searchSection ?: document).select(".vod-list ul.row > li, ul.row > li.col-xs-4, ul.row > li")
             .mapNotNull { item ->
                 val anchor = item.selectFirst(".pic a[href*=/voddetail/]") ?: return@mapNotNull null
+                val description = listOf(
+                    ".public-list-subtitle",
+                    ".text-muted",
+                    ".vod-content",
+                    ".detail",
+                    ".desc",
+                    ".remarks",
+                    ".module-item-note",
+                    "p:last-of-type"
+                ).asSequence()
+                    .mapNotNull { selector ->
+                        item.selectFirst(selector)
+                            ?.text()
+                            ?.replace(Regex("\\s+"), " ")
+                            ?.trim()
+                            ?.takeIf { it.isNotBlank() }
+                    }
+                    .firstOrNull()
+                    .orEmpty()
                 createVodItem(
                     detailHref = anchor.attr("href"),
                     title = item.selectFirst("h3 a")?.text().orEmpty().ifBlank { anchor.attr("title") },
                     imageUrl = item.selectFirst("[data-original]")?.attr("data-original")
                         ?: item.selectFirst("img")?.attr("data-original")
                         ?: item.selectFirst("img")?.attr("src").orEmpty(),
-                    remarks = item.selectFirst(".item-status")?.text().orEmpty()
+                    remarks = item.selectFirst(".item-status, .public-prt, .remarks")?.text().orEmpty(),
+                    description = description
                 )
             }
 
