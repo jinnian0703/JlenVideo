@@ -77,7 +77,11 @@ class AppleCmsRepository(
                 ?.let { return it }
         }
 
-        val latestPage = loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
+        val latestPage = runCatching {
+            loadLatestUpdatesFromLabelPage()
+        }.getOrElse {
+            loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
+        }
         val latest = latestPage.items
 
         if (latest.isEmpty()) {
@@ -156,6 +160,22 @@ class AppleCmsRepository(
 
     suspend fun loadLatestPage(page: Int): PagedVodItems =
         api.getLatest(page = page.coerceAtLeast(1)).toPagedVodItems()
+
+    private suspend fun loadLatestUpdatesFromLabelPage(): PagedVodItems {
+        val document = fetchDocument("$baseUrl/label/new/")
+        val items = parseLabelNewItems(document)
+        if (items.isEmpty()) {
+            throw IOException("最近更新解析失败")
+        }
+        return PagedVodItems(
+            items = items,
+            page = 1,
+            pageCount = 1,
+            totalItems = items.size,
+            limit = items.size,
+            hasNextPage = false
+        )
+    }
 
     suspend fun loadCategoryPage(typeId: String, page: Int, forceRefresh: Boolean = false): PagedVodItems {
         val safePage = page.coerceAtLeast(1)
@@ -943,6 +963,39 @@ class AppleCmsRepository(
             }
 
         return items.distinctBy { it.vodId }
+    }
+
+    private fun parseLabelNewItems(document: Document): List<VodItem> {
+        val scopedRoot = document.select("div, ul, ol, section")
+            .filter { root -> root.select("a[href*=/voddetail/]").size >= 12 }
+            .maxByOrNull { root -> root.select("a[href*=/voddetail/]").size }
+            ?: document
+
+        return scopedRoot.select("a[href*=/voddetail/]")
+            .mapNotNull { anchor ->
+                val title = anchor.attr("title").trim().ifBlank { anchor.text().trim() }
+                if (title.isBlank()) return@mapNotNull null
+
+                val container = anchor.parents().firstOrNull { parent ->
+                    parent.select("a[href*=/voddetail/]").size == 1
+                } ?: anchor.parent() ?: anchor
+
+                val remarks = container.text()
+                    .replace(title, "")
+                    .replace(Regex("\\s+"), " ")
+                    .trim()
+
+                createVodItem(
+                    detailHref = anchor.attr("href"),
+                    title = title,
+                    imageUrl = container.selectFirst("[data-original]")?.attr("data-original")
+                        ?: container.selectFirst("img")?.attr("data-original")
+                        ?: container.selectFirst("img")?.attr("src").orEmpty(),
+                    remarks = remarks
+                )
+            }
+            .distinctBy { it.vodId }
+            .take(100)
     }
 
     private fun parseUserCenterPage(document: Document): UserCenterPage {
