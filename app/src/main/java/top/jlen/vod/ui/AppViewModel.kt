@@ -421,7 +421,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         searchJob = viewModelScope.launch searchLaunch@{
             try {
                 val results = withContext(Dispatchers.IO) { repository.search(query) }
-                if (requestVersion != searchRequestVersion) return@launch
+                if (requestVersion != searchRequestVersion) return@searchLaunch
 
                 searchHistoryStore.save(query)
                 searchState = searchState.copy(
