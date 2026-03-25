@@ -16,6 +16,12 @@ interface AppleCmsApi {
     ): AppleCmsResponse
 
     @GET("api.php/provide/vod/")
+    suspend fun getListPage(
+        @Query("ac") action: String = "list",
+        @Query("pg") page: Int = 1
+    ): AppleCmsResponse
+
+    @GET("api.php/provide/vod/")
     suspend fun getByType(
         @Query("ac") action: String = "detail",
         @Query("t") typeId: String,

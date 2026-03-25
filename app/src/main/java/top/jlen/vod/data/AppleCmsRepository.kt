@@ -82,6 +82,7 @@ class AppleCmsRepository(
         }.getOrElse {
             loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
         }
+        val allCategoryPage = loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
         val latest = latestPage.items
 
         if (latest.isEmpty()) {
@@ -114,11 +115,15 @@ class AppleCmsRepository(
             sections = emptyList(),
             categories = categories,
             selectedCategory = categories.firstOrNull(),
-            categoryVideos = latest,
+            categoryVideos = allCategoryPage.items,
             latestPage = latestPage.page,
             latestPageCount = latestPage.pageCount,
             latestTotal = latestPage.totalItems,
-            latestHasNextPage = latestPage.hasNextPage
+            latestHasNextPage = latestPage.hasNextPage,
+            categoryPage = allCategoryPage.page,
+            categoryPageCount = allCategoryPage.pageCount,
+            categoryTotal = allCategoryPage.totalItems,
+            categoryHasNextPage = allCategoryPage.hasNextPage
         ).also { payload ->
             homeCache = CachedValue(
                 value = payload,
@@ -139,17 +144,14 @@ class AppleCmsRepository(
                 ?.value
                 ?.let { return it }
         }
-        val responses = allCategoryTypeIds
-            .map { typeId -> api.getByType(typeId = typeId, page = safePage) }
-
-        val mergedItems = interleaveCategoryItems(responses)
+        val response = api.getListPage(page = safePage)
         return PagedVodItems(
-            items = mergedItems,
-            page = safePage,
-            pageCount = responses.maxOfOrNull { it.safePageCount } ?: safePage,
-            totalItems = responses.sumOf { it.safeTotal },
-            limit = responses.sumOf { it.safeLimit }.takeIf { it > 0 } ?: mergedItems.size,
-            hasNextPage = responses.any { it.hasNextPage }
+            items = response.list.distinctBy { it.vodId },
+            page = response.safePage,
+            pageCount = response.safePageCount,
+            totalItems = response.safeTotal,
+            limit = response.safeLimit.takeIf { it > 0 } ?: response.list.size,
+            hasNextPage = response.hasNextPage
         ).also { payload ->
             categoryPageCache[cacheKey] = CachedValue(
                 value = payload,
@@ -1950,7 +1952,11 @@ data class HomePayload(
     val latestPage: Int,
     val latestPageCount: Int,
     val latestTotal: Int,
-    val latestHasNextPage: Boolean
+    val latestHasNextPage: Boolean,
+    val categoryPage: Int,
+    val categoryPageCount: Int,
+    val categoryTotal: Int,
+    val categoryHasNextPage: Boolean
 )
 
 data class HomeSection(

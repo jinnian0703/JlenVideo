@@ -144,11 +144,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     hasMoreHomePages = payload.latestHasNextPage,
                     categories = categories,
                     selectedCategory = localizedAllCategory,
-                    categoryVideos = payload.latest,
-                    categoryVisibleCount = payload.latest.size,
-                    categoryPage = payload.latestPage,
-                    categoryTotalCount = payload.latestTotal,
-                    hasMoreCategoryPages = payload.latestHasNextPage
+                    categoryVideos = payload.categoryVideos,
+                    categoryVisibleCount = payload.categoryVideos.size,
+                    categoryPage = payload.categoryPage,
+                    categoryTotalCount = payload.categoryTotal,
+                    hasMoreCategoryPages = payload.categoryHasNextPage
                 )
             }.onFailure { error ->
                 homeState = homeState.copy(
