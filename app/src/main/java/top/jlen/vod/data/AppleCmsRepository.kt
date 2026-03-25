@@ -46,6 +46,12 @@ class AppleCmsRepository(
         AppleCmsCategory(typeId = "3", typeName = "综艺", parentId = "3"),
         AppleCmsCategory(typeId = "4", typeName = "动漫", parentId = "4")
     )
+    private val categoryPageSlugs = mapOf(
+        "1" to "GCCCCG",
+        "2" to "GCCCCT",
+        "3" to "GCCCCV",
+        "4" to "GCCCCW"
+    )
     private val baseUrl = BuildConfig.APPLE_CMS_BASE_URL.trimEnd('/')
     private val gson = Gson()
     private val categoryPageCache = ConcurrentHashMap<String, CachedValue<PagedVodItems>>()
@@ -101,7 +107,7 @@ class AppleCmsRepository(
         if (latest.isEmpty()) {
             throw IOException("首页内容解析失败")
         }
-        val categories = loadBrowsableCategories(homeDocument = homeDocument)
+        val categories = defaultCategories
         return HomePayload(
             slides = emptyList(),
             hot = emptyList(),
@@ -139,23 +145,27 @@ class AppleCmsRepository(
                 ?.value
                 ?.let { return it }
         }
-        val allCategoryTypeIds = loadBrowsableCategories()
-            .map { it.typeId }
-            .filter { it.isNotBlank() }
-        val responses = coroutineScope {
-            allCategoryTypeIds
-                .map { typeId -> async { api.getByType(typeId = typeId, page = safePage) } }
+        val pages = coroutineScope {
+            defaultCategories
+                .map { category -> async { loadCategoryPage(category.typeId, safePage, forceRefresh = forceRefresh) } }
                 .awaitAll()
         }
-
-        val mergedItems = interleaveCategoryItems(responses)
+        val mergedItems = interleaveCategoryItems(pages.map { pagePayload ->
+            AppleCmsResponse(
+                page = pagePayload.page,
+                pageCount = pagePayload.pageCount,
+                limit = pagePayload.limit,
+                total = pagePayload.totalItems,
+                list = pagePayload.items
+            )
+        })
         return PagedVodItems(
             items = mergedItems,
             page = safePage,
-            pageCount = responses.maxOfOrNull { it.safePageCount } ?: safePage,
-            totalItems = responses.sumOf { it.safeTotal },
-            limit = responses.sumOf { it.safeLimit }.takeIf { it > 0 } ?: mergedItems.size,
-            hasNextPage = responses.any { it.hasNextPage }
+            pageCount = pages.maxOfOrNull { it.pageCount } ?: safePage,
+            totalItems = pages.sumOf { it.totalItems },
+            limit = pages.sumOf { it.limit }.takeIf { it > 0 } ?: mergedItems.size,
+            hasNextPage = pages.any { it.hasNextPage }
         ).also { payload ->
             categoryPageCache[cacheKey] = CachedValue(
                 value = payload,
@@ -192,14 +202,28 @@ class AppleCmsRepository(
                 ?.value
                 ?.let { return it }
         }
-        return api.getByType(typeId = typeId, page = safePage)
-            .toPagedVodItems()
-            .also { payload ->
-                categoryPageCache[cacheKey] = CachedValue(
-                    value = payload,
-                    timestampMs = System.currentTimeMillis()
-                )
-            }
+        val categorySlug = categoryPageSlugs[typeId]
+        val payload = if (categorySlug != null) {
+            val pageUrl = buildCategoryPageUrl(categorySlug, safePage)
+            val document = fetchDocument(pageUrl)
+            val items = parseVodCards(document)
+            PagedVodItems(
+                items = items,
+                page = safePage,
+                pageCount = if (hasCategoryNextPage(document, categorySlug, safePage)) safePage + 1 else safePage,
+                totalItems = items.size,
+                limit = items.size,
+                hasNextPage = hasCategoryNextPage(document, categorySlug, safePage)
+            )
+        } else {
+            api.getByType(typeId = typeId, page = safePage).toPagedVodItems()
+        }
+        return payload.also {
+            categoryPageCache[cacheKey] = CachedValue(
+                value = it,
+                timestampMs = System.currentTimeMillis()
+            )
+        }
     }
 
     suspend fun search(keyword: String, forceRefresh: Boolean = false): List<VodItem> {
@@ -1915,7 +1939,11 @@ class AppleCmsRepository(
     }
 
     private fun buildCategoryPageUrl(categorySlug: String, page: Int): String =
-        "$baseUrl/vodshow/$categorySlug--------${page.coerceAtLeast(1)}---/"
+        if (page.coerceAtLeast(1) <= 1) {
+            "$baseUrl/vodshow/$categorySlug-----------/"
+        } else {
+            "$baseUrl/vodshow/$categorySlug--------${page.coerceAtLeast(1)}---/"
+        }
 
     private fun hasCategoryNextPage(document: Document, categorySlug: String, page: Int): Boolean {
         val nextPageUrl = "/vodshow/$categorySlug--------${page + 1}---/"
