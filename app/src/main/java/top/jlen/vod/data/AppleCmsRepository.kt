@@ -1001,13 +1001,10 @@ class AppleCmsRepository(
             referer = sourceUrl,
             userAgent = HOT_SEARCH_MOBILE_UA
         )
-        val layoutJson = Regex(
-            """window\.layoutData\s*=\s*(\{.*?\});\s*window\._SSRERR_=""",
-            setOf(RegexOption.DOT_MATCHES_ALL)
-        ).find(html)
-            ?.groupValues
-            ?.getOrNull(1)
-            .orEmpty()
+        val layoutJson = extractAssignedJsonObject(
+            html = html,
+            variableName = "window.layoutData"
+        )
 
         if (layoutJson.isBlank()) {
             return HotSearchGroup(platform = "\u4f18\u9177")
@@ -1768,6 +1765,44 @@ class AppleCmsRepository(
                 }
             }
         }
+    }
+
+    private fun extractAssignedJsonObject(html: String, variableName: String): String {
+        val markerIndex = html.indexOf("$variableName=")
+        if (markerIndex < 0) return ""
+
+        val startIndex = html.indexOf('{', markerIndex)
+        if (startIndex < 0) return ""
+
+        var depth = 0
+        var inString = false
+        var escaped = false
+        for (index in startIndex until html.length) {
+            val char = html[index]
+            if (inString) {
+                if (escaped) {
+                    escaped = false
+                } else if (char == '\\') {
+                    escaped = true
+                } else if (char == '"') {
+                    inString = false
+                }
+                continue
+            }
+
+            when (char) {
+                '"' -> inString = true
+                '{' -> depth += 1
+                '}' -> {
+                    depth -= 1
+                    if (depth == 0) {
+                        return html.substring(startIndex, index + 1)
+                    }
+                }
+            }
+        }
+
+        return ""
     }
 
     private fun extractVodId(detailHref: String): String =
