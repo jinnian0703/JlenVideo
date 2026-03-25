@@ -619,16 +619,79 @@ fun SearchResultsScreen(
         }
         when {
             state.isLoading -> item { LoadingPane("搜索中..") }
+            !state.error.isNullOrBlank() && state.submittedQuery.isBlank() && state.results.isEmpty() ->
+                item { SearchEmptyState(query = "", message = state.error) }
             !state.error.isNullOrBlank() && state.results.isEmpty() ->
                 item { ErrorBanner(message = state.error, onRetry = onSearch) }
             state.results.isEmpty() ->
-                item { EmptyPane(if (state.submittedQuery.isBlank()) "输入片名搜索" else "暂无结果") }
+                item { SearchEmptyState(query = state.submittedQuery) }
             else -> items(
                 items = state.results,
                 key = { it.stableKey() },
                 contentType = { "search_result" }
             ) { item ->
                 ListCard(item = item, onClick = onOpenDetail)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchEmptyState(
+    query: String,
+    message: String? = null
+) {
+    val title = when {
+        message != null && query.isBlank() -> message
+        query.isBlank() -> "输入片名开始搜索"
+        else -> "没找到“$query”"
+    }
+    val description = when {
+        query.isBlank() -> "也可以试试主演、导演或别名"
+        else -> "换个关键词再试试，片名、主演、别名都可以"
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.72f)),
+        shape = RoundedCornerShape(28.dp),
+        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.7f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp, vertical = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(UiPalette.AccentSoft.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Search,
+                    contentDescription = null,
+                    tint = UiPalette.Accent,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = UiPalette.Ink
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = UiPalette.TextMuted
+                )
             }
         }
     }

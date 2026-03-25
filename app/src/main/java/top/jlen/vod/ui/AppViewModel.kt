@@ -428,7 +428,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     isLoading = false,
                     history = searchHistoryStore.load(),
                     results = results,
-                    error = if (results.isEmpty()) "没有找到相关结果" else null
+                    error = null
                 )
 
                 if (results.isNotEmpty()) {
