@@ -143,10 +143,12 @@ buildConfigField("String", "APPLE_CMS_BASE_URL", "\"https://your-domain.com/\"")
 当前客户端对接时参考使用的模板文件为：
 
 - [templates/v2.zip](F:/codex/1/templates/v2.zip)
+- [templates/DYXS2](F:/codex/1/templates/DYXS2)
 
 推荐使用方式：
 
 - 推荐直接使用仓库内附带的 [templates/v2.zip](F:/codex/1/templates/v2.zip) 作为模板参考或部署底包
+- 如果需要查看已解压的模板目录结构，可直接参考 [templates/DYXS2](F:/codex/1/templates/DYXS2)
 - 如果准备复刻 `cms.jlen.top` 当前结构，优先使用这份模板，客户端适配会更稳定
 - 如果更换了别的模板，也可以继续适配，但搜索、详情、播放、专题、演员、文章、用户中心等页面的解析逻辑可能需要重新调整
 
