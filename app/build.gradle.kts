@@ -11,8 +11,8 @@ android {
         applicationId = "top.jlen.vod"
         minSdk = 24
         targetSdk = 34
-        versionCode = 12
-        versionName = "2.0.0"
+        versionCode = 14
+        versionName = "2.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -76,7 +76,8 @@ afterEvaluate {
                     ?.maxByOrNull { it.lastModified() }
                     ?: return@doLast
 
-                val targetName = "JlenVideo-${variant.versionName ?: "dev"}-${variant.name}.apk"
+                val resolvedVersionName = android.defaultConfig.versionName ?: "dev"
+                val targetName = "JlenVideo-$resolvedVersionName-${variant.name}.apk"
                 val targetApk = outputDir.resolve(targetName)
                 if (targetApk.exists()) {
                     targetApk.delete()

@@ -8,8 +8,8 @@
 
 当前正式版：
 
-- `versionName`: `2.0.0`
-- `versionCode`: `12`
+- `versionName`: `2.0.1`
+- `versionCode`: `14`
 
 版本配置位置：
 
@@ -279,12 +279,12 @@ macOS / Linux：
 1. 修改 [app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt](app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt) 中的 GitHub Release 接口地址
 2. 修改同文件中的 Release 页面兜底地址
 3. 修改 [app/build.gradle.kts](app/build.gradle.kts) 里的 `versionCode` 和 `versionName`
-4. 创建新的 tag，例如 `v2.0.0`
+4. 创建新的 tag，例如 `v2.0.1`
 5. 创建 GitHub Release 并上传 APK
 
 注意事项：
 
-- `versionName` 建议与 Release 标签对应，例如本地 `2.0.0` 对应 `v2.0.0`
+- `versionName` 建议与 Release 标签对应，例如本地 `2.0.1` 对应 `v2.0.1`
 - 如果没有上传 APK 资产，下载按钮会自动回退到 Release 页面
 - 如果最新版本仍是 Draft，GitHub 的最新发布接口通常不会返回
 
@@ -300,11 +300,13 @@ macOS / Linux：
 6. 创建 GitHub Release
 7. 上传 APK
 
-## 2.0.0 版本说明
+## 2.0.1 版本说明
 
-当前仓库版本现已提升为 `2.0.0`。
+当前仓库版本现已提升为 `2.0.1`。
 
-最近一个已整理记录的功能版本为 `1.1.9`，主要包含以下变更：
+`2.0.1` 在 `2.0.0` 基础上继续优化了版本升级弹窗的布局与按钮显示。
+
+最近一个已整理记录的大版本功能更新为 `2.0.0`，相关能力已合入当前版本。
 
 - 重建搜索页结构，分离搜索入口、搜索记录、热搜榜和结果页
 - 新增多平台热搜榜抓取能力

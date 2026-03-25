@@ -6,22 +6,42 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -37,6 +57,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -46,6 +68,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.compose.ui.window.Dialog
+import top.jlen.vod.data.AppUpdateInfo
 
 private val topLevelRoutes = setOf("home", "categories", "search", "account")
 
@@ -84,6 +108,12 @@ fun JlenVideoApp() {
     val shouldShowUpdateDialog = updateInfo?.hasUpdate == true &&
         updateInfo.latestVersion.isNotBlank() &&
         dismissedUpdateVersion != updateInfo.latestVersion
+    val openReleaseLink: () -> Unit = {
+        val targetUrl = updateInfo?.releasePageUrl
+            ?.takeIf { it.isNotBlank() }
+            ?: "https://github.com/jinnian0703/JlenVideo/releases"
+        openExternalUrl(context, targetUrl)
+    }
     val openUpdateLink: () -> Unit = {
         val targetUrl = updateInfo?.downloadUrl
             ?.takeIf { it.isNotBlank() }
@@ -115,48 +145,16 @@ fun JlenVideoApp() {
         Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
             Box(modifier = Modifier.fillMaxSize().background(appBackground)) {
                 if (shouldShowUpdateDialog) {
-                    AlertDialog(
-                        onDismissRequest = {
+                    UpdatePromptDialog(
+                        updateInfo = updateInfo ?: AppUpdateInfo(),
+                        onDismiss = {
                             dismissedUpdateVersion = updateInfo?.latestVersion.orEmpty()
                         },
-                        title = {
-                            Text("发现新版本")
+                        onOpenRelease = openReleaseLink,
+                        onUpdate = {
+                            dismissedUpdateVersion = updateInfo?.latestVersion.orEmpty()
+                            openUpdateLink()
                         },
-                        text = {
-                            Text(
-                                buildString {
-                                    append("当前版本：")
-                                    append(updateInfo?.currentVersion.orEmpty().ifBlank { "未知" })
-                                    append("\n最新版本：")
-                                    append(updateInfo?.latestVersion.orEmpty())
-                                    updateInfo?.notes
-                                        ?.takeIf { it.isNotBlank() }
-                                        ?.let {
-                                            append("\n\n更新说明：\n")
-                                            append(it)
-                                        }
-                                }
-                            )
-                        },
-                        confirmButton = {
-                            TextButton(
-                                onClick = {
-                                    dismissedUpdateVersion = updateInfo?.latestVersion.orEmpty()
-                                    openUpdateLink()
-                                }
-                            ) {
-                                Text("立即更新")
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(
-                                onClick = {
-                                    dismissedUpdateVersion = updateInfo?.latestVersion.orEmpty()
-                                }
-                            ) {
-                                Text("稍后再说")
-                            }
-                        }
                     )
                 }
                 Scaffold(
@@ -347,6 +345,248 @@ private fun shouldAnimateRouteTransition(fromRoute: String?, toRoute: String?): 
     val fromTopLevel = fromRoute in topLevelRoutes
     val toTopLevel = toRoute in topLevelRoutes
     return !fromTopLevel && !toTopLevel
+}
+
+@Composable
+private fun UpdatePromptDialog(
+    updateInfo: AppUpdateInfo,
+    onDismiss: () -> Unit,
+    onOpenRelease: () -> Unit,
+    onUpdate: () -> Unit
+) {
+    val notes = updateInfo.notes
+        .lineSequence()
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .toList()
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(UiPalette.Accent, UiPalette.AccentSoft)
+                                ),
+                                shape = RoundedCornerShape(18.dp)
+                            ),
+                        contentAlignment = androidx.compose.ui.Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.NewReleases,
+                            contentDescription = null,
+                            tint = UiPalette.AccentText
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "发现新版本",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = UiPalette.Ink
+                        )
+                        Text(
+                            text = "建议更新到最新版本，获得更好的稳定性和体验。",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = UiPalette.TextSecondary
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .offset(y = 2.dp)
+                            .background(
+                                color = UiPalette.AccentGlow,
+                                shape = RoundedCornerShape(999.dp)
+                            )
+                            .border(1.dp, UiPalette.DangerBorder, RoundedCornerShape(999.dp))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            text = "可更新",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = UiPalette.DangerText
+                        )
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    UpdateVersionPill(
+                        modifier = Modifier.weight(1f),
+                        label = "当前版本",
+                        value = updateInfo.currentVersion.ifBlank { "未知" }
+                    )
+                    UpdateVersionPill(
+                        modifier = Modifier.weight(1f),
+                        label = "最新版本",
+                        value = updateInfo.latestVersion.ifBlank { "未知" }
+                    )
+                }
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "更新说明",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = UiPalette.Ink
+                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 220.dp)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (notes.isEmpty()) {
+                                Text(
+                                    text = "本次版本已发布，建议直接更新体验最新内容。",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = UiPalette.TextSecondary
+                                )
+                            } else {
+                                notes.forEach { note ->
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text(
+                                            text = "•",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = UiPalette.Accent
+                                        )
+                                        Text(
+                                            text = note.removePrefix("•").removePrefix("-").trim(),
+                                            modifier = Modifier.weight(1f),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = UiPalette.TextPrimary,
+                                            maxLines = 8,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = onDismiss,
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 12.dp)
+                    ) {
+                        Text(
+                            text = "稍后再说",
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onOpenRelease,
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 56.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Box(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "发布页",
+                                maxLines = 1,
+                                softWrap = false,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        Button(
+                            onClick = onUpdate,
+                            modifier = Modifier
+                                .weight(1.25f)
+                                .heightIn(min = 56.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = UiPalette.Accent,
+                                contentColor = UiPalette.AccentText
+                            ),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.FileDownload,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Box(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "立即更新",
+                                maxLines = 1,
+                                softWrap = false,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpdateVersionPill(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: String
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = UiPalette.TextMuted
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = UiPalette.Ink
+            )
+        }
+    }
 }
 
 @Composable
