@@ -1427,6 +1427,14 @@ class AppleCmsRepository(
     }
 
     private suspend fun loadBrowsableCategories(homeDocument: Document? = null): List<AppleCmsCategory> {
+        val apiCategories = runCatching { api.getCategories().categories }
+            .getOrDefault(emptyList())
+            .map(::normalizeCategory)
+            .filter(::isBrowsableCategory)
+            .distinctBy { it.typeId }
+
+        if (apiCategories.isNotEmpty()) return apiCategories
+
         val resolvedHomeDocument = homeDocument ?: runCatching { fetchDocument("$baseUrl/") }.getOrNull()
         val mapDocument = runCatching { fetchDocument("$baseUrl/map/") }.getOrNull()
 
@@ -1438,14 +1446,6 @@ class AppleCmsRepository(
             .distinctBy { it.typeId }
 
         if (parsedCategories.isNotEmpty()) return parsedCategories
-
-        val apiCategories = runCatching { api.getCategories().categories }
-            .getOrDefault(emptyList())
-            .map(::normalizeCategory)
-            .filter(::isBrowsableCategory)
-            .distinctBy { it.typeId }
-
-        if (apiCategories.isNotEmpty()) return apiCategories
 
         return defaultCategories.map(::normalizeCategory)
     }
