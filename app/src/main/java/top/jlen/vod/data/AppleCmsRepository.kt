@@ -47,12 +47,6 @@ class AppleCmsRepository(
         AppleCmsCategory(typeId = "3", typeName = "综艺", parentId = "3"),
         AppleCmsCategory(typeId = "4", typeName = "动漫", parentId = "4")
     )
-    private val categoryPageSlugs = mapOf(
-        "1" to "GCCCCG",
-        "2" to "GCCCCT",
-        "3" to "GCCCCV",
-        "4" to "GCCCCW"
-    )
     private val baseUrl = BuildConfig.APPLE_CMS_BASE_URL.trimEnd('/')
     private val gson = Gson()
     private val categoryPageCache = ConcurrentHashMap<String, CachedValue<PagedVodItems>>()
@@ -261,22 +255,7 @@ class AppleCmsRepository(
                     return cached.value
                 }
         }
-        val categorySlug = categoryPageSlugs[typeId]
-        val payload = if (categorySlug != null) {
-            val pageUrl = buildCategoryPageUrl(categorySlug, safePage)
-            val document = fetchDocument(pageUrl)
-            val items = parseVodCards(document)
-            PagedVodItems(
-                items = items,
-                page = safePage,
-                pageCount = if (hasCategoryNextPage(document, categorySlug, safePage)) safePage + 1 else safePage,
-                totalItems = items.size,
-                limit = items.size,
-                hasNextPage = hasCategoryNextPage(document, categorySlug, safePage)
-            )
-        } else {
-            api.getByType(typeId = typeId, page = safePage).toPagedVodItems()
-        }
+        val payload = api.getByType(typeId = typeId, page = safePage).toPagedVodItems()
         return payload.also { cachePagePayload(cacheKey, it) }
     }
 
@@ -2043,21 +2022,6 @@ class AppleCmsRepository(
                 .substringBefore('/')
                 .substringBefore('-')
             else -> ""
-        }
-    }
-
-    private fun buildCategoryPageUrl(categorySlug: String, page: Int): String =
-        if (page.coerceAtLeast(1) <= 1) {
-            "$baseUrl/vodshow/$categorySlug-----------/"
-        } else {
-            "$baseUrl/vodshow/$categorySlug--------${page.coerceAtLeast(1)}---/"
-        }
-
-    private fun hasCategoryNextPage(document: Document, categorySlug: String, page: Int): Boolean {
-        val nextPageUrl = "/vodshow/$categorySlug--------${page + 1}---/"
-        return document.select("a[href]").any { anchor ->
-            val href = anchor.attr("href")
-            href.contains(nextPageUrl) || anchor.text().contains("下一页")
         }
     }
 
