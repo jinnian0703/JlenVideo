@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -53,6 +54,7 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.TextStyle
@@ -569,7 +571,7 @@ fun NativeVideoPlayer(
                                         .height(controlChipHeight)
                                 )
                             }
-                            if (!fullscreenMode && onToggleFullscreen != null) {
+                            if (false && !fullscreenMode && onToggleFullscreen != null) {
                                 Text(
                                     text = "全屏",
                                     color = Color.White,
@@ -696,11 +698,11 @@ fun NativeVideoPlayer(
                                 }
                             )
                             if (hasNextEpisode && onNextEpisode != null) {
-                                ControlChip(
-                                    text = ">>",
+                                IconControlChip(
+                                    icon = Icons.Rounded.SkipNext,
+                                    contentDescription = "下一集",
                                     width = controlChipWidth,
                                     height = controlChipHeight,
-                                    textStyle = controlPillTextStyle,
                                     onClick = {
                                         controlsVersion++
                                         onNextEpisode()
@@ -734,6 +736,19 @@ fun NativeVideoPlayer(
                                 )
                             }
                             if (!fullscreenMode && onToggleFullscreen != null) {
+                                IconControlChip(
+                                    icon = Icons.Rounded.Fullscreen,
+                                    contentDescription = "全屏播放",
+                                    width = controlChipWidth,
+                                    height = controlChipHeight,
+                                    onClick = {
+                                        val snapshot = dispatchSnapshot(force = true)
+                                        latestFullscreenToggleCallback.value?.invoke(snapshot, lastReportedLandscape)
+                                        controlsVersion++
+                                    }
+                                )
+                            }
+                            if (false && !fullscreenMode && onToggleFullscreen != null) {
                                 Text(
                                     text = "⛶",
                                     color = Color.White,
@@ -765,6 +780,37 @@ fun NativeVideoPlayer(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun IconControlChip(
+    icon: ImageVector,
+    contentDescription: String,
+    width: androidx.compose.ui.unit.Dp,
+    height: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(Color.Black.copy(alpha = 0.28f))
+            .border(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.14f),
+                shape = RoundedCornerShape(999.dp)
+            )
+            .width(width)
+            .height(height)
+            .clickableWithoutRipple(onClick)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = Color.White,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
