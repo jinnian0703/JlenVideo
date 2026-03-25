@@ -8,8 +8,10 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 import java.io.InterruptedIOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
@@ -38,6 +40,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = AppleCmsRepository(application)
     private val searchHistoryStore = SearchHistoryStore(application)
     private val allCategory = AppleCmsCategory(typeId = "__all__", typeName = "全部分类")
+    private var searchJob: Job? = null
+    private var searchEnrichJob: Job? = null
+    private var searchRequestVersion: Long = 0L
 
     var homeState by mutableStateOf(HomeUiState())
         private set
@@ -394,6 +399,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun performSearch(keyword: String) {
         val query = keyword.trim()
         if (query.isBlank()) {
+            searchJob?.cancel()
+            searchEnrichJob?.cancel()
             searchState = searchState.copy(
                 submittedQuery = "",
                 results = emptyList(),
@@ -401,16 +408,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             )
             return
         }
-        viewModelScope.launch {
-            searchState = searchState.copy(
-                query = query,
-                submittedQuery = query,
-                isLoading = true,
-                error = null
-            )
-            runCatching {
-                withContext(Dispatchers.IO) { repository.search(query) }
-            }.onSuccess { results ->
+        searchJob?.cancel()
+        searchEnrichJob?.cancel()
+        val requestVersion = ++searchRequestVersion
+        searchState = searchState.copy(
+            query = query,
+            submittedQuery = query,
+            isLoading = true,
+            results = emptyList(),
+            error = null
+        )
+        searchJob = viewModelScope.launch searchLaunch@{
+            try {
+                val results = withContext(Dispatchers.IO) { repository.search(query) }
+                if (requestVersion != searchRequestVersion) return@launch
+
                 searchHistoryStore.save(query)
                 searchState = searchState.copy(
                     isLoading = false,
@@ -418,7 +430,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     results = results,
                     error = if (results.isEmpty()) "没有找到相关结果" else null
                 )
-            }.onFailure { error ->
+
+                if (results.isNotEmpty()) {
+                    searchEnrichJob = viewModelScope.launch searchEnrichLaunch@{
+                        val enrichedResults = withContext(Dispatchers.IO) {
+                            repository.enrichSearchResults(results, limit = 8)
+                        }
+                        if (requestVersion != searchRequestVersion) return@searchEnrichLaunch
+                        searchState = searchState.copy(results = enrichedResults)
+                    }
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (requestVersion != searchRequestVersion) return@searchLaunch
                 searchState = searchState.copy(
                     isLoading = false,
                     error = toUserFacingMessage(error, "搜索失败")

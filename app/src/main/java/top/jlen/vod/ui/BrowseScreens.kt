@@ -2825,6 +2825,14 @@ private fun CompactPosterCard(
 
 @Composable
 private fun ListCard(item: VodItem, onClick: (String) -> Unit) {
+    val detailDescription = item.description
+        .takeIf {
+            it.isNotBlank() &&
+                it != "暂无简介" &&
+                it != item.subtitle &&
+                it != item.badgeText
+        }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -2864,14 +2872,16 @@ private fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = UiPalette.TextSecondary
                 )
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = item.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = UiPalette.TextMuted,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis
-                )
+                detailDescription?.let {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = UiPalette.TextMuted,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }

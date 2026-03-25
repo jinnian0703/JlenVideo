@@ -220,22 +220,6 @@ class AppleCmsRepository(
                 ?.let { return it }
         }
 
-        val apiResults = runCatching {
-            api.search(keyword = normalizedKeyword, page = 1)
-                .list
-                .distinctBy { it.vodId }
-                .take(60)
-        }.getOrDefault(emptyList())
-
-        if (apiResults.isNotEmpty()) {
-            return apiResults.also { results ->
-                searchCache[cacheKey] = CachedValue(
-                    value = results,
-                    timestampMs = System.currentTimeMillis()
-                )
-            }
-        }
-
         val encodedKeyword = Uri.encode(normalizedKeyword)
         return runCatching {
             val document = fetchDocument("$baseUrl/vodsearch/-------------/?wd=$encodedKeyword")
@@ -248,6 +232,30 @@ class AppleCmsRepository(
                 timestampMs = System.currentTimeMillis()
             )
         }
+    }
+
+    suspend fun enrichSearchResults(items: List<VodItem>, limit: Int = 8): List<VodItem> {
+        if (items.isEmpty()) return items
+        val enrichTargets = items.take(limit)
+        val enrichedById = coroutineScope {
+            enrichTargets.map { item ->
+                async {
+                    val detailItem = runCatching { loadDetail(item.vodId) }.getOrNull()
+                    val description = detailItem?.description
+                        ?.takeIf { it.isNotBlank() && it != "暂无简介" }
+                        .orEmpty()
+                    item.vodId to if (description.isNotBlank()) {
+                        item.copy(
+                            vodBlurb = description,
+                            vodContent = description
+                        )
+                    } else {
+                        item
+                    }
+                }
+            }.awaitAll().toMap()
+        }
+        return items.map { item -> enrichedById[item.vodId] ?: item }
     }
 
     suspend fun loadHotSearchGroups(forceRefresh: Boolean = false): List<HotSearchGroup> {
@@ -1166,13 +1174,10 @@ class AppleCmsRepository(
                 val anchor = item.selectFirst(".pic a[href*=/voddetail/]") ?: return@mapNotNull null
                 val description = listOf(
                     ".public-list-subtitle",
-                    ".text-muted",
                     ".vod-content",
                     ".detail",
                     ".desc",
-                    ".remarks",
-                    ".module-item-note",
-                    "p:last-of-type"
+                    ".module-item-note"
                 ).asSequence()
                     .mapNotNull { selector ->
                         item.selectFirst(selector)
