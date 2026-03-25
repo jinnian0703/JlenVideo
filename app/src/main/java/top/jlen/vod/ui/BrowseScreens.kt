@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -61,6 +62,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -103,7 +105,9 @@ fun HomeScreen(
         return
     }
 
-    val listState = rememberLazyListState()
+    val listState = rememberSaveable(saver = LazyListState.Saver) {
+        LazyListState()
+    }
     val hotRows = remember(state.hot) { state.hot.chunked(POSTER_GRID_COLUMNS) }
     val latestRows = remember(state.visibleLatest) { state.visibleLatest.chunked(POSTER_GRID_COLUMNS) }
 
@@ -238,7 +242,9 @@ fun CategoryScreen(
     onLoadMore: () -> Unit,
     onOpenDetail: (String) -> Unit
 ) {
-    val listState = rememberLazyListState()
+    val listState = rememberSaveable(saver = LazyListState.Saver) {
+        LazyListState()
+    }
     val categoryRows = remember(state.visibleCategoryVideos) {
         state.visibleCategoryVideos.chunked(POSTER_GRID_COLUMNS)
     }
@@ -346,119 +352,6 @@ fun SearchScreen(
         onClearHistory = onClearHistory,
         onLoadHotSearches = onLoadHotSearches
     )
-    return
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp)
-    ) {
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "搜索",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.ExtraBold,
-            color = UiPalette.Ink
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        OutlinedTextField(
-            value = state.query,
-            onValueChange = onQueryChange,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = UiPalette.Accent,
-                unfocusedBorderColor = UiPalette.BorderSoft,
-                focusedTextColor = UiPalette.Ink,
-                unfocusedTextColor = UiPalette.Ink,
-                cursorColor = UiPalette.Accent,
-                focusedTrailingIconColor = UiPalette.Accent,
-                unfocusedTrailingIconColor = UiPalette.TextSecondary,
-                focusedContainerColor = UiPalette.Surface,
-                unfocusedContainerColor = UiPalette.Surface,
-                focusedPlaceholderColor = UiPalette.TextMuted,
-                unfocusedPlaceholderColor = UiPalette.TextMuted
-            ),
-            placeholder = { Text("搜片名") },
-            trailingIcon = {
-                TextButton(
-                    onClick = { onOpenSearchResults(state.query.trim()) },
-                    colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
-                ) {
-                    Text("搜索", fontWeight = FontWeight.Bold)
-                }
-            }
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        if (state.history.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.History,
-                        contentDescription = null,
-                        tint = UiPalette.TextSecondary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = "搜索历史",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = UiPalette.Ink
-                    )
-                }
-                TextButton(onClick = onClearHistory) {
-                    Text("清空")
-                }
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(
-                    items = state.history,
-                    key = { it },
-                    contentType = { "history" }
-                ) { keyword ->
-                    AssistChip(
-                        onClick = { onSearchHistory(keyword) },
-                        label = { Text(keyword) },
-                        colors = AssistChipDefaults.assistChipColors(
-                            containerColor = UiPalette.Surface,
-                            labelColor = UiPalette.Ink
-                        ),
-                        border = AssistChipDefaults.assistChipBorder(
-                            borderColor = UiPalette.BorderSoft,
-                            enabled = true
-                        )
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-        when {
-            state.isLoading -> LoadingPane("搜索中...")
-            !state.error.isNullOrBlank() && state.results.isEmpty() ->
-                ErrorBanner(message = state.error, onRetry = { onOpenSearchResults(state.query.trim()) })
-            state.results.isEmpty() -> EmptyPane(if (state.query.isBlank()) "输入片名搜索" else "暂无结果")
-            else -> LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                contentPadding = PaddingValues(bottom = 24.dp)
-            ) {
-                items(
-                    items = state.results,
-                    key = { it.stableKey() },
-                    contentType = { "search_result" }
-                ) { item ->
-                    ListCard(item = item, onClick = {})
-                }
-            }
-        }
-    }
 }
 
 private const val POSTER_GRID_COLUMNS = 3

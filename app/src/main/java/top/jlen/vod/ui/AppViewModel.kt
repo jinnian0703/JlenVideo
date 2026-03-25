@@ -151,7 +151,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     categoryTotalCount = payload.categoryTotal,
                     hasMoreCategoryPages = payload.categoryHasNextPage
                 )
-                preloadAllCategoryPage(forceRefresh = forceRefresh)
+                warmAllCategoryFirstPage(forceRefresh = forceRefresh)
             }.onFailure { error ->
                 homeState = homeState.copy(
                     isLoading = false,
@@ -448,32 +448,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun preloadAllCategoryPage(forceRefresh: Boolean = false) {
-        if (homeState.categoryVideos.isNotEmpty() || homeState.isCategoryLoading) {
-            return
-        }
+    private fun warmAllCategoryFirstPage(forceRefresh: Boolean = false) {
         viewModelScope.launch {
-            homeState = homeState.copy(isCategoryLoading = true)
             runCatching {
                 withContext(Dispatchers.IO) {
                     repository.loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
                 }
-            }.onSuccess { payload ->
-                if (homeState.selectedCategory?.typeId == allCategory.typeId) {
-                    homeState = homeState.copy(
-                        categoryVideos = payload.items,
-                        categoryVisibleCount = payload.items.size,
-                        categoryPage = payload.page,
-                        categoryTotalCount = payload.totalItems,
-                        hasMoreCategoryPages = payload.hasNextPage,
-                        isCategoryAppending = false,
-                        isCategoryLoading = false
-                    )
-                } else {
-                    homeState = homeState.copy(isCategoryLoading = false)
-                }
-            }.onFailure {
-                homeState = homeState.copy(isCategoryLoading = false)
             }
         }
     }
