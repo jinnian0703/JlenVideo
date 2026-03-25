@@ -1,6 +1,6 @@
 # JlenVideo
 
-`JlenVideo` 是一个基于原生 Android + Jetpack Compose 开发的苹果 CMS 影视客户端，当前版本为 `1.1.7` 正式版。
+`JlenVideo` 是一个基于原生 Android + Jetpack Compose 开发的苹果 CMS 影视客户端，当前版本为 `1.1.8` 正式版。
 
 项目目标不是简单网页套壳，而是围绕苹果 CMS 站点能力，提供更接近原生 App 的浏览、搜索、详情、播放、账号、收藏、历史与会员体验。
 
@@ -10,17 +10,17 @@
 
 ## 版本信息
 
-- 当前版本：`1.1.7`
-- `versionCode`：`9`
-- `versionName`：`1.1.7`
+- 当前版本：`1.1.8`
+- `versionCode`：`10`
+- `versionName`：`1.1.8`
 
 版本定义位置：
 
 - [app/build.gradle.kts](app/build.gradle.kts)
 
-## 1.1.7 更新内容
+## 1.1.8 更新内容
 
-本次 `1.1.7` 仅记录当前版本实际变更：
+本次 `1.1.8` 仅记录当前版本实际变更：
 
 - 优化整体页面切换与播放器交互转场，统一界面过渡动画
 - 降低播放器进度同步和界面重组频率，减少播放过程中的卡顿感
@@ -234,7 +234,7 @@ macOS / Linux：
 
 当前版本的“检查更新”功能基于 GitHub Release：
 
-- 版本号读取自 Release 的 `tag_name`，默认支持 `v1.1.7` 这种格式，进入 App 后会自动去掉前面的 `v`
+- 版本号读取自 Release 的 `tag_name`，默认支持 `v1.1.8` 这种格式，进入 App 后会自动去掉前面的 `v`
 - 发布说明读取自 Release 的 `body`
 - “查看发布”打开 Release 页面 `html_url`
 - “前往下载”优先打开 Release 资产里的 APK 下载地址 `browser_download_url`
@@ -244,20 +244,20 @@ macOS / Linux：
 1. 修改 [app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt](app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt) 里的 GitHub Release 接口地址
 2. 修改同文件里的 Release 页面兜底地址
 3. 修改 `app/build.gradle.kts` 中的 `versionCode` 和 `versionName`
-4. 打 tag，例如 `v1.1.7`
+4. 打 tag，例如 `v1.1.8`
 5. 创建 GitHub Release 并上传 APK
 
 注意事项：
 
-- `versionName` 要和 GitHub Release 的 `tag_name` 对应，例如本地是 `1.1.7`，Release 标签建议用 `v1.1.7`
+- `versionName` 要和 GitHub Release 的 `tag_name` 对应，例如本地是 `1.1.8`，Release 标签建议用 `v1.1.8`
 - 如果没有上传 APK 资产，“前往下载”会自动退回到 Release 页面
 - 如果 Release 还是 Draft，GitHub 最新发布接口可能不会返回它
 
 ## 开发与发布说明
 
-本仓库当前发布为 `1.1.7` 正式版，建议后续版本遵循语义化版本：
+本仓库当前发布为 `1.1.8` 正式版，建议后续版本遵循语义化版本：
 
-- `1.1.7`：问题修复
+- `1.1.8`：问题修复
 - `1.2.0`：新增功能
 - `2.0.0`：重大不兼容变更
 
@@ -267,7 +267,7 @@ macOS / Linux：
 2. 执行 `assembleDebug` 或 `assembleRelease`
 3. 更新 README 或变更说明
 4. 提交代码
-5. 打 tag，例如 `v1.1.7`
+5. 打 tag，例如 `v1.1.8`
 6. 推送到 GitHub
 7. 创建 GitHub Release
 
