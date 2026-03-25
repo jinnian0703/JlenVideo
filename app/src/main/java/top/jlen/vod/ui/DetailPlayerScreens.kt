@@ -321,88 +321,92 @@ fun PlayerScreen(
             .background(UiPalette.BackgroundBottom)
     ) {
         val listState = rememberLazyListState()
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 24.dp),
-            state = listState,
-            contentPadding = PaddingValues(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            item(key = "player_header") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(UiPalette.PlayerBackground)
-                ) {
-                    Column {
-                        DetailTopBar(
-                            title = state.title.ifBlank { "播放器" },
-                            onBack = onBack,
-                            darkMode = true
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(UiPalette.PlayerBackground)
+            ) {
+                Column {
+                    DetailTopBar(
+                        title = state.title.ifBlank { "播放器" },
+                        onBack = onBack,
+                        darkMode = true
+                    )
+                    when {
+                        state.isResolving && !isFullscreen -> ResolveLoadingSurface(
+                            message = "正在获取播放地址..."
                         )
-                        when {
-                            state.isResolving && !isFullscreen -> ResolveLoadingSurface(
-                                message = "正在获取播放地址..."
-                            )
-                            state.useWebPlayer && !isFullscreen -> ResolveUnavailableSurface()
-                            directPlayable && !isFullscreen -> playerContent(false)
-                            directPlayable -> Spacer(modifier = Modifier.height(0.dp))
-                            else -> EmptyPane("暂无可播放地址")
-                        }
+                        state.useWebPlayer && !isFullscreen -> ResolveUnavailableSurface()
+                        directPlayable && !isFullscreen -> playerContent(false)
+                        directPlayable -> Spacer(modifier = Modifier.height(0.dp))
+                        else -> EmptyPane("暂无可播放地址")
                     }
                 }
             }
-            item(key = "player_meta") {
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    Text(
-                        text = state.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = UiPalette.Ink
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = buildString {
-                            append("正在播放")
-                            if (state.sourceName.isNotBlank()) {
-                                append(" · ")
-                                append(state.sourceName)
-                            }
-                            if (state.episodeName.isNotBlank()) {
-                                append(" · ")
-                                append(state.episodeName)
-                            }
-                        },
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = UiPalette.TextSecondary
-                    )
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
+                state = listState,
+                contentPadding = PaddingValues(top = 18.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                item(key = "player_meta") {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        Text(
+                            text = state.title,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = UiPalette.Ink
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = buildString {
+                                append("正在播放")
+                                if (state.sourceName.isNotBlank()) {
+                                    append(" · ")
+                                    append(state.sourceName)
+                                }
+                                if (state.episodeName.isNotBlank()) {
+                                    append(" · ")
+                                    append(state.episodeName)
+                                }
+                            },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = UiPalette.TextSecondary
+                        )
+                    }
                 }
-            }
 
-            if (state.sources.isNotEmpty()) {
-                item(key = "source_title") {
-                    SectionTitle(title = "切换线路", action = state.sourceName, onAction = {})
+                if (state.sources.isNotEmpty()) {
+                    item(key = "source_title") {
+                        SectionTitle(title = "切换线路", action = state.sourceName, onAction = {})
+                    }
+                    item(key = "source_row") {
+                        SourceRow(
+                            sourceNames = state.sources.map { it.name },
+                            selectedIndex = state.selectedSourceIndex,
+                            onSelectSource = onSelectSource
+                        )
+                    }
                 }
-                item(key = "source_row") {
-                    SourceRow(
-                        sourceNames = state.sources.map { it.name },
-                        selectedIndex = state.selectedSourceIndex,
-                        onSelectSource = onSelectSource
-                    )
-                }
-            }
 
-            if (state.episodes.isNotEmpty()) {
-                item(key = "episode_title") {
-                    SectionTitle(title = "切换选集", action = null, onAction = {})
-                }
-                item(key = "episode_panel") {
-                    EpisodePanel(
-                        episodes = state.episodes,
-                        selectedIndex = state.selectedEpisodeIndex,
-                        onEpisodeClick = onSelectEpisode
-                    )
+                if (state.episodes.isNotEmpty()) {
+                    item(key = "episode_title") {
+                        SectionTitle(title = "切换选集", action = null, onAction = {})
+                    }
+                    item(key = "episode_panel") {
+                        EpisodePanel(
+                            episodes = state.episodes,
+                            selectedIndex = state.selectedEpisodeIndex,
+                            onEpisodeClick = onSelectEpisode
+                        )
+                    }
                 }
             }
         }
