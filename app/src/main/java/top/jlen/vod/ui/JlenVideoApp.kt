@@ -215,7 +215,6 @@ fun JlenVideoApp() {
                         composable("categories") {
                             CategoryScreen(
                                 state = viewModel.homeState,
-                                onEnsureAllCategory = { viewModel.refreshCategoryTab() },
                                 onSelectCategory = viewModel::selectCategory,
                                 onLoadMore = viewModel::loadMoreCategory,
                                 onOpenDetail = { navController.navigate("detail/$it") }

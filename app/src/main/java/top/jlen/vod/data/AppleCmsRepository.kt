@@ -196,6 +196,21 @@ class AppleCmsRepository(
         }
     }
 
+    fun peekCategoryPage(typeId: String, page: Int): PagedVodItems? {
+        val safePage = page.coerceAtLeast(1)
+        val cacheKey = "$typeId:$safePage"
+        categoryPageCache[cacheKey]
+            ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
+            ?.value
+            ?.let { return it }
+        readPersistedPageCache(cacheKey)
+            ?.takeIf { isCacheValid(it.timestampMs, DISK_PAGE_CACHE_TTL_MS) }
+            ?.also { cached -> categoryPageCache[cacheKey] = cached }
+            ?.value
+            ?.let { return it }
+        return null
+    }
+
     suspend fun loadLatestPage(page: Int): PagedVodItems =
         api.getLatest(page = page.coerceAtLeast(1)).toPagedVodItems()
 

@@ -39,7 +39,6 @@ import top.jlen.vod.data.VodItem
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = AppleCmsRepository(application)
     private val searchHistoryStore = SearchHistoryStore(application)
-    private val allCategory = AppleCmsCategory(typeId = "__all__", typeName = "全部分类")
     private var searchJob: Job? = null
     private var searchEnrichJob: Job? = null
     private var searchRequestVersion: Long = 0L
@@ -63,7 +62,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         searchState = searchState.copy(history = searchHistoryStore.load())
         refreshCrashLog()
         refreshAccount()
-        warmAllCategoryFirstPage()
         refreshHome()
         checkAppUpdate()
     }
@@ -136,9 +134,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadHome(forceRefresh = forceRefresh) }
             }.onSuccess { payload ->
-                val localizedAllCategory = allCategory.copy(typeName = "\u5168\u90e8\u5206\u7c7b")
-                val categories = listOf(localizedAllCategory) + payload.categories
-                val cachedAllCategory = repository.peekAllCategoryPage(page = 1)
+                val categories = payload.categories
+                val defaultSelected = categories.firstOrNull()
+                val cachedSelectedPage = defaultSelected?.let {
+                    repository.peekCategoryPage(typeId = it.typeId, page = 1)
+                }
                 homeState = HomeUiState(
                     isLoading = false,
                     slides = payload.slides,
@@ -151,14 +151,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     homeTotalCount = payload.latestTotal,
                     hasMoreHomePages = payload.latestHasNextPage,
                     categories = categories,
-                    selectedCategory = localizedAllCategory,
-                    categoryVideos = cachedAllCategory?.items ?: payload.categoryVideos,
-                    categoryVisibleCount = cachedAllCategory?.items?.size ?: payload.categoryVideos.size,
-                    categoryPage = cachedAllCategory?.page ?: payload.categoryPage,
-                    categoryTotalCount = cachedAllCategory?.totalItems ?: payload.categoryTotal,
-                    hasMoreCategoryPages = cachedAllCategory?.hasNextPage ?: payload.categoryHasNextPage
+                    selectedCategory = defaultSelected,
+                    categoryVideos = cachedSelectedPage?.items ?: payload.categoryVideos,
+                    categoryVisibleCount = cachedSelectedPage?.items?.size ?: payload.categoryVideos.size,
+                    categoryPage = cachedSelectedPage?.page ?: payload.categoryPage,
+                    categoryTotalCount = cachedSelectedPage?.totalItems ?: payload.categoryTotal,
+                    hasMoreCategoryPages = cachedSelectedPage?.hasNextPage ?: payload.categoryHasNextPage
                 )
-                warmAllCategoryFirstPage(forceRefresh = forceRefresh)
+                if (defaultSelected != null && (cachedSelectedPage == null || forceRefresh)) {
+                    selectCategory(defaultSelected, forceRefresh = forceRefresh)
+                }
             }.onFailure { error ->
                 homeState = homeState.copy(
                     isLoading = false,
@@ -169,68 +171,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectCategory(category: AppleCmsCategory, forceRefresh: Boolean = false) {
-        if (category.typeId == allCategory.typeId) {
-            val alreadyShowingAll = homeState.selectedCategory?.typeId == allCategory.typeId
-            if (!forceRefresh && alreadyShowingAll && homeState.categoryVideos.isNotEmpty()) {
-                homeState = homeState.copy(
-                    selectedCategory = category,
-                    categoryVideos = homeState.categoryVideos,
-                    categoryVisibleCount = homeState.categoryVideos.size,
-                    categoryPage = homeState.categoryPage,
-                    categoryTotalCount = homeState.categoryTotalCount,
-                    hasMoreCategoryPages = homeState.hasMoreCategoryPages,
-                    isCategoryAppending = false,
-                    isCategoryLoading = false,
-                    error = null
-                )
-                return
-            }
-            val cachedPayload = if (!forceRefresh) repository.peekAllCategoryPage(page = 1) else null
-            if (cachedPayload != null && cachedPayload.items.isNotEmpty()) {
-                homeState = homeState.copy(
-                    selectedCategory = category,
-                    categoryVideos = cachedPayload.items,
-                    categoryVisibleCount = cachedPayload.items.size,
-                    categoryPage = cachedPayload.page,
-                    categoryTotalCount = cachedPayload.totalItems,
-                    hasMoreCategoryPages = cachedPayload.hasNextPage,
-                    isCategoryAppending = false,
-                    isCategoryLoading = false,
-                    error = null
-                )
-            }
-            viewModelScope.launch {
-                homeState = homeState.copy(
-                    selectedCategory = category,
-                    isCategoryLoading = homeState.categoryVideos.isEmpty() || forceRefresh,
-                    isCategoryAppending = false,
-                    error = null
-                )
-                runCatching {
-                    withContext(Dispatchers.IO) {
-                        repository.loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
-                    }
-                }.onSuccess { payload ->
-                    homeState = homeState.copy(
-                        categoryVideos = payload.items,
-                        categoryVisibleCount = payload.items.size,
-                        categoryPage = payload.page,
-                        categoryTotalCount = payload.totalItems,
-                        hasMoreCategoryPages = payload.hasNextPage,
-                        isCategoryAppending = false,
-                        isCategoryLoading = false,
-                        error = null
-                    )
-                }.onFailure { error ->
-                    homeState = homeState.copy(
-                        isCategoryAppending = false,
-                        isCategoryLoading = false,
-                        error = toUserFacingMessage(error, "分类加载失败")
-                    )
-                }
-            }
-            return
-        }
         if (!forceRefresh && category.typeId == homeState.selectedCategory?.typeId && homeState.categoryVideos.isNotEmpty()) {
             return
         }
@@ -276,22 +216,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }.onSuccess { payload ->
                 val mergedLatest = (homeState.latest + payload.items).distinctBy { it.vodId }
-                val selectedAll = homeState.selectedCategory?.typeId == allCategory.typeId
                 homeState = homeState.copy(
                     latest = mergedLatest,
                     homeVisibleCount = mergedLatest.size,
                     homePage = payload.page,
                     homeTotalCount = payload.totalItems,
                     hasMoreHomePages = payload.hasNextPage,
-                    categoryVideos = if (selectedAll) mergedLatest else homeState.categoryVideos,
-                    categoryVisibleCount = if (selectedAll) {
-                        mergedLatest.size
-                    } else {
-                        homeState.categoryVisibleCount
-                    },
-                    categoryPage = if (selectedAll) payload.page else homeState.categoryPage,
-                    categoryTotalCount = if (selectedAll) payload.totalItems else homeState.categoryTotalCount,
-                    hasMoreCategoryPages = if (selectedAll) payload.hasNextPage else homeState.hasMoreCategoryPages,
                     isHomeAppending = false
                 )
             }.onFailure { error ->
@@ -304,36 +234,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadMoreCategory() {
-        if (homeState.selectedCategory?.typeId == allCategory.typeId) {
-            if (homeState.isCategoryAppending || !homeState.hasMoreCategoryPages) {
-                return
-            }
-            viewModelScope.launch {
-                val nextPage = homeState.categoryPage + 1
-                homeState = homeState.copy(isCategoryAppending = true, error = null)
-                runCatching {
-                    withContext(Dispatchers.IO) {
-                        repository.loadAllCategoryPage(page = nextPage)
-                    }
-                }.onSuccess { payload ->
-                    val mergedVideos = (homeState.categoryVideos + payload.items).distinctBy { it.vodId }
-                    homeState = homeState.copy(
-                        categoryVideos = mergedVideos,
-                        categoryVisibleCount = mergedVideos.size,
-                        categoryPage = payload.page,
-                        categoryTotalCount = payload.totalItems,
-                        hasMoreCategoryPages = payload.hasNextPage,
-                        isCategoryAppending = false
-                    )
-                }.onFailure { error ->
-                    homeState = homeState.copy(
-                        isCategoryAppending = false,
-                        error = toUserFacingMessage(error, "继续加载全部分类失败")
-                    )
-                }
-            }
-            return
-        }
         if (homeState.isCategoryAppending || !homeState.hasMoreCategoryPages) {
             return
         }
@@ -490,18 +390,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun warmAllCategoryFirstPage(forceRefresh: Boolean = false) {
-        viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    repository.loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
-                }
-            }
-        }
-    }
-
     fun refreshCategoryTab(forceRefresh: Boolean = false) {
-        val selectedCategory = homeState.selectedCategory ?: allCategory
+        val selectedCategory = homeState.selectedCategory ?: homeState.categories.firstOrNull() ?: return
         selectCategory(selectedCategory, forceRefresh = forceRefresh)
     }
 

@@ -238,18 +238,10 @@ fun HomeScreen(
 @Composable
 fun CategoryScreen(
     state: HomeUiState,
-    onEnsureAllCategory: () -> Unit,
     onSelectCategory: (AppleCmsCategory) -> Unit,
     onLoadMore: () -> Unit,
     onOpenDetail: (String) -> Unit
 ) {
-    LaunchedEffect(state.selectedCategory?.typeId, state.categoryVideos.size, state.isCategoryLoading) {
-        val selectedAll = state.selectedCategory?.typeId == "__all__"
-        if (selectedAll && state.categoryVideos.isEmpty() && !state.isCategoryLoading) {
-            onEnsureAllCategory()
-        }
-    }
-
     val listState = rememberSaveable(saver = LazyListState.Saver) {
         LazyListState()
     }
