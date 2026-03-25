@@ -98,6 +98,14 @@ fun JlenVideoApp() {
             restoreState = true
         }
     }
+    val navigateHome: () -> Unit = {
+        viewModel.refreshHome(forceRefresh = true)
+        navigateToTopLevel("home")
+    }
+    val navigateCategories: () -> Unit = {
+        viewModel.refreshCategoryTab(forceRefresh = true)
+        navigateToTopLevel("categories")
+    }
 
     MaterialTheme(colorScheme = appColors) {
         Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
@@ -154,7 +162,13 @@ fun JlenVideoApp() {
                         if (showBottomBar) {
                             AppBottomBar(
                                 currentRoute = currentRoute.orEmpty(),
-                                onNavigate = navigateToTopLevel
+                                onNavigate = { route ->
+                                    when (route) {
+                                        "home" -> navigateHome()
+                                        "categories" -> navigateCategories()
+                                        else -> navigateToTopLevel(route)
+                                    }
+                                }
                             )
                         }
                     }
@@ -198,7 +212,7 @@ fun JlenVideoApp() {
                                 onRefresh = { viewModel.refreshHome(forceRefresh = true) },
                                 onLoadMore = viewModel::loadMoreHome,
                                 onOpenDetail = { navController.navigate("detail/$it") },
-                                onOpenCategory = { navigateToTopLevel("categories") },
+                                onOpenCategory = navigateCategories,
                                 onOpenSearch = { navigateToTopLevel("search") }
                             )
                         }

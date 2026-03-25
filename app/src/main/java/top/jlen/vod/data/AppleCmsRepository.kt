@@ -1860,8 +1860,8 @@ class AppleCmsRepository(
         get() = siteVodId.ifBlank { vodId.takeIf { it.all(Char::isDigit) }.orEmpty() }
 
     companion object {
-        private const val HOME_CACHE_TTL_MS = 10_000L
-        private const val PAGE_CACHE_TTL_MS = 10_000L
+        private const val HOME_CACHE_TTL_MS = 0L
+        private const val PAGE_CACHE_TTL_MS = 0L
         private const val SEARCH_CACHE_TTL_MS = 15_000L
         private const val DETAIL_CACHE_TTL_MS = 10_000L
 

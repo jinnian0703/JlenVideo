@@ -159,22 +159,60 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun selectCategory(category: AppleCmsCategory) {
+    fun selectCategory(category: AppleCmsCategory, forceRefresh: Boolean = false) {
         if (category.typeId == allCategory.typeId) {
-            homeState = homeState.copy(
-                selectedCategory = category,
-                categoryVideos = homeState.latest,
-                categoryVisibleCount = homeState.latest.size,
-                categoryPage = homeState.homePage,
-                categoryTotalCount = homeState.homeTotalCount,
-                hasMoreCategoryPages = homeState.hasMoreHomePages,
-                isCategoryAppending = false,
-                isCategoryLoading = false,
-                error = null
-            )
+            if (!forceRefresh) {
+                homeState = homeState.copy(
+                    selectedCategory = category,
+                    categoryVideos = homeState.latest,
+                    categoryVisibleCount = homeState.latest.size,
+                    categoryPage = homeState.homePage,
+                    categoryTotalCount = homeState.homeTotalCount,
+                    hasMoreCategoryPages = homeState.hasMoreHomePages,
+                    isCategoryAppending = false,
+                    isCategoryLoading = false,
+                    error = null
+                )
+                return
+            }
+            viewModelScope.launch {
+                homeState = homeState.copy(
+                    selectedCategory = category,
+                    isCategoryLoading = true,
+                    isCategoryAppending = false,
+                    error = null
+                )
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        repository.loadAllCategoryPage(page = 1, forceRefresh = true)
+                    }
+                }.onSuccess { payload ->
+                    homeState = homeState.copy(
+                        latest = payload.items,
+                        homeVisibleCount = payload.items.size,
+                        homePage = payload.page,
+                        homeTotalCount = payload.totalItems,
+                        hasMoreHomePages = payload.hasNextPage,
+                        categoryVideos = payload.items,
+                        categoryVisibleCount = payload.items.size,
+                        categoryPage = payload.page,
+                        categoryTotalCount = payload.totalItems,
+                        hasMoreCategoryPages = payload.hasNextPage,
+                        isCategoryAppending = false,
+                        isCategoryLoading = false,
+                        error = null
+                    )
+                }.onFailure { error ->
+                    homeState = homeState.copy(
+                        isCategoryAppending = false,
+                        isCategoryLoading = false,
+                        error = toUserFacingMessage(error, "分类加载失败")
+                    )
+                }
+            }
             return
         }
-        if (category.typeId == homeState.selectedCategory?.typeId && homeState.categoryVideos.isNotEmpty()) {
+        if (!forceRefresh && category.typeId == homeState.selectedCategory?.typeId && homeState.categoryVideos.isNotEmpty()) {
             return
         }
         viewModelScope.launch {
@@ -185,7 +223,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 error = null
             )
             runCatching {
-                withContext(Dispatchers.IO) { repository.loadCategoryPage(category.typeId, page = 1) }
+                withContext(Dispatchers.IO) { repository.loadCategoryPage(category.typeId, page = 1, forceRefresh = forceRefresh) }
             }.onSuccess { payload ->
                 homeState = homeState.copy(
                     categoryVideos = payload.items,
@@ -378,6 +416,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             AccountAuthMode.FindPassword -> loadFindPasswordPage(forceRefresh = true)
             AccountAuthMode.About -> refreshCrashLog()
         }
+    }
+
+    fun refreshCategoryTab(forceRefresh: Boolean = false) {
+        val selectedCategory = homeState.selectedCategory ?: allCategory
+        selectCategory(selectedCategory, forceRefresh = forceRefresh)
     }
 
     fun updateRegisterEditor(transform: (RegisterEditor) -> RegisterEditor) {
