@@ -158,6 +158,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     categoryTotalCount = cachedSelectedPage?.totalItems ?: payload.categoryTotal,
                     hasMoreCategoryPages = cachedSelectedPage?.hasNextPage ?: payload.categoryHasNextPage
                 )
+                viewModelScope.launch(Dispatchers.IO) {
+                    repository.prewarmCategoryFirstPages(forceRefresh = false)
+                }
                 if (defaultSelected != null && (cachedSelectedPage == null || forceRefresh)) {
                     selectCategory(defaultSelected, forceRefresh = forceRefresh)
                 }

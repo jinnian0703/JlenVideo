@@ -157,8 +157,10 @@ class AppleCmsRepository(
                     return cached.value
                 }
         }
-        val pages = defaultCategories.map { category ->
-            loadCategoryPage(category.typeId, safePage, forceRefresh = forceRefresh)
+        val pages = coroutineScope {
+            defaultCategories
+                .map { category -> async { loadCategoryPage(category.typeId, safePage, forceRefresh = forceRefresh) } }
+                .awaitAll()
         }
         return buildMergedCategoryPage(pages, safePage).also { payload ->
             cachePagePayload(cacheKey, payload)
@@ -207,6 +209,22 @@ class AppleCmsRepository(
             ?.value
             ?.let { return it }
         return null
+    }
+
+    suspend fun prewarmCategoryFirstPages(forceRefresh: Boolean = false) {
+        coroutineScope {
+            defaultCategories.map { category ->
+                async {
+                    runCatching {
+                        loadCategoryPage(
+                            typeId = category.typeId,
+                            page = 1,
+                            forceRefresh = forceRefresh
+                        )
+                    }
+                }
+            }.awaitAll()
+        }
     }
 
     suspend fun loadLatestPage(page: Int): PagedVodItems =
