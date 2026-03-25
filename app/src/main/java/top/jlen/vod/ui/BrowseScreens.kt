@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -103,6 +104,8 @@ fun HomeScreen(
     }
 
     val listState = rememberLazyListState()
+    val hotRows = remember(state.hot) { state.hot.chunked(POSTER_GRID_COLUMNS) }
+    val latestRows = remember(state.visibleLatest) { state.visibleLatest.chunked(POSTER_GRID_COLUMNS) }
 
     LazyColumn(
         state = listState,
@@ -168,12 +171,11 @@ fun HomeScreen(
                     onAction = {}
                 )
             }
-            item {
-                PosterGridSection(
-                    items = state.hot,
-                    onOpenDetail = onOpenDetail
-                )
-            }
+            posterGridRows(
+                rows = hotRows,
+                rowKeyPrefix = "home_hot",
+                onOpenDetail = onOpenDetail
+            )
         }
         if (state.featured.isNotEmpty()) {
             item {
@@ -213,12 +215,11 @@ fun HomeScreen(
                 )
             }
         } else {
-            item {
-                PosterGridSection(
-                    items = state.visibleLatest,
-                    onOpenDetail = onOpenDetail
-                )
-            }
+            posterGridRows(
+                rows = latestRows,
+                rowKeyPrefix = "home_latest",
+                onOpenDetail = onOpenDetail
+            )
             item {
                 LoadMoreFooter(
                     hasMore = state.hasMoreLatest,
@@ -238,6 +239,9 @@ fun CategoryScreen(
     onOpenDetail: (String) -> Unit
 ) {
     val listState = rememberLazyListState()
+    val categoryRows = remember(state.visibleCategoryVideos) {
+        state.visibleCategoryVideos.chunked(POSTER_GRID_COLUMNS)
+    }
 
     LazyColumn(
         state = listState,
@@ -300,11 +304,14 @@ fun CategoryScreen(
             when {
                 state.isCategoryLoading -> LoadingPane("分类加载中...")
                 state.categoryVideos.isEmpty() -> EmptyPane("暂无内容")
-                else -> PosterGridSection(
-                    items = state.visibleCategoryVideos,
-                    onOpenDetail = onOpenDetail
-                )
             }
+        }
+        if (!state.isCategoryLoading && state.categoryVideos.isNotEmpty()) {
+            posterGridRows(
+                rows = categoryRows,
+                rowKeyPrefix = "category_${state.selectedCategory?.typeId.orEmpty()}",
+                onOpenDetail = onOpenDetail
+            )
         }
         if (!state.isCategoryLoading && state.categoryVideos.isNotEmpty()) {
             item {
@@ -451,6 +458,28 @@ fun SearchScreen(
                 }
             }
         }
+    }
+}
+
+private const val POSTER_GRID_COLUMNS = 3
+
+private fun LazyListScope.posterGridRows(
+    rows: List<List<VodItem>>,
+    rowKeyPrefix: String,
+    onOpenDetail: (String) -> Unit
+) {
+    items(
+        count = rows.size,
+        key = { rowIndex ->
+            val firstKey = rows[rowIndex].firstOrNull()?.stableKey().orEmpty()
+            "$rowKeyPrefix-$rowIndex-$firstKey"
+        },
+        contentType = { "poster_row" }
+    ) { rowIndex ->
+        PosterGridRow(
+            rowItems = rows[rowIndex],
+            onOpenDetail = onOpenDetail
+        )
     }
 }
 
@@ -2774,25 +2803,23 @@ private fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String)
 }
 
 @Composable
-private fun PosterGridSection(items: List<VodItem>, onOpenDetail: (String) -> Unit) {
-    val rows = remember(items) { items.chunked(3) }
-    Column(
+private fun PosterGridRow(
+    rowItems: List<VodItem>,
+    onOpenDetail: (String) -> Unit
+) {
+    Row(
         modifier = Modifier.padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        rows.forEach { rowItems ->
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                rowItems.forEach { item ->
-                    CompactPosterCard(
-                        item = item,
-                        onClick = onOpenDetail,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                repeat(3 - rowItems.size) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
-            }
+        rowItems.forEach { item ->
+            CompactPosterCard(
+                item = item,
+                onClick = onOpenDetail,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        repeat(POSTER_GRID_COLUMNS - rowItems.size) {
+            Spacer(modifier = Modifier.weight(1f))
         }
     }
 }

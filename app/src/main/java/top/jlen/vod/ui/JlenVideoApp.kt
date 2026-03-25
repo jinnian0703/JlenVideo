@@ -47,6 +47,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 
+private val topLevelRoutes = setOf("home", "categories", "search", "account")
+
 private val appBackground = Brush.verticalGradient(
     colors = listOf(UiPalette.HeroEnd, UiPalette.BackgroundTop, UiPalette.BackgroundBottom)
 )
@@ -76,7 +78,7 @@ fun JlenVideoApp() {
     }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-    val showBottomBar = currentRoute in setOf("home", "categories", "search", "account")
+    val showBottomBar = currentRoute in topLevelRoutes
     val updateInfo = viewModel.accountState.updateInfo
     var dismissedUpdateVersion by rememberSaveable { mutableStateOf("") }
     val shouldShowUpdateDialog = updateInfo?.hasUpdate == true &&
@@ -174,28 +176,28 @@ fun JlenVideoApp() {
                         startDestination = "home",
                         modifier = Modifier.padding(innerPadding),
                         enterTransition = {
-                            if (initialState.destination.route == targetState.destination.route) {
+                            if (!shouldAnimateRouteTransition(initialState.destination.route, targetState.destination.route)) {
                                 EnterTransition.None
                             } else {
                                 screenEnterTransition()
                             }
                         },
                         exitTransition = {
-                            if (initialState.destination.route == targetState.destination.route) {
+                            if (!shouldAnimateRouteTransition(initialState.destination.route, targetState.destination.route)) {
                                 ExitTransition.None
                             } else {
                                 screenExitTransition()
                             }
                         },
                         popEnterTransition = {
-                            if (initialState.destination.route == targetState.destination.route) {
+                            if (!shouldAnimateRouteTransition(initialState.destination.route, targetState.destination.route)) {
                                 EnterTransition.None
                             } else {
                                 screenPopEnterTransition()
                             }
                         },
                         popExitTransition = {
-                            if (initialState.destination.route == targetState.destination.route) {
+                            if (!shouldAnimateRouteTransition(initialState.destination.route, targetState.destination.route)) {
                                 ExitTransition.None
                             } else {
                                 screenPopExitTransition()
@@ -338,6 +340,13 @@ fun JlenVideoApp() {
             }
         }
     }
+}
+
+private fun shouldAnimateRouteTransition(fromRoute: String?, toRoute: String?): Boolean {
+    if (fromRoute == toRoute) return false
+    val fromTopLevel = fromRoute in topLevelRoutes
+    val toTopLevel = toRoute in topLevelRoutes
+    return !fromTopLevel && !toTopLevel
 }
 
 @Composable
