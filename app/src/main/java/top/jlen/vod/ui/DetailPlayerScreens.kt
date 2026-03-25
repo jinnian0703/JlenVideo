@@ -99,29 +99,6 @@ fun DetailScreen(
                             style = MaterialTheme.typography.bodyLarge,
                             color = UiPalette.TextSecondary
                         )
-                        if (item.tags.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(14.dp))
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                itemsIndexed(
-                                    items = item.tags,
-                                    key = { index, tag -> "$tag-$index" },
-                                    contentType = { _, _ -> "tag" }
-                                ) { _, tag ->
-                                    AssistChip(
-                                        onClick = {},
-                                        label = { Text(tag) },
-                                        colors = AssistChipDefaults.assistChipColors(
-                                            containerColor = UiPalette.SurfaceStrong,
-                                            labelColor = UiPalette.Ink
-                                        ),
-                                        border = AssistChipDefaults.assistChipBorder(
-                                            borderColor = UiPalette.Border,
-                                            enabled = true
-                                        )
-                                    )
-                                }
-                            }
-                        }
                         Spacer(modifier = Modifier.height(18.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Button(
