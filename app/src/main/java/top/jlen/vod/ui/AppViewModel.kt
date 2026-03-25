@@ -63,6 +63,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         searchState = searchState.copy(history = searchHistoryStore.load())
         refreshCrashLog()
         refreshAccount()
+        warmAllCategoryFirstPage()
         refreshHome()
         checkAppUpdate()
     }

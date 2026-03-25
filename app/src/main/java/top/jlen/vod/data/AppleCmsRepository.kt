@@ -2279,7 +2279,7 @@ class AppleCmsRepository(
 
     companion object {
         private const val HOME_CACHE_TTL_MS = 0L
-        private const val PAGE_CACHE_TTL_MS = 60_000L
+        private const val PAGE_CACHE_TTL_MS = 300_000L
         private const val SEARCH_CACHE_TTL_MS = 15_000L
         private const val DETAIL_CACHE_TTL_MS = 10_000L
         private const val HOT_SEARCH_CACHE_TTL_MS = 300_000L
