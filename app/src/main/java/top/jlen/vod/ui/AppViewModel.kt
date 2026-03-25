@@ -163,7 +163,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectCategory(category: AppleCmsCategory, forceRefresh: Boolean = false) {
         if (category.typeId == allCategory.typeId) {
-            if (!forceRefresh && homeState.categoryVideos.isNotEmpty()) {
+            val alreadyShowingAll = homeState.selectedCategory?.typeId == allCategory.typeId
+            if (!forceRefresh && alreadyShowingAll && homeState.categoryVideos.isNotEmpty()) {
                 homeState = homeState.copy(
                     selectedCategory = category,
                     categoryVideos = homeState.categoryVideos,
