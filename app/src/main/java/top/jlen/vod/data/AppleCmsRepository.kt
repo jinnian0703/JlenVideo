@@ -1545,10 +1545,8 @@ class AppleCmsRepository(
         val metaMap = LinkedHashMap<String, String>()
 
         infoRoot.select(".info p.row span").forEach { span ->
-            val text = span.text().replace(Regex("\\s+"), " ").trim()
-            val parts = text.split(Regex("[:\\uFF1A]"), limit = 2)
-            if (parts.size == 2) {
-                metaMap[parts[0].trim()] = parts[1].trim()
+            extractDetailMeta(span)?.let { (label, value) ->
+                metaMap[label] = value
             }
         }
 
@@ -1585,6 +1583,36 @@ class AppleCmsRepository(
                 .orEmpty(),
             detailUrl = document.location()
         )
+    }
+
+    private fun extractDetailMeta(span: Element): Pair<String, String>? {
+        val normalizedOwnText = span.ownText().replace(Regex("\\s+"), " ").trim()
+        val normalizedText = span.text().replace(Regex("\\s+"), " ").trim()
+        val label = normalizedOwnText
+            .substringBefore('：')
+            .substringBefore(':')
+            .trim()
+            .ifBlank {
+                normalizedText.substringBefore('：').substringBefore(':').trim()
+            }
+        if (label.isBlank()) return null
+
+        val childValues = span.children()
+            .mapNotNull { child ->
+                child.text()
+                    .replace(Regex("\\s+"), " ")
+                    .trim()
+                    .takeIf { it.isNotBlank() }
+            }
+            .distinct()
+
+        if (childValues.isNotEmpty()) {
+            return label to childValues.joinToString(" / ")
+        }
+
+        val parts = normalizedText.split(Regex("[:\\uFF1A]"), limit = 2)
+        if (parts.size != 2) return null
+        return label to parts[1].trim()
     }
 
     private fun parseDetailSources(document: Document): List<PlaySource> {
