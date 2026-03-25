@@ -40,6 +40,7 @@ class AppleCmsRepository(
     private val client: OkHttpClient = createClient(cookieJar)
 ) {
     private val appContext = context.applicationContext
+    private val pageCachePrefs = appContext.getSharedPreferences("library_page_cache", Context.MODE_PRIVATE)
     private val defaultCategories = listOf(
         AppleCmsCategory(typeId = "1", typeName = "电影", parentId = "1"),
         AppleCmsCategory(typeId = "2", typeName = "连续剧", parentId = "2"),
@@ -77,6 +78,11 @@ class AppleCmsRepository(
     private data class CachedValue<T>(
         val value: T,
         val timestampMs: Long
+    )
+
+    private data class PersistedPageCache(
+        val timestampMs: Long,
+        val payload: PagedVodItems
     )
 
     suspend fun loadHome(forceRefresh: Boolean = false): HomePayload {
@@ -144,6 +150,12 @@ class AppleCmsRepository(
                 ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
                 ?.value
                 ?.let { return it }
+            readPersistedPageCache(cacheKey)
+                ?.takeIf { isCacheValid(it.timestampMs, DISK_PAGE_CACHE_TTL_MS) }
+                ?.also { cached ->
+                    categoryPageCache[cacheKey] = cached
+                    return cached.value
+                }
         }
         val pages = coroutineScope {
             defaultCategories
@@ -151,10 +163,7 @@ class AppleCmsRepository(
                 .awaitAll()
         }
         return buildMergedCategoryPage(pages, safePage).also { payload ->
-            categoryPageCache[cacheKey] = CachedValue(
-                value = payload,
-                timestampMs = System.currentTimeMillis()
-            )
+            cachePagePayload(cacheKey, payload)
         }
     }
 
@@ -165,14 +174,26 @@ class AppleCmsRepository(
             ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
             ?.value
             ?.let { return it }
+        readPersistedPageCache(allCacheKey)
+            ?.takeIf { isCacheValid(it.timestampMs, DISK_PAGE_CACHE_TTL_MS) }
+            ?.also { cached ->
+                categoryPageCache[allCacheKey] = cached
+                return cached.value
+            }
 
         val cachedPages = defaultCategories.mapNotNull { category ->
             categoryPageCache["${category.typeId}:$safePage"]
                 ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
                 ?.value
+                ?: readPersistedPageCache("${category.typeId}:$safePage")
+                    ?.takeIf { isCacheValid(it.timestampMs, DISK_PAGE_CACHE_TTL_MS) }
+                    ?.also { cached -> categoryPageCache["${category.typeId}:$safePage"] = cached }
+                    ?.value
         }
         if (cachedPages.isEmpty()) return null
-        return buildMergedCategoryPage(cachedPages, safePage)
+        return buildMergedCategoryPage(cachedPages, safePage).also { payload ->
+            cachePagePayload(allCacheKey, payload)
+        }
     }
 
     suspend fun loadLatestPage(page: Int): PagedVodItems =
@@ -202,6 +223,12 @@ class AppleCmsRepository(
                 ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
                 ?.value
                 ?.let { return it }
+            readPersistedPageCache(cacheKey)
+                ?.takeIf { isCacheValid(it.timestampMs, DISK_PAGE_CACHE_TTL_MS) }
+                ?.also { cached ->
+                    categoryPageCache[cacheKey] = cached
+                    return cached.value
+                }
         }
         val categorySlug = categoryPageSlugs[typeId]
         val payload = if (categorySlug != null) {
@@ -219,12 +246,7 @@ class AppleCmsRepository(
         } else {
             api.getByType(typeId = typeId, page = safePage).toPagedVodItems()
         }
-        return payload.also {
-            categoryPageCache[cacheKey] = CachedValue(
-                value = it,
-                timestampMs = System.currentTimeMillis()
-            )
-        }
+        return payload.also { cachePagePayload(cacheKey, it) }
     }
 
     suspend fun search(keyword: String, forceRefresh: Boolean = false): List<VodItem> {
@@ -1467,6 +1489,37 @@ class AppleCmsRepository(
         )
     }
 
+    private fun cachePagePayload(cacheKey: String, payload: PagedVodItems) {
+        val cachedValue = CachedValue(
+            value = payload,
+            timestampMs = System.currentTimeMillis()
+        )
+        categoryPageCache[cacheKey] = cachedValue
+        pageCachePrefs.edit()
+            .putString(
+                cacheKey,
+                gson.toJson(
+                    PersistedPageCache(
+                        timestampMs = cachedValue.timestampMs,
+                        payload = payload
+                    )
+                )
+            )
+            .apply()
+    }
+
+    private fun readPersistedPageCache(cacheKey: String): CachedValue<PagedVodItems>? {
+        val raw = pageCachePrefs.getString(cacheKey, null).orEmpty()
+        if (raw.isBlank()) return null
+        val persisted = runCatching {
+            gson.fromJson(raw, PersistedPageCache::class.java)
+        }.getOrNull() ?: return null
+        return CachedValue(
+            value = persisted.payload,
+            timestampMs = persisted.timestampMs
+        )
+    }
+
     private fun isBrowsableCategory(category: AppleCmsCategory): Boolean {
         val parentId = category.parentId.orEmpty().trim()
         return category.typeId.isNotBlank() &&
@@ -2304,6 +2357,7 @@ class AppleCmsRepository(
     companion object {
         private const val HOME_CACHE_TTL_MS = 0L
         private const val PAGE_CACHE_TTL_MS = 300_000L
+        private const val DISK_PAGE_CACHE_TTL_MS = 43_200_000L
         private const val SEARCH_CACHE_TTL_MS = 15_000L
         private const val DETAIL_CACHE_TTL_MS = 10_000L
         private const val HOT_SEARCH_CACHE_TTL_MS = 300_000L

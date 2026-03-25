@@ -138,6 +138,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onSuccess { payload ->
                 val localizedAllCategory = allCategory.copy(typeName = "\u5168\u90e8\u5206\u7c7b")
                 val categories = listOf(localizedAllCategory) + payload.categories
+                val cachedAllCategory = repository.peekAllCategoryPage(page = 1)
                 homeState = HomeUiState(
                     isLoading = false,
                     slides = payload.slides,
@@ -151,11 +152,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     hasMoreHomePages = payload.latestHasNextPage,
                     categories = categories,
                     selectedCategory = localizedAllCategory,
-                    categoryVideos = payload.categoryVideos,
-                    categoryVisibleCount = payload.categoryVideos.size,
-                    categoryPage = payload.categoryPage,
-                    categoryTotalCount = payload.categoryTotal,
-                    hasMoreCategoryPages = payload.categoryHasNextPage
+                    categoryVideos = cachedAllCategory?.items ?: payload.categoryVideos,
+                    categoryVisibleCount = cachedAllCategory?.items?.size ?: payload.categoryVideos.size,
+                    categoryPage = cachedAllCategory?.page ?: payload.categoryPage,
+                    categoryTotalCount = cachedAllCategory?.totalItems ?: payload.categoryTotal,
+                    hasMoreCategoryPages = cachedAllCategory?.hasNextPage ?: payload.categoryHasNextPage
                 )
                 warmAllCategoryFirstPage(forceRefresh = forceRefresh)
             }.onFailure { error ->
