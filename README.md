@@ -1,54 +1,41 @@
-# JlenVideo
+﻿# JlenVideo
 
-`JlenVideo` 是一个基于原生 Android + Jetpack Compose 开发的苹果 CMS 影视客户端，当前版本为 `1.1.8` 正式版。
-
-项目目标不是简单网页套壳，而是围绕苹果 CMS 站点能力，提供更接近原生 App 的浏览、搜索、详情、播放、账号、收藏、历史与会员体验。
-
-当前默认站点：
-
+`JlenVideo` 鏄竴涓熀浜庡師鐢?Android + Jetpack Compose 寮€鍙戠殑鑻规灉 CMS 褰辫瀹㈡埛绔紝褰撳墠鐗堟湰涓?`1.1.9` 姝ｅ紡鐗堛€?
+椤圭洰鐩爣涓嶆槸绠€鍗曠綉椤靛澹筹紝鑰屾槸鍥寸粫鑻规灉 CMS 绔欑偣鑳藉姏锛屾彁渚涙洿鎺ヨ繎鍘熺敓 App 鐨勬祻瑙堛€佹悳绱€佽鎯呫€佹挱鏀俱€佽处鍙枫€佹敹钘忋€佸巻鍙蹭笌浼氬憳浣撻獙銆?
+褰撳墠榛樿绔欑偣锛?
 - `https://cms.jlen.top/`
 
-## 版本信息
+## 鐗堟湰淇℃伅
 
-- 当前版本：`1.1.8`
-- `versionCode`：`10`
-- `versionName`：`1.1.8`
+- 褰撳墠鐗堟湰锛歚1.1.9`
+- `versionCode`锛歚11`
+- `versionName`锛歚1.1.9`
 
-版本定义位置：
-
+鐗堟湰瀹氫箟浣嶇疆锛?
 - [app/build.gradle.kts](app/build.gradle.kts)
 
-## 1.1.8 更新内容
+## 1.1.9 鏇存柊鍐呭
 
-本次 `1.1.8` 仅记录当前版本实际变更：
+鏈 `1.1.9` 浠呰褰曞綋鍓嶇増鏈疄闄呭彉鏇达細
 
-- 优化整体页面切换与播放器交互转场，统一界面过渡动画
-- 降低播放器进度同步和界面重组频率，减少播放过程中的卡顿感
-- 优化首页、搜索、详情页图片加载与列表渲染，提升滚动流畅度
-- 为首页、分类、搜索、详情增加短时缓存，减少重复请求带来的等待
-- 优化全屏切换下一集的沉浸式过渡，并重写未完成接管线路的提示文案
+- 浼樺寲鏁翠綋椤甸潰鍒囨崲涓庢挱鏀惧櫒浜や簰杞満锛岀粺涓€鐣岄潰杩囨浮鍔ㄧ敾
+- 闄嶄綆鎾斁鍣ㄨ繘搴﹀悓姝ュ拰鐣岄潰閲嶇粍棰戠巼锛屽噺灏戞挱鏀捐繃绋嬩腑鐨勫崱椤挎劅
+- 浼樺寲棣栭〉銆佹悳绱€佽鎯呴〉鍥剧墖鍔犺浇涓庡垪琛ㄦ覆鏌擄紝鎻愬崌婊氬姩娴佺晠搴?- 涓洪椤点€佸垎绫汇€佹悳绱€佽鎯呭鍔犵煭鏃剁紦瀛橈紝鍑忓皯閲嶅璇锋眰甯︽潵鐨勭瓑寰?- 浼樺寲鍏ㄥ睆鍒囨崲涓嬩竴闆嗙殑娌夋蹈寮忚繃娓★紝骞堕噸鍐欐湭瀹屾垚鎺ョ绾胯矾鐨勬彁绀烘枃妗?
+## 涓昏鍔熻兘
 
-## 主要功能
+- 棣栭〉鎺ㄨ崘銆佹渶杩戞洿鏂般€佺墖搴撳垎绫绘祻瑙?- 绔欏唴鎼滅储
+- 褰辫璇︽儏椤?- 鍘熺敓鎾斁鍣ㄦ帴绠℃挱鏀?- 鍏ㄥ睆銆佸€嶉€熴€佹殏鍋溿€佷笅涓€闆嗐€佽嚜鍔ㄧ画鎾?- 鑷姩璁板綍瑙傜湅鍘嗗彶
+- 鏀惰棌銆佸巻鍙层€佷細鍛樺熀纭€淇℃伅
+- 鐧诲綍銆佹敞鍐屻€佹壘鍥炲瘑鐮併€佽祫鏂欎慨鏀?- 閭缁戝畾銆佽В缁戙€侀獙璇佺爜澶勭悊
+- 鍏充簬椤典笌宕╂簝鏃ュ織鏌ョ湅
+- GitHub Release 妫€鏌ユ洿鏂?
+## 棣栭〉鎺ㄨ崘璇存槑
 
-- 首页推荐、最近更新、片库分类浏览
-- 站内搜索
-- 影视详情页
-- 原生播放器接管播放
-- 全屏、倍速、暂停、下一集、自动续播
-- 自动记录观看历史
-- 收藏、历史、会员基础信息
-- 登录、注册、找回密码、资料修改
-- 邮箱绑定、解绑、验证码处理
-- 关于页与崩溃日志查看
-- GitHub Release 检查更新
+- 棣栭〉椤堕儴鈥滄帹鑽愨€濆尯鍩熻鍙栬嫻鏋?CMS 鎺ㄨ崘浣?`level=1`
+- 褰撳墠鐗堟湰涓嶅啀浣跨敤 `level=9` 杞挱鎺ㄨ崘鍜?`level=8` 鐑挱鎺ㄨ崘
+- 濡傛灉杞欢棣栭〉鎺ㄨ崘涓嶆樉绀猴紝璇峰厛鍒拌嫻鏋?CMS 鍚庡彴涓哄搴旇棰戣缃?`level=1`
 
-## 首页推荐说明
-
-- 首页顶部“推荐”区域读取苹果 CMS 推荐位 `level=1`
-- 当前版本不再使用 `level=9` 轮播推荐和 `level=8` 热播推荐
-- 如果软件首页推荐不显示，请先到苹果 CMS 后台为对应视频设置 `level=1`
-
-## 技术栈
+## 鎶€鏈爤
 
 - Kotlin
 - Jetpack Compose
@@ -61,10 +48,9 @@
 - Coil
 - Media3 ExoPlayer
 
-## 项目结构
+## 椤圭洰缁撴瀯
 
-核心文件如下：
-
+鏍稿績鏂囦欢濡備笅锛?
 - [app/src/main/java/top/jlen/vod/MainActivity.kt](app/src/main/java/top/jlen/vod/MainActivity.kt)
 - [app/src/main/java/top/jlen/vod/CrashLogger.kt](app/src/main/java/top/jlen/vod/CrashLogger.kt)
 - [app/src/main/java/top/jlen/vod/JlenVideoApplication.kt](app/src/main/java/top/jlen/vod/JlenVideoApplication.kt)
@@ -79,69 +65,56 @@
 - [app/src/main/java/top/jlen/vod/ui/NativeVideoPlayer.kt](app/src/main/java/top/jlen/vod/ui/NativeVideoPlayer.kt)
 - [app/src/main/java/top/jlen/vod/ui/FullscreenPlayerActivity.kt](app/src/main/java/top/jlen/vod/ui/FullscreenPlayerActivity.kt)
 
-## 工作原理
+## 宸ヤ綔鍘熺悊
 
-这个项目同时使用两类数据来源：
+杩欎釜椤圭洰鍚屾椂浣跨敤涓ょ被鏁版嵁鏉ユ簮锛?
+1. 鑻规灉 CMS JSON 鎺ュ彛
 
-1. 苹果 CMS JSON 接口
+- 鐢ㄤ簬鍒嗙被銆侀儴鍒嗗奖瑙嗗垪琛ㄧ瓑缁撴瀯鍖栨暟鎹媺鍙?
+2. 绔欑偣 HTML 椤甸潰瑙ｆ瀽
 
-- 用于分类、部分影视列表等结构化数据拉取
+- 鐢ㄤ簬鎼滅储銆佽鎯呫€佺敤鎴蜂腑蹇冦€佹敹钘忋€佸巻鍙层€佷細鍛樸€佹敞鍐屻€侀偖绠辩粦瀹氱瓑鍔熻兘
 
-2. 站点 HTML 页面解析
+鏁翠綋绛栫暐锛?
+- 鑳借蛋鎺ュ彛鐨勫湴鏂瑰敖閲忚蛋鎺ュ彛
+- 鎺ュ彛涓嶅鏃剁洿鎺ヨВ鏋愰〉闈?- 鎾斁椤垫嬁鍒扮湡瀹炲湴鍧€鍚庯紝浜ょ粰鍘熺敓鎾斁鍣ㄦ帴绠℃挱鏀?
+## 濡備綍淇敼 API 鍦板潃
 
-- 用于搜索、详情、用户中心、收藏、历史、会员、注册、邮箱绑定等功能
-
-整体策略：
-
-- 能走接口的地方尽量走接口
-- 接口不够时直接解析页面
-- 播放页拿到真实地址后，交给原生播放器接管播放
-
-## 如何修改 API 地址
-
-当前站点地址配置在：
+褰撳墠绔欑偣鍦板潃閰嶇疆鍦細
 
 - [app/build.gradle.kts](app/build.gradle.kts)
 
-找到这一行：
+鎵惧埌杩欎竴琛岋細
 
 ```kotlin
 buildConfigField("String", "APPLE_CMS_BASE_URL", "\"https://cms.jlen.top/\"")
 ```
 
-改成你自己的苹果 CMS 站点，例如：
+鏀规垚浣犺嚜宸辩殑鑻规灉 CMS 绔欑偣锛屼緥濡傦細
 
 ```kotlin
 buildConfigField("String", "APPLE_CMS_BASE_URL", "\"https://your-domain.com/\"")
 ```
 
-注意事项：
+娉ㄦ剰浜嬮」锛?
+- 蹇呴』甯﹀崗璁ご锛屼緥濡?`https://`
+- 鏈熬寤鸿淇濈暀 `/`
+- 濡傛灉绔欑偣寮€鍚簡 Cloudflare銆佷汉鏈洪獙璇佹垨棰濆鍙嶇埇锛岄儴鍒嗗姛鑳藉彲鑳介渶瑕侀澶栭€傞厤
+- 濡傛灉绔欑偣妯℃澘缁撴瀯鍙樺寲杈冨ぇ锛屾悳绱€佽鎯呫€佹敹钘忋€佸巻鍙层€佽处鍙风瓑 HTML 瑙ｆ瀽瑙勫垯涔熻鍚屾璋冩暣
 
-- 必须带协议头，例如 `https://`
-- 末尾建议保留 `/`
-- 如果站点开启了 Cloudflare、人机验证或额外反爬，部分功能可能需要额外适配
-- 如果站点模板结构变化较大，搜索、详情、收藏、历史、账号等 HTML 解析规则也要同步调整
-
-## 模板与路由配置
-
-当前客户端对接时，参考使用的模板文件为：
+## 妯℃澘涓庤矾鐢遍厤缃?
+褰撳墠瀹㈡埛绔鎺ユ椂锛屽弬鑰冧娇鐢ㄧ殑妯℃澘鏂囦欢涓猴細
 
 - [templates/v2.zip](templates/v2.zip)
 
-推荐使用方式：
+鎺ㄨ崘浣跨敤鏂瑰紡锛?
+- 鎺ㄨ崘鐩存帴浣跨敤浠撳簱鍐呴檮甯︾殑 [templates/v2.zip](templates/v2.zip) 浣滀负妯℃澘鍙傝€冩垨閮ㄧ讲搴曞寘
+- 濡傛灉鍑嗗澶嶅埢 `cms.jlen.top` 褰撳墠缁撴瀯锛屼紭鍏堜娇鐢ㄨ繖浠芥ā鏉匡紝瀹㈡埛绔€傞厤浼氭洿绋冲畾
+- 濡傛灉鏇存崲浜嗗埆鐨勬ā鏉匡紝涔熷彲浠ョ户缁€傞厤锛屼絾鎼滅储銆佽鎯呫€佹挱鏀俱€佷笓棰樸€佹紨鍛樸€佹枃绔犮€佺敤鎴蜂腑蹇冪瓑椤甸潰鐨勮В鏋愰€昏緫鍙兘闇€瑕侀噸鏂拌皟鏁?
+濡傛灉浣犵殑绔欑偣鍚屾牱鍩轰簬杩欏妯℃澘鎴栫浉杩戠粨鏋勶紝寤鸿鍚屾椂寮€鍚嫻鏋?CMS 鍚庡彴鐨勮矾鐢变吉闈欐€侀厤缃細
 
-- 推荐直接使用仓库内附带的 [templates/v2.zip](templates/v2.zip) 作为模板参考或部署底包
-- 如果准备复刻 `cms.jlen.top` 当前结构，优先使用这份模板，客户端适配会更稳定
-- 如果更换了别的模板，也可以继续适配，但搜索、详情、播放、专题、演员、文章、用户中心等页面的解析逻辑可能需要重新调整
-
-如果你的站点同样基于这套模板或相近结构，建议同时开启苹果 CMS 后台的路由伪静态配置：
-
-- 隐藏后缀：开启
-- 路由状态：开启
-- 伪静态状态：开启
-
-建议写入后台“路由伪静态设置”的规则如下：
-
+- 闅愯棌鍚庣紑锛氬紑鍚?- 璺敱鐘舵€侊細寮€鍚?- 浼潤鎬佺姸鎬侊細寮€鍚?
+寤鸿鍐欏叆鍚庡彴鈥滆矾鐢变吉闈欐€佽缃€濈殑瑙勫垯濡備笅锛?
 ```text
 map   => map/index
 rss/index   => rss/index
@@ -197,86 +170,74 @@ plotdetail/<id>-<page?>   => plot/plot
 plotdetail/<id>   => plot/detail
 ```
 
-## 编译教程
+## 缂栬瘧鏁欑▼
 
-### 1. 克隆项目
+### 1. 鍏嬮殕椤圭洰
 
 ```bash
 git clone https://github.com/jinnian0703/JlenVideo.git
 cd JlenVideo
 ```
 
-### 2. 使用 Android Studio 打开
+### 2. 浣跨敤 Android Studio 鎵撳紑
 
-- 打开 Android Studio
-- 选择项目根目录
-- 等待 Gradle 同步完成
+- 鎵撳紑 Android Studio
+- 閫夋嫨椤圭洰鏍圭洰褰?- 绛夊緟 Gradle 鍚屾瀹屾垚
 
-### 3. 编译调试包
-
-Windows：
-
+### 3. 缂栬瘧璋冭瘯鍖?
+Windows锛?
 ```powershell
 .\gradlew.bat assembleDebug
 ```
 
-macOS / Linux：
-
+macOS / Linux锛?
 ```bash
 ./gradlew assembleDebug
 ```
 
-生成路径：
-
+鐢熸垚璺緞锛?
 - `app/build/outputs/apk/debug/app-debug.apk`
 
-## 检查更新说明
+## 妫€鏌ユ洿鏂拌鏄?
+褰撳墠鐗堟湰鐨勨€滄鏌ユ洿鏂扳€濆姛鑳藉熀浜?GitHub Release锛?
+- 鐗堟湰鍙疯鍙栬嚜 Release 鐨?`tag_name`锛岄粯璁ゆ敮鎸?`v1.1.9` 杩欑鏍煎紡锛岃繘鍏?App 鍚庝細鑷姩鍘绘帀鍓嶉潰鐨?`v`
+- 鍙戝竷璇存槑璇诲彇鑷?Release 鐨?`body`
+- 鈥滄煡鐪嬪彂甯冣€濇墦寮€ Release 椤甸潰 `html_url`
+- 鈥滃墠寰€涓嬭浇鈥濅紭鍏堟墦寮€ Release 璧勪骇閲岀殑 APK 涓嬭浇鍦板潃 `browser_download_url`
 
-当前版本的“检查更新”功能基于 GitHub Release：
+濡傛灉浣犺鏀规垚鑷繁鐨勪粨搴撴洿鏂帮細
 
-- 版本号读取自 Release 的 `tag_name`，默认支持 `v1.1.8` 这种格式，进入 App 后会自动去掉前面的 `v`
-- 发布说明读取自 Release 的 `body`
-- “查看发布”打开 Release 页面 `html_url`
-- “前往下载”优先打开 Release 资产里的 APK 下载地址 `browser_download_url`
+1. 淇敼 [app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt](app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt) 閲岀殑 GitHub Release 鎺ュ彛鍦板潃
+2. 淇敼鍚屾枃浠堕噷鐨?Release 椤甸潰鍏滃簳鍦板潃
+3. 淇敼 `app/build.gradle.kts` 涓殑 `versionCode` 鍜?`versionName`
+4. 鎵?tag锛屼緥濡?`v1.1.9`
+5. 鍒涘缓 GitHub Release 骞朵笂浼?APK
 
-如果你要改成自己的仓库更新：
+娉ㄦ剰浜嬮」锛?
+- `versionName` 瑕佸拰 GitHub Release 鐨?`tag_name` 瀵瑰簲锛屼緥濡傛湰鍦版槸 `1.1.9`锛孯elease 鏍囩寤鸿鐢?`v1.1.9`
+- 濡傛灉娌℃湁涓婁紶 APK 璧勪骇锛屸€滃墠寰€涓嬭浇鈥濅細鑷姩閫€鍥炲埌 Release 椤甸潰
+- 濡傛灉 Release 杩樻槸 Draft锛孏itHub 鏈€鏂板彂甯冩帴鍙ｅ彲鑳戒笉浼氳繑鍥炲畠
 
-1. 修改 [app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt](app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt) 里的 GitHub Release 接口地址
-2. 修改同文件里的 Release 页面兜底地址
-3. 修改 `app/build.gradle.kts` 中的 `versionCode` 和 `versionName`
-4. 打 tag，例如 `v1.1.8`
-5. 创建 GitHub Release 并上传 APK
+## 寮€鍙戜笌鍙戝竷璇存槑
 
-注意事项：
+鏈粨搴撳綋鍓嶅彂甯冧负 `1.1.9` 姝ｅ紡鐗堬紝寤鸿鍚庣画鐗堟湰閬靛惊璇箟鍖栫増鏈細
 
-- `versionName` 要和 GitHub Release 的 `tag_name` 对应，例如本地是 `1.1.8`，Release 标签建议用 `v1.1.8`
-- 如果没有上传 APK 资产，“前往下载”会自动退回到 Release 页面
-- 如果 Release 还是 Draft，GitHub 最新发布接口可能不会返回它
+- `1.1.9`锛氶棶棰樹慨澶?- `1.2.0`锛氭柊澧炲姛鑳?- `2.0.0`锛氶噸澶т笉鍏煎鍙樻洿
 
-## 开发与发布说明
+鎺ㄨ崘鍙戝竷娴佺▼锛?
+1. 淇敼浠ｇ爜骞惰嚜娴?2. 鎵ц `assembleDebug` 鎴?`assembleRelease`
+3. 鏇存柊 README 鎴栧彉鏇磋鏄?4. 鎻愪氦浠ｇ爜
+5. 鎵?tag锛屼緥濡?`v1.1.9`
+6. 鎺ㄩ€佸埌 GitHub
+7. 鍒涘缓 GitHub Release
 
-本仓库当前发布为 `1.1.8` 正式版，建议后续版本遵循语义化版本：
-
-- `1.1.8`：问题修复
-- `1.2.0`：新增功能
-- `2.0.0`：重大不兼容变更
-
-推荐发布流程：
-
-1. 修改代码并自测
-2. 执行 `assembleDebug` 或 `assembleRelease`
-3. 更新 README 或变更说明
-4. 提交代码
-5. 打 tag，例如 `v1.1.8`
-6. 推送到 GitHub
-7. 创建 GitHub Release
-
-## 开源协议
-
-本项目采用 MIT License，详见：
+## 寮€婧愬崗璁?
+鏈」鐩噰鐢?MIT License锛岃瑙侊細
 
 - [LICENSE](LICENSE)
 
-## 仓库地址
+## 浠撳簱鍦板潃
 
 - GitHub: [https://github.com/jinnian0703/JlenVideo](https://github.com/jinnian0703/JlenVideo)
+
+
