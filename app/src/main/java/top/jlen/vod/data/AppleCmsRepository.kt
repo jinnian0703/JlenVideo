@@ -433,10 +433,23 @@ class AppleCmsRepository(
                 return session
             }
 
+            val failureMessage = authResponse?.msg
+                ?.takeIf(String::isNotBlank)
+                ?.let(::normalizeLoginFailureMessage)
+
             throw IOException(
-                authResponse?.msg?.takeIf(String::isNotBlank)
+                failureMessage
                     ?: "登录失败，请检查账号或密码"
             )
+        }
+    }
+
+    private fun normalizeLoginFailureMessage(rawMessage: String): String {
+        val message = rawMessage.trim()
+        return when {
+            message.isBlank() -> ""
+            message.contains("获取用户信息失败") -> "用户名不存在或密码错误"
+            else -> message
         }
     }
 

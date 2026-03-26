@@ -831,7 +831,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         viewModelScope.launch {
-            accountState = accountState.copy(isLoading = true, error = null)
+            accountState = accountState.copy(isLoading = true, error = null, message = null)
             runCatching {
                 withContext(Dispatchers.IO) {
                     repository.login(userName = userName, password = password)
@@ -848,6 +848,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure { error ->
                 accountState = accountState.copy(
                     isLoading = false,
+                    message = null,
                     error = toUserFacingMessage(error, "登录失败")
                 )
             }

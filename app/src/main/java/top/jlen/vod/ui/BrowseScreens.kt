@@ -837,6 +837,31 @@ fun AccountScreen(
             }
         }
 
+        state.message?.let { message ->
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = UiPalette.AccentSoft.copy(alpha = 0.25f)),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Text(
+                        text = message,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                        color = UiPalette.Ink,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+
+        state.error?.let { message ->
+            item {
+                ErrorBanner(
+                    message = message,
+                    onRetry = if (showLoggedInContent) onRefreshSection else onLogin
+                )
+            }
+        }
+
         if (showLoggedInContent) {
             item {
                 Card(
@@ -969,31 +994,6 @@ fun AccountScreen(
                             )
                         )
                     }
-                }
-            }
-
-            state.message?.let { message ->
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = UiPalette.AccentSoft.copy(alpha = 0.25f)),
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Text(
-                            text = message,
-                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                            color = UiPalette.Ink,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-
-            state.error?.let { message ->
-                item {
-                    ErrorBanner(
-                        message = message,
-                        onRetry = onRefreshSection
-                    )
                 }
             }
 
