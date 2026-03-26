@@ -15,6 +15,8 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -52,12 +54,17 @@ class AppleCmsRepository(
     private val categoryPageCache = ConcurrentHashMap<String, CachedValue<PagedVodItems>>()
     private val detailCache = ConcurrentHashMap<String, CachedValue<VodItem?>>()
     private val searchCache = ConcurrentHashMap<String, CachedValue<List<VodItem>>>()
+    private val inFlightRequests = ConcurrentHashMap<String, Deferred<Any>>()
     @Volatile
     private var homeCache: CachedValue<HomePayload>? = null
     @Volatile
     private var hotSearchCache: CachedValue<List<HotSearchGroup>>? = null
     @Volatile
     private var browsableCategoriesCache: CachedValue<List<AppleCmsCategory>>? = null
+    @Volatile
+    private var lastMemoryCacheCleanupAt = 0L
+    @Volatile
+    private var lastDiskCacheCleanupAt = 0L
     private val api: AppleCmsApi = Retrofit.Builder()
         .baseUrl("$baseUrl/")
         .client(client)
@@ -89,6 +96,19 @@ class AppleCmsRepository(
                 ?.let { return it }
         }
 
+        return if (forceRefresh) {
+            loadFreshHome(forceRefresh = true)
+        } else {
+            awaitSharedRequest("home") {
+                homeCache
+                    ?.takeIf { isCacheValid(it.timestampMs, HOME_CACHE_TTL_MS) }
+                    ?.value
+                    ?: loadFreshHome(forceRefresh = false)
+            }
+        }
+    }
+
+    private suspend fun loadFreshHome(forceRefresh: Boolean): HomePayload {
         val (latestPage, homeDocument) = coroutineScope {
             val latestDeferred = async {
                 runCatching {
@@ -132,6 +152,7 @@ class AppleCmsRepository(
                 value = payload,
                 timestampMs = System.currentTimeMillis()
             )
+            cleanupCachesIfNeeded()
         }
     }
 
@@ -153,13 +174,30 @@ class AppleCmsRepository(
                     return cached.value
                 }
         }
+        return if (forceRefresh) {
+            loadFreshAllCategoryPage(page = safePage, forceRefresh = true)
+        } else {
+            awaitSharedRequest("all_page:$safePage") {
+                categoryPageCache[cacheKey]
+                    ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
+                    ?.value
+                    ?: readPersistedPageCache(cacheKey)
+                        ?.takeIf { isCacheValid(it.timestampMs, DISK_PAGE_CACHE_TTL_MS) }
+                        ?.also { cached -> categoryPageCache[cacheKey] = cached }
+                        ?.value
+                    ?: loadFreshAllCategoryPage(page = safePage, forceRefresh = false)
+            }
+        }
+    }
+
+    private suspend fun loadFreshAllCategoryPage(page: Int, forceRefresh: Boolean): PagedVodItems {
         val pages = coroutineScope {
             getBrowsableCategories(forceRefresh = forceRefresh)
-                .map { category -> async { loadCategoryPage(category.typeId, safePage, forceRefresh = forceRefresh) } }
+                .map { category -> async { loadCategoryPage(category.typeId, page, forceRefresh = forceRefresh) } }
                 .awaitAll()
         }
-        return buildMergedCategoryPage(pages, safePage).also { payload ->
-            cachePagePayload(cacheKey, payload)
+        return buildMergedCategoryPage(pages, page).also { payload ->
+            cachePagePayload("all:$page", payload)
         }
     }
 
@@ -258,7 +296,25 @@ class AppleCmsRepository(
                     return cached.value
                 }
         }
-        val payload = loadCategoryPageFromWeb(typeId = typeId, page = safePage)
+        return if (forceRefresh) {
+            loadFreshCategoryPage(typeId = typeId, page = safePage)
+        } else {
+            awaitSharedRequest("category_page:$cacheKey") {
+                categoryPageCache[cacheKey]
+                    ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
+                    ?.value
+                    ?: readPersistedPageCache(cacheKey)
+                        ?.takeIf { isCacheValid(it.timestampMs, DISK_PAGE_CACHE_TTL_MS) }
+                        ?.also { cached -> categoryPageCache[cacheKey] = cached }
+                        ?.value
+                    ?: loadFreshCategoryPage(typeId = typeId, page = safePage)
+            }
+        }
+    }
+
+    private suspend fun loadFreshCategoryPage(typeId: String, page: Int): PagedVodItems {
+        val cacheKey = "$typeId:$page"
+        val payload = loadCategoryPageFromWeb(typeId = typeId, page = page)
         return payload.also { cachePagePayload(cacheKey, it) }
     }
 
@@ -273,10 +329,23 @@ class AppleCmsRepository(
                 ?.let { return it }
         }
 
-        val encodedKeyword = Uri.encode(normalizedKeyword)
+        return if (forceRefresh) {
+            performSearch(normalizedKeyword, cacheKey)
+        } else {
+            awaitSharedRequest("search:$cacheKey") {
+                searchCache[cacheKey]
+                    ?.takeIf { isCacheValid(it.timestampMs, SEARCH_CACHE_TTL_MS) }
+                    ?.value
+                    ?: performSearch(normalizedKeyword, cacheKey)
+            }
+        }
+    }
+
+    private suspend fun performSearch(keyword: String, cacheKey: String): List<VodItem> {
+        val encodedKeyword = Uri.encode(keyword)
         return runCatching {
             val document = fetchDocument("$baseUrl/vodsearch/-------------/?wd=$encodedKeyword")
-            parseSearchResults(document, normalizedKeyword)
+            parseSearchResults(document, keyword)
                 .distinctBy { it.vodId }
                 .take(60)
         }.getOrDefault(emptyList()).also { results ->
@@ -284,6 +353,7 @@ class AppleCmsRepository(
                 value = results,
                 timestampMs = System.currentTimeMillis()
             )
+            cleanupCachesIfNeeded()
         }
     }
 
@@ -319,6 +389,19 @@ class AppleCmsRepository(
                 ?.let { return it }
         }
 
+        return if (forceRefresh) {
+            loadFreshHotSearchGroups()
+        } else {
+            awaitSharedRequest("hot_search") {
+                hotSearchCache
+                    ?.takeIf { isCacheValid(it.timestampMs, HOT_SEARCH_CACHE_TTL_MS) }
+                    ?.value
+                    ?: loadFreshHotSearchGroups()
+            }
+        }
+    }
+
+    private suspend fun loadFreshHotSearchGroups(): List<HotSearchGroup> {
         val groups = coroutineScope {
             listOf(
                 async {
@@ -346,6 +429,7 @@ class AppleCmsRepository(
             value = groups,
             timestampMs = System.currentTimeMillis()
         )
+        cleanupCachesIfNeeded()
         return groups
     }
 
@@ -864,6 +948,19 @@ class AppleCmsRepository(
                 ?.let { return it }
         }
 
+        return if (forceRefresh) {
+            loadFreshDetail(normalizedId)
+        } else {
+            awaitSharedRequest("detail:$normalizedId") {
+                detailCache[normalizedId]
+                    ?.takeIf { isCacheValid(it.timestampMs, DETAIL_CACHE_TTL_MS) }
+                    ?.value
+                    ?: loadFreshDetail(normalizedId)
+            }
+        }
+    }
+
+    private suspend fun loadFreshDetail(normalizedId: String): VodItem? {
         if (normalizedId.all(Char::isDigit)) {
             val apiItem = runCatching {
                 api.getDetail(vodId = normalizedId)
@@ -875,6 +972,7 @@ class AppleCmsRepository(
                     value = apiItem,
                     timestampMs = System.currentTimeMillis()
                 )
+                cleanupCachesIfNeeded()
                 return apiItem
             }
         }
@@ -884,6 +982,7 @@ class AppleCmsRepository(
                 value = item,
                 timestampMs = System.currentTimeMillis()
             )
+            cleanupCachesIfNeeded()
         }
     }
 
@@ -1532,18 +1631,126 @@ class AppleCmsRepository(
                 )
             )
             .apply()
+        cleanupCachesIfNeeded()
     }
 
     private fun readPersistedPageCache(cacheKey: String): CachedValue<PagedVodItems>? {
         val raw = pageCachePrefs.getString(cacheKey, null).orEmpty()
         if (raw.isBlank()) return null
-        val persisted = runCatching {
-            gson.fromJson(raw, PersistedPageCache::class.java)
-        }.getOrNull() ?: return null
+        val persisted = parsePersistedPageCache(raw) ?: return null
         return CachedValue(
             value = persisted.payload,
             timestampMs = persisted.timestampMs
         )
+    }
+
+    private fun parsePersistedPageCache(raw: String): PersistedPageCache? =
+        runCatching {
+            gson.fromJson(raw, PersistedPageCache::class.java)
+        }.getOrNull()
+
+    private fun cleanupCachesIfNeeded() {
+        val now = System.currentTimeMillis()
+        if (now - lastMemoryCacheCleanupAt >= MEMORY_CACHE_CLEANUP_INTERVAL_MS) {
+            cleanupMemoryCaches(now)
+            lastMemoryCacheCleanupAt = now
+        }
+        if (now - lastDiskCacheCleanupAt >= DISK_CACHE_CLEANUP_INTERVAL_MS) {
+            cleanupDiskPageCache(now)
+            lastDiskCacheCleanupAt = now
+        }
+    }
+
+    private fun cleanupMemoryCaches(now: Long) {
+        pruneExpiredEntries(categoryPageCache, now, PAGE_CACHE_TTL_MS)
+        pruneExpiredEntries(detailCache, now, DETAIL_CACHE_TTL_MS)
+        pruneExpiredEntries(searchCache, now, SEARCH_CACHE_TTL_MS)
+        trimToSize(categoryPageCache, MAX_MEMORY_PAGE_CACHE_ENTRIES)
+        trimToSize(detailCache, MAX_DETAIL_CACHE_ENTRIES)
+        trimToSize(searchCache, MAX_SEARCH_CACHE_ENTRIES)
+
+        if (homeCache?.let { !isCacheValid(it.timestampMs, HOME_CACHE_TTL_MS, now) } == true) {
+            homeCache = null
+        }
+        if (hotSearchCache?.let { !isCacheValid(it.timestampMs, HOT_SEARCH_CACHE_TTL_MS, now) } == true) {
+            hotSearchCache = null
+        }
+        if (browsableCategoriesCache?.let { !isCacheValid(it.timestampMs, CATEGORY_CACHE_TTL_MS, now) } == true) {
+            browsableCategoriesCache = null
+        }
+    }
+
+    private fun cleanupDiskPageCache(now: Long) {
+        val snapshot = pageCachePrefs.all
+        if (snapshot.isEmpty()) return
+
+        val survivors = ArrayList<Pair<String, Long>>(snapshot.size)
+        val staleKeys = mutableListOf<String>()
+        snapshot.forEach { (key, value) ->
+            val raw = value as? String
+            val persisted = raw?.let(::parsePersistedPageCache)
+            when {
+                persisted == null -> staleKeys += key
+                !isCacheValid(persisted.timestampMs, DISK_PAGE_CACHE_TTL_MS, now) -> staleKeys += key
+                else -> survivors += key to persisted.timestampMs
+            }
+        }
+
+        if (survivors.size > MAX_DISK_PAGE_CACHE_ENTRIES) {
+            survivors
+                .sortedByDescending { it.second }
+                .drop(MAX_DISK_PAGE_CACHE_ENTRIES)
+                .mapTo(staleKeys) { it.first }
+        }
+
+        if (staleKeys.isEmpty()) return
+        pageCachePrefs.edit().apply {
+            staleKeys.distinct().forEach(::remove)
+        }.apply()
+    }
+
+    private fun <T> pruneExpiredEntries(
+        cache: ConcurrentHashMap<String, CachedValue<T>>,
+        now: Long,
+        ttlMs: Long
+    ) {
+        cache.entries.removeIf { (_, value) -> !isCacheValid(value.timestampMs, ttlMs, now) }
+    }
+
+    private fun <T> trimToSize(
+        cache: ConcurrentHashMap<String, CachedValue<T>>,
+        maxSize: Int
+    ) {
+        if (cache.size <= maxSize) return
+        cache.entries
+            .sortedByDescending { it.value.timestampMs }
+            .drop(maxSize)
+            .forEach { entry -> cache.remove(entry.key, entry.value) }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun <T> awaitSharedRequest(
+        key: String,
+        block: suspend () -> T
+    ): T = coroutineScope {
+        val existing = inFlightRequests[key] as Deferred<T>?
+        if (existing != null) {
+            return@coroutineScope existing.await()
+        }
+
+        val deferred = async(start = CoroutineStart.LAZY) { block() }
+        val deferredAny = deferred as Deferred<Any>
+        val active = (inFlightRequests.putIfAbsent(key, deferredAny) as Deferred<T>?) ?: deferred
+        if (active === deferred) {
+            deferred.start()
+        }
+        try {
+            active.await()
+        } finally {
+            if (active === deferred) {
+                inFlightRequests.remove(key, deferredAny)
+            }
+        }
     }
 
     private fun isBrowsableCategory(category: AppleCmsCategory): Boolean {
@@ -1564,6 +1771,15 @@ class AppleCmsRepository(
                 ?.takeIf { it.isNotEmpty() }
                 ?.let { return it }
         }
+        if (!forceRefresh && homeDocument == null) {
+            return awaitSharedRequest("browsable_categories") {
+                browsableCategoriesCache
+                    ?.takeIf { isCacheValid(it.timestampMs, CATEGORY_CACHE_TTL_MS) }
+                    ?.value
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: loadBrowsableCategories(forceRefresh = true)
+            }
+        }
         val resolvedHomeDocument = homeDocument ?: runCatching { fetchDocument("$baseUrl/") }.getOrNull()
         val mapDocument = runCatching { fetchDocument("$baseUrl/map/") }.getOrNull()
 
@@ -1580,6 +1796,7 @@ class AppleCmsRepository(
                     value = categories,
                     timestampMs = System.currentTimeMillis()
                 )
+                cleanupCachesIfNeeded()
             }
         }
 
@@ -1595,6 +1812,7 @@ class AppleCmsRepository(
                     value = categories,
                     timestampMs = System.currentTimeMillis()
                 )
+                cleanupCachesIfNeeded()
             }
         }
 
@@ -1603,6 +1821,7 @@ class AppleCmsRepository(
                 value = categories,
                 timestampMs = System.currentTimeMillis()
             )
+            cleanupCachesIfNeeded()
         }
     }
 
@@ -2499,20 +2718,29 @@ class AppleCmsRepository(
         get() = siteVodId.ifBlank { vodId.takeIf { it.all(Char::isDigit) }.orEmpty() }
 
     companion object {
-        private const val HOME_CACHE_TTL_MS = 0L
+        private const val HOME_CACHE_TTL_MS = 60_000L
         private const val CATEGORY_CACHE_TTL_MS = 300_000L
         private const val PAGE_CACHE_TTL_MS = 300_000L
         private const val DISK_PAGE_CACHE_TTL_MS = 43_200_000L
-        private const val SEARCH_CACHE_TTL_MS = 15_000L
-        private const val DETAIL_CACHE_TTL_MS = 10_000L
+        private const val SEARCH_CACHE_TTL_MS = 30_000L
+        private const val DETAIL_CACHE_TTL_MS = 60_000L
         private const val HOT_SEARCH_CACHE_TTL_MS = 300_000L
+        private const val MEMORY_CACHE_CLEANUP_INTERVAL_MS = 60_000L
+        private const val DISK_CACHE_CLEANUP_INTERVAL_MS = 300_000L
+        private const val MAX_MEMORY_PAGE_CACHE_ENTRIES = 24
+        private const val MAX_DISK_PAGE_CACHE_ENTRIES = 48
+        private const val MAX_DETAIL_CACHE_ENTRIES = 48
+        private const val MAX_SEARCH_CACHE_ENTRIES = 24
         private const val HOT_SEARCH_MOBILE_UA =
             "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) " +
                 "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 " +
                 "Mobile/15E148 Safari/604.1"
 
         private fun isCacheValid(timestampMs: Long, ttlMs: Long): Boolean =
-            System.currentTimeMillis() - timestampMs <= ttlMs
+            isCacheValid(timestampMs, ttlMs, System.currentTimeMillis())
+
+        private fun isCacheValid(timestampMs: Long, ttlMs: Long, now: Long): Boolean =
+            now - timestampMs <= ttlMs
 
         private fun createClient(cookieJar: PersistentCookieJar): OkHttpClient {
             val logging = HttpLoggingInterceptor().apply {
