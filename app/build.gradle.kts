@@ -11,8 +11,8 @@ android {
         applicationId = "top.jlen.vod"
         minSdk = 24
         targetSdk = 34
-        versionCode = 18
-        versionName = "2.0.2.2"
+        versionCode = 19
+        versionName = "2.0.2.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
