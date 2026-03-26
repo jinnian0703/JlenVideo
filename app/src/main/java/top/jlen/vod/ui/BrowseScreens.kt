@@ -2958,6 +2958,12 @@ private fun CompactPosterCard(
     onClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val supportText = item.subtitle
+        .takeIf {
+            it.isNotBlank() &&
+                it != item.badgeText
+        }
+
     Column(modifier = modifier.clickable { onClick(item.vodId) }) {
         Box {
             AsyncImage(
@@ -2998,14 +3004,16 @@ private fun CompactPosterCard(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
-        Spacer(modifier = Modifier.height(3.dp))
-        Text(
-            text = item.subtitle.ifBlank { "站内资源" },
-            style = MaterialTheme.typography.bodySmall,
-            color = UiPalette.TextMuted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        supportText?.let {
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = UiPalette.TextMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
