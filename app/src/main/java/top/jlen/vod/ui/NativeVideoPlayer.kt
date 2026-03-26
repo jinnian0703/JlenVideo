@@ -353,7 +353,7 @@ fun NativeVideoPlayer(
         lastReportedLandscape == false -> 420.dp
         else -> 228.dp
     }
-    val embeddedResizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+    val embeddedResizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     val controlPillTextStyle = if (fullscreenMode) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelMedium
     val controlChipHeight = if (fullscreenMode) 36.dp else 32.dp
     val controlChipWidth = if (fullscreenMode) 76.dp else 64.dp
@@ -367,7 +367,9 @@ fun NativeVideoPlayer(
                     .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 12.dp)
             ),
         shape = RoundedCornerShape(if (fullscreenMode) 0.dp else 24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Black)
+        colors = CardDefaults.cardColors(
+            containerColor = if (fullscreenMode) Color.Black else UiPalette.BackgroundBottom
+        )
     ) {
         Box(
             modifier = Modifier
@@ -376,7 +378,7 @@ fun NativeVideoPlayer(
                     if (fullscreenMode) Modifier.fillMaxSize()
                     else Modifier.heightIn(min = embeddedPlayerHeight).height(embeddedPlayerHeight)
                 )
-                .background(Color.Black)
+                .background(if (fullscreenMode) Color.Black else UiPalette.BackgroundBottom)
                 .clickableWithoutRipple {
                     if (fullscreenMode) {
                         controlsVisible = !controlsVisible

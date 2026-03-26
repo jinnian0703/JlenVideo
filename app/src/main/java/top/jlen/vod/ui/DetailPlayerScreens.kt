@@ -358,13 +358,13 @@ fun PlayerScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(UiPalette.PlayerBackground)
+                    .background(UiPalette.BackgroundBottom)
             ) {
                 Column {
                     DetailTopBar(
                         title = state.title.ifBlank { "播放器" },
                         onBack = onBack,
-                        darkMode = true
+                        darkMode = false
                     )
                     when {
                         state.isResolving && !isFullscreen -> ResolveLoadingSurface(
