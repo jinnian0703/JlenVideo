@@ -41,7 +41,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val searchHistoryStore = SearchHistoryStore(application)
     private var searchJob: Job? = null
     private var searchEnrichJob: Job? = null
+    private var historyEnrichJob: Job? = null
     private var searchRequestVersion: Long = 0L
+    private var historyEnrichVersion: Long = 0L
 
     var homeState by mutableStateOf(HomeUiState())
         private set
@@ -1019,20 +1021,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             accountState = accountState.copy(isContentLoading = true, error = null)
             runCatching {
-                withContext(Dispatchers.IO) {
-                    repository.loadHistoryPage(pageUrl).let { page ->
-                        page.copy(items = repository.enrichHistoryItems(page.items))
-                    }
-                }
+                withContext(Dispatchers.IO) { repository.loadHistoryPage(pageUrl) }
             }.onSuccess { page ->
+                val mergedItems = mergeAccountItems(
+                    current = if (append) accountState.historyItems else emptyList(),
+                    incoming = page.items
+                )
                 accountState = accountState.copy(
                     isContentLoading = false,
-                    historyItems = mergeAccountItems(
-                        current = if (append) accountState.historyItems else emptyList(),
-                        incoming = page.items
-                    ),
+                    historyItems = mergedItems,
                     historyNextPageUrl = page.nextPageUrl
                 )
+                enrichHistoryRecords(mergedItems)
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
@@ -1040,6 +1040,37 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     error = toUserFacingMessage(error, "加载播放记录失败")
                 )
             }
+        }
+    }
+
+    private fun enrichHistoryRecords(items: List<UserCenterItem>) {
+        val targetItems = items.filter { item ->
+            item.sourceIndex >= 0 &&
+                item.sourceName.isBlank() &&
+                (item.vodId.isNotBlank() || item.playUrl.isNotBlank() || item.actionUrl.isNotBlank())
+        }
+        if (targetItems.isEmpty()) return
+
+        historyEnrichJob?.cancel()
+        val requestVersion = ++historyEnrichVersion
+        historyEnrichJob = viewModelScope.launch {
+            val enrichedItems = runCatching {
+                withContext(Dispatchers.IO) { repository.enrichHistoryItems(targetItems) }
+            }.getOrNull() ?: return@launch
+            if (requestVersion != historyEnrichVersion) return@launch
+
+            val enrichedByKey = enrichedItems.associateBy(::historyRecordKey)
+            accountState = accountState.copy(
+                historyItems = accountState.historyItems.map { item ->
+                    enrichedByKey[historyRecordKey(item)]?.let { enriched ->
+                        item.copy(
+                            vodId = enriched.vodId.ifBlank { item.vodId },
+                            subtitle = enriched.subtitle.ifBlank { item.subtitle },
+                            sourceName = enriched.sourceName.ifBlank { item.sourceName }
+                        )
+                    } ?: item
+                }
+            )
         }
     }
 
@@ -1175,6 +1206,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         incoming: List<UserCenterItem>
     ): List<UserCenterItem> = (current + incoming)
         .distinctBy { item -> "${item.recordId}:${item.actionUrl}:${item.vodId}" }
+
+    private fun historyRecordKey(item: UserCenterItem): String =
+        listOf(item.recordId, item.actionUrl, item.playUrl, item.title)
+            .joinToString("|")
 
     fun openHistoryRecord(item: UserCenterItem) {
         val resolvedVodId = item.vodId.ifBlank {

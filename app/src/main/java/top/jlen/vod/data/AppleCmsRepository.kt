@@ -54,6 +54,7 @@ class AppleCmsRepository(
     private val categoryPageCache = ConcurrentHashMap<String, CachedValue<PagedVodItems>>()
     private val detailCache = ConcurrentHashMap<String, CachedValue<VodItem?>>()
     private val searchCache = ConcurrentHashMap<String, CachedValue<List<VodItem>>>()
+    private val historySourceCache = ConcurrentHashMap<String, CachedValue<List<PlaySource>>>()
     private val inFlightRequests = ConcurrentHashMap<String, Deferred<Any>>()
     @Volatile
     private var homeCache: CachedValue<HomePayload>? = null
@@ -1544,28 +1545,69 @@ class AppleCmsRepository(
     suspend fun enrichHistoryItems(items: List<UserCenterItem>): List<UserCenterItem> {
         if (items.isEmpty()) return items
 
-        val sourceCache = mutableMapOf<String, List<PlaySource>>()
-
-        return items.map { item ->
-            val resolvedVodId = item.vodId.ifBlank {
-                extractVodIdFromUserUrl(item.playUrl.ifBlank { item.actionUrl })
-            }
-            if (resolvedVodId.isBlank() || item.sourceIndex < 0) {
-                return@map item.copy(vodId = resolvedVodId.ifBlank { item.vodId })
-            }
-
-            val sources = sourceCache.getOrPut(resolvedVodId) {
-                runCatching {
-                    loadDetail(resolvedVodId)?.let(::parseSources).orEmpty()
-                }.getOrDefault(emptyList())
-            }
-            val sourceName = sources.getOrNull(item.sourceIndex)?.name.orEmpty()
-
+        val normalizedItems = items.map { item ->
             item.copy(
-                vodId = resolvedVodId,
-                sourceName = sourceName,
-                subtitle = replaceHistorySourceLabel(item.subtitle, sourceName)
+                vodId = item.vodId.ifBlank {
+                    extractVodIdFromUserUrl(item.playUrl.ifBlank { item.actionUrl })
+                }
             )
+        }
+
+        val targetVodIds = normalizedItems
+            .asSequence()
+            .filter { item -> item.vodId.isNotBlank() && item.sourceIndex >= 0 }
+            .map { item -> item.vodId }
+            .distinct()
+            .toList()
+
+        if (targetVodIds.isEmpty()) return normalizedItems
+
+        val sourcesByVodId = coroutineScope {
+            targetVodIds
+                .map { vodId ->
+                    async {
+                        vodId to loadHistorySources(vodId)
+                    }
+                }
+                .awaitAll()
+                .toMap()
+        }
+
+        return normalizedItems.map { item ->
+            val sourceName = sourcesByVodId[item.vodId]
+                ?.getOrNull(item.sourceIndex)
+                ?.name
+                .orEmpty()
+            if (sourceName.isBlank()) {
+                item
+            } else {
+                item.copy(
+                    sourceName = sourceName,
+                    subtitle = replaceHistorySourceLabel(item.subtitle, sourceName)
+                )
+            }
+        }
+    }
+
+    private suspend fun loadHistorySources(vodId: String): List<PlaySource> {
+        historySourceCache[vodId]
+            ?.takeIf { isCacheValid(it.timestampMs, HISTORY_SOURCE_CACHE_TTL_MS) }
+            ?.value
+            ?.let { return it }
+
+        return awaitSharedRequest("history_sources:$vodId") {
+            historySourceCache[vodId]
+                ?.takeIf { isCacheValid(it.timestampMs, HISTORY_SOURCE_CACHE_TTL_MS) }
+                ?.value
+                ?: runCatching {
+                    loadDetail(vodId)?.let(::parseSources).orEmpty()
+                }.getOrDefault(emptyList()).also { sources ->
+                    historySourceCache[vodId] = CachedValue(
+                        value = sources,
+                        timestampMs = System.currentTimeMillis()
+                    )
+                    cleanupCachesIfNeeded()
+                }
         }
     }
 
@@ -1665,9 +1707,11 @@ class AppleCmsRepository(
         pruneExpiredEntries(categoryPageCache, now, PAGE_CACHE_TTL_MS)
         pruneExpiredEntries(detailCache, now, DETAIL_CACHE_TTL_MS)
         pruneExpiredEntries(searchCache, now, SEARCH_CACHE_TTL_MS)
+        pruneExpiredEntries(historySourceCache, now, HISTORY_SOURCE_CACHE_TTL_MS)
         trimToSize(categoryPageCache, MAX_MEMORY_PAGE_CACHE_ENTRIES)
         trimToSize(detailCache, MAX_DETAIL_CACHE_ENTRIES)
         trimToSize(searchCache, MAX_SEARCH_CACHE_ENTRIES)
+        trimToSize(historySourceCache, MAX_HISTORY_SOURCE_CACHE_ENTRIES)
 
         if (homeCache?.let { !isCacheValid(it.timestampMs, HOME_CACHE_TTL_MS, now) } == true) {
             homeCache = null
@@ -2724,6 +2768,7 @@ class AppleCmsRepository(
         private const val DISK_PAGE_CACHE_TTL_MS = 43_200_000L
         private const val SEARCH_CACHE_TTL_MS = 30_000L
         private const val DETAIL_CACHE_TTL_MS = 60_000L
+        private const val HISTORY_SOURCE_CACHE_TTL_MS = 600_000L
         private const val HOT_SEARCH_CACHE_TTL_MS = 300_000L
         private const val MEMORY_CACHE_CLEANUP_INTERVAL_MS = 60_000L
         private const val DISK_CACHE_CLEANUP_INTERVAL_MS = 300_000L
@@ -2731,6 +2776,7 @@ class AppleCmsRepository(
         private const val MAX_DISK_PAGE_CACHE_ENTRIES = 48
         private const val MAX_DETAIL_CACHE_ENTRIES = 48
         private const val MAX_SEARCH_CACHE_ENTRIES = 24
+        private const val MAX_HISTORY_SOURCE_CACHE_ENTRIES = 96
         private const val HOT_SEARCH_MOBILE_UA =
             "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) " +
                 "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 " +
