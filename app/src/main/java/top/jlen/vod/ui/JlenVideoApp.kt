@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
@@ -20,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -106,7 +106,7 @@ fun JlenVideoApp() {
     val rootContentInsets = if (currentRoute == "player") {
         WindowInsets(0, 0, 0, 0)
     } else {
-        WindowInsets.statusBars
+        WindowInsets.safeDrawing
     }
     val updateInfo = viewModel.accountState.updateInfo
     var dismissedUpdateVersion by rememberSaveable { mutableStateOf("") }
