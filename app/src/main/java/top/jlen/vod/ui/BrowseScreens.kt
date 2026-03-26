@@ -5,11 +5,13 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.graphics.Rect
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,8 +66,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -74,7 +79,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -2953,11 +2961,6 @@ private fun CompactPosterCard(
     modifier: Modifier = Modifier
 ) {
     val badgeText = sanitizePosterBadge(item.badgeText)
-    val supportText = item.subtitle
-        .takeIf {
-            it.isNotBlank() &&
-                it != badgeText
-        }
 
     Column(modifier = modifier.clickable { onClick(item.vodId) }) {
         Box {
@@ -2975,12 +2978,8 @@ private fun CompactPosterCard(
                 contentScale = ContentScale.Crop
             )
             if (badgeText.isNotBlank()) {
-                Text(
+                PosterBadgeText(
                     text = badgeText,
-                    color = UiPalette.Surface,
-                    style = MaterialTheme.typography.labelSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(8.dp)
@@ -2999,17 +2998,43 @@ private fun CompactPosterCard(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
-        supportText?.let {
-            Spacer(modifier = Modifier.height(3.dp))
-            Text(
-                text = it,
-                style = MaterialTheme.typography.bodySmall,
-                color = UiPalette.TextMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
     }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun PosterBadgeText(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    val view = LocalView.current
+    var isVisibleInWindow by remember(text) { mutableStateOf(false) }
+
+    Text(
+        text = text,
+        color = UiPalette.Surface,
+        style = MaterialTheme.typography.labelSmall,
+        maxLines = 1,
+        overflow = if (isVisibleInWindow) TextOverflow.Clip else TextOverflow.Ellipsis,
+        modifier = modifier
+            .onGloballyPositioned { coordinates ->
+                val visibleFrame = Rect()
+                view.getWindowVisibleDisplayFrame(visibleFrame)
+                val bounds = coordinates.boundsInWindow()
+                isVisibleInWindow =
+                    bounds.right > visibleFrame.left &&
+                        bounds.left < visibleFrame.right &&
+                        bounds.bottom > visibleFrame.top &&
+                        bounds.top < visibleFrame.bottom
+            }
+            .then(
+                if (isVisibleInWindow && text.length > 8) {
+                    Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                } else {
+                    Modifier
+                }
+            )
+    )
 }
 
 private fun sanitizePosterBadge(raw: String): String {
