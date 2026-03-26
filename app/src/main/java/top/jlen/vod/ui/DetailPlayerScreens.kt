@@ -68,7 +68,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import coil.compose.AsyncImage
-import kotlinx.coroutines.delay
 import top.jlen.vod.data.Episode
 import top.jlen.vod.data.VodItem
 
@@ -573,43 +572,26 @@ private fun EpisodePanel(
     onEpisodeClick: (Int) -> Unit
 ) {
     val columns = 3
-    val marqueeCandidates = remember(episodes) {
-        episodes.mapIndexedNotNull { index, episode ->
-            index.takeIf { shouldMarqueeEpisodeLabel(episode.name) }
-        }
-    }
-    var activeMarqueeIndex by remember(episodes, selectedIndex) {
-        mutableStateOf(
-            selectedIndex.takeIf { it in marqueeCandidates }
-                ?: marqueeCandidates.firstOrNull()
-                ?: -1
-        )
+    val pageSize = 60
+    val pageCount = if (episodes.isEmpty()) 0 else ((episodes.size - 1) / pageSize) + 1
+    var currentPage by remember(episodes.size) {
+        mutableStateOf(selectedIndex.takeIf { it >= 0 }?.div(pageSize) ?: 0)
     }
 
-    LaunchedEffect(marqueeCandidates, selectedIndex, pauseMarquee) {
-        if (marqueeCandidates.isEmpty()) {
-            activeMarqueeIndex = -1
+    LaunchedEffect(selectedIndex, pageCount) {
+        if (pageCount == 0) {
+            currentPage = 0
             return@LaunchedEffect
         }
-
-        if (selectedIndex in marqueeCandidates) {
-            activeMarqueeIndex = selectedIndex
-            return@LaunchedEffect
-        }
-
-        if (pauseMarquee) return@LaunchedEffect
-
-        var currentCandidate = marqueeCandidates.indexOf(activeMarqueeIndex)
-            .takeIf { it >= 0 }
-            ?: 0
-        activeMarqueeIndex = marqueeCandidates[currentCandidate]
-
-        while (true) {
-            delay(2200)
-            currentCandidate = (currentCandidate + 1) % marqueeCandidates.size
-            activeMarqueeIndex = marqueeCandidates[currentCandidate]
+        if (selectedIndex >= 0) {
+            currentPage = (selectedIndex / pageSize).coerceIn(0, pageCount - 1)
+        } else {
+            currentPage = currentPage.coerceIn(0, pageCount - 1)
         }
     }
+
+    val pageStart = currentPage * pageSize
+    val visibleEpisodes = episodes.drop(pageStart).take(pageSize)
 
     Card(
         modifier = Modifier
@@ -623,13 +605,42 @@ private fun EpisodePanel(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            episodes.chunked(columns).forEachIndexed { rowIndex, row ->
+            if (pageCount > 1) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    itemsIndexed(List(pageCount) { it }) { _, pageIndex ->
+                        val selected = pageIndex == currentPage
+                        val start = pageIndex * pageSize + 1
+                        val end = minOf((pageIndex + 1) * pageSize, episodes.size)
+                        OutlinedButton(
+                            onClick = { currentPage = pageIndex },
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, if (selected) UiPalette.Accent else UiPalette.Border),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = if (selected) UiPalette.AccentGlow else UiPalette.SurfaceSoft,
+                                contentColor = if (selected) UiPalette.Accent else UiPalette.Ink
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = "$start-$end",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
+
+            visibleEpisodes.chunked(columns).forEachIndexed { rowIndex, row ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     row.forEachIndexed { columnIndex, episode ->
-                        val absoluteIndex = rowIndex * columns + columnIndex
+                        val absoluteIndex = pageStart + rowIndex * columns + columnIndex
                         val selected = absoluteIndex == selectedIndex
                         OutlinedButton(
                             onClick = { onEpisodeClick(absoluteIndex) },
@@ -646,7 +657,9 @@ private fun EpisodePanel(
                         ) {
                             EpisodeChipLabel(
                                 text = episode.name,
-                                enableMarquee = !pauseMarquee && absoluteIndex == activeMarqueeIndex,
+                                enableMarquee = !pauseMarquee &&
+                                    absoluteIndex == selectedIndex &&
+                                    shouldMarqueeEpisodeLabel(episode.name),
                                 fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold
                             )
                         }
@@ -694,7 +707,7 @@ private fun EpisodeChipLabel(
 }
 
 private fun shouldMarqueeEpisodeLabel(text: String): Boolean =
-    text.trim().length > 4
+    text.trim().length > 8 && text.any { !it.isDigit() }
 
 @Composable
 private fun ResolveLoadingSurface(
