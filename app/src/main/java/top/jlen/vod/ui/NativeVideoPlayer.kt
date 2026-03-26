@@ -113,7 +113,13 @@ fun NativeVideoPlayer(
     var playbackState by remember(player) { mutableStateOf(player?.playbackState ?: Player.STATE_IDLE) }
     var lastReportedLandscape by remember(playbackIdentity) { mutableStateOf<Boolean?>(null) }
     var fullscreenResizeMode by remember(playbackIdentity) {
-        mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT)
+        mutableIntStateOf(
+            if (fullscreenMode) {
+                AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            } else {
+                AspectRatioFrameLayout.RESIZE_MODE_FIT
+            }
+        )
     }
     var hasCompletedInitialOverlayDelay by remember(playbackIdentity) { mutableStateOf(false) }
     var hasStartedPlaybackOnce by remember(playbackIdentity) { mutableStateOf(false) }
