@@ -1,5 +1,8 @@
 package top.jlen.vod.ui
 
+import android.view.Gravity
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.os.SystemClock
 
 import androidx.compose.foundation.background
@@ -379,22 +382,24 @@ fun NativeVideoPlayer(
                 AndroidView(
                     factory = { viewContext ->
                         PlayerView(viewContext).apply {
-                            useController = false
+                            applyPlayerViewLayout(
+                                resizeMode = if (fullscreenMode) {
+                                    fullscreenResizeMode
+                                } else {
+                                    embeddedResizeMode
+                                }
+                            )
+                            this.player = player
+                        }
+                    },
+                    update = { playerView ->
+                        playerView.applyPlayerViewLayout(
                             resizeMode = if (fullscreenMode) {
                                 fullscreenResizeMode
                             } else {
                                 embeddedResizeMode
                             }
-                            this.player = player
-                        }
-                    },
-                    update = { playerView ->
-                        playerView.useController = false
-                        playerView.resizeMode = if (fullscreenMode) {
-                            fullscreenResizeMode
-                        } else {
-                            embeddedResizeMode
-                        }
+                        )
                         if (playerView.player !== player) {
                             playerView.player = player
                         }
@@ -857,6 +862,38 @@ private fun Modifier.clickableWithoutRipple(onClick: () -> Unit): Modifier =
             onClick = onClick
         )
     }
+
+private fun PlayerView.applyPlayerViewLayout(resizeMode: Int) {
+    useController = false
+    this.resizeMode = resizeMode
+    setPadding(0, 0, 0, 0)
+    clipToPadding = false
+    clipChildren = false
+
+    val contentFrame = findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)
+    val contentParams = (contentFrame.layoutParams as? FrameLayout.LayoutParams)
+        ?: FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        )
+    contentFrame.layoutParams = contentParams.apply {
+        width = ViewGroup.LayoutParams.MATCH_PARENT
+        height = ViewGroup.LayoutParams.MATCH_PARENT
+        gravity = Gravity.CENTER
+    }
+
+    val videoSurface = contentFrame.getChildAt(0)
+    val surfaceParams = (videoSurface?.layoutParams as? FrameLayout.LayoutParams)
+        ?: FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        )
+    videoSurface?.layoutParams = surfaceParams.apply {
+        width = ViewGroup.LayoutParams.MATCH_PARENT
+        height = ViewGroup.LayoutParams.MATCH_PARENT
+        gravity = Gravity.CENTER
+    }
+}
 
 private fun formatMillis(value: Long): String {
     if (value <= 0L) return "00:00"
