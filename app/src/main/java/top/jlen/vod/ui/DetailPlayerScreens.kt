@@ -6,6 +6,8 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.net.Uri
+import android.os.Build
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
@@ -66,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import coil.compose.AsyncImage
@@ -237,21 +240,37 @@ fun PlayerScreen(
         }
     }
 
-    DisposableEffect(activity, isFullscreen, detectedLandscapeVideo) {
+    DisposableEffect(activity, isFullscreen) {
         if (activity == null) {
             onDispose { }
         } else {
+            val window = activity.window
             val controller = WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+            val originalCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                window.attributes.layoutInDisplayCutoutMode
+            } else {
+                null
+            }
             if (isFullscreen) {
+                WindowCompat.setDecorFitsSystemWindows(window, false)
+                window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val attributes = window.attributes
+                    attributes.layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    window.attributes = attributes
+                }
                 controller.hide(WindowInsetsCompat.Type.systemBars())
                 controller.systemBarsBehavior =
                     WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                activity.requestedOrientation = if (detectedLandscapeVideo == false) {
-                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-                } else {
-                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                }
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             } else {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && originalCutoutMode != null) {
+                    val attributes = window.attributes
+                    attributes.layoutInDisplayCutoutMode = originalCutoutMode
+                    window.attributes = attributes
+                }
                 controller.show(WindowInsetsCompat.Type.systemBars())
                 controller.isAppearanceLightStatusBars = true
                 controller.isAppearanceLightNavigationBars = true
@@ -259,6 +278,12 @@ fun PlayerScreen(
             }
             onDispose {
                 if (isFullscreen) {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && originalCutoutMode != null) {
+                        val attributes = window.attributes
+                        attributes.layoutInDisplayCutoutMode = originalCutoutMode
+                        window.attributes = attributes
+                    }
                     controller.show(WindowInsetsCompat.Type.systemBars())
                     controller.isAppearanceLightStatusBars = true
                     controller.isAppearanceLightNavigationBars = true
