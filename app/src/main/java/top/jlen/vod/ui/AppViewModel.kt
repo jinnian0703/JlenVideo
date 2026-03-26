@@ -148,14 +148,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     featured = payload.featured,
                     latest = payload.latest,
                     sections = payload.sections,
-                    homeVisibleCount = payload.latest.size,
+                    homeVisibleCount = payload.latest.initialGridVisibleCount(),
                     homePage = payload.latestPage,
                     homeTotalCount = payload.latestTotal,
                     hasMoreHomePages = payload.latestHasNextPage,
                     categories = categories,
                     selectedCategory = defaultSelected,
                     categoryVideos = cachedSelectedPage?.items ?: payload.categoryVideos,
-                    categoryVisibleCount = cachedSelectedPage?.items?.size ?: payload.categoryVideos.size,
+                    categoryVisibleCount = (cachedSelectedPage?.items ?: payload.categoryVideos).initialGridVisibleCount(),
                     categoryPage = cachedSelectedPage?.page ?: payload.categoryPage,
                     categoryTotalCount = cachedSelectedPage?.totalItems ?: payload.categoryTotal,
                     hasMoreCategoryPages = cachedSelectedPage?.hasNextPage ?: payload.categoryHasNextPage
@@ -188,7 +188,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             homeState = homeState.copy(
                 selectedCategory = category,
                 categoryVideos = cachedPayload.items,
-                categoryVisibleCount = cachedPayload.items.size,
+                categoryVisibleCount = cachedPayload.items.initialGridVisibleCount(),
                 categoryPage = cachedPayload.page,
                 categoryTotalCount = cachedPayload.totalItems,
                 hasMoreCategoryPages = cachedPayload.hasNextPage,
@@ -209,7 +209,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onSuccess { payload ->
                 homeState = homeState.copy(
                     categoryVideos = payload.items,
-                    categoryVisibleCount = payload.items.size,
+                    categoryVisibleCount = payload.items.initialGridVisibleCount(),
                     categoryPage = payload.page,
                     categoryTotalCount = payload.totalItems,
                     hasMoreCategoryPages = payload.hasNextPage,
@@ -227,11 +227,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadMoreHome() {
-        if (homeState.isHomeAppending || !homeState.hasMoreHomePages) {
+        if (homeState.isHomeAppending) {
             return
         }
+        val nextVisibleCount = homeState.homeVisibleCount + GRID_BATCH_ITEM_COUNT
+        if (homeState.homeVisibleCount < homeState.latest.size) {
+            homeState = homeState.copy(
+                homeVisibleCount = nextVisibleCount.coerceAtMost(homeState.latest.size)
+            )
+            return
+        }
+        if (!homeState.hasMoreHomePages) return
         viewModelScope.launch {
             val nextPage = homeState.homePage + 1
+            val previousVisibleCount = homeState.homeVisibleCount
             homeState = homeState.copy(isHomeAppending = true, error = null)
             runCatching {
                 withContext(Dispatchers.IO) {
@@ -241,7 +250,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val mergedLatest = (homeState.latest + payload.items).distinctBy { it.vodId }
                 homeState = homeState.copy(
                     latest = mergedLatest,
-                    homeVisibleCount = mergedLatest.size,
+                    homeVisibleCount = (previousVisibleCount + GRID_BATCH_ITEM_COUNT)
+                        .coerceAtLeast(mergedLatest.initialGridVisibleCount())
+                        .coerceAtMost(mergedLatest.size),
                     homePage = payload.page,
                     homeTotalCount = payload.totalItems,
                     hasMoreHomePages = payload.hasNextPage,
@@ -257,12 +268,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadMoreCategory() {
-        if (homeState.isCategoryAppending || !homeState.hasMoreCategoryPages) {
+        if (homeState.isCategoryAppending) {
             return
         }
+        val nextVisibleCount = homeState.categoryVisibleCount + GRID_BATCH_ITEM_COUNT
+        if (homeState.categoryVisibleCount < homeState.categoryVideos.size) {
+            homeState = homeState.copy(
+                categoryVisibleCount = nextVisibleCount.coerceAtMost(homeState.categoryVideos.size)
+            )
+            return
+        }
+        if (!homeState.hasMoreCategoryPages) return
         val category = homeState.selectedCategory ?: return
         viewModelScope.launch {
             val nextPage = homeState.categoryPage + 1
+            val previousVisibleCount = homeState.categoryVisibleCount
             homeState = homeState.copy(isCategoryAppending = true, error = null)
             runCatching {
                 withContext(Dispatchers.IO) {
@@ -272,7 +292,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val mergedVideos = (homeState.categoryVideos + payload.items).distinctBy { it.vodId }
                 homeState = homeState.copy(
                     categoryVideos = mergedVideos,
-                    categoryVisibleCount = mergedVideos.size,
+                    categoryVisibleCount = (previousVisibleCount + GRID_BATCH_ITEM_COUNT)
+                        .coerceAtLeast(mergedVideos.initialGridVisibleCount())
+                        .coerceAtMost(mergedVideos.size),
                     categoryPage = payload.page,
                     categoryTotalCount = payload.totalItems,
                     hasMoreCategoryPages = payload.hasNextPage,
@@ -1660,17 +1682,24 @@ data class HomeUiState(
     val hasMoreCategoryPages: Boolean = false
 ) {
     val visibleLatest: List<VodItem>
-        get() = latest
+        get() = latest.take(homeVisibleCount.coerceIn(0, latest.size))
 
     val hasMoreLatest: Boolean
-        get() = hasMoreHomePages
+        get() = homeVisibleCount < latest.size || hasMoreHomePages
 
     val visibleCategoryVideos: List<VodItem>
-        get() = categoryVideos
+        get() = categoryVideos.take(categoryVisibleCount.coerceIn(0, categoryVideos.size))
 
     val hasMoreCategoryVideos: Boolean
-        get() = hasMoreCategoryPages
+        get() = categoryVisibleCount < categoryVideos.size || hasMoreCategoryPages
 }
+
+private fun List<VodItem>.initialGridVisibleCount(): Int =
+    size.coerceAtMost(GRID_BATCH_ITEM_COUNT)
+
+private const val GRID_BATCH_ROWS = 12
+private const val GRID_BATCH_COLUMNS = 3
+private const val GRID_BATCH_ITEM_COUNT = GRID_BATCH_ROWS * GRID_BATCH_COLUMNS
 
 data class SearchUiState(
     val query: String = "",

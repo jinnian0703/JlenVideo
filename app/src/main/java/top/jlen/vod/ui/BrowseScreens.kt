@@ -71,6 +71,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -121,6 +122,22 @@ fun HomeScreen(
     }
     val hotRows = remember(state.hot) { state.hot.chunked(POSTER_GRID_COLUMNS) }
     val latestRows = remember(state.visibleLatest) { state.visibleLatest.chunked(POSTER_GRID_COLUMNS) }
+
+    LaunchedEffect(listState, latestRows.size, state.hasMoreLatest, state.isHomeAppending) {
+        snapshotFlow { listState.maxVisiblePosterRowIndex("home_latest-") }
+            .collect { lastVisibleRowIndex ->
+                if (
+                    shouldAutoPreloadRows(
+                        lastVisibleRowIndex = lastVisibleRowIndex,
+                        totalRows = latestRows.size,
+                        hasMore = state.hasMoreLatest,
+                        isLoading = state.isHomeAppending
+                    )
+                ) {
+                    onLoadMore()
+                }
+            }
+    }
 
     LazyColumn(
         state = listState,
@@ -259,6 +276,25 @@ fun CategoryScreen(
     }
     val categoryRows = remember(state.visibleCategoryVideos) {
         state.visibleCategoryVideos.chunked(POSTER_GRID_COLUMNS)
+    }
+    val categoryRowKeyPrefix = remember(state.selectedCategory?.typeId) {
+        "category_${state.selectedCategory?.typeId.orEmpty()}-"
+    }
+
+    LaunchedEffect(listState, categoryRows.size, categoryRowKeyPrefix, state.hasMoreCategoryVideos, state.isCategoryAppending) {
+        snapshotFlow { listState.maxVisiblePosterRowIndex(categoryRowKeyPrefix) }
+            .collect { lastVisibleRowIndex ->
+                if (
+                    shouldAutoPreloadRows(
+                        lastVisibleRowIndex = lastVisibleRowIndex,
+                        totalRows = categoryRows.size,
+                        hasMore = state.hasMoreCategoryVideos,
+                        isLoading = state.isCategoryAppending
+                    )
+                ) {
+                    onLoadMore()
+                }
+            }
     }
 
     LazyColumn(
@@ -3053,6 +3089,30 @@ private fun sanitizePosterBadge(raw: String): String {
         else -> trimmedRankPrefix
     }
 }
+
+private fun LazyListState.maxVisiblePosterRowIndex(rowKeyPrefix: String): Int =
+    layoutInfo.visibleItemsInfo
+        .mapNotNull { itemInfo ->
+            val key = itemInfo.key.toString()
+            if (!key.startsWith(rowKeyPrefix)) return@mapNotNull null
+            key.removePrefix(rowKeyPrefix)
+                .substringBefore('-')
+                .toIntOrNull()
+        }
+        .maxOrNull() ?: -1
+
+private fun shouldAutoPreloadRows(
+    lastVisibleRowIndex: Int,
+    totalRows: Int,
+    hasMore: Boolean,
+    isLoading: Boolean
+): Boolean {
+    if (!hasMore || isLoading || totalRows <= 0 || lastVisibleRowIndex < 0) return false
+    val triggerRowIndex = (totalRows - GRID_AUTO_PRELOAD_REMAINING_ROWS - 1).coerceAtLeast(0)
+    return lastVisibleRowIndex >= triggerRowIndex
+}
+
+private const val GRID_AUTO_PRELOAD_REMAINING_ROWS = 4
 
 @Composable
 private fun ListCard(item: VodItem, onClick: (String) -> Unit) {
