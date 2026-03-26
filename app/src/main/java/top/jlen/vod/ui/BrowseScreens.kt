@@ -2605,6 +2605,8 @@ fun SectionTitle(
 
 @Composable
 fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
+    val badgeText = sanitizePosterBadge(item.badgeText)
+
     Card(
         modifier = Modifier
             .width(312.dp)
@@ -2634,9 +2636,9 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
                         )
                     )
             )
-            if (item.badgeText.isNotBlank()) {
+            if (badgeText.isNotBlank()) {
                 Text(
-                    text = item.badgeText,
+                    text = badgeText,
                     color = UiPalette.Surface,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier
@@ -2657,14 +2659,6 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
                     fontWeight = FontWeight.ExtraBold,
                     color = UiPalette.Surface,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = item.subtitle.ifBlank { "站内资源" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.86f),
-                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
@@ -2958,10 +2952,11 @@ private fun CompactPosterCard(
     onClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val badgeText = sanitizePosterBadge(item.badgeText)
     val supportText = item.subtitle
         .takeIf {
             it.isNotBlank() &&
-                it != item.badgeText
+                it != badgeText
         }
 
     Column(modifier = modifier.clickable { onClick(item.vodId) }) {
@@ -2979,9 +2974,9 @@ private fun CompactPosterCard(
                     .clip(RoundedCornerShape(18.dp)),
                 contentScale = ContentScale.Crop
             )
-            if (item.badgeText.isNotBlank()) {
+            if (badgeText.isNotBlank()) {
                 Text(
-                    text = item.badgeText,
+                    text = badgeText,
                     color = UiPalette.Surface,
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
@@ -3014,6 +3009,23 @@ private fun CompactPosterCard(
                 overflow = TextOverflow.Ellipsis
             )
         }
+    }
+}
+
+private fun sanitizePosterBadge(raw: String): String {
+    val normalized = raw
+        .replace(Regex("\\s+"), " ")
+        .trim()
+    if (normalized.isBlank()) return ""
+
+    val trimmedRankPrefix = normalized
+        .replace(Regex("^NO\\s*\\d+[\\d\\s]*"), "")
+        .trim()
+
+    return when {
+        trimmedRankPrefix.matches(Regex("^[.。·•…-]+$")) -> ""
+        trimmedRankPrefix.isBlank() -> ""
+        else -> trimmedRankPrefix
     }
 }
 
