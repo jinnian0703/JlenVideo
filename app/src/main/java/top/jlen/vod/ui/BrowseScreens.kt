@@ -3112,7 +3112,7 @@ private fun shouldAutoPreloadRows(
     return lastVisibleRowIndex >= triggerRowIndex
 }
 
-private const val GRID_AUTO_PRELOAD_REMAINING_ROWS = 4
+private const val GRID_AUTO_PRELOAD_REMAINING_ROWS = 6
 
 @Composable
 private fun ListCard(item: VodItem, onClick: (String) -> Unit) {
