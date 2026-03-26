@@ -3,7 +3,9 @@ package top.jlen.vod.ui
 import android.content.pm.ActivityInfo
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -42,6 +44,7 @@ class FullscreenPlayerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         intent.initialVideoOrientation()?.let(::applyInitialOrientation)
         super.onCreate(savedInstanceState)
+        allowDisplayCutout()
         enableEdgeToEdge()
         hideSystemBars()
 
@@ -131,6 +134,14 @@ class FullscreenPlayerActivity : ComponentActivity() {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
+    }
+
+    private fun allowDisplayCutout() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
+        val attributes = window.attributes
+        attributes.layoutInDisplayCutoutMode =
+            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        window.attributes = attributes
     }
 
     private fun applyInitialOrientation(isLandscapeVideo: Boolean) {
