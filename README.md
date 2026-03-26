@@ -77,7 +77,7 @@
 
 - 首页推荐：读取站点推荐位 `level=1`
 - 最近更新：解析 `https://cms.jlen.top/label/new/`
-- 片库列表：使用 `api.php/provide/vod/?ac=list&pg=页码`
+- 片库列表：当前使用 `vodshow/...` 网页分类页解析
 - 搜索、详情、用户中心、收藏、历史、会员等：以页面解析为主
 - 更新检测：读取 GitHub Release 最新发布
 

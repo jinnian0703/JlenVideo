@@ -42,10 +42,10 @@ class AppleCmsRepository(
     private val appContext = context.applicationContext
     private val pageCachePrefs = appContext.getSharedPreferences("library_page_cache", Context.MODE_PRIVATE)
     private val defaultCategories = listOf(
-        AppleCmsCategory(typeId = "1", typeName = "电影", parentId = "1"),
-        AppleCmsCategory(typeId = "2", typeName = "连续剧", parentId = "2"),
-        AppleCmsCategory(typeId = "3", typeName = "综艺", parentId = "3"),
-        AppleCmsCategory(typeId = "4", typeName = "动漫", parentId = "4")
+        AppleCmsCategory(typeId = "GCCCCG", typeName = "电影", parentId = "GCCCCG"),
+        AppleCmsCategory(typeId = "GCCCCT", typeName = "连续剧", parentId = "GCCCCT"),
+        AppleCmsCategory(typeId = "GCCCCV", typeName = "综艺", parentId = "GCCCCV"),
+        AppleCmsCategory(typeId = "GCCCCW", typeName = "动漫", parentId = "GCCCCW")
     )
     private val baseUrl = BuildConfig.APPLE_CMS_BASE_URL.trimEnd('/')
     private val gson = Gson()
@@ -56,6 +56,8 @@ class AppleCmsRepository(
     private var homeCache: CachedValue<HomePayload>? = null
     @Volatile
     private var hotSearchCache: CachedValue<List<HotSearchGroup>>? = null
+    @Volatile
+    private var browsableCategoriesCache: CachedValue<List<AppleCmsCategory>>? = null
     private val api: AppleCmsApi = Retrofit.Builder()
         .baseUrl("$baseUrl/")
         .client(client)
@@ -107,7 +109,7 @@ class AppleCmsRepository(
         if (latest.isEmpty()) {
             throw IOException("首页内容解析失败")
         }
-        val categories = defaultCategories
+        val categories = loadBrowsableCategories(homeDocument = homeDocument, forceRefresh = forceRefresh)
         return HomePayload(
             slides = emptyList(),
             hot = emptyList(),
@@ -152,7 +154,7 @@ class AppleCmsRepository(
                 }
         }
         val pages = coroutineScope {
-            defaultCategories
+            getBrowsableCategories(forceRefresh = forceRefresh)
                 .map { category -> async { loadCategoryPage(category.typeId, safePage, forceRefresh = forceRefresh) } }
                 .awaitAll()
         }
@@ -175,7 +177,7 @@ class AppleCmsRepository(
                 return cached.value
             }
 
-        val cachedPages = defaultCategories.mapNotNull { category ->
+        val cachedPages = getCachedBrowsableCategories().mapNotNull { category ->
             categoryPageCache["${category.typeId}:$safePage"]
                 ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
                 ?.value
@@ -206,8 +208,9 @@ class AppleCmsRepository(
     }
 
     suspend fun prewarmCategoryFirstPages(forceRefresh: Boolean = false) {
+        val categories = getBrowsableCategories(forceRefresh = forceRefresh)
         coroutineScope {
-            defaultCategories.map { category ->
+            categories.map { category ->
                 async {
                     runCatching {
                         loadCategoryPage(
@@ -255,7 +258,7 @@ class AppleCmsRepository(
                     return cached.value
                 }
         }
-        val payload = api.getByType(typeId = typeId, page = safePage).toPagedVodItems()
+        val payload = loadCategoryPageFromWeb(typeId = typeId, page = safePage)
         return payload.also { cachePagePayload(cacheKey, it) }
     }
 
@@ -1537,15 +1540,17 @@ class AppleCmsRepository(
             (parentId.isBlank() || parentId == "0" || parentId == category.typeId)
     }
 
-    private suspend fun loadBrowsableCategories(homeDocument: Document? = null): List<AppleCmsCategory> {
-        val apiCategories = runCatching { api.getCategories().categories }
-            .getOrDefault(emptyList())
-            .map(::normalizeCategory)
-            .filter(::isBrowsableCategory)
-            .distinctBy { it.typeId }
-
-        if (apiCategories.isNotEmpty()) return apiCategories
-
+    private suspend fun loadBrowsableCategories(
+        homeDocument: Document? = null,
+        forceRefresh: Boolean = false
+    ): List<AppleCmsCategory> {
+        if (!forceRefresh) {
+            browsableCategoriesCache
+                ?.takeIf { isCacheValid(it.timestampMs, CATEGORY_CACHE_TTL_MS) }
+                ?.value
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return it }
+        }
         val resolvedHomeDocument = homeDocument ?: runCatching { fetchDocument("$baseUrl/") }.getOrNull()
         val mapDocument = runCatching { fetchDocument("$baseUrl/map/") }.getOrNull()
 
@@ -1556,9 +1561,140 @@ class AppleCmsRepository(
             .filter(::isBrowsableCategory)
             .distinctBy { it.typeId }
 
-        if (parsedCategories.isNotEmpty()) return parsedCategories
+        if (parsedCategories.isNotEmpty()) {
+            return parsedCategories.also { categories ->
+                browsableCategoriesCache = CachedValue(
+                    value = categories,
+                    timestampMs = System.currentTimeMillis()
+                )
+            }
+        }
 
-        return defaultCategories.map(::normalizeCategory)
+        val apiCategories = runCatching { api.getCategories().categories }
+            .getOrDefault(emptyList())
+            .map(::normalizeCategory)
+            .filter(::isBrowsableCategory)
+            .distinctBy { it.typeId }
+
+        if (apiCategories.isNotEmpty()) {
+            return apiCategories.also { categories ->
+                browsableCategoriesCache = CachedValue(
+                    value = categories,
+                    timestampMs = System.currentTimeMillis()
+                )
+            }
+        }
+
+        return defaultCategories.map(::normalizeCategory).also { categories ->
+            browsableCategoriesCache = CachedValue(
+                value = categories,
+                timestampMs = System.currentTimeMillis()
+            )
+        }
+    }
+
+    private suspend fun getBrowsableCategories(forceRefresh: Boolean = false): List<AppleCmsCategory> =
+        loadBrowsableCategories(forceRefresh = forceRefresh)
+
+    private fun getCachedBrowsableCategories(): List<AppleCmsCategory> =
+        browsableCategoriesCache
+            ?.takeIf { isCacheValid(it.timestampMs, CATEGORY_CACHE_TTL_MS) }
+            ?.value
+            ?.takeIf { it.isNotEmpty() }
+            ?: defaultCategories.map(::normalizeCategory)
+
+    private suspend fun loadCategoryPageFromWeb(typeId: String, page: Int): PagedVodItems {
+        val safePage = page.coerceAtLeast(1)
+        val document = fetchDocument(buildCategoryBrowseUrl(typeId = typeId, page = safePage))
+        return parseCategoryPage(document = document, page = safePage, typeId = typeId)
+    }
+
+    private fun buildCategoryBrowseUrl(typeId: String, page: Int): String {
+        val slug = extractCategorySlug(typeId).ifBlank { typeId.trim().removeSuffix("/") }
+        return if (page <= 1) {
+            "$baseUrl/vodshow/$slug-----------/"
+        } else {
+            "$baseUrl/vodshow/$slug--------$page---/"
+        }
+    }
+
+    private fun parseCategoryPage(document: Document, page: Int, typeId: String): PagedVodItems {
+        val listSection = document.select(".layout-box .vod-list")
+            .firstOrNull { section ->
+                section.select("ul.row > li .pic a[href*=/voddetail/]").isNotEmpty()
+            }
+            ?: document
+        val items = parseVodCards(listSection)
+        if (items.isEmpty()) {
+            throw IOException("分类页面解析失败：$typeId")
+        }
+
+        val pagination = document.selectFirst("ul.ewave-page")
+        val pageCount = extractCategoryPageCount(document, pagination).coerceAtLeast(page)
+        val totalItems = extractCategoryTotal(document).coerceAtLeast(items.size)
+        val hasNextPage = pagination?.select("a[href]")
+            ?.any { anchor -> anchor.text().contains("下一页") }
+            ?: (page < pageCount)
+
+        return PagedVodItems(
+            items = items,
+            page = page,
+            pageCount = pageCount,
+            totalItems = totalItems,
+            limit = items.size,
+            hasNextPage = hasNextPage
+        )
+    }
+
+    private fun extractCategoryPageCount(document: Document, pagination: Element?): Int {
+        val mobileCount = pagination?.selectFirst("li.active .num")
+            ?.text()
+            .orEmpty()
+            .substringAfter('/')
+            .substringBefore(' ')
+            .toIntOrNull()
+        if (mobileCount != null && mobileCount > 0) return mobileCount
+
+        val numericLinks = pagination?.select("a[href]")
+            .orEmpty()
+            .mapNotNull { anchor ->
+                anchor.text().trim().toIntOrNull()
+            }
+        val maxNumericLink = numericLinks.maxOrNull()
+        if (maxNumericLink != null && maxNumericLink > 0) return maxNumericLink
+
+        val titleCount = Regex("""第(\d+)页""")
+            .find(document.title())
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toIntOrNull()
+        return titleCount ?: 1
+    }
+
+    private fun extractCategoryTotal(document: Document): Int {
+        val scriptTotal = document.select("script")
+            .asSequence()
+            .mapNotNull { script ->
+                Regex("""ewave-total"\)\.text\((\d+)\)""")
+                    .find(script.html())
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    ?.toIntOrNull()
+            }
+            .firstOrNull()
+        if (scriptTotal != null && scriptTotal > 0) return scriptTotal
+
+        val headerTotal = document.selectFirst(".vod-list h2 .small")
+            ?.text()
+            .orEmpty()
+            .let { text ->
+                Regex("""共\s*(\d+)\s*个视频""")
+                    .find(text)
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    ?.toIntOrNull()
+            }
+        return headerTotal ?: 0
     }
 
     private suspend fun fetchUserDocument(pathOrUrl: String): Document {
@@ -2351,6 +2487,7 @@ class AppleCmsRepository(
 
     companion object {
         private const val HOME_CACHE_TTL_MS = 0L
+        private const val CATEGORY_CACHE_TTL_MS = 300_000L
         private const val PAGE_CACHE_TTL_MS = 300_000L
         private const val DISK_PAGE_CACHE_TTL_MS = 43_200_000L
         private const val SEARCH_CACHE_TTL_MS = 15_000L
