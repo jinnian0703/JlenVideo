@@ -2649,7 +2649,7 @@ fun SectionTitle(
 
 @Composable
 fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
-    val badgeText = normalizePosterBadgeText(item.badgeText)
+    val badgeText = compactPosterBadgeText(item.badgeText)
 
     Card(
         modifier = Modifier
@@ -2996,7 +2996,7 @@ private fun CompactPosterCard(
     onClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val badgeText = normalizePosterBadgeText(item.badgeText)
+    val badgeText = compactPosterBadgeText(item.badgeText)
 
     Column(modifier = modifier.clickable { onClick(item.vodId) }) {
         Box {
@@ -3071,6 +3071,32 @@ private fun PosterBadgeText(
                 }
             )
     )
+}
+
+private fun compactPosterBadgeText(raw: String): String {
+    val normalized = raw
+        .replace(Regex("\\s+"), " ")
+        .trim()
+    if (normalized.isBlank()) return ""
+
+    val trimmedRankPrefix = normalized
+        .replace(Regex("^NO\\s*\\d+[\\d\\s]*"), "")
+        .trim()
+
+    val compactEpisodeBadge = when {
+        trimmedRankPrefix.matches(Regex("^更新至第\\d{1,4}集?$")) ->
+            trimmedRankPrefix.replace(Regex("^更新至第(\\d{1,4})集?$"), "第$1集")
+        trimmedRankPrefix.matches(Regex("^更新至\\d{1,4}集?$")) ->
+            trimmedRankPrefix.replace(Regex("^更新至(\\d{1,4})集?$"), "第$1集")
+        trimmedRankPrefix.matches(Regex("^第\\d{1,4}$")) -> "${trimmedRankPrefix}集"
+        else -> trimmedRankPrefix
+    }
+
+    return when {
+        compactEpisodeBadge.matches(Regex("^[.。·•…-]+$")) -> ""
+        compactEpisodeBadge.isBlank() -> ""
+        else -> compactEpisodeBadge
+    }
 }
 
 private fun normalizePosterBadgeText(raw: String): String {
