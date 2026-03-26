@@ -103,6 +103,11 @@ fun JlenVideoApp() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val showBottomBar = currentRoute in topLevelRoutes
+    val rootContentInsets = if (currentRoute == "player") {
+        WindowInsets(0, 0, 0, 0)
+    } else {
+        WindowInsets.statusBars
+    }
     val updateInfo = viewModel.accountState.updateInfo
     var dismissedUpdateVersion by rememberSaveable { mutableStateOf("") }
     val shouldShowUpdateDialog = updateInfo?.hasUpdate == true &&
@@ -159,7 +164,7 @@ fun JlenVideoApp() {
                 }
                 Scaffold(
                     containerColor = Color.Transparent,
-                    contentWindowInsets = WindowInsets.statusBars,
+                    contentWindowInsets = rootContentInsets,
                     bottomBar = {
                         if (showBottomBar) {
                             AppBottomBar(
