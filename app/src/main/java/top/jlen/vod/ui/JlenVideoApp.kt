@@ -313,6 +313,7 @@ fun JlenVideoApp() {
                                 onBack = { navController.popBackStack() },
                                 onSelectSource = viewModel::selectSource,
                                 onFavorite = viewModel::addCurrentDetailFavorite,
+                                onDismissActionMessage = viewModel::dismissDetailActionMessage,
                                 onPlay = { title, sourceIndex, episodeIndex ->
                                     viewModel.openPlayer(
                                         title = title,

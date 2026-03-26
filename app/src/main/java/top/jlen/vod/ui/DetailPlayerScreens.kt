@@ -36,6 +36,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.AssistChip
@@ -72,6 +73,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 import top.jlen.vod.data.Episode
 import top.jlen.vod.data.VodItem
 
@@ -82,6 +84,7 @@ fun DetailScreen(
     onBack: () -> Unit,
     onSelectSource: (Int) -> Unit,
     onFavorite: () -> Unit,
+    onDismissActionMessage: () -> Unit,
     onPlay: (String, Int, Int) -> Unit
 ) {
     when {
@@ -92,6 +95,12 @@ fun DetailScreen(
             val item = state.item
             val source = state.selectedSource
             val detailListState = rememberLazyListState()
+            LaunchedEffect(state.actionMessage, state.isActionError) {
+                if (!state.actionMessage.isNullOrBlank() && !state.isActionError) {
+                    delay(2200)
+                    onDismissActionMessage()
+                }
+            }
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 state = detailListState,
@@ -140,14 +149,21 @@ fun DetailScreen(
                             }
                             OutlinedButton(
                                 onClick = onFavorite,
-                                enabled = isLoggedIn && !state.isActionLoading,
+                                enabled = !state.isActionLoading,
                                 shape = RoundedCornerShape(20.dp),
-                                border = BorderStroke(1.dp, UiPalette.BorderSoft),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = UiPalette.Accent)
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (state.isFavorited) UiPalette.Accent.copy(alpha = 0.28f) else UiPalette.BorderSoft
+                                ),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = if (state.isFavorited) UiPalette.AccentSoft.copy(alpha = 0.16f) else Color.Transparent,
+                                    contentColor = UiPalette.Accent
+                                )
                             ) {
                                 Text(
                                     if (!isLoggedIn) "登录后收藏"
                                     else if (state.isActionLoading) "收藏中..."
+                                    else if (state.isFavorited) "已收藏"
                                     else "收藏"
                                 )
                             }
@@ -157,10 +173,9 @@ fun DetailScreen(
                 item {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         state.actionMessage?.takeIf { it.isNotBlank() }?.let { message ->
-                            Text(
-                                text = message,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = UiPalette.Accent
+                            DetailActionNotice(
+                                message = message,
+                                isError = state.isActionError
                             )
                         }
                     }
@@ -988,6 +1003,53 @@ fun ErrorBanner(
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(actionLabel, fontWeight = FontWeight.Bold)
             }
+        }
+    }
+}
+
+@Composable
+private fun DetailActionNotice(
+    message: String,
+    isError: Boolean
+) {
+    val containerColor = if (isError) UiPalette.DangerSurface else UiPalette.AccentSoft.copy(alpha = 0.18f)
+    val borderColor = if (isError) UiPalette.DangerBorder else UiPalette.BorderSoft
+    val iconTint = if (isError) UiPalette.DangerText else UiPalette.Accent
+    val textColor = if (isError) UiPalette.DangerText else UiPalette.Ink
+    val icon = if (isError) Icons.Rounded.ErrorOutline else Icons.Rounded.CheckCircle
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, borderColor)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = if (isError) 0.42f else 0.72f)),
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.material3.Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+            Text(
+                text = message,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                color = textColor
+            )
         }
     }
 }

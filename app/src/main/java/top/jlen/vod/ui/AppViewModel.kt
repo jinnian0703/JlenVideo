@@ -543,10 +543,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         runAccountAction(
             block = { deleteUserRecord(recordIds = listOf(recordId), type = 2, clearAll = false) },
             onSuccess = {
-            accountState = accountState.copy(
-                favoriteItems = accountState.favoriteItems.filterNot { item -> item.recordId == recordId }
-            )
-            selectAccountSection(AccountSection.Favorites, forceRefresh = true)
+                val removedItem = accountState.favoriteItems.firstOrNull { item -> item.recordId == recordId }
+                accountState = accountState.copy(
+                    favoriteItems = accountState.favoriteItems.filterNot { item -> item.recordId == recordId }
+                )
+                if (removedItem?.vodId == detailState.item?.vodId) {
+                    detailState = detailState.copy(isFavorited = false)
+                }
+                selectAccountSection(AccountSection.Favorites, forceRefresh = true)
             }
         )
     }
@@ -555,11 +559,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         runAccountAction(
             block = { deleteUserRecord(recordIds = emptyList(), type = 2, clearAll = true) },
             onSuccess = {
-            accountState = accountState.copy(
-                favoriteItems = emptyList(),
-                favoriteNextPageUrl = null
-            )
-            selectAccountSection(AccountSection.Favorites, forceRefresh = true)
+                accountState = accountState.copy(
+                    favoriteItems = emptyList(),
+                    favoriteNextPageUrl = null
+                )
+                if (detailState.item != null) {
+                    detailState = detailState.copy(isFavorited = false)
+                }
+                selectAccountSection(AccountSection.Favorites, forceRefresh = true)
             }
         )
     }
@@ -793,29 +800,54 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun addCurrentDetailFavorite() {
         val item = detailState.item ?: return
         if (!accountState.session.isLoggedIn) {
-            detailState = detailState.copy(actionMessage = "请先登录后再收藏")
+            detailState = detailState.copy(
+                actionMessage = "请先登录后再收藏",
+                isActionError = true
+            )
+            return
+        }
+        if (detailState.isFavorited) {
+            detailState = detailState.copy(
+                actionMessage = "已在收藏中",
+                isActionError = false
+            )
             return
         }
         if (detailState.isActionLoading) return
         viewModelScope.launch {
-            detailState = detailState.copy(isActionLoading = true, actionMessage = null)
+            detailState = detailState.copy(
+                isActionLoading = true,
+                actionMessage = null,
+                isActionError = false
+            )
             runCatching {
                 withContext(Dispatchers.IO) { repository.addFavorite(item) }
             }.onSuccess { message ->
+                val normalizedMessage = normalizeFavoriteActionMessage(message)
                 detailState = detailState.copy(
                     isActionLoading = false,
-                    actionMessage = message.ifBlank { "收藏成功" }
+                    actionMessage = normalizedMessage,
+                    isActionError = false,
+                    isFavorited = true
                 )
                 if (accountState.selectedSection == AccountSection.Favorites) {
                     selectAccountSection(AccountSection.Favorites, forceRefresh = true)
                 }
             }.onFailure { error ->
+                val isDuplicate = isDuplicateFavoriteMessage(error.message.orEmpty())
                 detailState = detailState.copy(
                     isActionLoading = false,
-                    actionMessage = error.message ?: "收藏失败"
+                    actionMessage = if (isDuplicate) "已在收藏中" else toUserFacingMessage(error, "收藏失败"),
+                    isActionError = !isDuplicate,
+                    isFavorited = isDuplicate || detailState.isFavorited
                 )
             }
         }
+    }
+
+    fun dismissDetailActionMessage() {
+        if (detailState.actionMessage.isNullOrBlank()) return
+        detailState = detailState.copy(actionMessage = null, isActionError = false)
     }
 
     fun login() {
@@ -1119,6 +1151,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun normalizeFavoriteActionMessage(rawMessage: String): String {
+        val message = rawMessage.trim()
+        if (message.isBlank()) return "已加入收藏"
+        return when {
+            isDuplicateFavoriteMessage(message) -> "已在收藏中"
+            message.contains("成功") || message.contains("获取成功") || message.contains("操作成功") -> "已加入收藏"
+            else -> "已加入收藏"
+        }
+    }
+
+    private fun isDuplicateFavoriteMessage(rawMessage: String): Boolean {
+        val message = rawMessage.trim()
+        if (message.isBlank()) return false
+        return message.contains("已收藏") ||
+            message.contains("已经收藏") ||
+            message.contains("已存在") ||
+            message.contains("重复")
+    }
+
     private fun mergeAccountItems(
         current: List<UserCenterItem>,
         incoming: List<UserCenterItem>
@@ -1300,7 +1351,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         sources = repository.parseSources(item),
                         selectedSourceIndex = 0,
                         actionMessage = null,
-                        isActionLoading = false
+                        isActionLoading = false,
+                        isFavorited = accountState.favoriteItems.any { favorite -> favorite.vodId == item.vodId }
                     )
                 }
             }.onFailure { error ->
@@ -1657,7 +1709,9 @@ data class DetailUiState(
     val sources: List<PlaySource> = emptyList(),
     val selectedSourceIndex: Int = 0,
     val isActionLoading: Boolean = false,
-    val actionMessage: String? = null
+    val actionMessage: String? = null,
+    val isActionError: Boolean = false,
+    val isFavorited: Boolean = false
 ) {
     val selectedSource: PlaySource?
         get() = sources.getOrNull(selectedSourceIndex)
