@@ -87,8 +87,10 @@ fun DetailScreen(
         else -> {
             val item = state.item
             val source = state.selectedSource
+            val detailListState = rememberLazyListState()
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
+                state = detailListState,
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
@@ -175,6 +177,7 @@ fun DetailScreen(
                             EpisodePanel(
                                 episodes = selected.episodes,
                                 selectedIndex = -1,
+                                pauseMarquee = detailListState.isScrollInProgress,
                                 onEpisodeClick = { episodeIndex ->
                                     onPlay(item.displayTitle, state.selectedSourceIndex, episodeIndex)
                                 }
@@ -389,6 +392,7 @@ fun PlayerScreen(
                         EpisodePanel(
                             episodes = state.episodes,
                             selectedIndex = state.selectedEpisodeIndex,
+                            pauseMarquee = false,
                             onEpisodeClick = onSelectEpisode
                         )
                     }
@@ -564,6 +568,7 @@ private fun DetailInfoCard(item: VodItem) {
 private fun EpisodePanel(
     episodes: List<Episode>,
     selectedIndex: Int,
+    pauseMarquee: Boolean,
     onEpisodeClick: (Int) -> Unit
 ) {
     Card(
@@ -601,6 +606,7 @@ private fun EpisodePanel(
                         ) {
                             EpisodeChipLabel(
                                 text = episode.name,
+                                pauseMarquee = pauseMarquee,
                                 fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold
                             )
                         }
@@ -618,6 +624,7 @@ private fun EpisodePanel(
 @Composable
 private fun EpisodeChipLabel(
     text: String,
+    pauseMarquee: Boolean,
     fontWeight: FontWeight
 ) {
     Box(
@@ -628,12 +635,16 @@ private fun EpisodeChipLabel(
     ) {
         Text(
             text = text,
-            modifier = Modifier
-                .basicMarquee(
-                    iterations = Int.MAX_VALUE,
-                    initialDelayMillis = 800
-                )
-                .wrapContentWidth(),
+            modifier = if (pauseMarquee) {
+                Modifier.wrapContentWidth()
+            } else {
+                Modifier
+                    .basicMarquee(
+                        iterations = Int.MAX_VALUE,
+                        initialDelayMillis = 800
+                    )
+                    .wrapContentWidth()
+            },
             maxLines = 1,
             overflow = TextOverflow.Clip,
             textAlign = TextAlign.Center,
