@@ -572,6 +572,7 @@ private fun EpisodePanel(
     pauseMarquee: Boolean,
     onEpisodeClick: (Int) -> Unit
 ) {
+    val columns = 3
     val marqueeCandidates = remember(episodes) {
         episodes.mapIndexedNotNull { index, episode ->
             index.takeIf { shouldMarqueeEpisodeLabel(episode.name) }
@@ -622,13 +623,13 @@ private fun EpisodePanel(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            episodes.chunked(4).forEachIndexed { rowIndex, row ->
+            episodes.chunked(columns).forEachIndexed { rowIndex, row ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     row.forEachIndexed { columnIndex, episode ->
-                        val absoluteIndex = rowIndex * 4 + columnIndex
+                        val absoluteIndex = rowIndex * columns + columnIndex
                         val selected = absoluteIndex == selectedIndex
                         OutlinedButton(
                             onClick = { onEpisodeClick(absoluteIndex) },
@@ -650,7 +651,7 @@ private fun EpisodePanel(
                             )
                         }
                     }
-                    repeat(4 - row.size) {
+                    repeat(columns - row.size) {
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
