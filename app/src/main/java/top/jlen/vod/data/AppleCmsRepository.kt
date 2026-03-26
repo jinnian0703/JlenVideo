@@ -1122,9 +1122,12 @@ class AppleCmsRepository(
         val document = fetchDocument(sourceUrl)
         val items = document.select(".mod_rank_search_list .hotlist li a")
             .mapIndexedNotNull { index, anchor ->
-                val keyword = decodeSiteText(
+                val keyword = sanitizeHotSearchKeyword(
+                    platform = "腾讯视频",
+                    raw = decodeSiteText(
                     anchor.selectFirst(".name")?.text().orEmpty()
                         .ifBlank { anchor.attr("title") }
+                    )
                 )
                 if (keyword.isBlank()) return@mapIndexedNotNull null
                 HotSearchItem(
@@ -1148,9 +1151,12 @@ class AppleCmsRepository(
         val items = document.select("a.rvi__box")
             .mapIndexedNotNull { index, anchor ->
                 val titleNode = anchor.selectFirst(".rvi__tit1") ?: return@mapIndexedNotNull null
-                val keyword = decodeSiteText(
+                val keyword = sanitizeHotSearchKeyword(
+                    platform = "爱奇艺",
+                    raw = decodeSiteText(
                     titleNode.attr("title").ifBlank { titleNode.ownText() }
-                ).replace(Regex("^\\d+"), "").trim()
+                    ).replace(Regex("^\\d+"), "").trim()
+                )
                 if (keyword.isBlank()) return@mapIndexedNotNull null
                 HotSearchItem(
                     rank = index + 1,
@@ -1225,7 +1231,10 @@ class AppleCmsRepository(
                 ?: return@buildList
             for ((index, itemElement) in itemMap.withIndex()) {
                 val item = itemElement.asJsonObject
-                val keyword = decodeSiteText(item.get("title")?.asString.orEmpty())
+                val keyword = sanitizeHotSearchKeyword(
+                    platform = "优酷",
+                    raw = decodeSiteText(item.get("title")?.asString.orEmpty())
+                )
                 if (keyword.isBlank()) continue
                 add(
                     HotSearchItem(
@@ -1258,8 +1267,11 @@ class AppleCmsRepository(
 
         val items = section?.select(".hitv_horizontal-title a")
             ?.mapIndexedNotNull { index, anchor ->
-                val keyword = decodeSiteText(
+                val keyword = sanitizeHotSearchKeyword(
+                    platform = "芒果TV",
+                    raw = decodeSiteText(
                     anchor.attr("title").ifBlank { anchor.text() }
+                    )
                 )
                 if (keyword.isBlank()) return@mapIndexedNotNull null
                 HotSearchItem(
@@ -1277,6 +1289,32 @@ class AppleCmsRepository(
             platform = "\u8292\u679cTV",
             items = items
         )
+    }
+
+    private fun sanitizeHotSearchKeyword(platform: String, raw: String): String {
+        val normalized = raw
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .removePrefix("#")
+            .trim()
+        if (normalized.isBlank()) return ""
+
+        val withoutEmojiSuffix = normalized
+            .replace(Regex("[\\p{So}\\p{Cn}]+.*$"), "")
+            .trim()
+
+        val cleaned = when (platform) {
+            "优酷" -> withoutEmojiSuffix
+            "芒果TV" -> withoutEmojiSuffix
+                .replace(Regex("\\s+加更版$"), "")
+                .replace(Regex("·[^·]*vlog$", RegexOption.IGNORE_CASE), "")
+                .trim()
+            else -> withoutEmojiSuffix
+        }
+
+        return cleaned
+            .replace(Regex("[\\p{Punct}·・：:：、，。！!？?]+$"), "")
+            .trim()
     }
 
     private fun parseVodCards(root: Element): List<VodItem> =
