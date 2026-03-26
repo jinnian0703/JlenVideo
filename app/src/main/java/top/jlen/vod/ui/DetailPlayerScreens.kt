@@ -29,6 +29,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -74,7 +77,7 @@ fun DetailScreen(
 ) {
     when {
         state.isLoading -> LoadingPane("正在加载详情...")
-        !state.error.isNullOrBlank() -> ErrorBanner(message = state.error, onRetry = onBack)
+        !state.error.isNullOrBlank() -> ErrorBanner(message = state.error, onRetry = onBack, actionLabel = "返回")
         state.item == null -> EmptyPane("没有找到影片详情")
         else -> {
             val item = state.item
@@ -792,28 +795,59 @@ fun EmptyPane(message: String) {
 }
 
 @Composable
-fun ErrorBanner(message: String, onRetry: () -> Unit) {
+fun ErrorBanner(
+    message: String,
+    onRetry: () -> Unit,
+    actionLabel: String = "重试"
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
         colors = CardDefaults.cardColors(containerColor = UiPalette.DangerSurface),
-        shape = RoundedCornerShape(22.dp)
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, UiPalette.DangerBorder)
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.42f)),
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.material3.Icon(
+                    imageVector = Icons.Rounded.ErrorOutline,
+                    contentDescription = null,
+                    tint = UiPalette.DangerText,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
             Text(
                 text = message,
+                modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium,
                 color = UiPalette.DangerText
             )
-            Spacer(modifier = Modifier.height(10.dp))
             OutlinedButton(
                 onClick = onRetry,
                 shape = RoundedCornerShape(16.dp),
                 border = BorderStroke(1.dp, UiPalette.DangerBorder),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = UiPalette.Ink)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = UiPalette.DangerText)
             ) {
-                Text("返回")
+                androidx.compose.material3.Icon(
+                    imageVector = Icons.Rounded.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(actionLabel, fontWeight = FontWeight.Bold)
             }
         }
     }

@@ -43,6 +43,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Whatshot
@@ -215,9 +216,10 @@ fun HomeScreen(
         }
         if (state.latest.isEmpty()) {
             item {
-                ErrorBanner(
+                InlineEmptyStateCard(
                     message = "暂无内容",
-                    onRetry = onRefresh
+                    actionLabel = "\u5237\u65b0",
+                    onAction = onRefresh
                 )
             }
         } else {
@@ -311,7 +313,7 @@ fun CategoryScreen(
         item {
             when {
                 state.isCategoryLoading -> LoadingPane("分类加载中...")
-                state.categoryVideos.isEmpty() -> EmptyPane("暂无内容")
+                state.categoryVideos.isEmpty() -> InlineEmptyStateCard("暂无内容")
             }
         }
         if (!state.isCategoryLoading && state.categoryVideos.isNotEmpty()) {
@@ -2814,6 +2816,65 @@ private fun AccountStatusNotice(
                 TextButton(
                     onClick = onAction,
                     colors = ButtonDefaults.textButtonColors(contentColor = textColor)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(actionLabel, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InlineEmptyStateCard(
+    message: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, UiPalette.Border)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(UiPalette.AccentSoft.copy(alpha = 0.22f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Info,
+                        contentDescription = null,
+                        tint = UiPalette.Accent,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = UiPalette.Ink
+                )
+            }
+            if (!actionLabel.isNullOrBlank() && onAction != null) {
+                TextButton(
+                    onClick = onAction,
+                    colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Refresh,
