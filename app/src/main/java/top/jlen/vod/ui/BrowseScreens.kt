@@ -39,6 +39,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Refresh
@@ -818,6 +820,12 @@ fun AccountScreen(
 ) {
     val context = LocalContext.current
     val showLoggedInContent = state.session.isLoggedIn
+    val noticeMessage = state.error?.takeIf { it.isNotBlank() } ?: state.message?.takeIf { it.isNotBlank() }
+    val noticeTone = if (!state.error.isNullOrBlank()) {
+        AccountNoticeTone.Error
+    } else {
+        AccountNoticeTone.Info
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -833,31 +841,6 @@ fun AccountScreen(
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold,
                     color = UiPalette.Ink
-                )
-            }
-        }
-
-        state.message?.let { message ->
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = UiPalette.AccentSoft.copy(alpha = 0.25f)),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Text(
-                        text = message,
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                        color = UiPalette.Ink,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-        }
-
-        state.error?.let { message ->
-            item {
-                ErrorBanner(
-                    message = message,
-                    onRetry = if (showLoggedInContent) onRefreshSection else onLogin
                 )
             }
         }
@@ -994,6 +977,17 @@ fun AccountScreen(
                             )
                         )
                     }
+                }
+            }
+
+            noticeMessage?.let { message ->
+                item {
+                    AccountStatusNotice(
+                        message = message,
+                        tone = noticeTone,
+                        actionLabel = if (noticeTone == AccountNoticeTone.Error) "刷新" else null,
+                        onAction = if (noticeTone == AccountNoticeTone.Error) onRefreshSection else null
+                    )
                 }
             }
 
@@ -1134,6 +1128,13 @@ fun AccountScreen(
                                 )
                             )
                         }
+                    }
+
+                    noticeMessage?.let { message ->
+                        AccountStatusNotice(
+                            message = message,
+                            tone = noticeTone
+                        )
                     }
 
                     when (state.authMode) {
@@ -2752,6 +2753,75 @@ private fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String)
                                 else UiPalette.BorderSoft
                             )
                     )
+                }
+            }
+        }
+    }
+}
+
+private enum class AccountNoticeTone {
+    Info,
+    Error
+}
+
+@Composable
+private fun AccountStatusNotice(
+    message: String,
+    tone: AccountNoticeTone,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null
+) {
+    val isError = tone == AccountNoticeTone.Error
+    val containerColor = if (isError) UiPalette.DangerSurface else UiPalette.AccentSoft.copy(alpha = 0.18f)
+    val borderColor = if (isError) UiPalette.DangerBorder else UiPalette.BorderSoft
+    val iconTint = if (isError) UiPalette.DangerText else UiPalette.Accent
+    val textColor = if (isError) UiPalette.DangerText else UiPalette.Ink
+    val icon = if (isError) Icons.Rounded.ErrorOutline else Icons.Rounded.CheckCircle
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, borderColor)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = if (isError) 0.42f else 0.7f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Text(
+                text = message,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                color = textColor
+            )
+            if (!actionLabel.isNullOrBlank() && onAction != null) {
+                TextButton(
+                    onClick = onAction,
+                    colors = ButtonDefaults.textButtonColors(contentColor = textColor)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(actionLabel, fontWeight = FontWeight.Bold)
                 }
             }
         }
