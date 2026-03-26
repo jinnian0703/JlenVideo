@@ -5,11 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -44,9 +45,7 @@ class FullscreenPlayerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         intent.initialVideoOrientation()?.let(::applyInitialOrientation)
         super.onCreate(savedInstanceState)
-        allowDisplayCutout()
-        enableEdgeToEdge()
-        hideSystemBars()
+        configureImmersiveWindow()
 
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         val sourceName = intent.getStringExtra(EXTRA_SOURCE_NAME).orEmpty()
@@ -87,6 +86,7 @@ class FullscreenPlayerActivity : ComponentActivity() {
                 )
             }
         }
+        consumeRootWindowInsets()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -128,12 +128,30 @@ class FullscreenPlayerActivity : ComponentActivity() {
         }
     }
 
+    private fun configureImmersiveWindow() {
+        window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        allowDisplayCutout()
+        hideSystemBars()
+    }
+
     private fun hideSystemBars() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
+    }
+
+    private fun consumeRootWindowInsets() {
+        val contentRoot = findViewById<ViewGroup>(android.R.id.content) ?: return
+        ViewCompat.setOnApplyWindowInsetsListener(contentRoot) { view, _ ->
+            view.setPadding(0, 0, 0, 0)
+            WindowInsetsCompat.CONSUMED
+        }
+        contentRoot.setPadding(0, 0, 0, 0)
+        ViewCompat.requestApplyInsets(contentRoot)
     }
 
     private fun allowDisplayCutout() {
