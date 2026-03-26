@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 import top.jlen.vod.data.Episode
 import top.jlen.vod.data.VodItem
 
@@ -571,6 +572,44 @@ private fun EpisodePanel(
     pauseMarquee: Boolean,
     onEpisodeClick: (Int) -> Unit
 ) {
+    val marqueeCandidates = remember(episodes) {
+        episodes.mapIndexedNotNull { index, episode ->
+            index.takeIf { shouldMarqueeEpisodeLabel(episode.name) }
+        }
+    }
+    var activeMarqueeIndex by remember(episodes, selectedIndex) {
+        mutableStateOf(
+            selectedIndex.takeIf { it in marqueeCandidates }
+                ?: marqueeCandidates.firstOrNull()
+                ?: -1
+        )
+    }
+
+    LaunchedEffect(marqueeCandidates, selectedIndex, pauseMarquee) {
+        if (marqueeCandidates.isEmpty()) {
+            activeMarqueeIndex = -1
+            return@LaunchedEffect
+        }
+
+        if (selectedIndex in marqueeCandidates) {
+            activeMarqueeIndex = selectedIndex
+            return@LaunchedEffect
+        }
+
+        if (pauseMarquee) return@LaunchedEffect
+
+        var currentCandidate = marqueeCandidates.indexOf(activeMarqueeIndex)
+            .takeIf { it >= 0 }
+            ?: 0
+        activeMarqueeIndex = marqueeCandidates[currentCandidate]
+
+        while (true) {
+            delay(2200)
+            currentCandidate = (currentCandidate + 1) % marqueeCandidates.size
+            activeMarqueeIndex = marqueeCandidates[currentCandidate]
+        }
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -606,7 +645,7 @@ private fun EpisodePanel(
                         ) {
                             EpisodeChipLabel(
                                 text = episode.name,
-                                pauseMarquee = pauseMarquee,
+                                enableMarquee = !pauseMarquee && absoluteIndex == activeMarqueeIndex,
                                 fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold
                             )
                         }
@@ -624,7 +663,7 @@ private fun EpisodePanel(
 @Composable
 private fun EpisodeChipLabel(
     text: String,
-    pauseMarquee: Boolean,
+    enableMarquee: Boolean,
     fontWeight: FontWeight
 ) {
     Box(
@@ -635,23 +674,26 @@ private fun EpisodeChipLabel(
     ) {
         Text(
             text = text,
-            modifier = if (pauseMarquee) {
-                Modifier.wrapContentWidth()
-            } else {
+            modifier = if (enableMarquee) {
                 Modifier
                     .basicMarquee(
                         iterations = Int.MAX_VALUE,
                         initialDelayMillis = 800
                     )
                     .wrapContentWidth()
+            } else {
+                Modifier.wrapContentWidth()
             },
             maxLines = 1,
-            overflow = TextOverflow.Clip,
+            overflow = if (enableMarquee) TextOverflow.Clip else TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
             fontWeight = fontWeight
         )
     }
 }
+
+private fun shouldMarqueeEpisodeLabel(text: String): Boolean =
+    text.trim().length > 4
 
 @Composable
 private fun ResolveLoadingSurface(
