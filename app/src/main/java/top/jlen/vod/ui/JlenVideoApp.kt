@@ -333,22 +333,6 @@ fun JlenVideoApp() {
                             PlayerScreen(
                                 state = viewModel.playerState,
                                 onBack = { navController.popBackStack() },
-                                onOpenDetail = {
-                                    val vodId = viewModel.playerState.item?.vodId.orEmpty()
-                                    if (vodId.isNotBlank()) {
-                                        val previousRoute = navController.previousBackStackEntry
-                                            ?.destination
-                                            ?.route
-                                            .orEmpty()
-                                        if (previousRoute.startsWith("detail/")) {
-                                            navController.popBackStack()
-                                        } else {
-                                            navController.navigate("detail/$vodId") {
-                                                launchSingleTop = true
-                                            }
-                                        }
-                                    }
-                                },
                                 onSelectEpisode = viewModel::selectPlayerEpisode,
                                 onSelectSource = viewModel::selectPlayerSource,
                                 onPlayNext = viewModel::playNextEpisode,

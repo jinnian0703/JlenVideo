@@ -213,7 +213,6 @@ fun DetailScreen(
 fun PlayerScreen(
     state: PlayerUiState,
     onBack: () -> Unit,
-    onOpenDetail: (() -> Unit)?,
     onSelectEpisode: (Int) -> Unit,
     onSelectSource: (Int) -> Unit,
     onPlayNext: () -> Unit,
@@ -411,19 +410,6 @@ fun PlayerScreen(
                             style = MaterialTheme.typography.bodyLarge,
                             color = UiPalette.TextSecondary
                         )
-                        if (onOpenDetail != null && state.item?.vodId?.isNotBlank() == true) {
-                            Spacer(modifier = Modifier.height(14.dp))
-                            OutlinedButton(
-                                onClick = onOpenDetail,
-                                shape = RoundedCornerShape(18.dp),
-                                border = BorderStroke(1.dp, UiPalette.BorderSoft),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = UiPalette.Ink
-                                )
-                            ) {
-                                Text("查看详情", fontWeight = FontWeight.SemiBold)
-                            }
-                        }
                     }
                 }
 
