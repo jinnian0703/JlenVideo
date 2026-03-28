@@ -94,6 +94,9 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Precision
 import coil.size.Scale
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.delay
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.data.AppNotice
@@ -1007,22 +1010,15 @@ fun AnnouncementDetailScreen(
                                 fontWeight = FontWeight.ExtraBold,
                                 color = UiPalette.Ink
                             )
-                            notice.startAt.takeIf(String::isNotBlank)?.let { startAt ->
+                            notice.formattedActiveTime.takeIf(String::isNotBlank)?.let { activeTime ->
                                 Text(
-                                    text = buildString {
-                                        append("生效时间：")
-                                        append(startAt)
-                                        notice.endAt.takeIf(String::isNotBlank)?.let {
-                                            append(" - ")
-                                            append(it)
-                                        }
-                                    },
+                                    text = "生效时间：$activeTime",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = UiPalette.TextSecondary
                                 )
-                            } ?: notice.createdAt.takeIf(String::isNotBlank)?.let { createdAt ->
+                            } ?: notice.formattedPublishTime.takeIf(String::isNotBlank)?.let { publishTime ->
                                 Text(
-                                    text = "发布时间：$createdAt",
+                                    text = "发布时间：$publishTime",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = UiPalette.TextSecondary
                                 )
@@ -1100,12 +1096,9 @@ private fun AnnouncementListCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = when {
-                        notice.startAt.isNotBlank() && notice.endAt.isNotBlank() -> "${notice.startAt} - ${notice.endAt}"
-                        notice.startAt.isNotBlank() -> notice.startAt
-                        notice.createdAt.isNotBlank() -> notice.createdAt
-                        else -> "暂无时间信息"
-                    },
+                    text = notice.formattedActiveTime
+                        .ifBlank { notice.formattedPublishTime }
+                        .ifBlank { "暂无时间信息" },
                     style = MaterialTheme.typography.labelLarge,
                     color = UiPalette.TextMuted
                 )
@@ -3543,6 +3536,34 @@ private fun PosterBadgeText(
                 }
             )
     )
+}
+
+private val noticeDisplayFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+
+private val AppNotice.formattedActiveTime: String
+    get() {
+        val start = startAt.formatNoticeTime()
+        val end = endAt.formatNoticeTime()
+        return when {
+            start.isNotBlank() && end.isNotBlank() -> "$start - $end"
+            start.isNotBlank() -> start
+            end.isNotBlank() -> end
+            else -> ""
+        }
+    }
+
+private val AppNotice.formattedPublishTime: String
+    get() = createdAt.formatNoticeTime().ifBlank { updatedAt.formatNoticeTime() }
+
+private fun String.formatNoticeTime(): String {
+    val raw = trim()
+    if (raw.isBlank()) return ""
+    val timeMillis = raw.toLongOrNull()?.let { numeric ->
+        if (raw.length <= 10) numeric * 1000 else numeric
+    } ?: return raw
+    return runCatching {
+        noticeDisplayFormatter.format(Date(timeMillis))
+    }.getOrDefault(raw)
 }
 
 private fun compactPosterBadgeText(raw: String): String {
