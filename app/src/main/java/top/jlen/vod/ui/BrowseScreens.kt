@@ -896,7 +896,7 @@ fun AnnouncementListScreen(
                 key = { it.id },
                 contentType = { "announcement" }
             ) { notice ->
-                AnnouncementListCard(
+                AnnouncementListCardCompact(
                     notice = notice,
                     onClick = { onOpenNotice(notice.id) }
                 )
@@ -1175,6 +1175,96 @@ private fun AnnouncementRichText(content: String) {
                         color = UiPalette.Ink,
                         lineHeight = MaterialTheme.typography.bodyLarge.lineHeight,
                         textAlign = TextAlign.Start
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnnouncementListCardCompact(
+    notice: AppNotice,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, UiPalette.Border)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (notice.isPinned) {
+                    Box(
+                        modifier = Modifier
+                            .background(UiPalette.Accent.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "置顶",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = UiPalette.Accent
+                        )
+                    }
+                }
+                Text(
+                    text = notice.title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Ink,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            notice.previewText.takeIf(String::isNotBlank)?.let { preview ->
+                Text(
+                    text = preview,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = UiPalette.TextSecondary,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = notice.formattedActiveTime
+                        .ifBlank { notice.formattedPublishTime }
+                        .ifBlank { "暂无时间信息" },
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = UiPalette.TextMuted
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(UiPalette.Accent.copy(alpha = 0.12f))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = if (notice.isActive) "查看详情" else "历史公告",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = UiPalette.Accent,
+                        maxLines = 1
                     )
                 }
             }
