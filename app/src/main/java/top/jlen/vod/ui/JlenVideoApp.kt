@@ -70,6 +70,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.delay
 import top.jlen.vod.data.AppNotice
 import top.jlen.vod.data.AppUpdateInfo
 
@@ -104,6 +105,7 @@ fun JlenVideoApp() {
     }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val heartbeatRoute = normalizeHeartbeatRoute(currentRoute)
     val showBottomBar = currentRoute in topLevelRoutes
     val rootContentInsets = if (currentRoute == "player") {
         WindowInsets(0, 0, 0, 0)
@@ -147,6 +149,13 @@ fun JlenVideoApp() {
         } else {
             viewModel.updateQuery(normalized)
             navController.navigate("search/results/${Uri.encode(normalized)}")
+        }
+    }
+    LaunchedEffect(heartbeatRoute, viewModel.accountState.session.userId) {
+        viewModel.reportHeartbeat(heartbeatRoute)
+        while (true) {
+            delay(60_000)
+            viewModel.reportHeartbeat(heartbeatRoute)
         }
     }
 
@@ -404,6 +413,14 @@ private fun shouldAnimateRouteTransition(fromRoute: String?, toRoute: String?): 
     val fromTopLevel = fromRoute in topLevelRoutes
     val toTopLevel = toRoute in topLevelRoutes
     return !fromTopLevel && !toTopLevel
+}
+
+private fun normalizeHeartbeatRoute(route: String?): String = when {
+    route.isNullOrBlank() -> "home"
+    route.startsWith("search/results/") || route == "search/results/{query}" -> "search_results"
+    route.startsWith("detail/") || route == "detail/{vodId}" -> "detail"
+    route.startsWith("announcement/") || route == "announcement/{noticeId}" -> "announcement_detail"
+    else -> route
 }
 
 @Composable

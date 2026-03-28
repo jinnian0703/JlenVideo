@@ -192,6 +192,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun findNotice(noticeId: String): AppNotice? =
         noticeState.notices.firstOrNull { it.id == noticeId }
 
+    fun reportHeartbeat(route: String) {
+        val normalizedRoute = route.trim().ifBlank { "home" }
+        val userId = accountState.session.userId
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                repository.reportHeartbeat(
+                    route = normalizedRoute,
+                    userId = userId
+                )
+            }
+        }
+    }
+
     fun refreshHome(forceRefresh: Boolean = false) {
         refreshNotices(forceRefresh = forceRefresh)
         viewModelScope.launch {

@@ -20,6 +20,7 @@ import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineStart
@@ -51,6 +52,7 @@ class AppleCmsRepository(
     private val appContext = context.applicationContext
     private val pageCachePrefs = appContext.getSharedPreferences("library_page_cache", Context.MODE_PRIVATE)
     private val noticePrefs = appContext.getSharedPreferences("app_notice_store", Context.MODE_PRIVATE)
+    private val heartbeatPrefs = appContext.getSharedPreferences("app_heartbeat_store", Context.MODE_PRIVATE)
     private val defaultCategories = listOf(
         AppleCmsCategory(typeId = "GCCCCG", typeName = "电影", parentId = "GCCCCG"),
         AppleCmsCategory(typeId = "GCCCCT", typeName = "连续剧", parentId = "GCCCCT"),
@@ -501,6 +503,37 @@ class AppleCmsRepository(
         cookieJar.clear()
     }
 
+    fun reportHeartbeat(route: String, userId: String = currentSession().userId) {
+        val request = Request.Builder()
+            .url(
+                Uri.parse(APP_CENTER_API_URL)
+                    .buildUpon()
+                    .appendQueryParameter("action", "heartbeat")
+                    .build()
+                    .toString()
+            )
+            .post(
+                FormBody.Builder()
+                    .add("device_id", ensureHeartbeatDeviceId())
+                    .add("platform", "android")
+                    .add("app_version", BuildConfig.VERSION_NAME)
+                    .add("route", route.trim().ifBlank { "home" })
+                    .apply {
+                        userId.trim()
+                            .takeIf(String::isNotBlank)
+                            ?.let { add("user_id", it) }
+                    }
+                    .build()
+            )
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("蹇冭烦涓婃姤澶辫触锛欻TTP ${response.code}")
+            }
+        }
+    }
+
     suspend fun login(userName: String, password: String): AuthSession {
         val payload = FormBody.Builder()
             .add("user_name", userName.trim())
@@ -636,6 +669,15 @@ class AppleCmsRepository(
             cleanupCachesIfNeeded()
             return notices
         }
+    }
+
+    private fun ensureHeartbeatDeviceId(): String {
+        heartbeatPrefs.getString(HEARTBEAT_DEVICE_ID_KEY, null)
+            ?.takeIf(String::isNotBlank)
+            ?.let { return it }
+        val generated = "android-${UUID.randomUUID()}"
+        heartbeatPrefs.edit().putString(HEARTBEAT_DEVICE_ID_KEY, generated).apply()
+        return generated
     }
 
     private fun normalizeLoginFailureMessage(rawMessage: String): String {
@@ -3106,6 +3148,7 @@ class AppleCmsRepository(
     companion object {
         private const val APP_CENTER_API_URL = "https://user.jlen.top/api.php"
         private const val KEY_DISMISSED_NOTICE_IDS = "dismissed_notice_ids"
+        private const val HEARTBEAT_DEVICE_ID_KEY = "device_id"
         private const val HOME_CACHE_TTL_MS = 60_000L
         private const val NOTICE_CACHE_TTL_MS = 60_000L
         private const val CATEGORY_CACHE_TTL_MS = 300_000L
