@@ -151,10 +151,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onSuccess { notices ->
                 val currentDialogId = noticeState.dialogNotice?.id.orEmpty()
                 val preservedDialog = notices.firstOrNull { it.id == currentDialogId }
+                val unreadNoticeIds = repository.unreadActiveNoticeIds(notices)
                 noticeState = noticeState.copy(
                     isLoading = false,
                     error = null,
                     notices = notices,
+                    unreadNoticeIds = unreadNoticeIds,
                     dialogNotice = preservedDialog ?: repository.pickPendingNotice(notices)
                 )
             }.onFailure { error ->
@@ -167,19 +169,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun dismissNoticeDialog() {
-        noticeState.dialogNotice?.id
+        val dismissedId = noticeState.dialogNotice?.id
             ?.takeIf(String::isNotBlank)
-            ?.let(repository::markNoticeDismissed)
-        noticeState = noticeState.copy(dialogNotice = null)
+        dismissedId?.let(repository::markNoticeDismissed)
+        noticeState = noticeState.copy(
+            dialogNotice = null,
+            unreadNoticeIds = dismissedId?.let { noticeState.unreadNoticeIds - it } ?: noticeState.unreadNoticeIds
+        )
     }
 
     fun markNoticeOpened(noticeId: String) {
-        noticeId.trim()
+        val normalized = noticeId.trim()
+        normalized
             .takeIf(String::isNotBlank)
             ?.let(repository::markNoticeDismissed)
-        if (noticeState.dialogNotice?.id == noticeId) {
-            noticeState = noticeState.copy(dialogNotice = null)
-        }
+        noticeState = noticeState.copy(
+            dialogNotice = noticeState.dialogNotice?.takeUnless { it.id == normalized },
+            unreadNoticeIds = if (normalized.isBlank()) noticeState.unreadNoticeIds else noticeState.unreadNoticeIds - normalized
+        )
     }
 
     fun findNotice(noticeId: String): AppNotice? =
@@ -1760,10 +1767,14 @@ data class NoticeUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val notices: List<AppNotice> = emptyList(),
+    val unreadNoticeIds: Set<String> = emptySet(),
     val dialogNotice: AppNotice? = null
 ) {
     val activeNotices: List<AppNotice>
         get() = notices.filter { it.isActive }
+
+    val hasUnreadActiveNotices: Boolean
+        get() = unreadNoticeIds.isNotEmpty()
 }
 
 private fun List<VodItem>.initialGridVisibleCount(): Int =

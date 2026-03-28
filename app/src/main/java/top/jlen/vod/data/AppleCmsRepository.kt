@@ -577,6 +577,14 @@ class AppleCmsRepository(
         }
     }
 
+    fun unreadActiveNoticeIds(notices: List<AppNotice>): Set<String> {
+        val dismissedIds = noticePrefs.getStringSet(KEY_DISMISSED_NOTICE_IDS, emptySet()).orEmpty()
+        return notices.asSequence()
+            .filter { it.isActive && it.id.isNotBlank() && !dismissedIds.contains(it.id) }
+            .map { it.id }
+            .toSet()
+    }
+
     fun markNoticeDismissed(noticeId: String) {
         val normalized = noticeId.trim()
         if (normalized.isBlank()) return

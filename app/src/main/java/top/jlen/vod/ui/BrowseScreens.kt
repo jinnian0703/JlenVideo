@@ -89,6 +89,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -1023,11 +1024,7 @@ fun AnnouncementDetailScreen(
                                     color = UiPalette.TextSecondary
                                 )
                             }
-                            Text(
-                                text = notice.displayContent,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = UiPalette.Ink
-                            )
+                            AnnouncementRichText(content = notice.displayContent)
                         }
                     }
                 }
@@ -1108,6 +1105,78 @@ private fun AnnouncementListCard(
                     fontWeight = FontWeight.Bold,
                     color = UiPalette.Accent
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnnouncementRichText(content: String) {
+    val blocks = remember(content) {
+        content
+            .split(Regex("\\n\\s*\\n"))
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        blocks.forEach { block ->
+            val lines = block
+                .lineSequence()
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .toList()
+
+            when {
+                lines.isEmpty() -> Unit
+                lines.all(::isAnnouncementListLine) -> {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        lines.forEach { line ->
+                            val label = line.removeAnnouncementListPrefix()
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .padding(top = 8.dp)
+                                        .size(6.dp)
+                                        .background(UiPalette.Accent, CircleShape)
+                                )
+                                Text(
+                                    text = label,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = UiPalette.Ink,
+                                    lineHeight = MaterialTheme.typography.bodyLarge.lineHeight
+                                )
+                            }
+                        }
+                    }
+                }
+
+                lines.size == 1 && block.length <= 20 -> {
+                    Text(
+                        text = block,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = UiPalette.Ink
+                    )
+                }
+
+                else -> {
+                    Text(
+                        text = block,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = UiPalette.Ink,
+                        lineHeight = MaterialTheme.typography.bodyLarge.lineHeight,
+                        textAlign = TextAlign.Start
+                    )
+                }
             }
         }
     }
@@ -2935,7 +3004,19 @@ private fun AnnouncementTickerStrip(
                     onClick = onOpenList,
                     colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
                 ) {
-                    Text("全部公告", fontWeight = FontWeight.Bold)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("全部公告", fontWeight = FontWeight.Bold)
+                        if (state.hasUnreadActiveNotices) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(UiPalette.Accent, CircleShape)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -3565,6 +3646,17 @@ private fun String.formatNoticeTime(): String {
         noticeDisplayFormatter.format(Date(timeMillis))
     }.getOrDefault(raw)
 }
+
+private fun isAnnouncementListLine(text: String): Boolean =
+    text.startsWith("- ") ||
+        text.startsWith("* ") ||
+        text.startsWith("•") ||
+        Regex("^\\d+[.、]\\s*.+").matches(text)
+
+private fun String.removeAnnouncementListPrefix(): String =
+    replaceFirst(Regex("^(-|\\*|•)\\s*"), "")
+        .replaceFirst(Regex("^\\d+[.、]\\s*"), "")
+        .trim()
 
 private fun compactPosterBadgeText(raw: String): String {
     val normalized = raw
