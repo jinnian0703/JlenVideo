@@ -1210,9 +1210,9 @@ private fun AnnouncementRichContent(notice: AppNotice) {
                 text = block.text,
                 modifier = Modifier.fillMaxWidth(),
                 style = when (block.kind) {
-                    AnnouncementBlockKind.Title -> MaterialTheme.typography.headlineSmall
+                    AnnouncementBlockKind.Title -> MaterialTheme.typography.titleLarge
                     AnnouncementBlockKind.Heading -> MaterialTheme.typography.titleMedium
-                    AnnouncementBlockKind.Paragraph -> MaterialTheme.typography.bodyLarge
+                    AnnouncementBlockKind.Paragraph -> MaterialTheme.typography.bodyMedium
                 },
                 fontWeight = when (block.kind) {
                     AnnouncementBlockKind.Title -> FontWeight.ExtraBold
@@ -1222,9 +1222,9 @@ private fun AnnouncementRichContent(notice: AppNotice) {
                 color = block.textColor ?: UiPalette.Ink,
                 textAlign = block.alignment,
                 lineHeight = when (block.kind) {
-                    AnnouncementBlockKind.Title -> MaterialTheme.typography.headlineSmall.lineHeight
+                    AnnouncementBlockKind.Title -> MaterialTheme.typography.titleLarge.lineHeight
                     AnnouncementBlockKind.Heading -> MaterialTheme.typography.titleMedium.lineHeight
-                    AnnouncementBlockKind.Paragraph -> MaterialTheme.typography.bodyLarge.lineHeight
+                    AnnouncementBlockKind.Paragraph -> MaterialTheme.typography.bodyMedium.lineHeight
                 }
             )
         }
@@ -3838,6 +3838,23 @@ private fun Node.toAnnouncementBlocks(): List<AnnouncementRichBlock> {
             .orEmpty()
 
         is Element -> when (tagName().lowercase(Locale.ROOT)) {
+            in announcementContainerTags ->
+                if (children().any { it.isAnnouncementBlockElement() }) {
+                    childNodes().flatMap { it.toAnnouncementBlocks() }
+                } else {
+                    val text = buildAnnouncementAnnotatedString(this)
+                    if (text.text.isBlank()) emptyList() else {
+                        listOf(
+                            AnnouncementRichBlock(
+                                text = text,
+                                alignment = resolveAnnouncementAlignment(),
+                                kind = resolveAnnouncementBlockKind(),
+                                textColor = resolveAnnouncementTextColor()
+                            )
+                        )
+                    }
+                }
+
             "ul", "ol" -> children().flatMapIndexed { index, child ->
                 val childText = buildAnnouncementAnnotatedString(child).text.trim()
                 if (childText.isBlank()) {
@@ -3890,7 +3907,11 @@ private fun buildAnnouncementAnnotatedString(node: Node): AnnotatedString {
 
 private fun appendAnnouncementNode(builder: AnnotatedString.Builder, node: Node) {
     when (node) {
-        is TextNode -> builder.append(node.text())
+        is TextNode -> {
+            val normalized = node.text()
+                .replace(Regex("\\s+"), " ")
+            builder.append(normalized)
+        }
         is Element -> {
             if (node.tagName().equals("br", ignoreCase = true)) {
                 builder.append('\n')
@@ -3975,6 +3996,28 @@ private fun Element.containsBoldContent(): Boolean =
 
 private fun AnnotatedString.Builder.endsWithLineBreak(): Boolean =
     length > 0 && toAnnotatedString().text.last() == '\n'
+
+private fun Element.isAnnouncementBlockElement(): Boolean =
+    tagName().lowercase(Locale.ROOT) in announcementBlockTags
+
+private val announcementContainerTags = setOf("div", "section", "article", "main")
+
+private val announcementBlockTags = setOf(
+    "div",
+    "section",
+    "article",
+    "p",
+    "ul",
+    "ol",
+    "li",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "center"
+)
 
 private fun compactPosterBadgeText(raw: String): String {
     val normalized = raw
