@@ -2923,9 +2923,8 @@ class AppleCmsRepository(
     private fun parseNoticeItem(element: JsonElement): AppNotice? {
         val obj = element.takeIf { it.isJsonObject }?.asJsonObject ?: return null
         val title = obj.firstString("title", "notice_title", "name", "subject")
-        val content = normalizeNoticeText(
-            obj.firstString("content", "notice_content", "body", "description", "detail")
-        )
+        val rawContent = obj.firstString("content", "notice_content", "body", "description", "detail")
+        val content = normalizeNoticeText(rawContent)
         val summary = normalizeNoticeText(
             obj.firstString("summary", "subtitle", "excerpt", "remark")
         )
@@ -2968,6 +2967,7 @@ class AppleCmsRepository(
         return AppNotice(
             id = resolvedId,
             title = title.ifBlank { "公告" },
+            htmlContent = rawContent.trim(),
             content = content,
             summary = summary,
             isPinned = isPinned,

@@ -85,16 +85,24 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Precision
 import coil.size.Scale
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
+import org.jsoup.nodes.Node
+import org.jsoup.nodes.TextNode
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -1024,7 +1032,7 @@ fun AnnouncementDetailScreen(
                                     color = UiPalette.TextSecondary
                                 )
                             }
-                            AnnouncementRichText(content = notice.displayContent)
+                            AnnouncementRichContent(notice = notice)
                         }
                     }
                 }
@@ -1178,6 +1186,47 @@ private fun AnnouncementRichText(content: String) {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AnnouncementRichContent(notice: AppNotice) {
+    val richBlocks = remember(notice.htmlContent) {
+        parseAnnouncementHtmlBlocks(notice.htmlContent)
+    }
+
+    if (richBlocks.isEmpty()) {
+        AnnouncementRichText(content = notice.displayContent)
+        return
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        richBlocks.forEach { block ->
+            Text(
+                text = block.text,
+                modifier = Modifier.fillMaxWidth(),
+                style = when (block.kind) {
+                    AnnouncementBlockKind.Title -> MaterialTheme.typography.headlineSmall
+                    AnnouncementBlockKind.Heading -> MaterialTheme.typography.titleMedium
+                    AnnouncementBlockKind.Paragraph -> MaterialTheme.typography.bodyLarge
+                },
+                fontWeight = when (block.kind) {
+                    AnnouncementBlockKind.Title -> FontWeight.ExtraBold
+                    AnnouncementBlockKind.Heading -> FontWeight.Bold
+                    AnnouncementBlockKind.Paragraph -> FontWeight.Normal
+                },
+                color = block.textColor ?: UiPalette.Ink,
+                textAlign = block.alignment,
+                lineHeight = when (block.kind) {
+                    AnnouncementBlockKind.Title -> MaterialTheme.typography.headlineSmall.lineHeight
+                    AnnouncementBlockKind.Heading -> MaterialTheme.typography.titleMedium.lineHeight
+                    AnnouncementBlockKind.Paragraph -> MaterialTheme.typography.bodyLarge.lineHeight
+                }
+            )
         }
     }
 }
@@ -3726,6 +3775,19 @@ private val AppNotice.formattedActiveTime: String
 private val AppNotice.formattedPublishTime: String
     get() = createdAt.formatNoticeTime().ifBlank { updatedAt.formatNoticeTime() }
 
+private enum class AnnouncementBlockKind {
+    Title,
+    Heading,
+    Paragraph
+}
+
+private data class AnnouncementRichBlock(
+    val text: AnnotatedString,
+    val alignment: TextAlign = TextAlign.Start,
+    val kind: AnnouncementBlockKind = AnnouncementBlockKind.Paragraph,
+    val textColor: Color? = null
+)
+
 private fun String.formatNoticeTime(): String {
     val raw = trim()
     if (raw.isBlank()) return ""
@@ -3747,6 +3809,172 @@ private fun String.removeAnnouncementListPrefix(): String =
     replaceFirst(Regex("^(-|\\*|•)\\s*"), "")
         .replaceFirst(Regex("^\\d+[.、]\\s*"), "")
         .trim()
+
+private fun parseAnnouncementHtmlBlocks(html: String): List<AnnouncementRichBlock> {
+    val normalized = html.trim()
+    if (normalized.isBlank() || !normalized.contains('<')) return emptyList()
+
+    val body = Jsoup.parseBodyFragment(normalized).body()
+    val blocks = mutableListOf<AnnouncementRichBlock>()
+    body.childNodes().forEach { node ->
+        blocks += node.toAnnouncementBlocks()
+    }
+    return blocks.filter { it.text.text.isNotBlank() }
+}
+
+private fun Node.toAnnouncementBlocks(): List<AnnouncementRichBlock> {
+    return when (this) {
+        is TextNode -> text()
+            .trim()
+            .takeIf(String::isNotBlank)
+            ?.let {
+                listOf(
+                    AnnouncementRichBlock(
+                        text = AnnotatedString(it),
+                        kind = AnnouncementBlockKind.Paragraph
+                    )
+                )
+            }
+            .orEmpty()
+
+        is Element -> when (tagName().lowercase(Locale.ROOT)) {
+            "ul", "ol" -> children().flatMapIndexed { index, child ->
+                val childText = buildAnnouncementAnnotatedString(child).text.trim()
+                if (childText.isBlank()) {
+                    emptyList()
+                } else {
+                    val prefix = if (tagName().equals("ol", ignoreCase = true)) "${index + 1}. " else "• "
+                    listOf(
+                        AnnouncementRichBlock(
+                            text = buildAnnotatedString {
+                                withStyle(SpanStyle(color = UiPalette.Accent, fontWeight = FontWeight.Bold)) {
+                                    append(prefix)
+                                }
+                                append(buildAnnouncementAnnotatedString(child))
+                            },
+                            alignment = child.resolveAnnouncementAlignment(),
+                            kind = AnnouncementBlockKind.Paragraph,
+                            textColor = child.resolveAnnouncementTextColor()
+                        )
+                    )
+                }
+            }
+
+            "br" -> emptyList()
+            else -> {
+                val text = buildAnnouncementAnnotatedString(this)
+                if (text.text.isBlank()) {
+                    children().flatMap { it.toAnnouncementBlocks() }
+                } else {
+                    listOf(
+                        AnnouncementRichBlock(
+                            text = text,
+                            alignment = resolveAnnouncementAlignment(),
+                            kind = resolveAnnouncementBlockKind(),
+                            textColor = resolveAnnouncementTextColor()
+                        )
+                    )
+                }
+            }
+        }
+
+        else -> emptyList()
+    }
+}
+
+private fun buildAnnouncementAnnotatedString(node: Node): AnnotatedString {
+    val builder = AnnotatedString.Builder()
+    appendAnnouncementNode(builder, node)
+    return builder.toAnnotatedString()
+}
+
+private fun appendAnnouncementNode(builder: AnnotatedString.Builder, node: Node) {
+    when (node) {
+        is TextNode -> builder.append(node.text())
+        is Element -> {
+            if (node.tagName().equals("br", ignoreCase = true)) {
+                builder.append('\n')
+                return
+            }
+
+            val style = node.resolveAnnouncementSpanStyle()
+            val handledBlock = node.tagName().lowercase(Locale.ROOT) in setOf("p", "div", "section", "article")
+            if (style != null) {
+                builder.pushStyle(style)
+            }
+            node.childNodes().forEach { child ->
+                appendAnnouncementNode(builder, child)
+            }
+            if (style != null) {
+                builder.pop()
+            }
+            if (handledBlock && !builder.endsWithLineBreak()) {
+                builder.append('\n')
+            }
+        }
+    }
+}
+
+private fun Element.resolveAnnouncementBlockKind(): AnnouncementBlockKind {
+    val tag = tagName().lowercase(Locale.ROOT)
+    return when {
+        tag in setOf("h1", "h2") -> AnnouncementBlockKind.Title
+        tag in setOf("h3", "h4", "h5", "h6") -> AnnouncementBlockKind.Heading
+        tag == "p" && text().trim().length <= 20 && containsBoldContent() -> AnnouncementBlockKind.Heading
+        else -> AnnouncementBlockKind.Paragraph
+    }
+}
+
+private fun Element.resolveAnnouncementAlignment(): TextAlign {
+    val style = attr("style").lowercase(Locale.ROOT)
+    return when {
+        style.contains("text-align:center") || tagName().equals("center", ignoreCase = true) -> TextAlign.Center
+        style.contains("text-align:right") -> TextAlign.End
+        else -> TextAlign.Start
+    }
+}
+
+private fun Element.resolveAnnouncementTextColor(): Color? {
+    val style = attr("style")
+    val colorValue = Regex("""color\s*:\s*([^;]+)""", RegexOption.IGNORE_CASE)
+        .find(style)
+        ?.groupValues
+        ?.getOrNull(1)
+        ?.trim()
+        .orEmpty()
+    if (colorValue.isBlank()) return null
+    return runCatching { Color(android.graphics.Color.parseColor(colorValue)) }.getOrNull()
+}
+
+private fun Element.resolveAnnouncementSpanStyle(): SpanStyle? {
+    var hasStyle = false
+    var color: Color? = null
+    var fontWeight: FontWeight? = null
+
+    when (tagName().lowercase(Locale.ROOT)) {
+        "b", "strong" -> {
+            fontWeight = FontWeight.Bold
+            hasStyle = true
+        }
+    }
+
+    resolveAnnouncementTextColor()?.let {
+        color = it
+        hasStyle = true
+    }
+
+    if (!hasStyle) return null
+    return SpanStyle(
+        color = color ?: Color.Unspecified,
+        fontWeight = fontWeight
+    )
+}
+
+private fun Element.containsBoldContent(): Boolean =
+    select("strong, b").isNotEmpty()
+
+private fun AnnotatedString.Builder.endsWithLineBreak(): Boolean =
+    length > 0 && toAnnotatedString().text.last() == '\n'
 
 private fun compactPosterBadgeText(raw: String): String {
     val normalized = raw

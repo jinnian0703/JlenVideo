@@ -247,6 +247,7 @@ data class AppUpdateInfo(
 data class AppNotice(
     val id: String = "",
     val title: String = "",
+    val htmlContent: String = "",
     val content: String = "",
     val summary: String = "",
     val isPinned: Boolean = false,
