@@ -244,6 +244,31 @@ data class AppUpdateInfo(
     val hasUpdate: Boolean = false
 )
 
+data class AppNotice(
+    val id: String = "",
+    val title: String = "",
+    val content: String = "",
+    val summary: String = "",
+    val isPinned: Boolean = false,
+    val isActive: Boolean = true,
+    val startAt: String = "",
+    val endAt: String = "",
+    val createdAt: String = "",
+    val updatedAt: String = ""
+) {
+    val previewText: String
+        get() = summary.ifBlank {
+            content
+                .lineSequence()
+                .map(String::trim)
+                .firstOrNull { it.isNotBlank() }
+                .orEmpty()
+        }
+
+    val displayContent: String
+        get() = content.ifBlank { summary }.ifBlank { "暂无公告内容" }
+}
+
 data class HotSearchItem(
     val rank: Int = 0,
     val keyword: String = "",

@@ -6,13 +6,20 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Base64
+import androidx.core.text.HtmlCompat
 import com.google.gson.Gson
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineStart
@@ -43,6 +50,7 @@ class AppleCmsRepository(
 ) {
     private val appContext = context.applicationContext
     private val pageCachePrefs = appContext.getSharedPreferences("library_page_cache", Context.MODE_PRIVATE)
+    private val noticePrefs = appContext.getSharedPreferences("app_notice_store", Context.MODE_PRIVATE)
     private val defaultCategories = listOf(
         AppleCmsCategory(typeId = "GCCCCG", typeName = "电影", parentId = "GCCCCG"),
         AppleCmsCategory(typeId = "GCCCCT", typeName = "连续剧", parentId = "GCCCCT"),
@@ -60,6 +68,8 @@ class AppleCmsRepository(
     private var homeCache: CachedValue<HomePayload>? = null
     @Volatile
     private var hotSearchCache: CachedValue<List<HotSearchGroup>>? = null
+    @Volatile
+    private var noticeCache: CachedValue<List<AppNotice>>? = null
     @Volatile
     private var browsableCategoriesCache: CachedValue<List<AppleCmsCategory>>? = null
     @Volatile
@@ -526,6 +536,97 @@ class AppleCmsRepository(
                 failureMessage
                     ?: "登录失败，请检查账号或密码"
             )
+        }
+    }
+
+    suspend fun loadNotices(
+        appVersion: String = BuildConfig.VERSION_NAME,
+        userId: String = "",
+        forceRefresh: Boolean = false
+    ): List<AppNotice> {
+        if (!forceRefresh) {
+            noticeCache
+                ?.takeIf { isCacheValid(it.timestampMs, NOTICE_CACHE_TTL_MS) }
+                ?.value
+                ?.let { return it }
+        }
+
+        val requestKey = buildString {
+            append("notices:")
+            append(appVersion.trim())
+            append(':')
+            append(userId.trim())
+        }
+
+        return if (forceRefresh) {
+            loadFreshNotices(appVersion = appVersion, userId = userId)
+        } else {
+            awaitSharedRequest(requestKey) {
+                noticeCache
+                    ?.takeIf { isCacheValid(it.timestampMs, NOTICE_CACHE_TTL_MS) }
+                    ?.value
+                    ?: loadFreshNotices(appVersion = appVersion, userId = userId)
+            }
+        }
+    }
+
+    fun pickPendingNotice(notices: List<AppNotice>): AppNotice? {
+        val dismissedIds = noticePrefs.getStringSet(KEY_DISMISSED_NOTICE_IDS, emptySet()).orEmpty()
+        return notices.firstOrNull { notice ->
+            notice.isActive && notice.id.isNotBlank() && !dismissedIds.contains(notice.id)
+        }
+    }
+
+    fun markNoticeDismissed(noticeId: String) {
+        val normalized = noticeId.trim()
+        if (normalized.isBlank()) return
+        val currentIds = noticePrefs.getStringSet(KEY_DISMISSED_NOTICE_IDS, emptySet()).orEmpty()
+        if (currentIds.contains(normalized)) return
+        noticePrefs.edit()
+            .putStringSet(KEY_DISMISSED_NOTICE_IDS, currentIds + normalized)
+            .apply()
+    }
+
+    private fun loadFreshNotices(appVersion: String, userId: String): List<AppNotice> {
+        val url = Uri.parse(APP_CENTER_API_URL)
+            .buildUpon()
+            .appendQueryParameter("action", "notices")
+            .appendQueryParameter("app_version", appVersion.trim().ifBlank { BuildConfig.VERSION_NAME })
+            .apply {
+                userId.trim()
+                    .takeIf(String::isNotBlank)
+                    ?.let { appendQueryParameter("user_id", it) }
+            }
+            .build()
+            .toString()
+
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("公告加载失败：HTTP ${response.code}")
+            }
+
+            val body = response.body?.string().orEmpty()
+            val json = JsonParser.parseString(body).asJsonObject
+            val items = json.extractNoticeItems()
+            val notices = items.mapNotNull(::parseNoticeItem)
+                .sortedWith(
+                    compareByDescending<AppNotice> { it.isPinned }
+                        .thenByDescending { it.isActive }
+                        .thenByDescending { parseNoticeTimeToMillis(it.updatedAt) ?: parseNoticeTimeToMillis(it.createdAt) ?: 0L }
+                        .thenByDescending { it.id }
+                )
+
+            noticeCache = CachedValue(
+                value = notices,
+                timestampMs = System.currentTimeMillis()
+            )
+            cleanupCachesIfNeeded()
+            return notices
         }
     }
 
@@ -1757,6 +1858,9 @@ class AppleCmsRepository(
         if (hotSearchCache?.let { !isCacheValid(it.timestampMs, HOT_SEARCH_CACHE_TTL_MS, now) } == true) {
             hotSearchCache = null
         }
+        if (noticeCache?.let { !isCacheValid(it.timestampMs, NOTICE_CACHE_TTL_MS, now) } == true) {
+            noticeCache = null
+        }
         if (browsableCategoriesCache?.let { !isCacheValid(it.timestampMs, CATEGORY_CACHE_TTL_MS, now) } == true) {
             browsableCategoriesCache = null
         }
@@ -2796,11 +2900,206 @@ class AppleCmsRepository(
             .trim()
     }
 
+    private fun JsonObject.extractNoticeItems(): List<JsonElement> {
+        val candidates = listOfNotNull(
+            getAsJsonObject("data")?.getAsJsonArray("items"),
+            getAsJsonArray("items"),
+            getAsJsonObject("data")?.getAsJsonArray("list"),
+            getAsJsonArray("list"),
+            getAsJsonObject("data")?.getAsJsonArray("rows"),
+            getAsJsonArray("rows")
+        )
+        return candidates.firstOrNull()?.toList().orEmpty()
+    }
+
+    private fun parseNoticeItem(element: JsonElement): AppNotice? {
+        val obj = element.takeIf { it.isJsonObject }?.asJsonObject ?: return null
+        val title = obj.firstString("title", "notice_title", "name", "subject")
+        val content = normalizeNoticeText(
+            obj.firstString("content", "notice_content", "body", "description", "detail")
+        )
+        val summary = normalizeNoticeText(
+            obj.firstString("summary", "subtitle", "excerpt", "remark")
+        )
+        if (title.isBlank() && content.isBlank() && summary.isBlank()) return null
+
+        val startAt = obj.firstString(
+            "start_time",
+            "start_at",
+            "begin_time",
+            "begin_at",
+            "valid_from",
+            "publish_at",
+            "publish_time",
+            "published_at"
+        )
+        val endAt = obj.firstString(
+            "end_time",
+            "end_at",
+            "expire_time",
+            "expire_at",
+            "valid_to",
+            "off_time",
+            "offline_at"
+        )
+        val createdAt = obj.firstString("created_at", "add_time", "created", "created_time")
+        val updatedAt = obj.firstString("updated_at", "update_time", "updated", "modified_at")
+        val isPinned = obj.firstBoolean("is_top", "isTop", "top", "pinned", "is_pinned", "sticky") ?: false
+        val isActive = resolveNoticeActive(obj, startAt = startAt, endAt = endAt)
+        val rawId = obj.firstString("id", "notice_id", "announcement_id", "nid")
+        val resolvedId = rawId.ifBlank {
+            buildNoticeStableId(
+                title = title,
+                content = content,
+                startAt = startAt,
+                endAt = endAt,
+                createdAt = createdAt
+            )
+        }
+
+        return AppNotice(
+            id = resolvedId,
+            title = title.ifBlank { "公告" },
+            content = content,
+            summary = summary,
+            isPinned = isPinned,
+            isActive = isActive,
+            startAt = startAt,
+            endAt = endAt,
+            createdAt = createdAt,
+            updatedAt = updatedAt
+        )
+    }
+
+    private fun JsonObject.firstString(vararg names: String): String =
+        names.asSequence()
+            .mapNotNull { name ->
+                get(name)
+                    ?.takeIf { !it.isJsonNull }
+                    ?.let { value ->
+                        runCatching {
+                            when {
+                                value.asJsonPrimitive.isString -> value.asString
+                                value.asJsonPrimitive.isNumber -> value.asNumber.toString()
+                                value.asJsonPrimitive.isBoolean -> value.asBoolean.toString()
+                                else -> value.toString()
+                            }
+                        }.getOrNull()
+                    }
+                    ?.trim()
+                    ?.takeIf(String::isNotBlank)
+            }
+            .firstOrNull()
+            .orEmpty()
+
+    private fun JsonObject.firstBoolean(vararg names: String): Boolean? =
+        names.asSequence()
+            .mapNotNull { name ->
+                val value = get(name)?.takeIf { !it.isJsonNull } ?: return@mapNotNull null
+                runCatching {
+                    val primitive = value.asJsonPrimitive
+                    when {
+                        primitive.isBoolean -> primitive.asBoolean
+                        primitive.isNumber -> primitive.asInt != 0
+                        primitive.isString -> {
+                            when (primitive.asString.trim().lowercase(Locale.ROOT)) {
+                                "1", "true", "yes", "on", "enabled", "active" -> true
+                                "0", "false", "no", "off", "disabled", "inactive" -> false
+                                else -> null
+                            }
+                        }
+                        else -> null
+                    }
+                }.getOrNull()
+            }
+            .firstOrNull()
+
+    private fun resolveNoticeActive(obj: JsonObject, startAt: String, endAt: String): Boolean {
+        val statusValue = obj.firstString("status", "state", "enabled", "publish_status")
+            .trim()
+            .lowercase(Locale.ROOT)
+        if (statusValue in setOf("0", "false", "inactive", "disabled", "draft", "offline", "expired")) {
+            return false
+        }
+
+        val now = System.currentTimeMillis()
+        val startMs = parseNoticeTimeToMillis(startAt)
+        if (startMs != null && now < startMs) return false
+        val endMs = parseNoticeTimeToMillis(endAt)
+        if (endMs != null && now > endMs) return false
+        return true
+    }
+
+    private fun normalizeNoticeText(raw: String): String {
+        if (raw.isBlank()) return ""
+        val normalizedHtml = raw
+            .replace(Regex("(?i)<br\\s*/?>"), "\n")
+            .replace(Regex("(?i)</p>"), "\n")
+        return HtmlCompat.fromHtml(normalizedHtml, HtmlCompat.FROM_HTML_MODE_LEGACY)
+            .toString()
+            .replace('\u00A0', ' ')
+            .replace(Regex("[ \\t\\x0B\\f\\r]+"), " ")
+            .replace(Regex("\\n{3,}"), "\n\n")
+            .trim()
+    }
+
+    private fun buildNoticeStableId(
+        title: String,
+        content: String,
+        startAt: String,
+        endAt: String,
+        createdAt: String
+    ): String {
+        val seed = listOf(title, content.take(120), startAt, endAt, createdAt).joinToString("|")
+        val digest = MessageDigest.getInstance("SHA-256").digest(seed.toByteArray(StandardCharsets.UTF_8))
+        return digest.joinToString(separator = "") { "%02x".format(it) }.take(24)
+    }
+
+    private fun parseNoticeTimeToMillis(raw: String): Long? {
+        val value = raw.trim()
+        if (value.isBlank()) return null
+        value.toLongOrNull()?.let { numeric ->
+            return if (value.length <= 10) numeric * 1000 else numeric
+        }
+
+        val patterns = listOf(
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd HH:mm",
+            "yyyy/MM/dd HH:mm:ss",
+            "yyyy/MM/dd HH:mm",
+            "yyyy.MM.dd HH:mm:ss",
+            "yyyy.MM.dd HH:mm",
+            "yyyy-MM-dd",
+            "yyyy/MM/dd",
+            "yyyy.MM.dd",
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            "yyyy-MM-dd'T'HH:mm:ssXXX",
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss"
+        )
+
+        return patterns.asSequence()
+            .mapNotNull { pattern ->
+                runCatching {
+                    SimpleDateFormat(pattern, Locale.getDefault()).apply {
+                        isLenient = false
+                        if (pattern.contains("X") || pattern.endsWith("'Z'")) {
+                            timeZone = TimeZone.getTimeZone("UTC")
+                        }
+                    }.parse(value)?.time
+                }.getOrNull()
+            }
+            .firstOrNull()
+    }
+
     private val VodItem.siteLogId: String
         get() = siteVodId.ifBlank { vodId.takeIf { it.all(Char::isDigit) }.orEmpty() }
 
     companion object {
+        private const val APP_CENTER_API_URL = "https://user.jlen.top/api.php"
+        private const val KEY_DISMISSED_NOTICE_IDS = "dismissed_notice_ids"
         private const val HOME_CACHE_TTL_MS = 60_000L
+        private const val NOTICE_CACHE_TTL_MS = 60_000L
         private const val CATEGORY_CACHE_TTL_MS = 300_000L
         private const val PAGE_CACHE_TTL_MS = 300_000L
         private const val DISK_PAGE_CACHE_TTL_MS = 43_200_000L

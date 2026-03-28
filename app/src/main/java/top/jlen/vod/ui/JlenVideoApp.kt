@@ -56,6 +56,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,6 +70,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.compose.ui.window.Dialog
+import top.jlen.vod.data.AppNotice
 import top.jlen.vod.data.AppUpdateInfo
 
 private val topLevelRoutes = setOf("home", "categories", "search", "account")
@@ -109,10 +111,12 @@ fun JlenVideoApp() {
         WindowInsets.safeDrawing
     }
     val updateInfo = viewModel.accountState.updateInfo
+    val noticeDialog = viewModel.noticeState.dialogNotice
     var dismissedUpdateVersion by rememberSaveable { mutableStateOf("") }
     val shouldShowUpdateDialog = updateInfo?.hasUpdate == true &&
         updateInfo.latestVersion.isNotBlank() &&
-        dismissedUpdateVersion != updateInfo.latestVersion
+        dismissedUpdateVersion != updateInfo.latestVersion &&
+        noticeDialog == null
     val openReleaseLink: () -> Unit = {
         val targetUrl = updateInfo?.releasePageUrl
             ?.takeIf { it.isNotBlank() }
@@ -149,6 +153,16 @@ fun JlenVideoApp() {
     MaterialTheme(colorScheme = appColors) {
         Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
             Box(modifier = Modifier.fillMaxSize().background(appBackground)) {
+                if (noticeDialog != null) {
+                    AnnouncementPromptDialog(
+                        notice = noticeDialog,
+                        onDismiss = viewModel::dismissNoticeDialog,
+                        onOpenDetail = {
+                            viewModel.markNoticeOpened(noticeDialog.id)
+                            navController.navigate("announcement/${Uri.encode(noticeDialog.id)}")
+                        }
+                    )
+                }
                 if (shouldShowUpdateDialog) {
                     UpdatePromptDialog(
                         updateInfo = updateInfo ?: AppUpdateInfo(),
@@ -210,10 +224,17 @@ fun JlenVideoApp() {
                         composable("home") {
                             HomeScreen(
                                 state = viewModel.homeState,
+                                noticeState = viewModel.noticeState,
                                 onRefresh = { viewModel.refreshHome(forceRefresh = true) },
+                                onRefreshAnnouncements = { viewModel.refreshNotices(forceRefresh = true) },
                                 onLoadMore = viewModel::loadMoreHome,
                                 onOpenDetail = { navController.navigate("detail/$it") },
                                 onOpenCategory = { navigateToTopLevel("categories") },
+                                onOpenAnnouncementList = { navController.navigate("announcements") },
+                                onOpenAnnouncementDetail = { noticeId ->
+                                    viewModel.markNoticeOpened(noticeId)
+                                    navController.navigate("announcement/${Uri.encode(noticeId)}")
+                                },
                                 onOpenSearch = { navigateToTopLevel("search") }
                             )
                         }
@@ -299,6 +320,38 @@ fun JlenVideoApp() {
                                 onClearCrashLog = viewModel::clearCrashLog
                             )
                         }
+                        composable("announcements") {
+                            LaunchedEffect(Unit) {
+                                viewModel.refreshNotices()
+                            }
+                            AnnouncementListScreen(
+                                state = viewModel.noticeState,
+                                onBack = { navController.popBackStack() },
+                                onRefresh = { viewModel.refreshNotices(forceRefresh = true) },
+                                onOpenNotice = { noticeId ->
+                                    viewModel.markNoticeOpened(noticeId)
+                                    navController.navigate("announcement/${Uri.encode(noticeId)}")
+                                }
+                            )
+                        }
+                        composable(
+                            route = "announcement/{noticeId}",
+                            arguments = listOf(navArgument("noticeId") { type = NavType.StringType })
+                        ) { entry ->
+                            val noticeId = entry.arguments?.getString("noticeId").orEmpty()
+                            LaunchedEffect(noticeId) {
+                                viewModel.markNoticeOpened(noticeId)
+                                if (viewModel.findNotice(noticeId) == null) {
+                                    viewModel.refreshNotices(forceRefresh = true)
+                                }
+                            }
+                            AnnouncementDetailScreen(
+                                notice = viewModel.findNotice(noticeId),
+                                isLoading = viewModel.noticeState.isLoading,
+                                onBack = { navController.popBackStack() },
+                                onRefresh = { viewModel.refreshNotices(forceRefresh = true) }
+                            )
+                        }
                         composable(
                             route = "detail/{vodId}",
                             arguments = listOf(navArgument("vodId") { type = NavType.StringType })
@@ -351,6 +404,112 @@ private fun shouldAnimateRouteTransition(fromRoute: String?, toRoute: String?): 
     val fromTopLevel = fromRoute in topLevelRoutes
     val toTopLevel = toRoute in topLevelRoutes
     return !fromTopLevel && !toTopLevel
+}
+
+@Composable
+private fun AnnouncementPromptDialog(
+    notice: AppNotice,
+    onDismiss: () -> Unit,
+    onOpenDetail: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(30.dp),
+            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 22.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .background(
+                                brush = Brush.linearGradient(colors = listOf(UiPalette.Accent, UiPalette.AccentSoft)),
+                                shape = RoundedCornerShape(14.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.NewReleases,
+                            contentDescription = null,
+                            tint = UiPalette.AccentText
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "公告提醒",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = UiPalette.Ink
+                            )
+                            if (notice.isPinned) {
+                                Box(
+                                    modifier = Modifier
+                                        .background(UiPalette.AccentSoft.copy(alpha = 0.2f), RoundedCornerShape(999.dp))
+                                        .border(1.dp, UiPalette.Accent.copy(alpha = 0.28f), RoundedCornerShape(999.dp))
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = "置顶",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = UiPalette.Accent
+                                    )
+                                }
+                            }
+                        }
+                        Text(
+                            text = notice.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = UiPalette.Ink
+                        )
+                    }
+                }
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
+                    shape = RoundedCornerShape(22.dp)
+                ) {
+                    Text(
+                        text = notice.displayContent,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 280.dp)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 18.dp, vertical = 16.dp),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = UiPalette.TextPrimary
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("稍后查看")
+                    }
+                    Button(
+                        onClick = onOpenDetail,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = UiPalette.Accent,
+                            contentColor = UiPalette.AccentText
+                        )
+                    ) {
+                        Text("查看详情", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

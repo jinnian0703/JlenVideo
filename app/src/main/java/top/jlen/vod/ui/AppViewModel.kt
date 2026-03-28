@@ -17,6 +17,7 @@ import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.net.ssl.SSLException
+import top.jlen.vod.data.AppNotice
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.CrashLogger
 import top.jlen.vod.data.AppUpdateInfo
@@ -48,6 +49,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var homeState by mutableStateOf(HomeUiState())
         private set
 
+    var noticeState by mutableStateOf(NoticeUiState())
+        private set
+
     var searchState by mutableStateOf(SearchUiState())
         private set
 
@@ -64,6 +68,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         searchState = searchState.copy(history = searchHistoryStore.load())
         refreshCrashLog()
         refreshAccount()
+        refreshNotices()
         refreshHome()
         checkAppUpdate()
     }
@@ -130,7 +135,58 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun refreshNotices(forceRefresh: Boolean = false) {
+        if (noticeState.isLoading && !forceRefresh) return
+        val userId = accountState.session.userId
+        viewModelScope.launch {
+            noticeState = noticeState.copy(isLoading = true, error = null)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    repository.loadNotices(
+                        appVersion = BuildConfig.VERSION_NAME,
+                        userId = userId,
+                        forceRefresh = forceRefresh
+                    )
+                }
+            }.onSuccess { notices ->
+                val currentDialogId = noticeState.dialogNotice?.id.orEmpty()
+                val preservedDialog = notices.firstOrNull { it.id == currentDialogId }
+                noticeState = noticeState.copy(
+                    isLoading = false,
+                    error = null,
+                    notices = notices,
+                    dialogNotice = preservedDialog ?: repository.pickPendingNotice(notices)
+                )
+            }.onFailure { error ->
+                noticeState = noticeState.copy(
+                    isLoading = false,
+                    error = toUserFacingMessage(error, "公告加载失败", hostOverride = "user.jlen.top")
+                )
+            }
+        }
+    }
+
+    fun dismissNoticeDialog() {
+        noticeState.dialogNotice?.id
+            ?.takeIf(String::isNotBlank)
+            ?.let(repository::markNoticeDismissed)
+        noticeState = noticeState.copy(dialogNotice = null)
+    }
+
+    fun markNoticeOpened(noticeId: String) {
+        noticeId.trim()
+            .takeIf(String::isNotBlank)
+            ?.let(repository::markNoticeDismissed)
+        if (noticeState.dialogNotice?.id == noticeId) {
+            noticeState = noticeState.copy(dialogNotice = null)
+        }
+    }
+
+    fun findNotice(noticeId: String): AppNotice? =
+        noticeState.notices.firstOrNull { it.id == noticeId }
+
     fun refreshHome(forceRefresh: Boolean = false) {
+        refreshNotices(forceRefresh = forceRefresh)
         viewModelScope.launch {
             homeState = homeState.copy(isLoading = true, error = null)
             runCatching {
@@ -654,6 +710,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         runAccountAction(
             block = { uploadPortraitOptimized(uri) },
             onSuccess = {
+                refreshNotices(forceRefresh = true)
                 selectAccountSection(AccountSection.Profile, forceRefresh = true)
             }
         )
@@ -926,6 +983,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     hasCrashLog = accountState.hasCrashLog,
                     latestCrashLog = accountState.latestCrashLog
                 )
+                refreshNotices(forceRefresh = true)
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
@@ -1170,8 +1228,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         return true
     }
 
-    private fun toUserFacingMessage(error: Throwable, fallback: String): String {
-        val host = BuildConfig.APPLE_CMS_BASE_URL
+    private fun toUserFacingMessage(
+        error: Throwable,
+        fallback: String,
+        hostOverride: String? = null
+    ): String {
+        val host = hostOverride?.trim()?.takeIf(String::isNotBlank) ?: BuildConfig.APPLE_CMS_BASE_URL
             .removePrefix("https://")
             .removePrefix("http://")
             .trimEnd('/')
@@ -1692,6 +1754,16 @@ data class HomeUiState(
 
     val hasMoreCategoryVideos: Boolean
         get() = categoryVisibleCount < categoryVideos.size || hasMoreCategoryPages
+}
+
+data class NoticeUiState(
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val notices: List<AppNotice> = emptyList(),
+    val dialogNotice: AppNotice? = null
+) {
+    val activeNotices: List<AppNotice>
+        get() = notices.filter { it.isActive }
 }
 
 private fun List<VodItem>.initialGridVisibleCount(): Int =

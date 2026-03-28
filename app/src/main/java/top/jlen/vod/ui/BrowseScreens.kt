@@ -46,6 +46,7 @@ import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Whatshot
@@ -95,6 +96,7 @@ import coil.size.Precision
 import coil.size.Scale
 import kotlinx.coroutines.delay
 import top.jlen.vod.BuildConfig
+import top.jlen.vod.data.AppNotice
 import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.HotSearchGroup
@@ -106,10 +108,14 @@ import top.jlen.vod.data.VodItem
 @Composable
 fun HomeScreen(
     state: HomeUiState,
+    noticeState: NoticeUiState,
     onRefresh: () -> Unit,
+    onRefreshAnnouncements: () -> Unit,
     onLoadMore: () -> Unit,
     onOpenDetail: (String) -> Unit,
     onOpenCategory: () -> Unit,
+    onOpenAnnouncementList: () -> Unit,
+    onOpenAnnouncementDetail: (String) -> Unit,
     onOpenSearch: () -> Unit
 ) {
     if (state.isLoading) {
@@ -149,7 +155,10 @@ fun HomeScreen(
             HomeTopBlock(
                 source = BuildConfig.APPLE_CMS_BASE_URL.removePrefix("https://").removePrefix("http://").trimEnd('/'),
                 onRefresh = onRefresh,
-                onOpenCategory = onOpenCategory,
+                noticeState = noticeState,
+                onRefreshAnnouncements = onRefreshAnnouncements,
+                onOpenAnnouncementList = onOpenAnnouncementList,
+                onOpenAnnouncementDetail = onOpenAnnouncementDetail,
                 onOpenSearch = onOpenSearch
             )
         }
@@ -821,6 +830,291 @@ private fun HotSearchBoard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun AnnouncementListScreen(
+    state: NoticeUiState,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    onOpenNotice: (String) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
+    ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircleActionButton(icon = Icons.AutoMirrored.Rounded.ArrowBack, onClick = onBack)
+                    Text(
+                        text = "公告",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = UiPalette.Ink
+                    )
+                }
+                TextButton(
+                    onClick = onRefresh,
+                    colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
+                ) {
+                    Text("刷新", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        if (!state.error.isNullOrBlank() && state.notices.isEmpty()) {
+            item { ErrorBanner(message = state.error, onRetry = onRefresh) }
+        }
+        when {
+            state.isLoading && state.notices.isEmpty() -> item { LoadingPane("公告加载中...") }
+            state.notices.isEmpty() -> item {
+                InlineEmptyStateCard(
+                    message = "暂无公告",
+                    actionLabel = "刷新",
+                    onAction = onRefresh
+                )
+            }
+            else -> items(
+                items = state.notices,
+                key = { it.id },
+                contentType = { "announcement" }
+            ) { notice ->
+                AnnouncementListCard(
+                    notice = notice,
+                    onClick = { onOpenNotice(notice.id) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AnnouncementDetailScreen(
+    notice: AppNotice?,
+    isLoading: Boolean,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit
+) {
+    when {
+        isLoading && notice == null -> LoadingPane("公告加载中...")
+        notice == null -> {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
+            ) {
+                item {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircleActionButton(icon = Icons.AutoMirrored.Rounded.ArrowBack, onClick = onBack)
+                        Text(
+                            text = "公告详情",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = UiPalette.Ink
+                        )
+                    }
+                }
+                item {
+                    InlineEmptyStateCard(
+                        message = "未找到公告内容",
+                        actionLabel = "刷新",
+                        onAction = onRefresh
+                    )
+                }
+            }
+        }
+        else -> {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
+            ) {
+                item {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircleActionButton(icon = Icons.AutoMirrored.Rounded.ArrowBack, onClick = onBack)
+                        Text(
+                            text = "公告详情",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = UiPalette.Ink
+                        )
+                    }
+                }
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                        shape = RoundedCornerShape(28.dp),
+                        border = BorderStroke(1.dp, UiPalette.Border)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 18.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (notice.isPinned) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(UiPalette.Accent.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "置顶",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = UiPalette.Accent
+                                        )
+                                    }
+                                }
+                                if (notice.isActive) {
+                                    Text(
+                                        text = "生效中",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = UiPalette.TextSecondary
+                                    )
+                                }
+                            }
+                            Text(
+                                text = notice.title,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = UiPalette.Ink
+                            )
+                            notice.startAt.takeIf(String::isNotBlank)?.let { startAt ->
+                                Text(
+                                    text = buildString {
+                                        append("生效时间：")
+                                        append(startAt)
+                                        notice.endAt.takeIf(String::isNotBlank)?.let {
+                                            append(" - ")
+                                            append(it)
+                                        }
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = UiPalette.TextSecondary
+                                )
+                            } ?: notice.createdAt.takeIf(String::isNotBlank)?.let { createdAt ->
+                                Text(
+                                    text = "发布时间：$createdAt",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = UiPalette.TextSecondary
+                                )
+                            }
+                            Text(
+                                text = notice.displayContent,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = UiPalette.Ink
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnnouncementListCard(
+    notice: AppNotice,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, UiPalette.Border)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (notice.isPinned) {
+                    Box(
+                        modifier = Modifier
+                            .background(UiPalette.Accent.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "置顶",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = UiPalette.Accent
+                        )
+                    }
+                }
+                Text(
+                    text = notice.title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Ink
+                )
+            }
+            notice.previewText.takeIf(String::isNotBlank)?.let { preview ->
+                Text(
+                    text = preview,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = UiPalette.TextSecondary,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = when {
+                        notice.startAt.isNotBlank() && notice.endAt.isNotBlank() -> "${notice.startAt} - ${notice.endAt}"
+                        notice.startAt.isNotBlank() -> notice.startAt
+                        notice.createdAt.isNotBlank() -> notice.createdAt
+                        else -> "暂无时间信息"
+                    },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = UiPalette.TextMuted
+                )
+                Text(
+                    text = if (notice.isActive) "查看详情" else "历史公告",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = UiPalette.Accent
+                )
             }
         }
     }
@@ -2529,7 +2823,10 @@ private fun String.toMembershipDuration(): String = when (lowercase()) {
 private fun HomeTopBlock(
     source: String,
     onRefresh: () -> Unit,
-    onOpenCategory: () -> Unit,
+    noticeState: NoticeUiState,
+    onRefreshAnnouncements: () -> Unit,
+    onOpenAnnouncementList: () -> Unit,
+    onOpenAnnouncementDetail: (String) -> Unit,
     onOpenSearch: () -> Unit
 ) {
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -2552,12 +2849,19 @@ private fun HomeTopBlock(
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                CircleActionButton(icon = Icons.Rounded.GridView, onClick = onOpenCategory)
+                CircleActionButton(icon = Icons.Rounded.NewReleases, onClick = onOpenAnnouncementList)
                 CircleActionButton(icon = Icons.Rounded.Refresh, onClick = onRefresh)
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
         SearchDock(onClick = onOpenSearch)
+        Spacer(modifier = Modifier.height(14.dp))
+        AnnouncementTickerStrip(
+            state = noticeState,
+            onRefresh = onRefreshAnnouncements,
+            onOpenList = onOpenAnnouncementList,
+            onOpenDetail = onOpenAnnouncementDetail
+        )
     }
 }
 
@@ -2586,6 +2890,174 @@ private fun SearchDock(onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = UiPalette.TextSecondary
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun AnnouncementTickerStrip(
+    state: NoticeUiState,
+    onRefresh: () -> Unit,
+    onOpenList: () -> Unit,
+    onOpenDetail: (String) -> Unit
+) {
+    val activeNotices = state.activeNotices
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, UiPalette.Border)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.NewReleases,
+                        contentDescription = null,
+                        tint = UiPalette.Accent,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "公告",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = UiPalette.Ink
+                    )
+                }
+                TextButton(
+                    onClick = onOpenList,
+                    colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
+                ) {
+                    Text("全部公告", fontWeight = FontWeight.Bold)
+                }
+            }
+
+            when {
+                state.isLoading && activeNotices.isEmpty() -> {
+                    Text(
+                        text = "公告加载中...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = UiPalette.TextSecondary
+                    )
+                }
+
+                !state.error.isNullOrBlank() && activeNotices.isEmpty() -> {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { onRefresh() }
+                            .background(UiPalette.DangerSurface)
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = state.error,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = UiPalette.DangerText,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "重试",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = UiPalette.DangerText
+                        )
+                    }
+                }
+
+                activeNotices.isEmpty() -> {
+                    Text(
+                        text = "当前暂无有效公告",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = UiPalette.TextSecondary
+                    )
+                }
+
+                else -> {
+                    val pagerState = rememberPagerState(pageCount = { activeNotices.size })
+                    LaunchedEffect(activeNotices.size) {
+                        if (activeNotices.size <= 1) return@LaunchedEffect
+                        while (true) {
+                            delay(3200)
+                            val nextPage = (pagerState.currentPage + 1) % activeNotices.size
+                            pagerState.animateScrollToPage(nextPage, animationSpec = tween(durationMillis = 600))
+                        }
+                    }
+                    HorizontalPager(
+                        state = pagerState,
+                        userScrollEnabled = false,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { page ->
+                        val notice = activeNotices[page]
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable { onOpenDetail(notice.id) }
+                                .background(UiPalette.SurfaceSoft)
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (notice.isPinned) {
+                                Box(
+                                    modifier = Modifier
+                                        .background(UiPalette.Accent.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
+                                        .padding(horizontal = 9.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = "置顶",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = UiPalette.Accent
+                                    )
+                                }
+                            }
+                            Text(
+                                text = notice.title,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .then(
+                                        if (notice.title.length > 14) {
+                                            Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                                        } else {
+                                            Modifier
+                                        }
+                                    ),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = UiPalette.Ink,
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                                contentDescription = null,
+                                tint = UiPalette.TextSecondary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
