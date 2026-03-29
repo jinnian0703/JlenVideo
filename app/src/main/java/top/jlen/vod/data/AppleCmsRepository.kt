@@ -13,7 +13,10 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.net.ConnectException
 import java.net.URI
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
@@ -42,8 +45,10 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.HttpException
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.ui.PLAYER_DESKTOP_UA
+import javax.net.ssl.SSLException
 
 class AppleCmsRepository(
     context: Context,
@@ -82,8 +87,10 @@ class AppleCmsRepository(
     private var lastMemoryCacheCleanupAt = 0L
     @Volatile
     private var lastDiskCacheCleanupAt = 0L
-    private val api: AppleCmsApi = createApi(baseUrl)
-    private val fallbackApi: AppleCmsApi? = fallbackApiBaseUrl?.let(::createApi)
+    private val primaryApi: AppleCmsApi = createApi(baseUrl)
+    private val backupApi: AppleCmsApi? = fallbackApiBaseUrl?.let(::createApi)
+    @Volatile
+    private var preferBackupApiUntilMs = 0L
 
     private data class PortraitUploadPayload(
         val bytes: ByteArray,
@@ -2873,13 +2880,35 @@ class AppleCmsRepository(
             .create(AppleCmsApi::class.java)
 
     private suspend fun <T> requestApi(block: suspend AppleCmsApi.() -> T): T {
+        val resolvedBackupApi = backupApi ?: return primaryApi.block()
+        val now = System.currentTimeMillis()
+        if (now < preferBackupApiUntilMs) {
+            return try {
+                resolvedBackupApi.block()
+            } catch (backupError: Exception) {
+                if (backupError is CancellationException) throw backupError
+                try {
+                    primaryApi.block().also {
+                        preferBackupApiUntilMs = 0L
+                    }
+                } catch (primaryError: Exception) {
+                    if (primaryError is CancellationException) throw primaryError
+                    primaryError.addSuppressed(backupError)
+                    throw primaryError
+                }
+            }
+        }
+
         try {
-            return api.block()
+            return primaryApi.block().also {
+                preferBackupApiUntilMs = 0L
+            }
         } catch (error: Exception) {
             if (error is CancellationException) throw error
-            val backupApi = fallbackApi ?: throw error
+            if (!shouldFailoverToBackup(error)) throw error
+            preferBackupApiUntilMs = System.currentTimeMillis() + API_FAILOVER_COOLDOWN_MS
             return try {
-                backupApi.block()
+                resolvedBackupApi.block()
             } catch (fallbackError: Exception) {
                 if (fallbackError is CancellationException) throw fallbackError
                 fallbackError.addSuppressed(error)
@@ -2887,6 +2916,19 @@ class AppleCmsRepository(
             }
         }
     }
+
+    private fun shouldFailoverToBackup(error: Throwable): Boolean =
+        generateSequence(error) { it.cause }.any { cause ->
+            when (cause) {
+                is HttpException -> cause.code() in TRANSIENT_API_STATUS_CODES
+                is UnknownHostException,
+                is ConnectException,
+                is SocketTimeoutException,
+                is SSLException,
+                is IOException -> true
+                else -> false
+            }
+        }
 
     private fun parseUserProfileSession(document: Document): AuthSession {
         val cookieSession = currentSession()
@@ -3601,11 +3643,13 @@ class AppleCmsRepository(
         private const val HOT_SEARCH_CACHE_TTL_MS = 300_000L
         private const val MEMORY_CACHE_CLEANUP_INTERVAL_MS = 60_000L
         private const val DISK_CACHE_CLEANUP_INTERVAL_MS = 300_000L
+        private const val API_FAILOVER_COOLDOWN_MS = 300_000L
         private const val MAX_MEMORY_PAGE_CACHE_ENTRIES = 24
         private const val MAX_DISK_PAGE_CACHE_ENTRIES = 48
         private const val MAX_DETAIL_CACHE_ENTRIES = 48
         private const val MAX_SEARCH_CACHE_ENTRIES = 24
         private const val MAX_HISTORY_SOURCE_CACHE_ENTRIES = 96
+        private val TRANSIENT_API_STATUS_CODES = setOf(500, 502, 503, 504, 521, 522, 523, 524)
         private const val HOT_SEARCH_MOBILE_UA =
             "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) " +
                 "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 " +
