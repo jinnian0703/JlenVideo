@@ -192,14 +192,36 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun findNotice(noticeId: String): AppNotice? =
         noticeState.notices.firstOrNull { it.id == noticeId }
 
+    private fun resolveHeartbeatVodId(): String {
+        val item = playerState.item
+        return item?.siteVodId
+            .orEmpty()
+            .ifBlank { item?.vodId?.takeIf { it.all(Char::isDigit) }.orEmpty() }
+            .ifBlank {
+                Regex("""/vodplay/([^/]+?)-\d+-\d+(?:\.html)?/?(?:\?.*)?$""")
+                    .find(playerState.episodePageUrl)
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    .orEmpty()
+                    .takeIf { it.all(Char::isDigit) }
+                    .orEmpty()
+            }
+    }
+
     fun reportHeartbeat(route: String) {
         val normalizedRoute = route.trim().ifBlank { "home" }
         val userId = accountState.session.userId
+        val vodId = if (normalizedRoute == "player") resolveHeartbeatVodId() else ""
+        val sid = if (normalizedRoute == "player") playerState.selectedSourceIndex + 1 else null
+        val nid = if (normalizedRoute == "player") playerState.selectedEpisodeIndex + 1 else null
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
                 repository.reportHeartbeat(
                     route = normalizedRoute,
-                    userId = userId
+                    userId = userId,
+                    vodId = vodId,
+                    sid = sid,
+                    nid = nid
                 )
             }
         }

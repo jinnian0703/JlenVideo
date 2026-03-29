@@ -106,6 +106,16 @@ fun JlenVideoApp() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val heartbeatRoute = normalizeHeartbeatRoute(currentRoute)
+    val heartbeatPlaybackKey = if (heartbeatRoute == "player") {
+        listOf(
+            viewModel.playerState.item?.siteVodId,
+            viewModel.playerState.item?.vodId,
+            viewModel.playerState.selectedSourceIndex,
+            viewModel.playerState.selectedEpisodeIndex
+        ).joinToString("|")
+    } else {
+        heartbeatRoute
+    }
     val showBottomBar = currentRoute in topLevelRoutes
     val rootContentInsets = if (currentRoute == "player") {
         WindowInsets(0, 0, 0, 0)
@@ -151,7 +161,7 @@ fun JlenVideoApp() {
             navController.navigate("search/results/${Uri.encode(normalized)}")
         }
     }
-    LaunchedEffect(heartbeatRoute, viewModel.accountState.session.userId) {
+    LaunchedEffect(heartbeatRoute, heartbeatPlaybackKey, viewModel.accountState.session.userId) {
         viewModel.reportHeartbeat(heartbeatRoute)
         while (true) {
             delay(60_000)

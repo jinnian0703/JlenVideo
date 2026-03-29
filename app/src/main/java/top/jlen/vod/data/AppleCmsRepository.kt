@@ -503,7 +503,13 @@ class AppleCmsRepository(
         cookieJar.clear()
     }
 
-    fun reportHeartbeat(route: String, userId: String = currentSession().userId) {
+    fun reportHeartbeat(
+        route: String,
+        userId: String = currentSession().userId,
+        vodId: String = "",
+        sid: Int? = null,
+        nid: Int? = null
+    ) {
         val request = Request.Builder()
             .url(
                 Uri.parse(APP_CENTER_API_URL)
@@ -522,6 +528,15 @@ class AppleCmsRepository(
                         userId.trim()
                             .takeIf(String::isNotBlank)
                             ?.let { add("user_id", it) }
+                        vodId.trim()
+                            .takeIf(String::isNotBlank)
+                            ?.let { add("vod_id", it) }
+                        sid
+                            ?.takeIf { it > 0 }
+                            ?.let { add("sid", it.toString()) }
+                        nid
+                            ?.takeIf { it > 0 }
+                            ?.let { add("nid", it.toString()) }
                     }
                     .build()
             )
