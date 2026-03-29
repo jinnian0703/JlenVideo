@@ -10,8 +10,10 @@ import androidx.core.text.HtmlCompat
 import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
+import com.google.gson.JsonParseException
 import com.google.gson.JsonParser
 import java.io.ByteArrayOutputStream
+import java.io.EOFException
 import java.io.IOException
 import java.net.ConnectException
 import java.net.URI
@@ -137,7 +139,7 @@ class AppleCmsRepository(
     }
 
     private suspend fun loadFreshHome(forceRefresh: Boolean): HomePayload {
-        val (latestPage, homeDocument) = coroutineScope {
+        val (latestPage, homeDocument, recommendedItems) = coroutineScope {
             val latestDeferred = async {
                 runCatching {
                     loadLatestUpdatesFromLabelPage()
@@ -149,10 +151,24 @@ class AppleCmsRepository(
                 runCatching { fetchDocument("$baseUrl/") }
                     .getOrNull()
             }
-            latestDeferred.await() to homeDocumentDeferred.await()
+            val recommendationsDeferred = async {
+                runCatching {
+                    requestApi { getRecommendations(limit = 16) }
+                        .data
+                        .orEmpty()
+                        .distinctBy { it.vodId }
+                }.getOrDefault(emptyList())
+            }
+            Triple(
+                latestDeferred.await(),
+                homeDocumentDeferred.await(),
+                recommendationsDeferred.await()
+            )
         }
         val latest = latestPage.items
-        val featured = homeDocument?.let { parseLevelOneItemsFromHomePage(it, limit = 16) }.orEmpty()
+        val featured = homeDocument?.let { parseLevelOneItemsFromHomePage(it, limit = 16) }
+            .orEmpty()
+            .ifEmpty { recommendedItems }
 
         if (latest.isEmpty()) {
             throw IOException("首页内容解析失败")
@@ -2921,6 +2937,8 @@ class AppleCmsRepository(
         generateSequence(error) { it.cause }.any { cause ->
             when (cause) {
                 is HttpException -> cause.code() in TRANSIENT_API_STATUS_CODES
+                is JsonParseException,
+                is EOFException,
                 is UnknownHostException,
                 is ConnectException,
                 is SocketTimeoutException,
