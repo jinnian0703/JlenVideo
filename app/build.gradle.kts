@@ -20,6 +20,7 @@ android {
         }
 
         buildConfigField("String", "APPLE_CMS_BASE_URL", "\"https://cms.jlen.top/\"")
+        buildConfigField("String", "APPLE_CMS_FALLBACK_BASE_URL", "\"http://82.157.207.243:39888/\"")
     }
 
     buildTypes {

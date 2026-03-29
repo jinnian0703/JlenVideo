@@ -23,6 +23,7 @@ import java.util.TimeZone
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -60,6 +61,9 @@ class AppleCmsRepository(
         AppleCmsCategory(typeId = "GCCCCW", typeName = "动漫", parentId = "GCCCCW")
     )
     private val baseUrl = BuildConfig.APPLE_CMS_BASE_URL.trimEnd('/')
+    private val fallbackApiBaseUrl = BuildConfig.APPLE_CMS_FALLBACK_BASE_URL
+        .trimEnd('/')
+        .takeIf { it.isNotBlank() && !it.equals(baseUrl, ignoreCase = true) }
     private val gson = Gson()
     private val categoryPageCache = ConcurrentHashMap<String, CachedValue<PagedVodItems>>()
     private val detailCache = ConcurrentHashMap<String, CachedValue<VodItem?>>()
@@ -78,12 +82,8 @@ class AppleCmsRepository(
     private var lastMemoryCacheCleanupAt = 0L
     @Volatile
     private var lastDiskCacheCleanupAt = 0L
-    private val api: AppleCmsApi = Retrofit.Builder()
-        .baseUrl("$baseUrl/")
-        .client(client)
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
-        .create(AppleCmsApi::class.java)
+    private val api: AppleCmsApi = createApi(baseUrl)
+    private val fallbackApi: AppleCmsApi? = fallbackApiBaseUrl?.let(::createApi)
 
     private data class PortraitUploadPayload(
         val bytes: ByteArray,
@@ -99,6 +99,14 @@ class AppleCmsRepository(
     private data class PersistedPageCache(
         val timestampMs: Long,
         val payload: PagedVodItems
+    )
+
+    private data class AppCenterUserSnapshot(
+        val session: AuthSession = AuthSession(),
+        val profileFields: List<Pair<String, String>> = emptyList(),
+        val profileEditor: UserProfileEditor = UserProfileEditor(),
+        val membershipInfo: MembershipInfo = MembershipInfo(),
+        val membershipPlans: List<MembershipPlan> = emptyList()
     )
 
     suspend fun loadHome(forceRefresh: Boolean = false): HomePayload {
@@ -276,7 +284,7 @@ class AppleCmsRepository(
     }
 
     suspend fun loadLatestPage(page: Int): PagedVodItems =
-        api.getLatest(page = page.coerceAtLeast(1)).toPagedVodItems()
+        requestApi { getLatest(page = page.coerceAtLeast(1)) }.toPagedVodItems()
 
     private suspend fun loadLatestUpdatesFromLabelPage(): PagedVodItems {
         val document = fetchDocument("$baseUrl/label/new/")
@@ -327,7 +335,17 @@ class AppleCmsRepository(
 
     private suspend fun loadFreshCategoryPage(typeId: String, page: Int): PagedVodItems {
         val cacheKey = "$typeId:$page"
-        val payload = loadCategoryPageFromWeb(typeId = typeId, page = page)
+        val payload = runCatching {
+            typeId.takeIf { it.all(Char::isDigit) }
+                ?.let { numericTypeId ->
+                    requestApi {
+                        getByType(typeId = numericTypeId, page = page)
+                    }.toPagedVodItems()
+                }
+                ?: throw IOException("Non-numeric category id")
+        }.getOrElse {
+            loadCategoryPageFromWeb(typeId = typeId, page = page)
+        }
         return payload.also { cachePagePayload(cacheKey, it) }
     }
 
@@ -357,11 +375,20 @@ class AppleCmsRepository(
     private suspend fun performSearch(keyword: String, cacheKey: String): List<VodItem> {
         val encodedKeyword = Uri.encode(keyword)
         return runCatching {
-            val document = fetchDocument("$baseUrl/vodsearch/-------------/?wd=$encodedKeyword")
-            parseSearchResults(document, keyword)
+            requestApi { search(keyword = keyword) }
+                .data
+                ?.rows
+                .orEmpty()
                 .distinctBy { it.vodId }
                 .take(60)
-        }.getOrDefault(emptyList()).also { results ->
+        }.getOrElse {
+            runCatching {
+                val document = fetchDocument("$baseUrl/vodsearch/-------------/?wd=$encodedKeyword")
+                parseSearchResults(document, keyword)
+                    .distinctBy { it.vodId }
+                    .take(60)
+            }.getOrDefault(emptyList())
+        }.also { results ->
             searchCache[cacheKey] = CachedValue(
                 value = results,
                 timestampMs = System.currentTimeMillis()
@@ -923,6 +950,10 @@ class AppleCmsRepository(
     }
 
     suspend fun loadUserProfile(): UserProfilePage {
+        runCatching { loadUserProfileFromAppCenter() }
+            .getOrNull()
+            ?.let { return it }
+
         val profileDocument = fetchUserDocument("/index.php/user/index.html")
         val editorDocument = fetchUserDocument("/index.php/user/info.html")
         return UserProfilePage(
@@ -943,6 +974,10 @@ class AppleCmsRepository(
         )
 
     suspend fun loadMembershipPage(): MembershipPage {
+        runCatching { loadMembershipPageFromAppCenter() }
+            .getOrNull()
+            ?.let { return it }
+
         val document = fetchUserDocument("/index.php/user/upgrade.html")
         val infoMap = extractLabeledValues(
             document = document,
@@ -969,6 +1004,10 @@ class AppleCmsRepository(
     }
 
     suspend fun saveUserProfile(editor: UserProfileEditor): String {
+        runCatching { submitUserProfileToAppCenter(editor) }
+            .getOrNull()
+            ?.let { return it }
+
         val form = FormBody.Builder()
             .add("user_pwd", editor.currentPassword)
             .add("user_pwd1", editor.newPassword)
@@ -986,7 +1025,77 @@ class AppleCmsRepository(
         )
     }
 
+    private suspend fun loadUserProfileFromAppCenter(): UserProfilePage {
+        val snapshot = loadAppCenterUserSnapshot()
+        return UserProfilePage(
+            fields = snapshot.profileFields,
+            editor = snapshot.profileEditor,
+            session = snapshot.session
+        )
+    }
+
+    private suspend fun loadMembershipPageFromAppCenter(): MembershipPage {
+        val snapshot = loadAppCenterUserSnapshot()
+        return MembershipPage(
+            info = snapshot.membershipInfo,
+            plans = snapshot.membershipPlans
+        )
+    }
+
+    private suspend fun submitUserProfileToAppCenter(editor: UserProfileEditor): String {
+        return submitAppCenterUserProfileMutation(
+            FormBody.Builder()
+            .add("user_pwd", editor.currentPassword)
+            .add("user_pwd1", editor.newPassword)
+            .add("user_pwd2", editor.confirmPassword)
+            .add("user_qq", editor.qq)
+            .add("user_email", editor.email)
+            .add("user_phone", editor.phone)
+            .add("user_question", editor.question)
+            .add("user_answer", editor.answer)
+            .add("current_password", editor.currentPassword)
+            .add("new_password", editor.newPassword)
+            .add("confirm_password", editor.confirmPassword)
+            .add("qq", editor.qq)
+            .add("email", editor.email)
+            .add("phone", editor.phone)
+            .add("question", editor.question)
+            .add("answer", editor.answer)
+            .build()
+        )
+    }
+
+    private suspend fun submitAppCenterUserProfileMutation(formBody: FormBody): String {
+        val json = requestAppCenterJson(action = "user_profile", formBody = formBody)
+        val code = json.firstInt("code", "status")
+        val message = json.firstString("msg", "message")
+        if (code != null && code !in setOf(1, 200)) {
+            throw IOException(message.ifBlank { "操作失败" })
+        }
+        if (message.contains("fail", ignoreCase = true) || message.contains("error", ignoreCase = true)) {
+            throw IOException(message)
+        }
+        return message.ifBlank { "操作成功" }
+    }
+
+    private suspend fun loadAppCenterUserSnapshot(): AppCenterUserSnapshot {
+        val json = requestAppCenterJson(action = "me")
+        return parseAppCenterUserSnapshot(json)
+            ?: throw IOException("内容服务返回的用户资料为空")
+    }
+
     suspend fun sendEmailBindCode(email: String): String {
+        runCatching {
+            submitAppCenterUserProfileMutation(
+                FormBody.Builder()
+                    .add("ac", "email")
+                    .add("to", email.trim())
+                    .add("op", "send_bind_code")
+                    .add("action", "send_bind_code")
+                    .build()
+            )
+        }.getOrNull()?.let { return it }
+
         val form = FormBody.Builder()
             .add("ac", "email")
             .add("to", email.trim())
@@ -999,6 +1108,18 @@ class AppleCmsRepository(
     }
 
     suspend fun bindEmail(email: String, code: String): String {
+        runCatching {
+            submitAppCenterUserProfileMutation(
+                FormBody.Builder()
+                    .add("ac", "email")
+                    .add("to", email.trim())
+                    .add("code", code.trim())
+                    .add("op", "bind_email")
+                    .add("action", "bind_email")
+                    .build()
+            )
+        }.getOrNull()?.let { return it }
+
         val form = FormBody.Builder()
             .add("ac", "email")
             .add("to", email.trim())
@@ -1012,6 +1133,16 @@ class AppleCmsRepository(
     }
 
     suspend fun unbindEmail(): String {
+        runCatching {
+            submitAppCenterUserProfileMutation(
+                FormBody.Builder()
+                    .add("ac", "email")
+                    .add("op", "unbind_email")
+                    .add("action", "unbind_email")
+                    .build()
+            )
+        }.getOrNull()?.let { return it }
+
         val form = FormBody.Builder()
             .add("ac", "email")
             .build()
@@ -1094,6 +1225,17 @@ class AppleCmsRepository(
     }
 
     suspend fun upgradeMembership(plan: MembershipPlan): String {
+        runCatching {
+            submitAppCenterUserProfileMutation(
+                FormBody.Builder()
+                    .add("group_id", plan.groupId)
+                    .add("long", plan.duration)
+                    .add("op", "upgrade_membership")
+                    .add("action", "upgrade_membership")
+                    .build()
+            )
+        }.getOrNull()?.let { return it }
+
         val form = FormBody.Builder()
             .add("group_id", plan.groupId)
             .add("long", plan.duration)
@@ -1130,9 +1272,8 @@ class AppleCmsRepository(
     private suspend fun loadFreshDetail(normalizedId: String): VodItem? {
         if (normalizedId.all(Char::isDigit)) {
             val apiItem = runCatching {
-                api.getDetail(vodId = normalizedId)
-                    .list
-                    .firstOrNull()
+                requestApi { getDetail(vodId = normalizedId) }
+                    .data
             }.getOrNull()
             if (apiItem != null) {
                 detailCache[normalizedId] = CachedValue(
@@ -1690,6 +1831,30 @@ class AppleCmsRepository(
             hasNextPage = hasNextPage
         )
 
+    private fun VideoApiEnvelope<VideoApiPagedRows<VodItem>>.toPagedVodItems(): PagedVodItems {
+        val payload = data ?: return PagedVodItems(
+            items = emptyList(),
+            page = 1,
+            pageCount = 1,
+            totalItems = 0,
+            limit = 0,
+            hasNextPage = false
+        )
+        val safePage = payload.page.coerceAtLeast(1)
+        val safePageCount = payload.totalPages.coerceAtLeast(safePage)
+        val items = payload.rows.distinctBy { it.vodId }
+        val safeLimit = payload.limit.coerceAtLeast(items.size)
+        val safeTotal = payload.total.coerceAtLeast(items.size)
+        return PagedVodItems(
+            items = items,
+            page = safePage,
+            pageCount = safePageCount,
+            totalItems = safeTotal,
+            limit = safeLimit,
+            hasNextPage = safePage < safePageCount
+        )
+    }
+
     private fun parseUserCenterPageEnhanced(document: Document): UserCenterPage {
         val items = document.select("input[name='ids[]']")
             .mapNotNull { input ->
@@ -2051,7 +2216,7 @@ class AppleCmsRepository(
             }
         }
 
-        val apiCategories = runCatching { api.getCategories().categories }
+        val apiCategories = runCatching { requestApi { getCategories() }.data.orEmpty() }
             .getOrDefault(emptyList())
             .map(::normalizeCategory)
             .filter(::isBrowsableCategory)
@@ -2699,6 +2864,30 @@ class AppleCmsRepository(
         return appendTimestamp(normalizeUrl(value))
     }
 
+    private fun createApi(baseUrl: String): AppleCmsApi =
+        Retrofit.Builder()
+            .baseUrl("$baseUrl/")
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(AppleCmsApi::class.java)
+
+    private suspend fun <T> requestApi(block: suspend AppleCmsApi.() -> T): T {
+        try {
+            return api.block()
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            val backupApi = fallbackApi ?: throw error
+            return try {
+                backupApi.block()
+            } catch (fallbackError: Exception) {
+                if (fallbackError is CancellationException) throw fallbackError
+                fallbackError.addSuppressed(error)
+                throw fallbackError
+            }
+        }
+    }
+
     private fun parseUserProfileSession(document: Document): AuthSession {
         val cookieSession = currentSession()
         val portraitUrl = normalizePortraitUrl(
@@ -2821,6 +3010,207 @@ class AppleCmsRepository(
     private fun normalizeBoundEmail(value: String): String {
         val trimmed = value.trim()
         return if (trimmed.contains("@") && trimmed.contains(".")) trimmed else ""
+    }
+
+    private suspend fun requestAppCenterJson(
+        action: String,
+        formBody: FormBody? = null
+    ): JsonObject {
+        val url = Uri.parse(APP_CENTER_API_URL)
+            .buildUpon()
+            .appendQueryParameter("action", action.trim())
+            .build()
+            .toString()
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json")
+            .apply {
+                if (formBody == null) {
+                    get()
+                } else {
+                    header("X-Requested-With", "XMLHttpRequest")
+                    post(formBody)
+                }
+            }
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            val json = runCatching {
+                JsonParser.parseString(body).asJsonObject
+            }.getOrNull()
+
+            val code = json?.firstInt("code", "status")
+            val message = json?.firstString("msg", "message")
+
+            if (response.code == 401 || code == 401 || message.equals("login required", ignoreCase = true)) {
+                throw IOException("请先登录")
+            }
+
+            if (!response.isSuccessful) {
+                throw IOException(message?.takeIf(String::isNotBlank) ?: "内容服务请求失败：HTTP ${response.code}")
+            }
+
+            return json ?: throw IOException("内容服务返回了无法解析的数据")
+        }
+    }
+
+    private fun parseAppCenterUserSnapshot(root: JsonObject): AppCenterUserSnapshot? {
+        val data = root.firstObject("data") ?: return null
+        val userObject = data.firstObject("user", "profile", "account", "member", "me", "info") ?: data
+        val membershipObject = data.firstObject(
+            "membership",
+            "member_info",
+            "membership_info",
+            "vip",
+            "group"
+        ) ?: userObject
+
+        val isLoggedIn = data.firstBoolean("is_login", "isLogin", "logged_in", "loggedIn")
+            ?: userObject.firstBoolean("is_login", "isLogin", "logged_in", "loggedIn")
+            ?: true
+        if (!isLoggedIn) {
+            throw IOException("请先登录")
+        }
+
+        val userId = userObject.firstString("user_id", "uid", "id", "userId")
+        val userName = decodeSiteText(
+            userObject.firstString("user_name", "username", "nickname", "name", "userName")
+        )
+        val groupName = decodeSiteText(
+            membershipObject.firstString(
+                "group_name",
+                "member_name",
+                "vip_name",
+                "current_group_name",
+                "group"
+            ).ifBlank {
+                userObject.firstString("group_name", "group", "member_name", "vip_name")
+            }
+        )
+        val portraitUrl = normalizePortraitUrl(
+            userObject.firstString(
+                "user_portrait",
+                "portrait",
+                "avatar",
+                "avatar_url",
+                "headimg",
+                "face"
+            )
+        )
+        val qq = decodeSiteText(userObject.firstString("user_qq", "qq", "im_qq"))
+        val email = normalizeBoundEmail(
+            decodeSiteText(userObject.firstString("user_email", "email", "mail"))
+        )
+        val phone = decodeSiteText(userObject.firstString("user_phone", "phone", "mobile"))
+        val question = decodeSiteText(userObject.firstString("user_question", "question", "security_question"))
+        val answer = decodeSiteText(userObject.firstString("user_answer", "answer", "security_answer"))
+        val points = decodeSiteText(
+            membershipObject.firstString(
+                "points",
+                "score",
+                "user_points",
+                "integral",
+                "point_balance"
+            ).ifBlank {
+                userObject.firstString("points", "score", "user_points", "integral")
+            }
+        )
+        val expiry = decodeSiteText(
+            membershipObject.firstString(
+                "expiry",
+                "expire_time",
+                "expire_at",
+                "group_expiry",
+                "vip_expire_time",
+                "member_expire_time"
+            ).ifBlank {
+                userObject.firstString(
+                    "expiry",
+                    "expire_time",
+                    "expire_at",
+                    "group_expiry",
+                    "vip_expire_time",
+                    "member_expire_time"
+                )
+            }
+        )
+
+        val plans = buildList {
+            addAll(data.firstArray("membership_plans", "plans", "plan_list", "upgrade_plans", "groups", "group_list"))
+            addAll(userObject.firstArray("membership_plans", "plans", "plan_list", "upgrade_plans", "groups", "group_list"))
+            addAll(membershipObject.firstArray("membership_plans", "plans", "plan_list", "upgrade_plans", "groups", "group_list"))
+        }.mapNotNull(::parseAppCenterMembershipPlan)
+            .distinctBy { "${it.groupId}:${it.duration}:${it.points}" }
+
+        val session = AuthSession(
+            isLoggedIn = isLoggedIn,
+            userId = userId,
+            userName = userName,
+            groupName = groupName,
+            portraitUrl = portraitUrl
+        )
+        val membershipInfo = MembershipInfo(
+            groupName = groupName,
+            points = points,
+            expiry = expiry
+        )
+        val profileFields = buildList {
+            userId.takeIf(String::isNotBlank)?.let { add("User ID" to it) }
+            userName.takeIf(String::isNotBlank)?.let { add("Username" to it) }
+            groupName.takeIf(String::isNotBlank)?.let { add("Group" to it) }
+            points.takeIf(String::isNotBlank)?.let { add("Points" to it) }
+            expiry.takeIf(String::isNotBlank)?.let { add("Expiry" to it) }
+            email.takeIf(String::isNotBlank)?.let { add("Email" to it) }
+            phone.takeIf(String::isNotBlank)?.let { add("Phone" to it) }
+            qq.takeIf(String::isNotBlank)?.let { add("QQ" to it) }
+        }
+
+        if (
+            session.userId.isBlank() &&
+            session.userName.isBlank() &&
+            membershipInfo.groupName.isBlank() &&
+            membershipInfo.points.isBlank() &&
+            membershipInfo.expiry.isBlank() &&
+            plans.isEmpty()
+        ) {
+            return null
+        }
+
+        return AppCenterUserSnapshot(
+            session = session,
+            profileFields = profileFields,
+            profileEditor = UserProfileEditor(
+                qq = qq,
+                email = email,
+                phone = phone,
+                question = question,
+                answer = answer
+            ),
+            membershipInfo = membershipInfo,
+            membershipPlans = plans
+        )
+    }
+
+    private fun parseAppCenterMembershipPlan(element: JsonElement): MembershipPlan? {
+        val obj = element.takeIf { it.isJsonObject }?.asJsonObject ?: return null
+        val groupId = obj.firstString("group_id", "id", "gid", "groupId")
+        val groupName = decodeSiteText(obj.firstString("group_name", "name", "title", "label"))
+        val duration = decodeSiteText(
+            obj.firstString("duration", "long", "period", "days", "months", "month_label", "long_name")
+        )
+        val points = decodeSiteText(
+            obj.firstString("points", "need_points", "cost_points", "price", "score")
+        )
+        if (groupId.isBlank() && groupName.isBlank() && duration.isBlank() && points.isBlank()) {
+            return null
+        }
+        return MembershipPlan(
+            groupId = groupId,
+            groupName = groupName,
+            duration = duration,
+            points = points
+        )
     }
 
     private fun extractLabeledValues(
@@ -3078,6 +3468,42 @@ class AppleCmsRepository(
                 }.getOrNull()
             }
             .firstOrNull()
+
+    private fun JsonObject.firstInt(vararg names: String): Int? =
+        names.asSequence()
+            .mapNotNull { name ->
+                val value = get(name)?.takeIf { !it.isJsonNull } ?: return@mapNotNull null
+                runCatching {
+                    val primitive = value.asJsonPrimitive
+                    when {
+                        primitive.isNumber -> primitive.asInt
+                        primitive.isString -> primitive.asString.trim().toIntOrNull()
+                        primitive.isBoolean -> if (primitive.asBoolean) 1 else 0
+                        else -> null
+                    }
+                }.getOrNull()
+            }
+            .firstOrNull()
+
+    private fun JsonObject.firstObject(vararg names: String): JsonObject? =
+        names.asSequence()
+            .mapNotNull { name ->
+                get(name)
+                    ?.takeIf { it.isJsonObject }
+                    ?.asJsonObject
+            }
+            .firstOrNull()
+
+    private fun JsonObject.firstArray(vararg names: String): List<JsonElement> =
+        names.asSequence()
+            .mapNotNull { name ->
+                get(name)
+                    ?.takeIf { it.isJsonArray }
+                    ?.asJsonArray
+                    ?.toList()
+            }
+            .firstOrNull()
+            .orEmpty()
 
     private fun resolveNoticeActive(obj: JsonObject, startAt: String, endAt: String): Boolean {
         val statusValue = obj.firstString("status", "state", "enabled", "publish_status")

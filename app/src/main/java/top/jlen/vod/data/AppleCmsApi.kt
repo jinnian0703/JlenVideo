@@ -4,41 +4,36 @@ import retrofit2.http.GET
 import retrofit2.http.Query
 
 interface AppleCmsApi {
-    @GET("api.php/provide/vod/")
-    suspend fun getCategories(
-        @Query("ac") action: String = "list"
-    ): AppleCmsResponse
+    @GET("api.php/video/categories")
+    suspend fun getCategories(): VideoApiEnvelope<List<AppleCmsCategory>>
 
-    @GET("api.php/provide/vod/")
+    @GET("api.php/video/recommends")
+    suspend fun getRecommendations(
+        @Query("limit") limit: Int = 12
+    ): VideoApiEnvelope<List<VodItem>>
+
+    @GET("api.php/video/latest")
     suspend fun getLatest(
-        @Query("ac") action: String = "detail",
-        @Query("pg") page: Int = 1
-    ): AppleCmsResponse
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 36
+    ): VideoApiEnvelope<VideoApiPagedRows<VodItem>>
 
-    @GET("api.php/provide/vod/")
+    @GET("api.php/video/list")
     suspend fun getByType(
-        @Query("ac") action: String = "detail",
-        @Query("t") typeId: String,
-        @Query("pg") page: Int = 1
-    ): AppleCmsResponse
+        @Query("type_id") typeId: String,
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 36
+    ): VideoApiEnvelope<VideoApiPagedRows<VodItem>>
 
-    @GET("api.php/provide/vod/")
+    @GET("api.php/video/search")
     suspend fun search(
-        @Query("ac") action: String = "detail",
         @Query("wd") keyword: String,
-        @Query("pg") page: Int = 1
-    ): AppleCmsResponse
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 60
+    ): VideoApiEnvelope<VideoApiPagedRows<VodItem>>
 
-    @GET("api.php/provide/vod/")
+    @GET("api.php/video/detail")
     suspend fun getDetail(
-        @Query("ac") action: String = "detail",
-        @Query("ids") vodId: String
-    ): AppleCmsResponse
-
-    @GET("api.php/provide/vod/")
-    suspend fun getByLevel(
-        @Query("ac") action: String = "detail",
-        @Query("h") level: String,
-        @Query("pg") page: Int = 1
-    ): AppleCmsResponse
+        @Query("vod_id") vodId: String
+    ): VideoApiEnvelope<VodItem>
 }

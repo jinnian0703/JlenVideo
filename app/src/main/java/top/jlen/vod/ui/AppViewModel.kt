@@ -162,7 +162,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure { error ->
                 noticeState = noticeState.copy(
                     isLoading = false,
-                    error = toUserFacingMessage(error, "公告加载失败", hostOverride = "user.jlen.top")
+                    error = toUserFacingMessage(error, "公告加载失败", serviceLabel = "公告服务")
                 )
             }
         }
@@ -1273,13 +1273,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun toUserFacingMessage(
         error: Throwable,
         fallback: String,
-        hostOverride: String? = null
+        serviceLabel: String? = null
     ): String {
-        val host = hostOverride?.trim()?.takeIf(String::isNotBlank) ?: BuildConfig.APPLE_CMS_BASE_URL
-            .removePrefix("https://")
-            .removePrefix("http://")
-            .trimEnd('/')
-            .ifBlank { "站点" }
+        val host = serviceLabel?.trim()?.takeIf(String::isNotBlank) ?: "内容服务"
         val rawMessage = error.message.orEmpty().trim()
 
         return when {

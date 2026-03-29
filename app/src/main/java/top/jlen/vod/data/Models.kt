@@ -29,6 +29,21 @@ data class AppleCmsResponse(
         get() = safePage < safePageCount
 }
 
+data class VideoApiEnvelope<T>(
+    @SerializedName("code") val code: Int = 0,
+    @SerializedName("msg") val message: String = "",
+    @SerializedName("data") val data: T? = null
+)
+
+data class VideoApiPagedRows<T>(
+    @SerializedName("engine") val engine: String = "",
+    @SerializedName("page") val page: Int = 1,
+    @SerializedName("limit") val limit: Int = 0,
+    @SerializedName("total") val total: Int = 0,
+    @SerializedName("total_pages") val totalPages: Int = 1,
+    @SerializedName("rows") val rows: List<T> = emptyList()
+)
+
 data class AppleCmsCategory(
     @SerializedName("type_id") val typeId: String = "",
     @SerializedName("type_name") val typeName: String = "",

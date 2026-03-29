@@ -165,7 +165,6 @@ fun HomeScreen(
     ) {
         item {
             HomeTopBlock(
-                source = BuildConfig.APPLE_CMS_BASE_URL.removePrefix("https://").removePrefix("http://").trimEnd('/'),
                 onRefresh = onRefresh,
                 noticeState = noticeState,
                 onRefreshAnnouncements = onRefreshAnnouncements,
@@ -3022,7 +3021,6 @@ private fun String.toMembershipDuration(): String = when (lowercase()) {
 
 @Composable
 private fun HomeTopBlock(
-    source: String,
     onRefresh: () -> Unit,
     noticeState: NoticeUiState,
     onRefreshAnnouncements: () -> Unit,
@@ -3038,7 +3036,7 @@ private fun HomeTopBlock(
         ) {
             Column {
                 Text(
-                    text = source,
+                    text = "Featured Library",
                     style = MaterialTheme.typography.labelLarge,
                     color = UiPalette.TextSecondary
                 )
