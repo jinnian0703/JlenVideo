@@ -126,32 +126,100 @@ class AppleCmsRepository(
                 ?.let { return it }
         }
 
-        return if (forceRefresh) {
-            loadFreshHome(forceRefresh = true)
-        } else {
-            awaitSharedRequest("home") {
-                homeCache
-                    ?.takeIf { isCacheValid(it.timestampMs, HOME_CACHE_TTL_MS) }
-                    ?.value
-                    ?: loadFreshHome(forceRefresh = false)
+        return runCatching {
+            if (forceRefresh) {
+                loadFreshHome(forceRefresh = true)
+            } else {
+                awaitSharedRequest("home") {
+                    homeCache
+                        ?.takeIf { isCacheValid(it.timestampMs, HOME_CACHE_TTL_MS) }
+                        ?.value
+                        ?: loadFreshHome(forceRefresh = false)
+                }
             }
+        }.getOrElse {
+            loadEmergencyHome()
+        }
+    }
+
+    private suspend fun loadEmergencyHome(): HomePayload {
+        val cachedHome = homeCache?.value
+        val latestPage = runCatching { loadLatestPage(page = 1) }
+            .getOrNull()
+            ?: peekAllCategoryPage(1)
+            ?: readPersistedPageCache("all:1")?.value
+            ?: PagedVodItems(
+                items = emptyList(),
+                page = 1,
+                pageCount = 1,
+                totalItems = 0,
+                limit = 0,
+                hasNextPage = false
+            )
+        val recommendedItems = runCatching {
+            requestApi { getRecommendations(limit = 16) }
+                .data
+                .orEmpty()
+                .distinctBy { it.vodId }
+        }.getOrElse {
+            cachedHome?.featured.orEmpty()
+        }
+        val categories = runCatching { loadBrowsableCategories(forceRefresh = false) }
+            .getOrElse { getCachedBrowsableCategories() }
+            .ifEmpty { defaultCategories.map(::normalizeCategory) }
+        val selectedCategory = categories.firstOrNull()
+        val categoryPage = selectedCategory?.let { category ->
+            peekCategoryPage(typeId = category.typeId, page = 1)
+                ?: readPersistedPageCache("${category.typeId}:1")?.value
+        } ?: PagedVodItems(
+            items = emptyList(),
+            page = 1,
+            pageCount = 1,
+            totalItems = 0,
+            limit = 0,
+            hasNextPage = false
+        )
+        val latestItems = latestPage.items.ifEmpty { recommendedItems.take(36) }
+        val featuredItems = recommendedItems
+            .ifEmpty { cachedHome?.featured.orEmpty() }
+            .ifEmpty { latestItems.take(16) }
+
+        return HomePayload(
+            slides = emptyList(),
+            hot = emptyList(),
+            featured = featuredItems,
+            latest = latestItems,
+            sections = emptyList(),
+            categories = categories,
+            selectedCategory = selectedCategory,
+            categoryVideos = categoryPage.items,
+            latestPage = latestPage.page,
+            latestPageCount = latestPage.pageCount,
+            latestTotal = latestPage.totalItems,
+            latestHasNextPage = latestPage.hasNextPage,
+            categoryPage = categoryPage.page,
+            categoryPageCount = categoryPage.pageCount,
+            categoryTotal = categoryPage.totalItems,
+            categoryHasNextPage = categoryPage.hasNextPage
+        ).also { payload ->
+            homeCache = CachedValue(
+                value = payload,
+                timestampMs = System.currentTimeMillis()
+            )
+            cleanupCachesIfNeeded()
         }
     }
 
     private suspend fun loadFreshHome(forceRefresh: Boolean): HomePayload {
-        val (latestPage, homeDocument, recommendedItems) = coroutineScope {
+        val (latestPage, recommendedItems) = coroutineScope {
             val latestDeferred = async {
                 runCatching {
-                    loadLatestUpdatesFromLabelPage()
-                }.recoverCatching {
                     loadLatestPage(page = 1)
+                }.recoverCatching {
+                    loadLatestUpdatesFromLabelPage()
                 }.getOrElse {
                     loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
                 }
-            }
-            val homeDocumentDeferred = async {
-                runCatching { fetchDocument("$baseUrl/") }
-                    .getOrNull()
             }
             val recommendationsDeferred = async {
                 runCatching {
@@ -161,16 +229,17 @@ class AppleCmsRepository(
                         .distinctBy { it.vodId }
                 }.getOrDefault(emptyList())
             }
-            Triple(
-                latestDeferred.await(),
-                homeDocumentDeferred.await(),
-                recommendationsDeferred.await()
-            )
+            latestDeferred.await() to recommendationsDeferred.await()
+        }
+        val homeDocument = if (recommendedItems.isEmpty()) {
+            runCatching { fetchDocument("$baseUrl/") }.getOrNull()
+        } else {
+            null
         }
         val latest = latestPage.items
-        val featured = homeDocument?.let { parseLevelOneItemsFromHomePage(it, limit = 16) }
-            .orEmpty()
-            .ifEmpty { recommendedItems }
+        val featured = recommendedItems.ifEmpty {
+            homeDocument?.let { parseLevelOneItemsFromHomePage(it, limit = 16) }.orEmpty()
+        }
         val categories = loadBrowsableCategories(homeDocument = homeDocument, forceRefresh = forceRefresh)
 
         if (latest.isEmpty() && featured.isEmpty() && categories.isEmpty()) {
@@ -2221,6 +2290,22 @@ class AppleCmsRepository(
                     ?: loadBrowsableCategories(forceRefresh = true)
             }
         }
+        val apiCategories = runCatching { requestApi { getCategories() }.data.orEmpty() }
+            .getOrDefault(emptyList())
+            .map(::normalizeCategory)
+            .filter(::isBrowsableCategory)
+            .distinctBy { it.typeId }
+
+        if (apiCategories.isNotEmpty()) {
+            return apiCategories.also { categories ->
+                browsableCategoriesCache = CachedValue(
+                    value = categories,
+                    timestampMs = System.currentTimeMillis()
+                )
+                cleanupCachesIfNeeded()
+            }
+        }
+
         val resolvedHomeDocument = homeDocument ?: runCatching { fetchDocument("$baseUrl/") }.getOrNull()
         val mapDocument = runCatching { fetchDocument("$baseUrl/map/") }.getOrNull()
 
@@ -2233,22 +2318,6 @@ class AppleCmsRepository(
 
         if (parsedCategories.isNotEmpty()) {
             return parsedCategories.also { categories ->
-                browsableCategoriesCache = CachedValue(
-                    value = categories,
-                    timestampMs = System.currentTimeMillis()
-                )
-                cleanupCachesIfNeeded()
-            }
-        }
-
-        val apiCategories = runCatching { requestApi { getCategories() }.data.orEmpty() }
-            .getOrDefault(emptyList())
-            .map(::normalizeCategory)
-            .filter(::isBrowsableCategory)
-            .distinctBy { it.typeId }
-
-        if (apiCategories.isNotEmpty()) {
-            return apiCategories.also { categories ->
                 browsableCategoriesCache = CachedValue(
                     value = categories,
                     timestampMs = System.currentTimeMillis()
