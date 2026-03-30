@@ -676,12 +676,7 @@ class AppleCmsRepository(
             .takeIf(String::isNotBlank)
             ?: throw IOException("请先登录")
 
-    private fun userActionBaseCandidates(): List<String> = buildList {
-        add(baseUrl)
-        fallbackApiBaseUrl
-            ?.takeIf(String::isNotBlank)
-            ?.let(::add)
-    }.distinct()
+    private fun userActionBaseCandidates(): List<String> = listOf(baseUrl)
 
     private suspend fun executeUserRequest(
         path: String,
@@ -725,57 +720,13 @@ class AppleCmsRepository(
         path: String,
         queryParameters: Map<String, String> = emptyMap(),
         formBody: FormBody? = null
-    ): JsonObject {
-        val resolvedBackupBaseUrl = fallbackApiBaseUrl ?: return performVideoApiJsonRequest(
+    ): JsonObject =
+        performVideoApiJsonRequest(
             base = baseUrl,
             path = path,
             queryParameters = queryParameters,
             formBody = formBody
         )
-
-        val now = System.currentTimeMillis()
-        if (now < preferBackupApiUntilMs) {
-            return try {
-                performVideoApiJsonRequest(
-                    base = resolvedBackupBaseUrl,
-                    path = path,
-                    queryParameters = queryParameters,
-                    formBody = formBody
-                )
-            } catch (backupError: Exception) {
-                if (backupError is CancellationException) throw backupError
-                performVideoApiJsonRequest(
-                    base = baseUrl,
-                    path = path,
-                    queryParameters = queryParameters,
-                    formBody = formBody
-                ).also {
-                    preferBackupApiUntilMs = 0L
-                }
-            }
-        }
-
-        return try {
-            performVideoApiJsonRequest(
-                base = baseUrl,
-                path = path,
-                queryParameters = queryParameters,
-                formBody = formBody
-            ).also {
-                preferBackupApiUntilMs = 0L
-            }
-        } catch (error: Exception) {
-            if (error is CancellationException) throw error
-            if (!shouldFailoverToBackup(error)) throw error
-            preferBackupApiUntilMs = System.currentTimeMillis() + API_FAILOVER_COOLDOWN_MS
-            performVideoApiJsonRequest(
-                base = resolvedBackupBaseUrl,
-                path = path,
-                queryParameters = queryParameters,
-                formBody = formBody
-            )
-        }
-    }
 
     private fun performVideoApiJsonRequest(
         base: String,
@@ -3785,43 +3736,8 @@ class AppleCmsRepository(
             .build()
             .create(AppleCmsApi::class.java)
 
-    private suspend fun <T> requestApi(block: suspend AppleCmsApi.() -> T): T {
-        val resolvedBackupApi = backupApi ?: return primaryApi.block()
-        val now = System.currentTimeMillis()
-        if (now < preferBackupApiUntilMs) {
-            return try {
-                resolvedBackupApi.block()
-            } catch (backupError: Exception) {
-                if (backupError is CancellationException) throw backupError
-                try {
-                    primaryApi.block().also {
-                        preferBackupApiUntilMs = 0L
-                    }
-                } catch (primaryError: Exception) {
-                    if (primaryError is CancellationException) throw primaryError
-                    primaryError.addSuppressed(backupError)
-                    throw primaryError
-                }
-            }
-        }
-
-        try {
-            return primaryApi.block().also {
-                preferBackupApiUntilMs = 0L
-            }
-        } catch (error: Exception) {
-            if (error is CancellationException) throw error
-            if (!shouldFailoverToBackup(error)) throw error
-            preferBackupApiUntilMs = System.currentTimeMillis() + API_FAILOVER_COOLDOWN_MS
-            return try {
-                resolvedBackupApi.block()
-            } catch (fallbackError: Exception) {
-                if (fallbackError is CancellationException) throw fallbackError
-                fallbackError.addSuppressed(error)
-                throw fallbackError
-            }
-        }
-    }
+    private suspend fun <T> requestApi(block: suspend AppleCmsApi.() -> T): T =
+        primaryApi.block()
 
     private fun shouldFailoverToBackup(error: Throwable): Boolean =
         generateSequence(error) { it.cause }.any { cause ->
