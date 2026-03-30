@@ -40,6 +40,7 @@ import top.jlen.vod.data.VodItem
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = AppleCmsRepository(application)
     private val searchHistoryStore = SearchHistoryStore(application)
+    private val searchResultScrollPositions = mutableMapOf<String, SearchResultScrollPosition>()
     private var searchJob: Job? = null
     private var searchEnrichJob: Job? = null
     private var historyEnrichJob: Job? = null
@@ -453,6 +454,34 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun search() {
         performSearch(searchState.query)
+    }
+
+    fun getSearchResultScroll(query: String): SearchResultScrollPosition =
+        searchResultScrollPositions[query.trim()]
+            ?: SearchResultScrollPosition()
+
+    fun updateSearchResultScroll(query: String, index: Int, offset: Int) {
+        val normalized = query.trim()
+        if (normalized.isBlank()) return
+        val current = searchResultScrollPositions[normalized]
+        if (current?.index == index && current.offset == offset) return
+        searchResultScrollPositions[normalized] = SearchResultScrollPosition(index = index, offset = offset)
+    }
+
+    fun ensureSearchResults(query: String) {
+        val normalized = query.trim()
+        if (normalized.isBlank()) return
+        val current = searchState
+        val alreadyShowingSameQuery =
+            current.submittedQuery == normalized &&
+                (current.results.isNotEmpty() || current.isLoading || !current.error.isNullOrBlank())
+        if (alreadyShowingSameQuery) {
+            if (current.query != normalized) {
+                searchState = current.copy(query = normalized)
+            }
+            return
+        }
+        performSearch(normalized)
     }
 
     private fun performSearch(keyword: String) {
@@ -1200,13 +1229,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             accountState = accountState.copy(isContentLoading = true, error = null)
             runCatching {
-                withContext(Dispatchers.IO) { repository.loadMembershipPageForApp() }
+                withContext(Dispatchers.IO) { repository.loadMembershipDataForApp() }
             }.onSuccess { page ->
+                val refreshedSession = mergeAccountSession(repository.currentSession()).let { session ->
+                    session.copy(groupName = page.info.groupName.ifBlank { session.groupName })
+                }
                 accountState = accountState.copy(
                     isContentLoading = false,
+                    session = refreshedSession,
                     membershipInfo = page.info.copy(
                         groupName = page.info.groupName.ifBlank {
-                            accountState.session.groupName
+                            refreshedSession.groupName
                         }
                     ),
                     membershipPlans = page.plans
@@ -1814,6 +1847,11 @@ private fun List<VodItem>.initialGridVisibleCount(): Int =
 private const val GRID_BATCH_ROWS = 12
 private const val GRID_BATCH_COLUMNS = 3
 private const val GRID_BATCH_ITEM_COUNT = GRID_BATCH_ROWS * GRID_BATCH_COLUMNS
+
+data class SearchResultScrollPosition(
+    val index: Int = 0,
+    val offset: Int = 0
+)
 
 data class SearchUiState(
     val query: String = "",

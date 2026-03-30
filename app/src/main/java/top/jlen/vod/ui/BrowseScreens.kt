@@ -640,12 +640,29 @@ fun SearchResultsScreen(
 @Composable
 fun SearchResultsScreen(
     state: SearchUiState,
+    resultKey: String,
+    initialScrollIndex: Int,
+    initialScrollOffset: Int,
+    onScrollPositionChange: (Int, Int) -> Unit,
     onBack: () -> Unit,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
     onOpenDetail: (String) -> Unit
 ) {
+    val listState = rememberSaveable(resultKey, saver = LazyListState.Saver) {
+        LazyListState(
+            firstVisibleItemIndex = initialScrollIndex,
+            firstVisibleItemScrollOffset = initialScrollOffset
+        )
+    }
+    LaunchedEffect(resultKey, listState) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                onScrollPositionChange(index, offset)
+            }
+    }
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),

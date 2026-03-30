@@ -280,11 +280,18 @@ fun JlenVideoApp() {
                             arguments = listOf(navArgument("query") { type = NavType.StringType })
                         ) { entry ->
                             val query = entry.arguments?.getString("query").orEmpty()
+                            val scrollPosition = viewModel.getSearchResultScroll(query)
                             LaunchedEffect(query) {
-                                viewModel.search(query)
+                                viewModel.ensureSearchResults(query)
                             }
                             SearchResultsScreen(
                                 state = viewModel.searchState,
+                                resultKey = query.trim(),
+                                initialScrollIndex = scrollPosition.index,
+                                initialScrollOffset = scrollPosition.offset,
+                                onScrollPositionChange = { index, offset ->
+                                    viewModel.updateSearchResultScroll(query, index, offset)
+                                },
                                 onBack = { navController.popBackStack() },
                                 onQueryChange = viewModel::updateQuery,
                                 onSearch = {

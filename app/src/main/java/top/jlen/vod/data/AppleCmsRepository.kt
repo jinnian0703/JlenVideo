@@ -1260,6 +1260,10 @@ class AppleCmsRepository(
             .getOrNull()
             ?.let { return it }
 
+        return loadMembershipPageFromHtml()
+    }
+
+    private suspend fun loadMembershipPageFromHtml(): MembershipPage {
         val document = fetchUserDocument("/index.php/user/upgrade.html")
         val infoMap = extractLabeledValues(
             document = document,
@@ -1732,6 +1736,28 @@ class AppleCmsRepository(
             info = MembershipInfo(groupName = session.groupName),
             plans = emptyList()
         )
+    }
+
+    suspend fun loadMembershipDataForApp(): MembershipPage {
+        val session = currentSession()
+        if (!session.isLoggedIn) {
+            throw IOException("璇峰厛鐧诲綍")
+        }
+
+        return mergeMembershipPages(
+            base = MembershipPage(info = MembershipInfo(groupName = session.groupName)),
+            fallback = runCatching { loadMembershipPageFromUserCenterJson() }.getOrNull()
+        ).let { merged ->
+            mergeMembershipPages(
+                base = merged,
+                fallback = runCatching { loadMembershipPageFromAppCenter() }.getOrNull()
+            )
+        }.let { merged ->
+            mergeMembershipPages(
+                base = merged,
+                fallback = runCatching { loadMembershipPage() }.getOrNull()
+            )
+        }
     }
 
     suspend fun addFavoriteForApp(item: VodItem): String {
@@ -3953,6 +3979,89 @@ class AppleCmsRepository(
         }
     }
 
+    private suspend fun requestUserCenterJson(
+        path: String,
+        queryParameters: Map<String, String> = emptyMap(),
+        formBody: FormBody? = null
+    ): JsonObject {
+        var lastError: Exception? = null
+
+        for (candidateBase in userActionBaseCandidates()) {
+            try {
+                return performUserCenterJsonRequest(
+                    base = candidateBase,
+                    path = path,
+                    queryParameters = queryParameters,
+                    formBody = formBody
+                )
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                lastError = error
+            }
+        }
+
+        throw lastError ?: IOException("鐢ㄦ埛涓績璇锋眰澶辫触")
+    }
+
+    private fun performUserCenterJsonRequest(
+        base: String,
+        path: String,
+        queryParameters: Map<String, String>,
+        formBody: FormBody?
+    ): JsonObject {
+        val requestQueryParameters = linkedMapOf("format" to "json")
+        requestQueryParameters.putAll(queryParameters)
+
+        val url = Uri.parse(base + path)
+            .buildUpon()
+            .apply {
+                requestQueryParameters.forEach { (name, value) ->
+                    appendQueryParameter(name, value)
+                }
+            }
+            .build()
+            .toString()
+
+        val requestBuilder = Request.Builder()
+            .url(url)
+            .header("Referer", base + path)
+            .header("Accept", "application/json")
+
+        val request = if (formBody == null) {
+            requestBuilder.get().build()
+        } else {
+            requestBuilder
+                .header("X-Requested-With", "XMLHttpRequest")
+                .post(formBody)
+                .build()
+        }
+
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            val resolvedPath = response.request.url.encodedPath
+
+            if (resolvedPath.contains("/index.php/user/login")) {
+                throw IOException("璇峰厛鐧诲綍")
+            }
+
+            if (!response.isSuccessful) {
+                throw IOException("HTTP ${response.code}")
+            }
+
+            return runCatching {
+                JsonParser.parseString(body).asJsonObject
+            }.getOrElse {
+                if (
+                    body.contains("/index.php/user/login", ignoreCase = true) ||
+                    body.contains("user/login", ignoreCase = true)
+                ) {
+                    throw IOException("璇峰厛鐧诲綍")
+                }
+                throw IOException("鐢ㄦ埛涓績杩斿洖浜嗘棤娉曡В鏋愮殑鏁版嵁")
+            }
+        }
+    }
+
     private fun parseAppCenterUserSnapshot(root: JsonObject): AppCenterUserSnapshot? {
         val data = root.firstObject("data") ?: return null
         val userObject = data.firstObject("user", "profile", "account", "member", "me", "info") ?: data
@@ -4087,6 +4196,258 @@ class AppleCmsRepository(
             ),
             membershipInfo = membershipInfo,
             membershipPlans = plans
+        )
+    }
+
+    private suspend fun loadMembershipPageFromUserCenterJson(): MembershipPage {
+        val memberInfoJson = requestUserCenterJson(path = "/index.php/user/member_info")
+        val upgradeJson = requestUserCenterJson(path = "/index.php/user/upgrade")
+
+        return MembershipPage(
+            info = parseMembershipInfoFromUserCenter(memberInfoJson) ?: MembershipInfo(),
+            plans = parseMembershipPlansFromUserCenter(upgradeJson)
+        )
+    }
+
+    private fun parseMembershipInfoFromUserCenter(root: JsonObject): MembershipInfo? {
+        val payload = unwrapUserCenterPayload(root)
+        val userObject = payload.firstObject("user", "member", "info", "member_info", "membership_info") ?: payload
+        val membershipObject = payload.firstObject(
+            "membership",
+            "member_info",
+            "membership_info",
+            "vip",
+            "group",
+            "current_group"
+        ) ?: userObject
+
+        val groupName = decodeSiteText(
+            payload.firstString(
+                "group_name",
+                "member_name",
+                "vip_name",
+                "current_group_name"
+            ).ifBlank {
+                membershipObject.firstString(
+                    "group_name",
+                    "member_name",
+                    "vip_name",
+                    "current_group_name",
+                    "group"
+                )
+            }.ifBlank {
+                userObject.firstString("group_name", "member_name", "vip_name", "group")
+            }
+        )
+        val points = decodeSiteText(
+            payload.firstString(
+                "user_points",
+                "points",
+                "score",
+                "integral",
+                "point_balance"
+            ).ifBlank {
+                membershipObject.firstString(
+                    "user_points",
+                    "points",
+                    "score",
+                    "integral",
+                    "point_balance"
+                )
+            }.ifBlank {
+                userObject.firstString("user_points", "points", "score", "integral")
+            }
+        )
+        val expiry = resolveMembershipExpiryText(payload, membershipObject, userObject)
+
+        if (groupName.isBlank() && points.isBlank() && expiry.isBlank()) {
+            return null
+        }
+
+        return MembershipInfo(
+            groupName = groupName,
+            points = points,
+            expiry = expiry
+        )
+    }
+
+    private fun parseMembershipPlansFromUserCenter(root: JsonObject): List<MembershipPlan> {
+        val payload = unwrapUserCenterPayload(root)
+        val groupElements = buildList {
+            addAll(payload.firstArray("groups", "group_list", "plans", "list", "items", "upgrade_plans", "membership_plans"))
+            addAll(root.firstArray("groups", "group_list", "plans", "list", "items", "upgrade_plans", "membership_plans"))
+        }
+
+        return groupElements
+            .flatMap(::parseUserCenterMembershipPlans)
+            .distinctBy { "${it.groupId}:${it.duration}:${it.points}" }
+    }
+
+    private fun parseUserCenterMembershipPlans(element: JsonElement): List<MembershipPlan> {
+        val obj = element.takeIf { it.isJsonObject }?.asJsonObject ?: return emptyList()
+        val groupId = obj.firstString("group_id", "id", "gid", "groupId")
+        val groupName = decodeSiteText(obj.firstString("group_name", "name", "title", "label"))
+
+        val plans = SUPPORTED_MEMBERSHIP_DURATIONS.mapNotNull { duration ->
+            val points = decodeSiteText(
+                obj.firstString(
+                    "${duration}_points",
+                    "points_$duration",
+                    "group_points_$duration",
+                    "${duration}_price",
+                    "price_$duration",
+                    "group_price_$duration",
+                    "${duration}_score",
+                    "score_$duration"
+                ).ifBlank {
+                    obj.primitiveString(duration).takeIf { it.any(Char::isDigit) }.orEmpty()
+                }.ifBlank {
+                    extractMembershipPlanValue(obj, duration)
+                }
+            )
+            points
+                .takeIf(String::isNotBlank)
+                ?.takeIf { it != "0" && !it.equals("false", ignoreCase = true) }
+                ?.let {
+                    MembershipPlan(
+                        groupId = groupId,
+                        groupName = groupName,
+                        duration = duration,
+                        points = it
+                    )
+                }
+        }
+
+        if (plans.isNotEmpty()) {
+            return plans
+        }
+
+        return parseAppCenterMembershipPlan(obj)
+            ?.takeIf { it.groupId.isNotBlank() || it.groupName.isNotBlank() || it.points.isNotBlank() }
+            ?.let(::listOf)
+            .orEmpty()
+    }
+
+    private fun extractMembershipPlanValue(obj: JsonObject, duration: String): String {
+        val nestedContainers = sequenceOf(
+            obj.get("points"),
+            obj.get("prices"),
+            obj.get("price"),
+            obj.get("cost"),
+            obj.get("costs"),
+            obj.get("amounts")
+        )
+
+        return nestedContainers
+            .mapNotNull { element -> element?.takeIf { it.isJsonObject }?.asJsonObject }
+            .mapNotNull { container ->
+                container.firstString(
+                    duration,
+                    "${duration}_points",
+                    "points_$duration",
+                    "${duration}_price",
+                    "price_$duration",
+                    "group_points_$duration",
+                    "group_price_$duration"
+                ).takeIf(String::isNotBlank)
+            }
+            .firstOrNull()
+            .orEmpty()
+    }
+
+    private fun unwrapUserCenterPayload(root: JsonObject): JsonObject =
+        root.firstObject("data", "info") ?: root
+
+    private fun resolveMembershipExpiryText(
+        payload: JsonObject,
+        membershipObject: JsonObject,
+        userObject: JsonObject
+    ): String {
+        val textValue = decodeSiteText(
+            payload.firstString(
+                "user_end_time_text",
+                "end_time_text",
+                "expire_text",
+                "expiry_text"
+            ).ifBlank {
+                membershipObject.firstString(
+                    "user_end_time_text",
+                    "end_time_text",
+                    "expire_text",
+                    "expiry_text"
+                )
+            }.ifBlank {
+                userObject.firstString(
+                    "user_end_time_text",
+                    "end_time_text",
+                    "expire_text",
+                    "expiry_text"
+                )
+            }
+        )
+        if (textValue.isNotBlank()) return textValue
+
+        val rawValue = payload.firstString(
+            "user_end_time",
+            "end_time",
+            "expire_time",
+            "expire_at",
+            "group_expiry",
+            "vip_expire_time",
+            "member_expire_time"
+        ).ifBlank {
+            membershipObject.firstString(
+                "user_end_time",
+                "end_time",
+                "expire_time",
+                "expire_at",
+                "group_expiry",
+                "vip_expire_time",
+                "member_expire_time"
+            )
+        }.ifBlank {
+            userObject.firstString(
+                "user_end_time",
+                "end_time",
+                "expire_time",
+                "expire_at",
+                "group_expiry",
+                "vip_expire_time",
+                "member_expire_time"
+            )
+        }
+        return formatMembershipExpiry(rawValue)
+    }
+
+    private fun formatMembershipExpiry(raw: String): String {
+        val value = raw.trim()
+        if (value.isBlank() || value == "0") return ""
+
+        value.toLongOrNull()?.let { numeric ->
+            if (numeric <= 0L) return ""
+            val millis = if (value.length <= 10) numeric * 1000 else numeric
+            return SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(millis)
+        }
+
+        return decodeSiteText(value)
+    }
+
+    private fun mergeMembershipPages(base: MembershipPage, fallback: MembershipPage?): MembershipPage {
+        if (fallback == null) return base
+        return MembershipPage(
+            info = MembershipInfo(
+                groupName = base.info.groupName.ifBlank { fallback.info.groupName },
+                points = base.info.points.ifBlank { fallback.info.points },
+                expiry = base.info.expiry.ifBlank { fallback.info.expiry }
+            ),
+            plans = (base.plans + fallback.plans)
+                .filter { plan ->
+                    plan.groupId.isNotBlank() ||
+                        plan.groupName.isNotBlank() ||
+                        plan.duration.isNotBlank() ||
+                        plan.points.isNotBlank()
+                }
+                .distinctBy { "${it.groupId}:${it.groupName}:${it.duration}:${it.points}" }
         )
     }
 
@@ -4403,6 +4764,23 @@ class AppleCmsRepository(
             .firstOrNull()
             .orEmpty()
 
+    private fun JsonObject.primitiveString(name: String): String =
+        get(name)
+            ?.takeIf { !it.isJsonNull && it.isJsonPrimitive }
+            ?.let { primitive ->
+                runCatching {
+                    val value = primitive.asJsonPrimitive
+                    when {
+                        value.isString -> value.asString
+                        value.isNumber -> value.asNumber.toString()
+                        value.isBoolean -> value.asBoolean.toString()
+                        else -> ""
+                    }
+                }.getOrNull()
+            }
+            ?.trim()
+            .orEmpty()
+
     private fun resolveNoticeActive(obj: JsonObject, startAt: String, endAt: String): Boolean {
         val statusValue = obj.firstString("status", "state", "enabled", "publish_status")
             .trim()
@@ -4486,6 +4864,7 @@ class AppleCmsRepository(
 
     companion object {
         private const val APP_CENTER_API_URL = "https://user.jlen.top/api.php"
+        private val SUPPORTED_MEMBERSHIP_DURATIONS = listOf("day", "week", "month", "year")
         private const val DISABLE_APP_CACHE = false
         private const val KEY_DISMISSED_NOTICE_IDS = "dismissed_notice_ids"
         private const val HEARTBEAT_DEVICE_ID_KEY = "device_id"
