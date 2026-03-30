@@ -1232,7 +1232,7 @@ class AppleCmsRepository(
     }
 
     suspend fun loadUserProfile(): UserProfilePage {
-        runCatching { loadUserProfileFromAppCenter() }
+        runCatching { loadUserProfileFromUserDetailApi(currentSession()) }
             .getOrNull()
             ?.let { return it }
 
@@ -1741,22 +1741,7 @@ class AppleCmsRepository(
         ).let { merged ->
             mergeMembershipPages(
                 base = merged,
-                fallback = runCatching { loadMembershipInfoFromProfileHtml() }.getOrNull()
-            )
-        }.let { merged ->
-            mergeMembershipPages(
-                base = merged,
                 fallback = runCatching { loadMembershipInfoFromUserDetailApi(session.userId) }.getOrNull()
-            )
-        }.let { merged ->
-            mergeMembershipPages(
-                base = merged,
-                fallback = runCatching { loadMembershipPageFromHtml() }.getOrNull()
-            )
-        }.let { merged ->
-            mergeMembershipPages(
-                base = merged,
-                fallback = runCatching { loadMembershipPageFromAppCenter() }.getOrNull()
             )
         }
     }
@@ -4210,6 +4195,76 @@ class AppleCmsRepository(
         return MembershipPage(
             info = parseMembershipInfoFromUserCenter(memberInfoJson) ?: MembershipInfo(),
             plans = parseMembershipPlansFromUserCenter(upgradeJson)
+        )
+    }
+
+    private suspend fun loadUserProfileFromUserDetailApi(session: AuthSession): UserProfilePage {
+        val normalizedUserId = session.userId.trim().takeIf(String::isNotBlank)
+            ?: throw IOException("璇峰厛鐧诲綍")
+        val json = requestVideoApiJson(
+            path = "api.php/user/get_detail",
+            queryParameters = mapOf("id" to normalizedUserId)
+        )
+        val code = json.firstInt("code", "status")
+        if (code != null && code !in setOf(1, 200)) {
+            throw IOException(json.firstString("msg", "message").ifBlank { "鑾峰彇鐢ㄦ埛璇︽儏澶辫触" })
+        }
+
+        val payload = json.firstObject("info", "data", "user")
+            ?: throw IOException("鐢ㄦ埛璇︽儏涓虹┖")
+        val points = decodeSiteText(payload.firstString("user_points", "points", "score", "integral", "point_balance"))
+        val groupName = decodeSiteText(payload.firstString("group_name", "member_name", "vip_name", "group"))
+            .ifBlank { session.groupName }
+        val portraitUrl = normalizePortraitUrl(
+            payload.firstString("user_portrait", "portrait", "avatar", "avatar_url", "headimg", "face")
+        ).ifBlank { session.portraitUrl }
+        val email = normalizeBoundEmail(
+            decodeSiteText(payload.firstString("user_email", "email", "mail"))
+        )
+        val phone = decodeSiteText(payload.firstString("user_phone", "phone", "mobile"))
+        val qq = decodeSiteText(payload.firstString("user_qq", "qq", "im_qq"))
+        val expiry = decodeSiteText(
+            payload.firstString("user_end_time_text", "end_time_text", "expire_text", "expiry_text")
+                .ifBlank {
+                    formatMembershipExpiry(
+                        payload.firstString(
+                            "user_end_time",
+                            "end_time",
+                            "expire_time",
+                            "expire_at",
+                            "group_expiry",
+                            "vip_expire_time",
+                            "member_expire_time"
+                        )
+                    )
+                }
+        )
+
+        return UserProfilePage(
+            fields = buildList {
+                normalizedUserId.let { add("User ID" to it) }
+                decodeSiteText(payload.firstString("user_name", "username", "nickname", "name"))
+                    .ifBlank { session.userName }
+                    .takeIf(String::isNotBlank)
+                    ?.let { add("Username" to it) }
+                groupName.takeIf(String::isNotBlank)?.let { add("Group" to it) }
+                points.takeIf(String::isNotBlank)?.let { add("Points" to it) }
+                expiry.takeIf(String::isNotBlank)?.let { add("Expiry" to it) }
+                email.takeIf(String::isNotBlank)?.let { add("Email" to it) }
+                phone.takeIf(String::isNotBlank)?.let { add("Phone" to it) }
+                qq.takeIf(String::isNotBlank)?.let { add("QQ" to it) }
+            },
+            editor = UserProfileEditor(
+                qq = qq,
+                email = email,
+                phone = phone
+            ),
+            session = session.copy(
+                userName = decodeSiteText(payload.firstString("user_name", "username", "nickname", "name"))
+                    .ifBlank { session.userName },
+                groupName = groupName,
+                portraitUrl = portraitUrl
+            )
         )
     }
 

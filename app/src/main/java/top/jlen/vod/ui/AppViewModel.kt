@@ -99,7 +99,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun hydrateAccountSession() {
         viewModelScope.launch {
             runCatching {
-                withContext(Dispatchers.IO) { repository.loadUserProfile() }
+                withContext(Dispatchers.IO) { repository.loadUserProfileForApp() }
             }.onSuccess { page ->
                 accountState = accountState.copy(
                     session = mergeAccountSession(page.session)
