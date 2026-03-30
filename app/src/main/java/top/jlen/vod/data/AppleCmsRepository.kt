@@ -1276,16 +1276,7 @@ class AppleCmsRepository(
                 points = infoMap["剩余积分"].orEmpty(),
                 expiry = infoMap["到期时间"].orEmpty()
             ),
-            plans = document.select("[data-id][data-name][data-points][data-long]")
-                .map { element ->
-                    MembershipPlan(
-                        groupId = element.attr("data-id").trim(),
-                        groupName = decodeSiteText(element.attr("data-name").trim()),
-                        duration = decodeSiteText(element.attr("data-long").trim()),
-                        points = decodeSiteText(element.attr("data-points").trim())
-                    )
-                }
-                .distinctBy { "${it.groupId}:${it.duration}" }
+            plans = parseMembershipPlansFromHtml(document)
         )
     }
 
@@ -1750,12 +1741,22 @@ class AppleCmsRepository(
         ).let { merged ->
             mergeMembershipPages(
                 base = merged,
-                fallback = runCatching { loadMembershipPageFromAppCenter() }.getOrNull()
+                fallback = runCatching { loadMembershipInfoFromProfileHtml() }.getOrNull()
+            )
+        }.let { merged ->
+            mergeMembershipPages(
+                base = merged,
+                fallback = runCatching { loadMembershipInfoFromUserDetailApi(session.userId) }.getOrNull()
             )
         }.let { merged ->
             mergeMembershipPages(
                 base = merged,
                 fallback = runCatching { loadMembershipPage() }.getOrNull()
+            )
+        }.let { merged ->
+            mergeMembershipPages(
+                base = merged,
+                fallback = runCatching { loadMembershipPageFromAppCenter() }.getOrNull()
             )
         }
     }
@@ -4028,7 +4029,10 @@ class AppleCmsRepository(
             .header("Accept", "application/json")
 
         val request = if (formBody == null) {
-            requestBuilder.get().build()
+            requestBuilder
+                .header("X-Requested-With", "XMLHttpRequest")
+                .get()
+                .build()
         } else {
             requestBuilder
                 .header("X-Requested-With", "XMLHttpRequest")
@@ -4209,6 +4213,73 @@ class AppleCmsRepository(
         )
     }
 
+    private suspend fun loadMembershipInfoFromProfileHtml(): MembershipPage {
+        val profilePage = loadUserProfile()
+        val groupName = profilePage.fields
+            .firstOrNull { (label, _) -> label.contains("鎵€灞") || label.contains("鐢ㄦ埛缁") }
+            ?.second
+            .orEmpty()
+            .ifBlank { profilePage.session.groupName }
+        val expiry = profilePage.fields
+            .firstOrNull { (label, _) -> label.contains("浼氬憳鏈") || label.contains("鍒版湡") }
+            ?.second
+            .orEmpty()
+        val points = profilePage.fields
+            .firstOrNull { (label, _) -> label.contains("绉垎") || label.contains("璐︽埛") }
+            ?.second
+            .orEmpty()
+
+        return MembershipPage(
+            info = MembershipInfo(
+                groupName = decodeSiteText(groupName),
+                points = decodeSiteText(points),
+                expiry = decodeSiteText(expiry)
+            ),
+            plans = emptyList()
+        )
+    }
+
+    private suspend fun loadMembershipInfoFromUserDetailApi(userId: String): MembershipPage {
+        val normalizedUserId = userId.trim().takeIf(String::isNotBlank) ?: return MembershipPage()
+        val json = requestVideoApiJson(
+            path = "api.php/user/get_detail",
+            queryParameters = mapOf("id" to normalizedUserId)
+        )
+        val code = json.firstInt("code", "status")
+        if (code != null && code !in setOf(1, 200)) {
+            return MembershipPage()
+        }
+
+        val payload = json.firstObject("info", "data", "user") ?: return MembershipPage()
+        val points = decodeSiteText(payload.firstString("user_points", "points", "score", "integral", "point_balance"))
+        val groupName = decodeSiteText(payload.firstString("group_name", "member_name", "vip_name", "group"))
+        val expiry = decodeSiteText(
+            payload.firstString("user_end_time_text", "end_time_text", "expire_text", "expiry_text")
+                .ifBlank {
+                    formatMembershipExpiry(
+                        payload.firstString(
+                            "user_end_time",
+                            "end_time",
+                            "expire_time",
+                            "expire_at",
+                            "group_expiry",
+                            "vip_expire_time",
+                            "member_expire_time"
+                        )
+                    )
+                }
+        )
+
+        return MembershipPage(
+            info = MembershipInfo(
+                groupName = groupName,
+                points = points,
+                expiry = expiry
+            ),
+            plans = emptyList()
+        )
+    }
+
     private fun parseMembershipInfoFromUserCenter(root: JsonObject): MembershipInfo? {
         val payload = unwrapUserCenterPayload(root)
         val userObject = payload.firstObject("user", "member", "info", "member_info", "membership_info") ?: payload
@@ -4270,6 +4341,118 @@ class AppleCmsRepository(
             expiry = expiry
         )
     }
+
+    private fun parseMembershipPlansFromHtml(document: Document): List<MembershipPlan> {
+        val attributePlans = document.select(
+            "[data-id][data-points][data-long], " +
+                "[data-id][data-duration][data-points], " +
+                "[data-group-id][data-long], " +
+                "[data-group_id][data-long], " +
+                "[data-gid][data-long], " +
+                "[data-id][data-long], " +
+                "[data-id][data-duration]"
+        ).mapNotNull(::parseMembershipPlanFromHtmlElement)
+
+        val scriptPlans = document.select("script, [onclick]")
+            .flatMap { element ->
+                buildList {
+                    element.data().takeIf(String::isNotBlank)?.let(::add)
+                    element.attr("onclick").takeIf(String::isNotBlank)?.let(::add)
+                }
+            }
+            .flatMap(::parseMembershipPlansFromScript)
+
+        return (attributePlans + scriptPlans)
+            .filter { it.groupId.isNotBlank() || it.groupName.isNotBlank() || it.duration.isNotBlank() || it.points.isNotBlank() }
+            .distinctBy { "${it.groupId}:${it.groupName}:${it.duration}:${it.points}" }
+    }
+
+    private fun parseMembershipPlanFromHtmlElement(element: Element): MembershipPlan? {
+        val groupId = element.attr("data-id").trim()
+            .ifBlank { element.attr("data-group-id").trim() }
+            .ifBlank { element.attr("data-group_id").trim() }
+            .ifBlank { element.attr("data-gid").trim() }
+        val groupName = decodeSiteText(
+            element.attr("data-name").trim()
+                .ifBlank { element.attr("data-title").trim() }
+                .ifBlank { element.attr("data-group-name").trim() }
+                .ifBlank { element.ownText().trim() }
+        )
+        val duration = decodeSiteText(
+            element.attr("data-long").trim()
+                .ifBlank { element.attr("data-duration").trim() }
+                .ifBlank { parseMembershipDurationFromText(element.text()) }
+        )
+        val points = decodeSiteText(
+            element.attr("data-points").trim()
+                .ifBlank { element.attr("data-price").trim() }
+                .ifBlank { element.attr("data-score").trim() }
+                .ifBlank { parseMembershipPointsFromText(element.text()) }
+        )
+
+        if (groupId.isBlank() && groupName.isBlank() && duration.isBlank() && points.isBlank()) {
+            return null
+        }
+
+        return MembershipPlan(
+            groupId = groupId,
+            groupName = groupName,
+            duration = duration,
+            points = points
+        )
+    }
+
+    private fun parseMembershipPlansFromScript(script: String): List<MembershipPlan> {
+        val normalized = script.trim()
+        if (normalized.isBlank()) return emptyList()
+
+        val duration = Regex("(?i)\\b(day|week|month|year)\\b")
+            .find(normalized)
+            ?.groupValues
+            ?.getOrNull(1)
+            .orEmpty()
+        val groupId = Regex("(?i)(?:group_id|groupId|gid|data-id|data-group-id)\\D{0,8}(\\d{1,6})")
+            .find(normalized)
+            ?.groupValues
+            ?.getOrNull(1)
+            .orEmpty()
+        val points = Regex("(?i)(?:points|price|score|need_points|cost_points)\\D{0,8}(\\d{1,8})")
+            .find(normalized)
+            ?.groupValues
+            ?.getOrNull(1)
+            .orEmpty()
+
+        if (duration.isBlank() || points.isBlank()) {
+            return emptyList()
+        }
+
+        return listOf(
+            MembershipPlan(
+                groupId = groupId,
+                groupName = "",
+                duration = duration,
+                points = points
+            )
+        )
+    }
+
+    private fun parseMembershipDurationFromText(text: String): String {
+        val normalized = text.lowercase(Locale.ROOT)
+        return when {
+            "day" in normalized || "鍖呭ぉ" in text -> "day"
+            "week" in normalized || "鍖呭懆" in text -> "week"
+            "month" in normalized || "鍖呮湀" in text -> "month"
+            "year" in normalized || "鍖呭勾" in text -> "year"
+            else -> ""
+        }
+    }
+
+    private fun parseMembershipPointsFromText(text: String): String =
+        Regex("(\\d{1,8})\\s*(?:绉垎|points|score)", RegexOption.IGNORE_CASE)
+            .find(text)
+            ?.groupValues
+            ?.getOrNull(1)
+            .orEmpty()
 
     private fun parseMembershipPlansFromUserCenter(root: JsonObject): List<MembershipPlan> {
         val payload = unwrapUserCenterPayload(root)
