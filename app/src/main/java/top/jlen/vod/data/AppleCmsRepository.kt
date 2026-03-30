@@ -1221,8 +1221,14 @@ class AppleCmsRepository(
     }
 
     private fun uploadPortraitViaVideoApiBase64(payload: PortraitUploadPayload): String {
+        val base64Payload = buildString {
+            append("data:")
+            append(payload.mimeType.ifBlank { "image/jpeg" })
+            append(";base64,")
+            append(Base64.encodeToString(payload.bytes, Base64.NO_WRAP))
+        }
         val body = FormBody.Builder()
-            .add("imgdata", Base64.encodeToString(payload.bytes, Base64.NO_WRAP))
+            .add("imgdata", base64Payload)
             .build()
 
         val request = Request.Builder()
