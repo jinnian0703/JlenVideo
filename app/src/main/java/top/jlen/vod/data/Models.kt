@@ -282,6 +282,7 @@ data class AppNotice(
     val summary: String = "",
     val isPinned: Boolean = false,
     val isActive: Boolean = true,
+    val alwaysShowDialog: Boolean = false,
     val startAt: String = "",
     val endAt: String = "",
     val createdAt: String = "",

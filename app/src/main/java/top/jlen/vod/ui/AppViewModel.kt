@@ -27,9 +27,11 @@ import top.jlen.vod.data.AuthSession
 import top.jlen.vod.data.Episode
 import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.HotSearchGroup
+import top.jlen.vod.data.HomePayload
 import top.jlen.vod.data.HomeSection
 import top.jlen.vod.data.MembershipInfo
 import top.jlen.vod.data.MembershipPlan
+import top.jlen.vod.data.PagedVodItems
 import top.jlen.vod.data.PlaySource
 import top.jlen.vod.data.RegisterEditor
 import top.jlen.vod.data.SearchHistoryStore
@@ -193,23 +195,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun dismissNoticeDialog() {
-        val dismissedId = noticeState.dialogNotice?.id
-            ?.takeIf(String::isNotBlank)
-        dismissedId?.let(repository::markNoticeDismissed)
+        val dismissedNotice = noticeState.dialogNotice
+        dismissedNotice?.let(repository::markNoticeDismissed)
         noticeState = noticeState.copy(
             dialogNotice = null,
-            unreadNoticeIds = dismissedId?.let { noticeState.unreadNoticeIds - it } ?: noticeState.unreadNoticeIds
+            unreadNoticeIds = repository.unreadActiveNoticeIds(noticeState.notices)
         )
     }
 
     fun markNoticeOpened(noticeId: String) {
         val normalized = noticeId.trim()
-        normalized
-            .takeIf(String::isNotBlank)
+        noticeState.notices
+            .firstOrNull { it.id == normalized }
             ?.let(repository::markNoticeDismissed)
         noticeState = noticeState.copy(
             dialogNotice = noticeState.dialogNotice?.takeUnless { it.id == normalized },
-            unreadNoticeIds = if (normalized.isBlank()) noticeState.unreadNoticeIds else noticeState.unreadNoticeIds - normalized
+            unreadNoticeIds = repository.unreadActiveNoticeIds(noticeState.notices)
         )
     }
 
@@ -253,47 +254,47 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshHome(forceRefresh: Boolean = false) {
         refreshNotices(forceRefresh = forceRefresh)
-        viewModelScope.launch {
+        val cachedPayload = if (!forceRefresh) {
+            repository.peekHomePayload(allowStale = true)
+        } else {
+            null
+        }
+        if (cachedPayload != null) {
+            homeState = homeStateFromPayload(
+                payload = cachedPayload,
+                cachedSelectedPage = cachedPayload.categories
+                    .firstOrNull()
+                    ?.let { repository.peekCategoryPage(typeId = it.typeId, page = 1, allowStale = true) }
+            )
+        } else {
             homeState = homeState.copy(isLoading = true, error = null)
+        }
+        viewModelScope.launch {
+            val shouldRefreshFromNetwork = forceRefresh || cachedPayload != null
             runCatching {
-                withContext(Dispatchers.IO) { repository.loadHome(forceRefresh = forceRefresh) }
+                withContext(Dispatchers.IO) { repository.loadHome(forceRefresh = shouldRefreshFromNetwork) }
             }.onSuccess { payload ->
-                val categories = payload.categories
-                val defaultSelected = categories.firstOrNull()
+                val defaultSelected = payload.categories.firstOrNull()
                 val cachedSelectedPage = defaultSelected?.let {
                     repository.peekCategoryPage(typeId = it.typeId, page = 1)
                 }
-                homeState = HomeUiState(
-                    isLoading = false,
-                    slides = payload.slides,
-                    hot = payload.hot,
-                    featured = payload.featured,
-                    latest = payload.latest,
-                    sections = payload.sections,
-                    homeVisibleCount = payload.latest.initialGridVisibleCount(),
-                    homePage = payload.latestPage,
-                    homeTotalCount = payload.latestTotal,
-                    hasMoreHomePages = payload.latestHasNextPage,
-                    categories = categories,
-                    selectedCategory = defaultSelected,
-                    categoryVideos = cachedSelectedPage?.items ?: payload.categoryVideos,
-                    categoryVisibleCount = (cachedSelectedPage?.items ?: payload.categoryVideos).initialGridVisibleCount(),
-                    categoryPage = cachedSelectedPage?.page ?: payload.categoryPage,
-                    categoryTotalCount = cachedSelectedPage?.totalItems ?: payload.categoryTotal,
-                    hasMoreCategoryPages = cachedSelectedPage?.hasNextPage ?: payload.categoryHasNextPage
-                )
+                homeState = homeStateFromPayload(payload, cachedSelectedPage)
                 if (
                     defaultSelected != null &&
-                    (cachedSelectedPage == null || forceRefresh) &&
+                    cachedSelectedPage == null &&
                     payload.categoryVideos.isEmpty()
                 ) {
-                    selectCategory(defaultSelected, forceRefresh = forceRefresh)
+                    selectCategory(defaultSelected, forceRefresh = true)
                 }
             }.onFailure { error ->
-                homeState = homeState.copy(
+                homeState = if (cachedPayload != null && !forceRefresh) {
+                    homeState.copy(isLoading = false)
+                } else {
+                    homeState.copy(
                     isLoading = false,
                     error = toUserFacingMessage(error, "首页加载失败")
-                )
+                    )
+                }
             }
         }
     }
@@ -311,7 +312,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         val cachedPayload = if (!forceRefresh) {
-            repository.peekCategoryPage(typeId = category.typeId, page = 1)
+            repository.peekCategoryPage(typeId = category.typeId, page = 1, allowStale = true)
         } else {
             null
         }
@@ -329,14 +330,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         viewModelScope.launch {
+            val shouldRefreshFromNetwork = forceRefresh || cachedPayload != null
             homeState = homeState.copy(
                 selectedCategory = category,
-                isCategoryLoading = cachedPayload == null || forceRefresh,
+                isCategoryLoading = cachedPayload == null,
                 isCategoryAppending = false,
                 error = null
             )
             runCatching {
-                withContext(Dispatchers.IO) { repository.loadCategoryPage(category.typeId, page = 1, forceRefresh = forceRefresh) }
+                withContext(Dispatchers.IO) {
+                    repository.loadCategoryPage(
+                        category.typeId,
+                        page = 1,
+                        forceRefresh = shouldRefreshFromNetwork
+                    )
+                }
             }.onSuccess { payload ->
                 homeState = homeState.copy(
                     categoryVideos = payload.items,
@@ -348,6 +356,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     isCategoryLoading = false
                 )
             }.onFailure { error ->
+                if (cachedPayload != null && !forceRefresh) {
+                    homeState = homeState.copy(
+                        isCategoryAppending = false,
+                        isCategoryLoading = false
+                    )
+                    return@onFailure
+                }
                 homeState = homeState.copy(
                     isCategoryAppending = false,
                     isCategoryLoading = false,
@@ -355,6 +370,34 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
+    }
+
+    private fun homeStateFromPayload(
+        payload: HomePayload,
+        cachedSelectedPage: PagedVodItems? = null
+    ): HomeUiState {
+        val defaultSelected = payload.categories.firstOrNull()
+        val categoryVideos = cachedSelectedPage?.items ?: payload.categoryVideos
+        return HomeUiState(
+            isLoading = false,
+            slides = payload.slides,
+            hot = payload.hot,
+            featured = payload.featured,
+            latest = payload.latest,
+            sections = payload.sections,
+            homeVisibleCount = payload.latest.initialGridVisibleCount(),
+            homePage = payload.latestPage,
+            homeTotalCount = payload.latestTotal,
+            hasMoreHomePages = payload.latestHasNextPage,
+            categories = payload.categories,
+            selectedCategory = defaultSelected,
+            categoryVideos = categoryVideos,
+            categoryVisibleCount = categoryVideos.initialGridVisibleCount(),
+            categoryPage = cachedSelectedPage?.page ?: payload.categoryPage,
+            categoryTotalCount = cachedSelectedPage?.totalItems ?: payload.categoryTotal,
+            hasMoreCategoryPages = cachedSelectedPage?.hasNextPage ?: payload.categoryHasNextPage,
+            error = null
+        )
     }
 
     fun loadMoreHome() {

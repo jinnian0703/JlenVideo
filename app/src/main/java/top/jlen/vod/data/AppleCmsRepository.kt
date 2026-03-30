@@ -155,17 +155,21 @@ class AppleCmsRepository(
         clearAllAppCaches()
     }
 
+    fun peekHomePayload(allowStale: Boolean = false): HomePayload? {
+        val ttlMs = if (allowStale) DISK_HOME_CACHE_TTL_MS else HOME_CACHE_TTL_MS
+        homeCache
+            ?.takeIf { isCacheValid(it.timestampMs, ttlMs) }
+            ?.value
+            ?.let { return it }
+        return readPersistedHomeCache()
+            ?.takeIf { isCacheValid(it.timestampMs, ttlMs) }
+            ?.also { cached -> homeCache = cached }
+            ?.value
+    }
+
     suspend fun loadHome(forceRefresh: Boolean = false): HomePayload {
         if (!forceRefresh) {
-            homeCache
-                ?.takeIf { isCacheValid(it.timestampMs, HOME_CACHE_TTL_MS) }
-                ?.value
-                ?.let { return it }
-            readPersistedHomeCache()
-                ?.takeIf { isCacheValid(it.timestampMs, HOME_CACHE_TTL_MS) }
-                ?.also { cached -> homeCache = cached }
-                ?.value
-                ?.let { return it }
+            peekHomePayload()?.let { return it }
         }
 
         return runCatching {
@@ -173,10 +177,7 @@ class AppleCmsRepository(
                 loadFreshHome(forceRefresh = true)
             } else {
                 awaitSharedRequest("home") {
-                    homeCache
-                        ?.takeIf { isCacheValid(it.timestampMs, HOME_CACHE_TTL_MS) }
-                        ?.value
-                        ?: loadFreshHome(forceRefresh = false)
+                    peekHomePayload() ?: loadFreshHome(forceRefresh = false)
                 }
             }
         }.getOrElse {
@@ -398,15 +399,16 @@ class AppleCmsRepository(
         }
     }
 
-    fun peekCategoryPage(typeId: String, page: Int): PagedVodItems? {
+    fun peekCategoryPage(typeId: String, page: Int, allowStale: Boolean = false): PagedVodItems? {
         val safePage = page.coerceAtLeast(1)
         val cacheKey = "$typeId:$safePage"
+        val ttlMs = if (allowStale) DISK_PAGE_CACHE_TTL_MS else PAGE_CACHE_TTL_MS
         categoryPageCache[cacheKey]
-            ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
+            ?.takeIf { isCacheValid(it.timestampMs, ttlMs) }
             ?.value
             ?.let { return it }
         readPersistedPageCache(cacheKey)
-            ?.takeIf { isCacheValid(it.timestampMs, DISK_PAGE_CACHE_TTL_MS) }
+            ?.takeIf { isCacheValid(it.timestampMs, ttlMs) }
             ?.also { cached -> categoryPageCache[cacheKey] = cached }
             ?.value
             ?.let { return it }
@@ -775,7 +777,7 @@ class AppleCmsRepository(
             if (!response.isSuccessful) {
                 throw IOException("HTTP ${response.code}")
             }
-            return JsonParser.parseString(body).asJsonObject
+            return parseVideoApiResponseBody(body)
         }
     }
 
@@ -906,16 +908,27 @@ class AppleCmsRepository(
     fun pickPendingNotice(notices: List<AppNotice>): AppNotice? {
         val dismissedIds = noticePrefs.getStringSet(KEY_DISMISSED_NOTICE_IDS, emptySet()).orEmpty()
         return notices.firstOrNull { notice ->
-            notice.isActive && notice.id.isNotBlank() && !dismissedIds.contains(notice.id)
+            notice.isActive &&
+                notice.id.isNotBlank() &&
+                (notice.alwaysShowDialog || !dismissedIds.contains(notice.id))
         }
     }
 
     fun unreadActiveNoticeIds(notices: List<AppNotice>): Set<String> {
         val dismissedIds = noticePrefs.getStringSet(KEY_DISMISSED_NOTICE_IDS, emptySet()).orEmpty()
         return notices.asSequence()
-            .filter { it.isActive && it.id.isNotBlank() && !dismissedIds.contains(it.id) }
+            .filter { notice ->
+                notice.isActive &&
+                    notice.id.isNotBlank() &&
+                    (notice.alwaysShowDialog || !dismissedIds.contains(notice.id))
+            }
             .map { it.id }
             .toSet()
+    }
+
+    fun markNoticeDismissed(notice: AppNotice) {
+        if (notice.alwaysShowDialog) return
+        markNoticeDismissed(notice.id)
     }
 
     fun markNoticeDismissed(noticeId: String) {
@@ -1858,7 +1871,7 @@ class AppleCmsRepository(
 
     private fun parseFavoritePageFromApi(json: JsonObject, page: Int): UserCenterPage {
         extractVideoApiMessage(json, "加载收藏失败")
-        val data = json.firstObject("data") ?: return UserCenterPage()
+        val data = unwrapApiPayload(json) ?: return UserCenterPage()
         val rows = data.firstArray("rows", "list", "items")
         val totalPages = data.firstInt("total_pages", "page_count", "pageCount")
             ?.coerceAtLeast(page)
@@ -1884,7 +1897,7 @@ class AppleCmsRepository(
 
     private fun parseHistoryPageFromApi(json: JsonObject, page: Int): UserCenterPage {
         extractVideoApiMessage(json, "加载播放记录失败")
-        val data = json.firstObject("data") ?: return UserCenterPage()
+        val data = unwrapApiPayload(json) ?: return UserCenterPage()
         val rows = data.firstArray("rows", "list", "items")
         val totalPages = data.firstInt("total_pages", "page_count", "pageCount")
             ?.coerceAtLeast(page)
@@ -1939,11 +1952,14 @@ class AppleCmsRepository(
     }
 
     private fun parseUserCenterVod(row: JsonObject): VodItem? {
-        val vodObject = row.firstObject("vod") ?: return null
+        val vodObject = row.firstObject("vod", "video", "item") ?: row
         val rawItem = runCatching { gson.fromJson(vodObject, VodItem::class.java) }.getOrNull() ?: return null
         val resolvedVodId = rawItem.vodId.ifBlank { vodObject.firstString("vod_id", "id") }
         val resolvedTypeName = rawItem.typeName.orEmpty().ifBlank {
             vodObject.firstObject("type")?.firstString("type_name").orEmpty()
+        }
+        if (resolvedVodId.isBlank() && rawItem.vodName.isBlank() && vodObject === row) {
+            return null
         }
         return rawItem.copy(
             vodId = resolvedVodId,
@@ -4213,7 +4229,7 @@ class AppleCmsRepository(
             throw IOException(json.firstString("msg", "message").ifBlank { "鑾峰彇鐢ㄦ埛璇︽儏澶辫触" })
         }
 
-        val payload = json.firstObject("info", "data", "user")
+        val payload = extractUserApiPayload(json)
             ?: throw IOException("鐢ㄦ埛璇︽儏涓虹┖")
         val points = decodeSiteText(payload.firstString("user_points", "points", "score", "integral", "point_balance"))
         val groupName = decodeSiteText(payload.firstString("group_name", "member_name", "vip_name", "group"))
@@ -4331,7 +4347,7 @@ class AppleCmsRepository(
             return MembershipPage()
         }
 
-        val payload = json.firstObject("info", "data", "user") ?: return MembershipPage()
+        val payload = extractUserApiPayload(json) ?: return MembershipPage()
         val points = decodeSiteText(payload.firstString("user_points", "points", "score", "integral", "point_balance"))
         val groupName = decodeSiteText(payload.firstString("group_name", "member_name", "vip_name", "group"))
         val expiry = decodeSiteText(
@@ -4637,6 +4653,14 @@ class AppleCmsRepository(
 
     private fun unwrapUserCenterPayload(root: JsonObject): JsonObject =
         root.firstObject("data", "info") ?: root
+
+    private fun unwrapApiPayload(root: JsonObject): JsonObject? =
+        root.firstObject("data", "info") ?: root.takeIf { it.entrySet().isNotEmpty() }
+
+    private fun extractUserApiPayload(root: JsonObject): JsonObject? {
+        val payload = unwrapApiPayload(root) ?: return null
+        return payload.firstObject("user", "profile", "account", "member", "me", "info") ?: payload
+    }
 
     private fun resolveMembershipExpiryText(
         payload: JsonObject,
@@ -4945,6 +4969,7 @@ class AppleCmsRepository(
         val updatedAt = obj.firstString("updated_at", "update_time", "updated", "modified_at")
         val isPinned = obj.firstBoolean("is_top", "isTop", "top", "pinned", "is_pinned", "sticky") ?: false
         val isActive = resolveNoticeActive(obj, startAt = startAt, endAt = endAt)
+        val alwaysShowDialog = resolveNoticeAlwaysShowDialog(obj)
         val rawId = obj.firstString("id", "notice_id", "announcement_id", "nid")
         val resolvedId = rawId.ifBlank {
             buildNoticeStableId(
@@ -4964,6 +4989,7 @@ class AppleCmsRepository(
             summary = summary,
             isPinned = isPinned,
             isActive = isActive,
+            alwaysShowDialog = alwaysShowDialog,
             startAt = startAt,
             endAt = endAt,
             createdAt = createdAt,
@@ -5067,6 +5093,32 @@ class AppleCmsRepository(
             .firstOrNull()
             .orEmpty()
 
+    private fun parseVideoApiResponseBody(body: String): JsonObject {
+        val trimmed = body.trim()
+        runCatching {
+            return JsonParser.parseString(trimmed).asJsonObject
+        }
+        if (trimmed.equals("closed", ignoreCase = true)) {
+            return JsonObject().apply {
+                addProperty("code", 0)
+                addProperty("msg", "api closed")
+                add("data", com.google.gson.JsonNull.INSTANCE)
+            }
+        }
+        if (
+            trimmed.contains("login required", ignoreCase = true) ||
+                trimmed.contains("/index.php/user/login", ignoreCase = true) ||
+                trimmed.contains("user/login", ignoreCase = true)
+        ) {
+            return JsonObject().apply {
+                addProperty("code", 401)
+                addProperty("msg", "login required")
+                add("data", com.google.gson.JsonNull.INSTANCE)
+            }
+        }
+        throw IOException("瑙嗛 API 杩斿洖浜嗘棤娉曡В鏋愮殑鏁版嵁")
+    }
+
     private fun JsonObject.primitiveString(name: String): String =
         get(name)
             ?.takeIf { !it.isJsonNull && it.isJsonPrimitive }
@@ -5098,6 +5150,47 @@ class AppleCmsRepository(
         val endMs = parseNoticeTimeToMillis(endAt)
         if (endMs != null && now > endMs) return false
         return true
+    }
+
+    private fun resolveNoticeAlwaysShowDialog(obj: JsonObject): Boolean {
+        obj.firstBoolean(
+            "always_show_dialog",
+            "always_show",
+            "always_popup",
+            "always_alert",
+            "always_prompt",
+            "repeat_prompt",
+            "repeat_popup",
+            "persistent_prompt",
+            "is_repeat_prompt",
+            "is_repeat_popup"
+        )?.let { return it }
+
+        obj.firstBoolean(
+            "show_once",
+            "popup_once",
+            "alert_once",
+            "prompt_once",
+            "only_once",
+            "dismiss_forever"
+        )?.let { return !it }
+
+        return when (
+            obj.firstString(
+                "dialog_mode",
+                "popup_mode",
+                "alert_mode",
+                "prompt_mode",
+                "notice_mode",
+                "display_mode",
+                "remind_mode",
+                "show_mode"
+            ).trim().lowercase(Locale.ROOT)
+        ) {
+            "always", "repeat", "persistent", "loop", "sticky", "forever", "every_time" -> true
+            "once", "single", "one_time", "show_once", "popup_once" -> false
+            else -> false
+        }
     }
 
     private fun normalizeNoticeText(raw: String): String {
@@ -5173,6 +5266,7 @@ class AppleCmsRepository(
         private const val KEY_DISMISSED_NOTICE_IDS = "dismissed_notice_ids"
         private const val HEARTBEAT_DEVICE_ID_KEY = "device_id"
         private const val HOME_CACHE_TTL_MS = 60_000L
+        private const val DISK_HOME_CACHE_TTL_MS = 43_200_000L
         private const val NOTICE_CACHE_TTL_MS = 60_000L
         private const val CATEGORY_CACHE_TTL_MS = 300_000L
         private const val PAGE_CACHE_TTL_MS = 300_000L
