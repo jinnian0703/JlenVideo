@@ -355,6 +355,7 @@ class AppleCmsRepository(
             ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
             ?.value
             ?.let { return it }
+
         readPersistedPageCache(allCacheKey)
             ?.takeIf { isCacheValid(it.timestampMs, DISK_PAGE_CACHE_TTL_MS) }
             ?.also { cached ->
@@ -1673,6 +1674,11 @@ class AppleCmsRepository(
             ?.takeIf { it.session.isLoggedIn }
             ?.let { return it }
 
+        runCatching { loadUserProfile() }
+            .getOrNull()
+            ?.takeIf { it.session.isLoggedIn || currentSession().isLoggedIn }
+            ?.let { return it }
+
         val session = currentSession()
         if (!session.isLoggedIn) {
             throw IOException("请先登录")
@@ -1751,6 +1757,16 @@ class AppleCmsRepository(
             mergeMembershipPages(
                 base = merged,
                 fallback = runCatching { loadMembershipInfoFromUserDetailApi(session.userId) }.getOrNull()
+            )
+        }.let { merged ->
+            mergeMembershipPages(
+                base = merged,
+                fallback = runCatching { loadMembershipInfoFromProfileHtml() }.getOrNull()
+            )
+        }.let { merged ->
+            mergeMembershipPages(
+                base = merged,
+                fallback = runCatching { loadMembershipPageFromHtml() }.getOrNull()
             )
         }
     }
