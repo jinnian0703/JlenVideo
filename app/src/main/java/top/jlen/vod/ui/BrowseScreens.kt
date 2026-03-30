@@ -103,6 +103,7 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
+import org.jsoup.parser.Parser
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -3830,7 +3831,7 @@ private fun String.removeAnnouncementListPrefix(): String =
         .trim()
 
 private fun parseAnnouncementHtmlBlocks(html: String): List<AnnouncementRichBlock> {
-    val normalized = html.trim()
+    val normalized = Parser.unescapeEntities(html.trim(), false).trim()
     if (normalized.isBlank() || !normalized.contains('<')) return emptyList()
 
     val body = Jsoup.parseBodyFragment(normalized).body()
