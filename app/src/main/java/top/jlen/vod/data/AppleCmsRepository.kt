@@ -158,11 +158,12 @@ class AppleCmsRepository(
                 hasNextPage = false
             )
         val recommendedItems = runCatching {
-            requestApi { getRecommendations(limit = 16) }
+            val rawItems = requestApi { getRecommendations(limit = 16) }
                 .data
                 ?.rows
                 .orEmpty()
                 .distinctBy { it.vodId }
+            filterPlayablePreviewItems(rawItems)
         }.getOrElse {
             cachedHome?.featured.orEmpty()
         }
@@ -185,7 +186,11 @@ class AppleCmsRepository(
         val featuredItems = recommendedItems
             .ifEmpty { cachedHome?.featured.orEmpty() }
             .ifEmpty { latestItems.take(16) }
-        rememberPreviewItems(latestItems + featuredItems + categoryPage.items)
+        rememberPreviewItems(buildList {
+            addAll(latestItems)
+            addAll(featuredItems)
+            addAll(categoryPage.items)
+        })
 
         return HomePayload(
             slides = emptyList(),
@@ -226,11 +231,12 @@ class AppleCmsRepository(
             }
             val recommendationsDeferred = async {
                 runCatching {
-                    requestApi { getRecommendations(limit = 16) }
+                    val rawItems = requestApi { getRecommendations(limit = 16) }
                         .data
                         ?.rows
                         .orEmpty()
                         .distinctBy { it.vodId }
+                    filterPlayablePreviewItems(rawItems)
                 }.getOrDefault(emptyList())
             }
             latestDeferred.await() to recommendationsDeferred.await()
@@ -382,10 +388,14 @@ class AppleCmsRepository(
         }
     }
 
-    suspend fun loadLatestPage(page: Int): PagedVodItems =
-        requestApi { getLatest(page = page.coerceAtLeast(1)) }
+    suspend fun loadLatestPage(page: Int): PagedVodItems {
+        val payload = requestApi { getLatest(page = page.coerceAtLeast(1)) }
             .toPagedVodItems()
-            .also { payload -> rememberPreviewItems(payload.items) }
+        val playableItems = filterPlayablePreviewItems(payload.items)
+        return payload.copy(items = playableItems).also { filtered ->
+            rememberPreviewItems(filtered.items)
+        }
+    }
 
     private suspend fun loadLatestUpdatesFromLabelPage(): PagedVodItems {
         val document = fetchDocument("$baseUrl/label/new/")
@@ -1440,6 +1450,47 @@ class AppleCmsRepository(
             }
         }
         return null
+    }
+
+    private suspend fun filterPlayablePreviewItems(items: List<VodItem>): List<VodItem> {
+        if (items.isEmpty()) return emptyList()
+        return coroutineScope {
+            items.map { previewItem ->
+                async {
+                    val resolved = runCatching {
+                        resolvePlayableDetailForPreview(previewItem)
+                    }.getOrNull()
+                    if (resolved != null && parseSources(resolved).isNotEmpty()) {
+                        detailCache[previewItem.vodId] = CachedValue(
+                            value = resolved,
+                            timestampMs = System.currentTimeMillis()
+                        )
+                        rememberPreviewItems(listOf(resolved))
+                        previewItem
+                    } else {
+                        null
+                    }
+                }
+            }.awaitAll().filterNotNull()
+        }
+    }
+
+    private suspend fun resolvePlayableDetailForPreview(previewItem: VodItem): VodItem? {
+        detailCache[previewItem.vodId]
+            ?.takeIf { isCacheValid(it.timestampMs, DETAIL_CACHE_TTL_MS) }
+            ?.value
+            ?.takeIf { parseSources(it).isNotEmpty() }
+            ?.let { return it }
+
+        val apiItem = loadDetailFromApi(previewItem.vodId)
+        return when {
+            apiItem == null -> resolveDetailMismatch(previewItem, excludedVodId = previewItem.vodId)
+                ?.let { mergePreviewIntoDetail(previewItem, it) }
+            !detailMatchesPreview(apiItem, previewItem) ->
+                resolveDetailMismatch(previewItem, excludedVodId = previewItem.vodId)
+                    ?.let { mergePreviewIntoDetail(previewItem, it) }
+            else -> mergePreviewIntoDetail(previewItem, apiItem)
+        }
     }
 
     private fun detailMatchesPreview(detail: VodItem, preview: VodItem): Boolean {
