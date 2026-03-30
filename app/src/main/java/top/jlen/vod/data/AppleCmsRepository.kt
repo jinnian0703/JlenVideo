@@ -642,6 +642,159 @@ class AppleCmsRepository(
         cookieJar.clear()
     }
 
+    private fun requireLoggedInUserId(): String =
+        currentSession().userId
+            .trim()
+            .takeIf(String::isNotBlank)
+            ?: throw IOException("请先登录")
+
+    private fun userActionBaseCandidates(): List<String> = buildList {
+        add(baseUrl)
+        fallbackApiBaseUrl
+            ?.takeIf(String::isNotBlank)
+            ?.let(::add)
+    }.distinct()
+
+    private suspend fun executeUserRequest(
+        path: String,
+        refererPath: String,
+        requestBody: okhttp3.RequestBody,
+        extraHeaders: Map<String, String> = emptyMap(),
+        acceptedStatusCodes: Set<Int> = emptySet()
+    ): String {
+        var lastError: Exception? = null
+
+        for (candidateBase in userActionBaseCandidates()) {
+            val requestBuilder = Request.Builder()
+                .url(candidateBase + path)
+                .header("Referer", candidateBase + refererPath)
+
+            extraHeaders.forEach { (name, value) ->
+                requestBuilder.header(name, value)
+            }
+
+            val request = requestBuilder
+                .post(requestBody)
+                .build()
+
+            try {
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful && response.code !in acceptedStatusCodes) {
+                        throw IOException("HTTP ${response.code}")
+                    }
+                    return response.body?.string().orEmpty()
+                }
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                lastError = error
+            }
+        }
+
+        throw lastError ?: IOException("用户服务请求失败")
+    }
+
+    private suspend fun requestVideoApiJson(
+        path: String,
+        queryParameters: Map<String, String> = emptyMap(),
+        formBody: FormBody? = null
+    ): JsonObject {
+        val resolvedBackupBaseUrl = fallbackApiBaseUrl ?: return performVideoApiJsonRequest(
+            base = baseUrl,
+            path = path,
+            queryParameters = queryParameters,
+            formBody = formBody
+        )
+
+        val now = System.currentTimeMillis()
+        if (now < preferBackupApiUntilMs) {
+            return try {
+                performVideoApiJsonRequest(
+                    base = resolvedBackupBaseUrl,
+                    path = path,
+                    queryParameters = queryParameters,
+                    formBody = formBody
+                )
+            } catch (backupError: Exception) {
+                if (backupError is CancellationException) throw backupError
+                performVideoApiJsonRequest(
+                    base = baseUrl,
+                    path = path,
+                    queryParameters = queryParameters,
+                    formBody = formBody
+                ).also {
+                    preferBackupApiUntilMs = 0L
+                }
+            }
+        }
+
+        return try {
+            performVideoApiJsonRequest(
+                base = baseUrl,
+                path = path,
+                queryParameters = queryParameters,
+                formBody = formBody
+            ).also {
+                preferBackupApiUntilMs = 0L
+            }
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            if (!shouldFailoverToBackup(error)) throw error
+            preferBackupApiUntilMs = System.currentTimeMillis() + API_FAILOVER_COOLDOWN_MS
+            performVideoApiJsonRequest(
+                base = resolvedBackupBaseUrl,
+                path = path,
+                queryParameters = queryParameters,
+                formBody = formBody
+            )
+        }
+    }
+
+    private fun performVideoApiJsonRequest(
+        base: String,
+        path: String,
+        queryParameters: Map<String, String>,
+        formBody: FormBody?
+    ): JsonObject {
+        val url = Uri.parse("$base/$path")
+            .buildUpon()
+            .apply {
+                queryParameters.forEach { (name, value) ->
+                    appendQueryParameter(name, value)
+                }
+            }
+            .build()
+            .toString()
+
+        val requestBuilder = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json")
+
+        val request = if (formBody == null) {
+            requestBuilder.get().build()
+        } else {
+            requestBuilder
+                .post(formBody)
+                .build()
+        }
+
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw IOException("HTTP ${response.code}")
+            }
+            return JsonParser.parseString(body).asJsonObject
+        }
+    }
+
+    private fun extractVideoApiMessage(json: JsonObject, fallbackMessage: String): String {
+        val code = json.firstInt("code", "status")
+        val message = json.firstString("msg", "message")
+        if (code != null && code !in setOf(1, 200)) {
+            throw IOException(message.ifBlank { fallbackMessage })
+        }
+        return message.ifBlank { fallbackMessage }
+    }
+
     fun reportHeartbeat(
         route: String,
         userId: String = currentSession().userId,
@@ -1358,6 +1511,430 @@ class AppleCmsRepository(
             formBody = form
         )
     }
+
+    suspend fun loginForApp(userName: String, password: String): AuthSession {
+        val body = executeUserRequest(
+            path = "/index.php/user/login",
+            refererPath = "/index.php/user/login.html",
+            requestBody = FormBody.Builder()
+                .add("user_name", userName.trim())
+                .add("user_pwd", password)
+                .build(),
+            extraHeaders = mapOf("X-Requested-With" to "XMLHttpRequest")
+        )
+        val authResponse = runCatching {
+            gson.fromJson(body, AuthResponse::class.java)
+        }.getOrNull()
+
+        val session = currentSession()
+        if (session.isLoggedIn) {
+            return session
+        }
+
+        runCatching { JsonParser.parseString(body).asJsonObject }
+            .getOrNull()
+            ?.let { json ->
+                if (json.firstInt("code", "status") in setOf(1, 200)) {
+                    val data = json.firstObject("data", "info", "user")
+                    val userObject = data?.firstObject("user", "profile", "account", "member") ?: data
+                    val userId = userObject?.firstString("user_id", "uid", "id", "userId").orEmpty()
+                    if (userId.isNotBlank()) {
+                        return AuthSession(
+                            isLoggedIn = true,
+                            userId = userId,
+                            userName = decodeSiteText(
+                                userObject?.firstString("user_name", "username", "nickname", "name").orEmpty()
+                                    .ifBlank { userName }
+                            ),
+                            groupName = decodeSiteText(
+                                userObject?.firstString("group_name", "group", "member_name").orEmpty()
+                            ),
+                            portraitUrl = normalizePortraitUrl(
+                                userObject?.firstString("user_portrait", "portrait", "avatar").orEmpty()
+                            )
+                        )
+                    }
+                }
+            }
+
+        val failureMessage = authResponse?.msg
+            ?.takeIf(String::isNotBlank)
+            ?.let(::normalizeLoginFailureMessage)
+
+        throw IOException(failureMessage ?: "登录失败，请检查账号或密码")
+    }
+
+    suspend fun loadRegisterPageForApp(): RegisterPage =
+        RegisterPage(
+            channel = "email",
+            contactLabel = "邮箱",
+            codeLabel = "邮箱验证码",
+            requiresCode = true,
+            requiresVerify = false,
+            captchaUrl = "",
+            captchaBytes = null
+        )
+
+    suspend fun loadFindPasswordPageForApp(): FindPasswordPage =
+        FindPasswordPage(
+            requiresVerify = false,
+            captchaUrl = "",
+            captchaBytes = null
+        )
+
+    suspend fun sendRegisterCodeForApp(channel: String, contact: String): String {
+        val body = executeUserRequest(
+            path = "/index.php/user/reg_msg",
+            refererPath = "/index.php/user/reg.html",
+            requestBody = FormBody.Builder()
+                .add("ac", channel.trim())
+                .add("to", contact.trim())
+                .build(),
+            extraHeaders = mapOf("X-Requested-With" to "XMLHttpRequest")
+        )
+        val authResponse = runCatching { gson.fromJson(body, AuthResponse::class.java) }.getOrNull()
+        return authResponse?.msg?.takeIf(String::isNotBlank) ?: "验证码发送成功"
+    }
+
+    suspend fun registerForApp(editor: RegisterEditor): String {
+        val body = executeUserRequest(
+            path = "/index.php/user/reg",
+            refererPath = "/index.php/user/reg.html",
+            requestBody = FormBody.Builder()
+                .add("user_name", editor.userName.trim())
+                .add("user_pwd", editor.password)
+                .add("user_pwd2", editor.confirmPassword)
+                .add("ac", editor.channel.trim())
+                .add("to", editor.contact.trim())
+                .add("code", editor.code.trim())
+                .add("verify", editor.verify.trim())
+                .build(),
+            extraHeaders = mapOf("X-Requested-With" to "XMLHttpRequest")
+        )
+        val authResponse = runCatching { gson.fromJson(body, AuthResponse::class.java) }.getOrNull()
+        if (authResponse != null && authResponse.code != 1) {
+            throw IOException(authResponse.msg.ifBlank { "注册失败" })
+        }
+        return authResponse?.msg?.takeIf(String::isNotBlank) ?: "注册成功"
+    }
+
+    suspend fun findPasswordForApp(editor: FindPasswordEditor): String {
+        val body = executeUserRequest(
+            path = "/index.php/user/findpass",
+            refererPath = "/index.php/user/findpass.html",
+            requestBody = FormBody.Builder()
+                .add("user_name", editor.userName.trim())
+                .add("user_question", editor.question.trim())
+                .add("user_answer", editor.answer.trim())
+                .add("user_pwd", editor.password)
+                .add("user_pwd2", editor.confirmPassword)
+                .add("verify", editor.verify.trim())
+                .build(),
+            extraHeaders = mapOf("X-Requested-With" to "XMLHttpRequest")
+        )
+        val authResponse = runCatching { gson.fromJson(body, AuthResponse::class.java) }.getOrNull()
+        if (authResponse != null && authResponse.code != 1) {
+            throw IOException(authResponse.msg.ifBlank { "找回密码失败" })
+        }
+        return authResponse?.msg?.takeIf(String::isNotBlank) ?: "密码已重置"
+    }
+
+    suspend fun logoutForApp() {
+        runCatching {
+            executeUserRequest(
+                path = "/index.php/user/logout",
+                refererPath = "/index.php/user",
+                requestBody = FormBody.Builder().build(),
+                acceptedStatusCodes = setOf(302)
+            )
+        }
+        clearSession()
+    }
+
+    suspend fun loadUserProfileForApp(): UserProfilePage {
+        runCatching { loadUserProfileFromAppCenter() }
+            .getOrNull()
+            ?.takeIf { it.session.isLoggedIn }
+            ?.let { return it }
+
+        val session = currentSession()
+        if (!session.isLoggedIn) {
+            throw IOException("请先登录")
+        }
+
+        return UserProfilePage(
+            fields = buildList {
+                session.userId.takeIf(String::isNotBlank)?.let { add("User ID" to it) }
+                session.userName.takeIf(String::isNotBlank)?.let { add("Username" to it) }
+                session.groupName.takeIf(String::isNotBlank)?.let { add("Group" to it) }
+            },
+            editor = UserProfileEditor(),
+            session = session
+        )
+    }
+
+    suspend fun loadFavoritePageForApp(pageUrl: String? = null): UserCenterPage {
+        val userId = requireLoggedInUserId()
+        val page = parseUserCenterApiPage(pageUrl, prefix = "favorites")
+        val json = requestVideoApiJson(
+            path = "api.php/video/favorites",
+            queryParameters = mapOf(
+                "user_id" to userId,
+                "page" to page.toString(),
+                "limit" to USER_CENTER_PAGE_LIMIT.toString()
+            )
+        )
+        return parseFavoritePageFromApi(json, page = page)
+    }
+
+    suspend fun loadHistoryPageForApp(pageUrl: String? = null): UserCenterPage {
+        val userId = requireLoggedInUserId()
+        val page = parseUserCenterApiPage(pageUrl, prefix = "history")
+        val json = requestVideoApiJson(
+            path = "api.php/video/history",
+            queryParameters = mapOf(
+                "user_id" to userId,
+                "page" to page.toString(),
+                "limit" to USER_CENTER_PAGE_LIMIT.toString()
+            )
+        )
+        return parseHistoryPageFromApi(json, page = page)
+    }
+
+    suspend fun loadMembershipPageForApp(): MembershipPage {
+        runCatching { loadMembershipPageFromAppCenter() }
+            .getOrNull()
+            ?.let { return it }
+
+        val session = currentSession()
+        if (!session.isLoggedIn) {
+            throw IOException("请先登录")
+        }
+
+        return MembershipPage(
+            info = MembershipInfo(groupName = session.groupName),
+            plans = emptyList()
+        )
+    }
+
+    suspend fun addFavoriteForApp(item: VodItem): String {
+        val userId = requireLoggedInUserId()
+        val vodId = resolveUserActionVodId(item)
+        val json = requestVideoApiJson(
+            path = "api.php/video/favorite",
+            formBody = FormBody.Builder()
+                .add("user_id", userId)
+                .add("vod_id", vodId)
+                .add("action", "add")
+                .build()
+        )
+        return extractVideoApiMessage(json, "已加入收藏")
+    }
+
+    suspend fun addPlayRecordForApp(item: VodItem, episodePageUrl: String): String {
+        val userId = requireLoggedInUserId()
+        val vodId = resolveUserActionVodId(item)
+        val route = parsePlayRoute(episodePageUrl)
+        val formBuilder = FormBody.Builder()
+            .add("user_id", userId)
+            .add("vod_id", vodId)
+            .add("action", "add")
+        route?.sid?.takeIf(String::isNotBlank)?.let { formBuilder.add("sid", it) }
+        route?.nid?.takeIf(String::isNotBlank)?.let { formBuilder.add("nid", it) }
+        val json = requestVideoApiJson(
+            path = "api.php/video/historyRecord",
+            formBody = formBuilder.build()
+        )
+        return extractVideoApiMessage(json, "播放记录已同步")
+    }
+
+    suspend fun deleteUserRecordForApp(recordIds: List<String>, type: Int, clearAll: Boolean): String {
+        val userId = requireLoggedInUserId()
+        return when (type) {
+            2 -> {
+                val targetVodIds = if (clearAll) {
+                    collectAllUserCenterItems { token -> loadFavoritePageForApp(token) }
+                        .map { it.recordId }
+                } else {
+                    recordIds
+                }
+                targetVodIds
+                    .map(String::trim)
+                    .filter(String::isNotBlank)
+                    .distinct()
+                    .forEach { vodId ->
+                        val json = requestVideoApiJson(
+                            path = "api.php/video/favorite",
+                            formBody = FormBody.Builder()
+                                .add("user_id", userId)
+                                .add("vod_id", vodId)
+                                .add("action", "delete")
+                                .build()
+                        )
+                        extractVideoApiMessage(json, "操作成功")
+                    }
+                if (targetVodIds.isEmpty()) "没有可删除的收藏" else "操作成功"
+            }
+            4 -> {
+                val targetHistoryIds = if (clearAll) {
+                    collectAllUserCenterItems { token -> loadHistoryPageForApp(token) }
+                        .map { it.recordId }
+                } else {
+                    recordIds
+                }
+                targetHistoryIds
+                    .map(String::trim)
+                    .filter(String::isNotBlank)
+                    .distinct()
+                    .forEach { ulogId ->
+                        val json = requestVideoApiJson(
+                            path = "api.php/video/historyRecord",
+                            formBody = FormBody.Builder()
+                                .add("user_id", userId)
+                                .add("ulog_id", ulogId)
+                                .add("action", "delete")
+                                .build()
+                        )
+                        extractVideoApiMessage(json, "操作成功")
+                    }
+                if (targetHistoryIds.isEmpty()) "没有可删除的记录" else "操作成功"
+            }
+            else -> deleteUserRecord(recordIds, type, clearAll)
+        }
+    }
+
+    private suspend fun collectAllUserCenterItems(
+        loader: suspend (String?) -> UserCenterPage
+    ): List<UserCenterItem> {
+        val items = mutableListOf<UserCenterItem>()
+        var nextPageToken: String? = null
+        do {
+            val page = loader(nextPageToken)
+            items += page.items
+            nextPageToken = page.nextPageUrl
+        } while (!nextPageToken.isNullOrBlank())
+        return items
+    }
+
+    private fun parseUserCenterApiPage(pageUrl: String?, prefix: String): Int {
+        val raw = pageUrl.orEmpty().trim()
+        if (raw.startsWith("$prefix:")) {
+            return raw.substringAfter(':').toIntOrNull()?.coerceAtLeast(1) ?: 1
+        }
+        return Uri.parse(raw.ifBlank { "https://localhost/" })
+            .getQueryParameter("page")
+            ?.toIntOrNull()
+            ?.coerceAtLeast(1)
+            ?: 1
+    }
+
+    private fun buildUserCenterNextPage(prefix: String, page: Int, totalPages: Int): String? =
+        if (page < totalPages) "$prefix:${page + 1}" else null
+
+    private fun parseFavoritePageFromApi(json: JsonObject, page: Int): UserCenterPage {
+        extractVideoApiMessage(json, "加载收藏失败")
+        val data = json.firstObject("data") ?: return UserCenterPage()
+        val rows = data.firstArray("rows", "list", "items")
+        val totalPages = data.firstInt("total_pages", "page_count", "pageCount")
+            ?.coerceAtLeast(page)
+            ?: page
+        val items = rows.mapNotNull { element ->
+            val row = element.takeIf { it.isJsonObject }?.asJsonObject ?: return@mapNotNull null
+            val vod = parseUserCenterVod(row) ?: return@mapNotNull null
+            rememberPreviewItems(listOf(vod))
+            UserCenterItem(
+                recordId = vod.vodId,
+                vodId = vod.vodId,
+                title = vod.displayTitle,
+                subtitle = vod.subtitle,
+                actionLabel = "查看详情",
+                actionUrl = buildVodDetailUrl(vod)
+            )
+        }
+        return UserCenterPage(
+            items = items.distinctBy { "${it.recordId}:${it.vodId}" },
+            nextPageUrl = buildUserCenterNextPage("favorites", page, totalPages)
+        )
+    }
+
+    private fun parseHistoryPageFromApi(json: JsonObject, page: Int): UserCenterPage {
+        extractVideoApiMessage(json, "加载播放记录失败")
+        val data = json.firstObject("data") ?: return UserCenterPage()
+        val rows = data.firstArray("rows", "list", "items")
+        val totalPages = data.firstInt("total_pages", "page_count", "pageCount")
+            ?.coerceAtLeast(page)
+            ?: page
+        val items = rows.mapNotNull { element ->
+            val row = element.takeIf { it.isJsonObject }?.asJsonObject ?: return@mapNotNull null
+            val vod = parseUserCenterVod(row) ?: return@mapNotNull null
+            val currentPlay = row.firstObject("current_play")
+            val sourceIndex = (currentPlay?.firstInt("sid") ?: 0) - 1
+            val episodeIndex = (currentPlay?.firstInt("nid") ?: 0) - 1
+            val sources = parseSources(vod)
+            val resolvedSource = sources.getOrNull(sourceIndex)
+            val sourceName = decodeSiteText(
+                resolvedSource?.name.orEmpty().ifBlank { currentPlay?.firstString("from").orEmpty() }
+            )
+            val episodeName = decodeSiteText(
+                currentPlay?.firstString("name").orEmpty().ifBlank {
+                    resolvedSource?.episodes?.getOrNull(episodeIndex)?.name.orEmpty()
+                }
+            )
+            rememberPreviewItems(listOf(vod))
+            UserCenterItem(
+                recordId = row.firstString("ulog_id", "id"),
+                vodId = vod.vodId,
+                title = vod.displayTitle,
+                subtitle = listOf(
+                    sourceName.takeIf(String::isNotBlank),
+                    episodeName.takeIf(String::isNotBlank),
+                    vod.subtitle.takeIf(String::isNotBlank)
+                ).joinToString(" | "),
+                actionLabel = if (currentPlay?.firstString("url", "source_url").isNullOrBlank()) "查看详情" else "继续观看",
+                actionUrl = buildVodDetailUrl(vod),
+                playUrl = currentPlay?.firstString("url", "source_url").orEmpty(),
+                sourceName = sourceName,
+                sourceIndex = sourceIndex,
+                episodeIndex = episodeIndex
+            )
+        }
+        return UserCenterPage(
+            items = items.distinctBy { "${it.recordId}:${it.playUrl}:${it.vodId}" },
+            nextPageUrl = buildUserCenterNextPage("history", page, totalPages)
+        )
+    }
+
+    private fun parseUserCenterVod(row: JsonObject): VodItem? {
+        val vodObject = row.firstObject("vod") ?: return null
+        val rawItem = runCatching { gson.fromJson(vodObject, VodItem::class.java) }.getOrNull() ?: return null
+        val resolvedVodId = rawItem.vodId.ifBlank { vodObject.firstString("vod_id", "id") }
+        val resolvedTypeName = rawItem.typeName.orEmpty().ifBlank {
+            vodObject.firstObject("type")?.firstString("type_name").orEmpty()
+        }
+        return rawItem.copy(
+            vodId = resolvedVodId,
+            vodName = decodeSiteText(rawItem.vodName.ifBlank { vodObject.firstString("vod_name", "name", "title") }),
+            vodPic = rawItem.vodPic?.let { normalizeAgainst(it, "$baseUrl/") },
+            typeName = resolvedTypeName,
+            siteVodId = rawItem.siteVodId.ifBlank { resolvedVodId },
+            detailUrl = buildVodDetailUrl(rawItem.copy(vodId = resolvedVodId))
+        )
+    }
+
+    private fun buildVodDetailUrl(item: VodItem): String =
+        item.detailUrl.ifBlank {
+            item.vodId
+                .takeIf(String::isNotBlank)
+                ?.let { normalizeUrl("/voddetail/$it/") }
+                .orEmpty()
+        }
+
+    private fun resolveUserActionVodId(item: VodItem): String =
+        item.vodId
+            .takeIf { it.all(Char::isDigit) }
+            .orEmpty()
+            .ifBlank { item.siteLogId }
+            .ifBlank { throw IOException("未找到影片编号") }
 
     suspend fun loadDetail(vodId: String, forceRefresh: Boolean = false): VodItem? {
         val normalizedId = vodId.trim()
@@ -3899,6 +4476,7 @@ class AppleCmsRepository(
         private const val MEMORY_CACHE_CLEANUP_INTERVAL_MS = 60_000L
         private const val DISK_CACHE_CLEANUP_INTERVAL_MS = 300_000L
         private const val API_FAILOVER_COOLDOWN_MS = 300_000L
+        private const val USER_CENTER_PAGE_LIMIT = 20
         private const val MAX_MEMORY_PAGE_CACHE_ENTRIES = 24
         private const val MAX_DISK_PAGE_CACHE_ENTRIES = 48
         private const val MAX_DETAIL_CACHE_ENTRIES = 48

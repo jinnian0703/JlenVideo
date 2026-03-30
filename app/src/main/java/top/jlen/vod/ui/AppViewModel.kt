@@ -663,7 +663,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteFavorite(recordId: String) {
         if (recordId.isBlank()) return
         runAccountAction(
-            block = { deleteUserRecord(recordIds = listOf(recordId), type = 2, clearAll = false) },
+            block = { deleteUserRecordForApp(recordIds = listOf(recordId), type = 2, clearAll = false) },
             onSuccess = {
                 val removedItem = accountState.favoriteItems.firstOrNull { item -> item.recordId == recordId }
                 accountState = accountState.copy(
@@ -679,7 +679,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearFavorites() {
         runAccountAction(
-            block = { deleteUserRecord(recordIds = emptyList(), type = 2, clearAll = true) },
+            block = { deleteUserRecordForApp(recordIds = emptyList(), type = 2, clearAll = true) },
             onSuccess = {
                 accountState = accountState.copy(
                     favoriteItems = emptyList(),
@@ -696,7 +696,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteHistory(recordId: String) {
         if (recordId.isBlank()) return
         runAccountAction(
-            block = { deleteUserRecord(recordIds = listOf(recordId), type = 4, clearAll = false) },
+            block = { deleteUserRecordForApp(recordIds = listOf(recordId), type = 4, clearAll = false) },
             onSuccess = {
             accountState = accountState.copy(
                 historyItems = accountState.historyItems.filterNot { item -> item.recordId == recordId }
@@ -708,7 +708,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearHistory() {
         runAccountAction(
-            block = { deleteUserRecord(recordIds = emptyList(), type = 4, clearAll = true) },
+            block = { deleteUserRecordForApp(recordIds = emptyList(), type = 4, clearAll = true) },
             onSuccess = {
             accountState = accountState.copy(
                 historyItems = emptyList(),
@@ -827,7 +827,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         runAccountAction(
-            block = { sendRegisterCode(editor.channel, contact) },
+            block = { sendRegisterCodeForApp(editor.channel, contact) },
             onSuccess = { }
         )
     }
@@ -864,7 +864,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         runAccountAction(
-            block = { register(editor.copy(channel = accountState.registerChannel)) },
+            block = { registerForApp(editor.copy(channel = accountState.registerChannel)) },
             onSuccess = {
                 accountState = accountState.copy(
                     authMode = AccountAuthMode.Login,
@@ -908,7 +908,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         runAccountAction(
-            block = { findPassword(editor) },
+            block = { findPasswordForApp(editor) },
             onSuccess = {
                 accountState = accountState.copy(
                     authMode = AccountAuthMode.Login,
@@ -944,7 +944,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 isActionError = false
             )
             runCatching {
-                withContext(Dispatchers.IO) { repository.addFavorite(item) }
+                withContext(Dispatchers.IO) { repository.addFavoriteForApp(item) }
             }.onSuccess { message ->
                 val normalizedMessage = normalizeFavoriteActionMessage(message)
                 detailState = detailState.copy(
@@ -989,7 +989,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             accountState = accountState.copy(isLoading = true, error = null, message = null)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.login(userName = userName, password = password)
+                    repository.loginForApp(userName = userName, password = password)
                 }
             }.onSuccess { session ->
                 accountState = accountState.copy(
@@ -1015,7 +1015,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             accountState = accountState.copy(isLoading = true, error = null)
             runCatching {
-                withContext(Dispatchers.IO) { repository.logout() }
+                withContext(Dispatchers.IO) { repository.logoutForApp() }
             }.onSuccess {
                 accountState = AccountUiState(
                     userName = accountState.userName,
@@ -1041,7 +1041,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             accountState = accountState.copy(isContentLoading = true, error = null)
             runCatching {
-                withContext(Dispatchers.IO) { repository.loadRegisterPage() }
+                withContext(Dispatchers.IO) { repository.loadRegisterPageForApp() }
             }.onSuccess { page ->
                 accountState = accountState.copy(
                     isContentLoading = false,
@@ -1072,7 +1072,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             accountState = accountState.copy(isContentLoading = true, error = null)
             runCatching {
-                withContext(Dispatchers.IO) { repository.loadFindPasswordPage() }
+                withContext(Dispatchers.IO) { repository.loadFindPasswordPageForApp() }
             }.onSuccess { page ->
                 accountState = accountState.copy(
                     isContentLoading = false,
@@ -1097,7 +1097,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             accountState = accountState.copy(isContentLoading = true, error = null)
             runCatching {
-                withContext(Dispatchers.IO) { repository.loadUserProfile() }
+                withContext(Dispatchers.IO) { repository.loadUserProfileForApp() }
             }.onSuccess { page ->
                 accountState = accountState.copy(
                     isContentLoading = false,
@@ -1119,7 +1119,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             accountState = accountState.copy(isContentLoading = true, error = null)
             runCatching {
-                withContext(Dispatchers.IO) { repository.loadFavoritePage(pageUrl) }
+                withContext(Dispatchers.IO) { repository.loadFavoritePageForApp(pageUrl) }
             }.onSuccess { page ->
                 accountState = accountState.copy(
                     isContentLoading = false,
@@ -1143,7 +1143,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             accountState = accountState.copy(isContentLoading = true, error = null)
             runCatching {
-                withContext(Dispatchers.IO) { repository.loadHistoryPage(pageUrl) }
+                withContext(Dispatchers.IO) { repository.loadHistoryPageForApp(pageUrl) }
             }.onSuccess { page ->
                 val mergedItems = mergeAccountItems(
                     current = if (append) accountState.historyItems else emptyList(),
@@ -1200,7 +1200,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             accountState = accountState.copy(isContentLoading = true, error = null)
             runCatching {
-                withContext(Dispatchers.IO) { repository.loadMembershipPage() }
+                withContext(Dispatchers.IO) { repository.loadMembershipPageForApp() }
             }.onSuccess { page ->
                 accountState = accountState.copy(
                     isContentLoading = false,
@@ -1707,7 +1707,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             runCatching {
-                withContext(Dispatchers.IO) { repository.addPlayRecord(item, episodePageUrl) }
+                withContext(Dispatchers.IO) { repository.addPlayRecordForApp(item, episodePageUrl) }
             }.onSuccess {
                 if (accountState.selectedSection == AccountSection.History) {
                     selectAccountSection(AccountSection.History, forceRefresh = true)
