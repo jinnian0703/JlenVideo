@@ -1802,22 +1802,22 @@ class AppleCmsRepository(
         runCatching { loadUserProfileFromUserDetailApi(currentSession()) }
             .getOrNull()
             ?.takeIf { it.session.isLoggedIn }
-            ?.let { return it }
+            ?.let { return enrichUserProfilePageSession(it) }
 
         runCatching { loadUserProfileFromVideoMemberInfoApi() }
             .getOrNull()
             ?.takeIf { it.session.isLoggedIn }
-            ?.let { return it }
+            ?.let { return enrichUserProfilePageSession(it) }
 
         runCatching { loadUserProfileFromAppCenter() }
             .getOrNull()
             ?.takeIf { it.session.isLoggedIn }
-            ?.let { return it }
+            ?.let { return enrichUserProfilePageSession(it) }
 
         runCatching { loadUserProfile() }
             .getOrNull()
             ?.takeIf { it.session.isLoggedIn || currentSession().isLoggedIn }
-            ?.let { return it }
+            ?.let { return enrichUserProfilePageSession(it) }
 
         val session = currentSession()
         if (!session.isLoggedIn) {
@@ -1832,6 +1832,22 @@ class AppleCmsRepository(
             ),
             editor = UserProfileEditor(),
             session = session
+        )
+    }
+
+    private suspend fun enrichUserProfilePageSession(page: UserProfilePage): UserProfilePage {
+        val htmlSession = runCatching {
+            parseUserProfileSession(fetchUserDocument("/index.php/user/index.html"))
+        }.getOrNull() ?: return page
+
+        return page.copy(
+            session = page.session.copy(
+                isLoggedIn = page.session.isLoggedIn || htmlSession.isLoggedIn,
+                userId = page.session.userId.ifBlank { htmlSession.userId },
+                userName = htmlSession.userName.ifBlank { page.session.userName },
+                groupName = htmlSession.groupName.ifBlank { page.session.groupName },
+                portraitUrl = htmlSession.portraitUrl.ifBlank { page.session.portraitUrl }
+            )
         )
     }
 
