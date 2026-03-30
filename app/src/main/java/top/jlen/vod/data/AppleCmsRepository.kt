@@ -187,17 +187,13 @@ class AppleCmsRepository(
 
     private suspend fun loadEmergencyHome(): HomePayload {
         val cachedHome = homeCache?.value
-        val latestPage = runCatching { loadLatestPage(page = 1) }
+        val latestPage = runCatching { loadLatestCursorPage(cursor = "") }
             .getOrNull()
-            ?: peekAllCategoryPage(1)
-            ?: readPersistedPageCache("all:1")?.value
-            ?: PagedVodItems(
-                items = emptyList(),
-                page = 1,
-                pageCount = 1,
-                totalItems = 0,
-                limit = 0,
-                hasNextPage = false
+            ?: CursorPagedVodItems(
+                items = cachedHome?.latest.orEmpty(),
+                limit = cachedHome?.latest?.size ?: 0,
+                nextCursor = cachedHome?.latestCursor.orEmpty(),
+                hasMore = cachedHome?.latestHasMore ?: false
             )
         val recommendedItems = runCatching {
             val rawItems = requestApi { getRecommendations(limit = 16) }
@@ -214,16 +210,8 @@ class AppleCmsRepository(
             .ifEmpty { defaultCategories.map(::normalizeCategory) }
         val selectedCategory = categories.firstOrNull()
         val categoryPage = selectedCategory?.let { category ->
-            peekCategoryPage(typeId = category.typeId, page = 1)
-                ?: readPersistedPageCache("${category.typeId}:1")?.value
-        } ?: PagedVodItems(
-            items = emptyList(),
-            page = 1,
-            pageCount = 1,
-            totalItems = 0,
-            limit = 0,
-            hasNextPage = false
-        )
+            runCatching { loadCategoryCursorPage(typeId = category.typeId, cursor = "") }.getOrNull()
+        } ?: CursorPagedVodItems()
         val latestItems = latestPage.items.ifEmpty { recommendedItems.take(36) }
         val featuredItems = recommendedItems
             .ifEmpty { cachedHome?.featured.orEmpty() }
@@ -243,14 +231,10 @@ class AppleCmsRepository(
             categories = categories,
             selectedCategory = selectedCategory,
             categoryVideos = categoryPage.items,
-            latestPage = latestPage.page,
-            latestPageCount = latestPage.pageCount,
-            latestTotal = latestPage.totalItems,
-            latestHasNextPage = latestPage.hasNextPage,
-            categoryPage = categoryPage.page,
-            categoryPageCount = categoryPage.pageCount,
-            categoryTotal = categoryPage.totalItems,
-            categoryHasNextPage = categoryPage.hasNextPage
+            latestCursor = latestPage.nextCursor,
+            latestHasMore = latestPage.hasMore,
+            categoryCursor = categoryPage.nextCursor,
+            categoryHasMore = categoryPage.hasMore
         ).also { payload ->
             cacheHomePayload(payload)
             cleanupCachesIfNeeded()
@@ -261,11 +245,9 @@ class AppleCmsRepository(
         val (latestPage, recommendedItems) = coroutineScope {
             val latestDeferred = async {
                 runCatching {
-                    loadLatestPage(page = 1)
-                }.recoverCatching {
-                    loadLatestUpdatesFromLabelPage()
+                    loadLatestCursorPage(cursor = "")
                 }.getOrElse {
-                    loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
+                    CursorPagedVodItems()
                 }
             }
             val recommendationsDeferred = async {
@@ -293,7 +275,7 @@ class AppleCmsRepository(
         val selectedCategory = categories.firstOrNull()
         val selectedCategoryPage = selectedCategory?.let { category ->
             runCatching {
-                loadCategoryPage(typeId = category.typeId, page = 1, forceRefresh = forceRefresh)
+                loadCategoryCursorPage(typeId = category.typeId, cursor = "")
             }.getOrNull()
         }
         rememberPreviewItems(latest + featured + selectedCategoryPage?.items.orEmpty())
@@ -310,14 +292,10 @@ class AppleCmsRepository(
             categories = categories,
             selectedCategory = selectedCategory,
             categoryVideos = selectedCategoryPage?.items.orEmpty(),
-            latestPage = latestPage.page,
-            latestPageCount = latestPage.pageCount,
-            latestTotal = latestPage.totalItems,
-            latestHasNextPage = latestPage.hasNextPage,
-            categoryPage = selectedCategoryPage?.page ?: 1,
-            categoryPageCount = selectedCategoryPage?.pageCount ?: 1,
-            categoryTotal = selectedCategoryPage?.totalItems ?: 0,
-            categoryHasNextPage = selectedCategoryPage?.hasNextPage ?: true
+            latestCursor = latestPage.nextCursor,
+            latestHasMore = latestPage.hasMore,
+            categoryCursor = selectedCategoryPage?.nextCursor.orEmpty(),
+            categoryHasMore = selectedCategoryPage?.hasMore ?: false
         ).also { payload ->
             cacheHomePayload(payload)
             cleanupCachesIfNeeded()
@@ -432,6 +410,22 @@ class AppleCmsRepository(
         }
     }
 
+    suspend fun loadLatestCursorPage(cursor: String): CursorPagedVodItems {
+        val payload = requestApi {
+            getCursorList(
+                linkedMapOf(
+                    "limit" to HOME_CURSOR_PAGE_LIMIT.toString(),
+                    "sort" to "time",
+                    "cursor" to cursor
+                )
+            )
+        }.toCursorPagedVodItems()
+        val playableItems = filterPlayablePreviewItems(payload.items)
+        return payload.copy(items = playableItems).also { filtered ->
+            rememberPreviewItems(filtered.items)
+        }
+    }
+
     suspend fun loadLatestPage(page: Int): PagedVodItems {
         val payload = requestApi { getLatest(page = page.coerceAtLeast(1)) }
             .toPagedVodItems()
@@ -504,6 +498,30 @@ class AppleCmsRepository(
         return payload.also { cachePagePayload(cacheKey, it) }
     }
 
+    suspend fun loadCategoryCursorPage(
+        typeId: String,
+        cursor: String,
+        filters: Map<String, String> = emptyMap()
+    ): CursorPagedVodItems {
+        val queryParameters = linkedMapOf(
+            "type_id" to typeId.trim(),
+            "limit" to CATEGORY_CURSOR_PAGE_LIMIT.toString(),
+            "cursor" to cursor
+        ).apply {
+            filters.forEach { (key, value) ->
+                val normalizedKey = key.trim()
+                val normalizedValue = value.trim()
+                if (normalizedKey.isNotBlank() && normalizedValue.isNotBlank()) {
+                    put(normalizedKey, normalizedValue)
+                }
+            }
+        }
+
+        return requestApi { getCursorList(queryParameters) }
+            .toCursorPagedVodItems()
+            .also { rememberPreviewItems(it.items) }
+    }
+
     suspend fun search(keyword: String, forceRefresh: Boolean = false): List<VodItem> {
         val normalizedKeyword = keyword.trim()
         if (normalizedKeyword.isBlank()) return emptyList()
@@ -551,6 +569,20 @@ class AppleCmsRepository(
         rememberPreviewItems(results)
         cleanupCachesIfNeeded()
     }
+    }
+
+    suspend fun searchCursor(keyword: String, cursor: String): CursorPagedVodItems {
+        val query = keyword.trim()
+        if (query.isBlank()) return CursorPagedVodItems()
+        return requestApi {
+            searchCursor(
+                linkedMapOf(
+                    "q" to query,
+                    "limit" to SEARCH_CURSOR_PAGE_LIMIT.toString(),
+                    "cursor" to cursor
+                )
+            )
+        }.toCursorPagedVodItems().also { rememberPreviewItems(it.items) }
     }
 
     suspend fun enrichSearchResults(items: List<VodItem>, limit: Int = 8): List<VodItem> {
@@ -2927,6 +2959,18 @@ class AppleCmsRepository(
             totalItems = safeTotal,
             limit = safeLimit,
             hasNextPage = safePage < safePageCount
+        )
+    }
+
+    private fun VideoApiEnvelope<VideoApiPagedRows<VodItem>>.toCursorPagedVodItems(): CursorPagedVodItems {
+        val payload = data ?: return CursorPagedVodItems()
+        val items = payload.rows.distinctBy { it.vodId }
+        val nextCursor = payload.nextCursor.orEmpty().trim()
+        return CursorPagedVodItems(
+            items = items,
+            limit = payload.limit.coerceAtLeast(items.size),
+            nextCursor = nextCursor,
+            hasMore = payload.hasMore?.let { it != 0 } ?: nextCursor.isNotBlank()
         )
     }
 
@@ -5626,6 +5670,9 @@ class AppleCmsRepository(
         private const val DISABLE_APP_CACHE = false
         private const val KEY_DISMISSED_NOTICE_IDS = "dismissed_notice_ids"
         private const val HEARTBEAT_DEVICE_ID_KEY = "device_id"
+        private const val HOME_CURSOR_PAGE_LIMIT = 20
+        private const val CATEGORY_CURSOR_PAGE_LIMIT = 20
+        private const val SEARCH_CURSOR_PAGE_LIMIT = 20
         private const val HOME_CACHE_TTL_MS = 60_000L
         private const val DISK_HOME_CACHE_TTL_MS = 43_200_000L
         private const val NOTICE_CACHE_TTL_MS = 60_000L
@@ -5695,14 +5742,10 @@ data class HomePayload(
     val categories: List<AppleCmsCategory>,
     val selectedCategory: AppleCmsCategory?,
     val categoryVideos: List<VodItem>,
-    val latestPage: Int,
-    val latestPageCount: Int,
-    val latestTotal: Int,
-    val latestHasNextPage: Boolean,
-    val categoryPage: Int,
-    val categoryPageCount: Int,
-    val categoryTotal: Int,
-    val categoryHasNextPage: Boolean
+    val latestCursor: String,
+    val latestHasMore: Boolean,
+    val categoryCursor: String,
+    val categoryHasMore: Boolean
 )
 
 data class HomeSection(

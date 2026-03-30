@@ -138,12 +138,44 @@
 接口基址：
 
 - `https://cms.jlen.top/api.php/user`
+- `https://cms.jlen.top/index.php/user`
 
 当前客户端主要使用这些接口：
 
 - `GET /api.php/user/get_detail?id={userId}`
   用途：获取用户详情。
   返回内容通常包括：用户名、用户组、积分、到期时间、头像、邮箱、手机号、QQ 等。
+
+### 2.1 账号认证接口
+
+登录、注册、找回密码当前仍使用主站用户路由：
+
+| 接口 | 方法 | 用途 | 关键参数 |
+| --- | --- | --- | --- |
+| `/index.php/user/login` | `POST` | 登录 | `user_name`、`user_pwd` |
+| `/index.php/user/reg_msg` | `POST` | 发送注册验证码 | `ac`、`to` |
+| `/index.php/user/reg` | `POST` | 注册账号 | `user_name`、`user_pwd`、`user_pwd2`、`ac`、`to`、`code`、`verify` |
+| `/index.php/user/findpass` | `POST` | 找回密码 / 重置密码 | `user_name`、`user_question`、`user_answer`、`user_pwd`、`user_pwd2`、`verify` |
+| `/index.php/user/logout` | `POST` | 退出登录 | 无固定业务参数 |
+
+当前 App 端对应关系如下：
+
+| 功能 | 实际调用接口 | 说明 |
+| --- | --- | --- |
+| 登录 | `/index.php/user/login` | 提交用户名和密码，成功后以前端 Cookie 会话为准 |
+| 注册页初始化 | `loadRegisterPageForApp()` | App 端当前默认使用邮箱注册，默认开启验证码输入，默认不启用图片验证码 |
+| 发送注册验证码 | `/index.php/user/reg_msg` | 当前默认 `ac=email`，`to` 为邮箱地址 |
+| 注册提交 | `/index.php/user/reg` | App 端会提交邮箱、验证码、用户名、密码、确认密码 |
+| 找回密码页初始化 | `loadFindPasswordPageForApp()` | App 端当前默认不启用图片验证码 |
+| 找回密码提交 | `/index.php/user/findpass` | 提交用户名、密保问题、密保答案、新密码、确认密码 |
+
+补充说明：
+
+- `ac` 表示注册或验证码通道，当前 App 默认使用 `email`
+- `to` 表示接收验证码的目标地址，邮箱模式下就是邮箱地址
+- `code` 是邮箱验证码
+- `verify` 是站点图片验证码；当前 App 默认流程里通常为空，但接口仍保留兼容
+- 登录成功后，前端通过 `Cookie` 中的 `user_id`、`user_name`、`group_name`、`user_portrait` 维护登录态
 
 ### 3. 内容中心接口
 

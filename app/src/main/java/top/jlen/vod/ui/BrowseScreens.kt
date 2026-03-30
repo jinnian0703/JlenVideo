@@ -285,6 +285,7 @@ fun HomeScreen(
                 LoadMoreFooter(
                     hasMore = state.hasMoreLatest,
                     isLoading = state.isHomeAppending,
+                    errorMessage = state.homeAppendError,
                     onLoadMore = onLoadMore
                 )
             }
@@ -383,9 +384,15 @@ fun CategoryScreen(
             )
         }
         item {
-            when {
+            state.error?.let { message ->
+                ErrorBanner(
+                    message = message,
+                    onRetry = { state.selectedCategory?.let(onSelectCategory) }
+                )
+            } ?: when {
                 state.isCategoryLoading -> LoadingPane("分类加载中...")
                 state.categoryVideos.isEmpty() -> InlineEmptyStateCard("暂无内容")
+                else -> Spacer(modifier = Modifier.height(0.dp))
             }
         }
         if (!state.isCategoryLoading && state.categoryVideos.isNotEmpty()) {
@@ -400,6 +407,7 @@ fun CategoryScreen(
                 LoadMoreFooter(
                     hasMore = state.hasMoreCategoryVideos,
                     isLoading = state.isCategoryAppending,
+                    errorMessage = state.categoryAppendError,
                     onLoadMore = onLoadMore
                 )
             }
@@ -655,6 +663,7 @@ fun SearchResultsScreen(
     onBack: () -> Unit,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
+    onLoadMore: () -> Unit,
     onOpenDetail: (String) -> Unit
 ) {
     val listState = rememberSaveable(resultKey, saver = LazyListState.Saver) {
@@ -667,6 +676,22 @@ fun SearchResultsScreen(
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (index, offset) ->
                 onScrollPositionChange(index, offset)
+            }
+    }
+    LaunchedEffect(listState, state.results.size, state.hasMore, state.isAppending, state.isLoading) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
+            .collect { lastVisibleIndex ->
+                val resultsStartIndex = 3
+                val preloadThreshold = (resultsStartIndex + state.results.size - 3).coerceAtLeast(resultsStartIndex)
+                if (
+                    !state.isLoading &&
+                        !state.isAppending &&
+                        state.hasMore &&
+                        state.results.isNotEmpty() &&
+                        lastVisibleIndex >= preloadThreshold
+                ) {
+                    onLoadMore()
+                }
             }
     }
     LazyColumn(
@@ -720,6 +745,16 @@ fun SearchResultsScreen(
                 contentType = { "search_result" }
             ) { item ->
                 ListCard(item = item, onClick = onOpenDetail)
+            }
+        }
+        if (state.results.isNotEmpty()) {
+            item {
+                LoadMoreFooter(
+                    hasMore = state.hasMore,
+                    isLoading = state.isAppending,
+                    errorMessage = state.appendError,
+                    onLoadMore = onLoadMore
+                )
             }
         }
     }
@@ -3666,6 +3701,7 @@ private fun PosterGridRow(
 private fun LoadMoreFooter(
     hasMore: Boolean,
     isLoading: Boolean,
+    errorMessage: String? = null,
     onLoadMore: () -> Unit
 ) {
     Column(
@@ -3686,6 +3722,18 @@ private fun LoadMoreFooter(
                 style = MaterialTheme.typography.bodySmall,
                 color = UiPalette.TextMuted
             )
+        } else if (!errorMessage.isNullOrBlank()) {
+            Text(
+                text = errorMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = UiPalette.DangerText
+            )
+            TextButton(
+                onClick = onLoadMore,
+                colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
+            ) {
+                Text("重试", fontWeight = FontWeight.Bold)
+            }
         } else if (hasMore) {
             TextButton(
                 onClick = onLoadMore,
@@ -3695,7 +3743,7 @@ private fun LoadMoreFooter(
             }
         } else {
             Text(
-                text = "到底了",
+                text = "没有更多了",
                 style = MaterialTheme.typography.bodySmall,
                 color = UiPalette.TextMuted
             )

@@ -31,7 +31,6 @@ import top.jlen.vod.data.HomePayload
 import top.jlen.vod.data.HomeSection
 import top.jlen.vod.data.MembershipInfo
 import top.jlen.vod.data.MembershipPlan
-import top.jlen.vod.data.PagedVodItems
 import top.jlen.vod.data.PlaySource
 import top.jlen.vod.data.RegisterEditor
 import top.jlen.vod.data.SearchHistoryStore
@@ -260,32 +259,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             null
         }
         if (cachedPayload != null) {
-            homeState = homeStateFromPayload(
-                payload = cachedPayload,
-                cachedSelectedPage = cachedPayload.categories
-                    .firstOrNull()
-                    ?.let { repository.peekCategoryPage(typeId = it.typeId, page = 1, allowStale = true) }
-            )
+            homeState = homeStateFromPayload(payload = cachedPayload)
         } else {
-            homeState = homeState.copy(isLoading = true, error = null)
+            homeState = HomeUiState(isLoading = true)
         }
         viewModelScope.launch {
             val shouldRefreshFromNetwork = forceRefresh || cachedPayload != null
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadHome(forceRefresh = shouldRefreshFromNetwork) }
             }.onSuccess { payload ->
-                val defaultSelected = payload.categories.firstOrNull()
-                val cachedSelectedPage = defaultSelected?.let {
-                    repository.peekCategoryPage(typeId = it.typeId, page = 1)
-                }
-                homeState = homeStateFromPayload(payload, cachedSelectedPage)
-                if (
-                    defaultSelected != null &&
-                    cachedSelectedPage == null &&
-                    payload.categoryVideos.isEmpty()
-                ) {
-                    selectCategory(defaultSelected, forceRefresh = true)
-                }
+                homeState = homeStateFromPayload(payload)
             }.onFailure { error ->
                 homeState = if (cachedPayload != null && !forceRefresh) {
                     homeState.copy(isLoading = false)
@@ -308,61 +291,38 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectCategory(category: AppleCmsCategory, forceRefresh: Boolean = false) {
-        if (!forceRefresh && category.typeId == homeState.selectedCategory?.typeId && homeState.categoryVideos.isNotEmpty()) {
+        val sameCategory = category.typeId == homeState.selectedCategory?.typeId
+        if (!forceRefresh && sameCategory && homeState.categoryFirstLoaded) {
             return
         }
-        val cachedPayload = if (!forceRefresh) {
-            repository.peekCategoryPage(typeId = category.typeId, page = 1, allowStale = true)
-        } else {
-            null
-        }
-        if (cachedPayload != null && cachedPayload.items.isNotEmpty()) {
-            homeState = homeState.copy(
-                selectedCategory = category,
-                categoryVideos = cachedPayload.items,
-                categoryVisibleCount = cachedPayload.items.initialGridVisibleCount(),
-                categoryPage = cachedPayload.page,
-                categoryTotalCount = cachedPayload.totalItems,
-                hasMoreCategoryPages = cachedPayload.hasNextPage,
-                isCategoryAppending = false,
-                isCategoryLoading = false,
-                error = null
-            )
-        }
         viewModelScope.launch {
-            val shouldRefreshFromNetwork = forceRefresh || cachedPayload != null
             homeState = homeState.copy(
                 selectedCategory = category,
-                isCategoryLoading = cachedPayload == null,
+                categoryVideos = emptyList(),
+                categoryVisibleCount = 0,
+                categoryCursor = "",
+                hasMoreCategoryItems = true,
+                categoryFirstLoaded = false,
+                isCategoryLoading = true,
                 isCategoryAppending = false,
+                categoryAppendError = null,
                 error = null
             )
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.loadCategoryPage(
-                        category.typeId,
-                        page = 1,
-                        forceRefresh = shouldRefreshFromNetwork
-                    )
+                    repository.loadCategoryCursorPage(typeId = category.typeId, cursor = "")
                 }
             }.onSuccess { payload ->
                 homeState = homeState.copy(
                     categoryVideos = payload.items,
                     categoryVisibleCount = payload.items.initialGridVisibleCount(),
-                    categoryPage = payload.page,
-                    categoryTotalCount = payload.totalItems,
-                    hasMoreCategoryPages = payload.hasNextPage,
+                    categoryCursor = payload.nextCursor,
+                    hasMoreCategoryItems = payload.hasMore,
+                    categoryFirstLoaded = true,
                     isCategoryAppending = false,
                     isCategoryLoading = false
                 )
             }.onFailure { error ->
-                if (cachedPayload != null && !forceRefresh) {
-                    homeState = homeState.copy(
-                        isCategoryAppending = false,
-                        isCategoryLoading = false
-                    )
-                    return@onFailure
-                }
                 homeState = homeState.copy(
                     isCategoryAppending = false,
                     isCategoryLoading = false,
@@ -373,11 +333,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun homeStateFromPayload(
-        payload: HomePayload,
-        cachedSelectedPage: PagedVodItems? = null
+        payload: HomePayload
     ): HomeUiState {
         val defaultSelected = payload.categories.firstOrNull()
-        val categoryVideos = cachedSelectedPage?.items ?: payload.categoryVideos
+        val categoryVideos = payload.categoryVideos
         return HomeUiState(
             isLoading = false,
             slides = payload.slides,
@@ -386,16 +345,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             latest = payload.latest,
             sections = payload.sections,
             homeVisibleCount = payload.latest.initialGridVisibleCount(),
-            homePage = payload.latestPage,
-            homeTotalCount = payload.latestTotal,
-            hasMoreHomePages = payload.latestHasNextPage,
+            homeCursor = payload.latestCursor,
+            hasMoreHomeItems = payload.latestHasMore,
+            homeFirstLoaded = true,
             categories = payload.categories,
             selectedCategory = defaultSelected,
             categoryVideos = categoryVideos,
             categoryVisibleCount = categoryVideos.initialGridVisibleCount(),
-            categoryPage = cachedSelectedPage?.page ?: payload.categoryPage,
-            categoryTotalCount = cachedSelectedPage?.totalItems ?: payload.categoryTotal,
-            hasMoreCategoryPages = cachedSelectedPage?.hasNextPage ?: payload.categoryHasNextPage,
+            categoryCursor = payload.categoryCursor,
+            hasMoreCategoryItems = payload.categoryHasMore,
+            categoryFirstLoaded = true,
             error = null
         )
     }
@@ -411,14 +370,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             )
             return
         }
-        if (!homeState.hasMoreHomePages) return
+        if (!homeState.hasMoreHomeItems) return
         viewModelScope.launch {
-            val nextPage = homeState.homePage + 1
             val previousVisibleCount = homeState.homeVisibleCount
-            homeState = homeState.copy(isHomeAppending = true, error = null)
+            homeState = homeState.copy(isHomeAppending = true, homeAppendError = null)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.loadAllCategoryPage(page = nextPage)
+                    repository.loadLatestCursorPage(cursor = homeState.homeCursor)
                 }
             }.onSuccess { payload ->
                 val mergedLatest = (homeState.latest + payload.items).distinctBy { it.vodId }
@@ -427,15 +385,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     homeVisibleCount = (previousVisibleCount + GRID_BATCH_ITEM_COUNT)
                         .coerceAtLeast(mergedLatest.initialGridVisibleCount())
                         .coerceAtMost(mergedLatest.size),
-                    homePage = payload.page,
-                    homeTotalCount = payload.totalItems,
-                    hasMoreHomePages = payload.hasNextPage,
+                    homeCursor = payload.nextCursor,
+                    hasMoreHomeItems = payload.hasMore,
                     isHomeAppending = false
                 )
             }.onFailure { error ->
                 homeState = homeState.copy(
                     isHomeAppending = false,
-                    error = toUserFacingMessage(error, "继续加载首页失败")
+                    homeAppendError = toUserFacingMessage(error, "继续加载首页失败")
                 )
             }
         }
@@ -452,15 +409,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             )
             return
         }
-        if (!homeState.hasMoreCategoryPages) return
+        if (!homeState.hasMoreCategoryItems) return
         val category = homeState.selectedCategory ?: return
         viewModelScope.launch {
-            val nextPage = homeState.categoryPage + 1
             val previousVisibleCount = homeState.categoryVisibleCount
-            homeState = homeState.copy(isCategoryAppending = true, error = null)
+            homeState = homeState.copy(isCategoryAppending = true, categoryAppendError = null)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.loadCategoryPage(typeId = category.typeId, page = nextPage)
+                    repository.loadCategoryCursorPage(typeId = category.typeId, cursor = homeState.categoryCursor)
                 }
             }.onSuccess { payload ->
                 val mergedVideos = (homeState.categoryVideos + payload.items).distinctBy { it.vodId }
@@ -469,15 +425,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     categoryVisibleCount = (previousVisibleCount + GRID_BATCH_ITEM_COUNT)
                         .coerceAtLeast(mergedVideos.initialGridVisibleCount())
                         .coerceAtMost(mergedVideos.size),
-                    categoryPage = payload.page,
-                    categoryTotalCount = payload.totalItems,
-                    hasMoreCategoryPages = payload.hasNextPage,
+                    categoryCursor = payload.nextCursor,
+                    hasMoreCategoryItems = payload.hasMore,
                     isCategoryAppending = false
                 )
             }.onFailure { error ->
                 homeState = homeState.copy(
                     isCategoryAppending = false,
-                    error = toUserFacingMessage(error, "继续加载分类失败")
+                    categoryAppendError = toUserFacingMessage(error, "继续加载分类失败")
                 )
             }
         }
@@ -549,7 +504,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val current = searchState
         val alreadyShowingSameQuery =
             current.submittedQuery == normalized &&
-                (current.results.isNotEmpty() || current.isLoading || !current.error.isNullOrBlank())
+                (current.firstLoaded || current.isLoading || !current.error.isNullOrBlank())
         if (alreadyShowingSameQuery) {
             if (current.query != normalized) {
                 searchState = current.copy(query = normalized)
@@ -566,7 +521,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             searchEnrichJob?.cancel()
             searchState = searchState.copy(
                 submittedQuery = "",
+                isLoading = false,
+                isAppending = false,
                 results = emptyList(),
+                cursor = "",
+                hasMore = false,
+                firstLoaded = false,
+                appendError = null,
                 error = "请输入影片名称"
             )
             return
@@ -578,26 +539,36 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             query = query,
             submittedQuery = query,
             isLoading = true,
+            isAppending = false,
+            cursor = "",
+            hasMore = true,
+            firstLoaded = false,
             results = emptyList(),
+            appendError = null,
             error = null
         )
         searchJob = viewModelScope.launch searchLaunch@{
             try {
-                val results = withContext(Dispatchers.IO) { repository.search(query) }
+                val firstPage = withContext(Dispatchers.IO) {
+                    repository.searchCursor(keyword = query, cursor = "")
+                }
                 if (requestVersion != searchRequestVersion) return@searchLaunch
 
                 searchHistoryStore.save(query)
                 searchState = searchState.copy(
                     isLoading = false,
                     history = searchHistoryStore.load(),
-                    results = results,
+                    results = firstPage.items,
+                    cursor = firstPage.nextCursor,
+                    hasMore = firstPage.hasMore,
+                    firstLoaded = true,
                     error = null
                 )
 
-                if (results.isNotEmpty()) {
+                if (firstPage.items.isNotEmpty()) {
                     searchEnrichJob = viewModelScope.launch searchEnrichLaunch@{
                         val enrichedResults = withContext(Dispatchers.IO) {
-                            repository.enrichSearchResults(results, limit = 8)
+                            repository.enrichSearchResults(firstPage.items, limit = 8)
                         }
                         if (requestVersion != searchRequestVersion) return@searchEnrichLaunch
                         searchState = searchState.copy(results = enrichedResults)
@@ -609,7 +580,42 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (requestVersion != searchRequestVersion) return@searchLaunch
                 searchState = searchState.copy(
                     isLoading = false,
+                    firstLoaded = true,
                     error = toUserFacingMessage(error, "搜索失败")
+                )
+            }
+        }
+    }
+
+    fun loadMoreSearchResults() {
+        val query = searchState.submittedQuery.trim()
+        if (
+            query.isBlank() ||
+                searchState.isLoading ||
+                searchState.isAppending ||
+                !searchState.hasMore
+        ) {
+            return
+        }
+
+        viewModelScope.launch {
+            searchState = searchState.copy(isAppending = true, appendError = null)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    repository.searchCursor(keyword = query, cursor = searchState.cursor)
+                }
+            }.onSuccess { page ->
+                val mergedResults = (searchState.results + page.items).distinctBy { it.vodId }
+                searchState = searchState.copy(
+                    isAppending = false,
+                    results = mergedResults,
+                    cursor = page.nextCursor,
+                    hasMore = page.hasMore
+                )
+            }.onFailure { error ->
+                searchState = searchState.copy(
+                    isAppending = false,
+                    appendError = toUserFacingMessage(error, "继续加载搜索结果失败")
                 )
             }
         }
@@ -1872,34 +1878,36 @@ data class HomeUiState(
     val isCategoryLoading: Boolean = false,
     val isCategoryAppending: Boolean = false,
     val error: String? = null,
+    val homeAppendError: String? = null,
+    val categoryAppendError: String? = null,
     val slides: List<VodItem> = emptyList(),
     val hot: List<VodItem> = emptyList(),
     val featured: List<VodItem> = emptyList(),
     val latest: List<VodItem> = emptyList(),
     val sections: List<HomeSection> = emptyList(),
     val homeVisibleCount: Int = 0,
-    val homePage: Int = 1,
-    val homeTotalCount: Int = 0,
-    val hasMoreHomePages: Boolean = false,
+    val homeCursor: String = "",
+    val hasMoreHomeItems: Boolean = false,
+    val homeFirstLoaded: Boolean = false,
     val categories: List<AppleCmsCategory> = emptyList(),
     val selectedCategory: AppleCmsCategory? = null,
     val categoryVideos: List<VodItem> = emptyList(),
     val categoryVisibleCount: Int = 0,
-    val categoryPage: Int = 1,
-    val categoryTotalCount: Int = 0,
-    val hasMoreCategoryPages: Boolean = false
+    val categoryCursor: String = "",
+    val hasMoreCategoryItems: Boolean = false,
+    val categoryFirstLoaded: Boolean = false
 ) {
     val visibleLatest: List<VodItem>
         get() = latest.take(homeVisibleCount.coerceIn(0, latest.size))
 
     val hasMoreLatest: Boolean
-        get() = homeVisibleCount < latest.size || hasMoreHomePages
+        get() = homeVisibleCount < latest.size || hasMoreHomeItems
 
     val visibleCategoryVideos: List<VodItem>
         get() = categoryVideos.take(categoryVisibleCount.coerceIn(0, categoryVideos.size))
 
     val hasMoreCategoryVideos: Boolean
-        get() = categoryVisibleCount < categoryVideos.size || hasMoreCategoryPages
+        get() = categoryVisibleCount < categoryVideos.size || hasMoreCategoryItems
 }
 
 data class NoticeUiState(
@@ -1932,12 +1940,17 @@ data class SearchUiState(
     val query: String = "",
     val submittedQuery: String = "",
     val isLoading: Boolean = false,
+    val isAppending: Boolean = false,
     val isHotSearchLoading: Boolean = false,
     val error: String? = null,
+    val appendError: String? = null,
     val hotSearchError: String? = null,
     val history: List<String> = emptyList(),
     val hotSearchGroups: List<HotSearchGroup> = emptyList(),
-    val results: List<VodItem> = emptyList()
+    val results: List<VodItem> = emptyList(),
+    val cursor: String = "",
+    val hasMore: Boolean = false,
+    val firstLoaded: Boolean = false
 )
 
 enum class AccountSection {

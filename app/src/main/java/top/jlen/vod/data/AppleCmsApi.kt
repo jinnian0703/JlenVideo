@@ -3,6 +3,7 @@ package top.jlen.vod.data
 import com.google.gson.JsonElement
 import retrofit2.http.GET
 import retrofit2.http.Query
+import retrofit2.http.QueryMap
 
 interface AppleCmsApi {
     @GET("api.php/video/categories")
@@ -26,11 +27,21 @@ interface AppleCmsApi {
         @Query("limit") limit: Int = 36
     ): VideoApiEnvelope<VideoApiPagedRows<VodItem>>
 
+    @GET("api.php/video/list")
+    suspend fun getCursorList(
+        @QueryMap options: Map<String, String>
+    ): VideoApiEnvelope<VideoApiPagedRows<VodItem>>
+
     @GET("api.php/video/search")
     suspend fun search(
         @Query("wd") keyword: String,
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 60
+    ): VideoApiEnvelope<VideoApiPagedRows<VodItem>>
+
+    @GET("api.php/video/search")
+    suspend fun searchCursor(
+        @QueryMap options: Map<String, String>
     ): VideoApiEnvelope<VideoApiPagedRows<VodItem>>
 
     @GET("api.php/video/detail")

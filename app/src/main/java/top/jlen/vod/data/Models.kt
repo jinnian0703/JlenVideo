@@ -41,7 +41,16 @@ data class VideoApiPagedRows<T>(
     @SerializedName("limit") val limit: Int = 0,
     @SerializedName("total") val total: Int = 0,
     @SerializedName("total_pages") val totalPages: Int = 1,
+    @SerializedName("has_more") val hasMore: Int? = null,
+    @SerializedName("next_cursor") val nextCursor: String? = null,
     @SerializedName("rows") val rows: List<T> = emptyList()
+)
+
+data class CursorPagedVodItems(
+    val items: List<VodItem> = emptyList(),
+    val limit: Int = 0,
+    val nextCursor: String = "",
+    val hasMore: Boolean = false
 )
 
 data class AppleCmsCategory(

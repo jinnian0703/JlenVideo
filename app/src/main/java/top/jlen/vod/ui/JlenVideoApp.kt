@@ -302,6 +302,7 @@ fun JlenVideoApp() {
                                         openSearchResults(normalized)
                                     }
                                 },
+                                onLoadMore = viewModel::loadMoreSearchResults,
                                 onOpenDetail = { navController.navigate("detail/$it") }
                             )
                         }
