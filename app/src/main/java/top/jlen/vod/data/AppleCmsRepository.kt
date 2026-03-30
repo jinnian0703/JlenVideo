@@ -1376,9 +1376,16 @@ class AppleCmsRepository(
             val previewItem = findPreviewItem(normalizedId)
             val apiItem = loadDetailFromApi(normalizedId)
             val resolvedItem = when {
-                apiItem == null -> previewItem?.let { resolveDetailMismatch(it, excludedVodId = normalizedId) }
+                apiItem == null -> previewItem?.let { preview ->
+                    resolveDetailMismatch(preview, excludedVodId = normalizedId)
+                        ?.let { mergePreviewIntoDetail(preview, it) }
+                        ?: preview
+                }
                 previewItem != null && !detailMatchesPreview(apiItem, previewItem) ->
                     resolveDetailMismatch(previewItem, excludedVodId = normalizedId)
+                        ?.let { mergePreviewIntoDetail(previewItem, it) }
+                        ?: previewItem
+                previewItem != null -> mergePreviewIntoDetail(previewItem, apiItem)
                 else -> apiItem
             }
             detailCache[normalizedId] = CachedValue(
@@ -1454,6 +1461,23 @@ class AppleCmsRepository(
         }
         return score
     }
+
+    private fun mergePreviewIntoDetail(preview: VodItem, detail: VodItem): VodItem =
+        detail.copy(
+            vodId = preview.vodId.ifBlank { detail.vodId },
+            vodName = preview.vodName.ifBlank { detail.vodName },
+            vodSub = preview.vodSub ?: detail.vodSub,
+            vodPic = preview.vodPic ?: detail.vodPic,
+            vodRemarks = preview.vodRemarks ?: detail.vodRemarks,
+            vodBlurb = preview.vodBlurb ?: detail.vodBlurb,
+            vodContent = preview.vodContent ?: detail.vodContent,
+            vodYear = preview.vodYear ?: detail.vodYear,
+            vodArea = preview.vodArea ?: detail.vodArea,
+            vodLang = preview.vodLang ?: detail.vodLang,
+            typeName = preview.typeName ?: detail.typeName,
+            siteVodId = preview.siteVodId.ifBlank { detail.siteVodId },
+            detailUrl = preview.detailUrl.ifBlank { detail.detailUrl }
+        )
 
     private fun canonicalTitle(raw: String): String =
         raw.lowercase(Locale.ROOT)
