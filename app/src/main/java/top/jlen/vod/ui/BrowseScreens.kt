@@ -123,6 +123,7 @@ import top.jlen.vod.data.PersistentCookieJar
 import top.jlen.vod.data.RegisterEditor
 import top.jlen.vod.data.UserProfileEditor
 import top.jlen.vod.data.VodItem
+import top.jlen.vod.data.sanitizeUserFacingComposite
 
 @Composable
 fun HomeScreen(
@@ -2854,9 +2855,10 @@ private fun AccountRecordCard(
                 fontWeight = FontWeight.ExtraBold,
                 color = UiPalette.Ink
             )
-            if (item.subtitle.isNotBlank()) {
+            val subtitle = sanitizeUserFacingComposite(item.subtitle)
+            if (subtitle.isNotBlank()) {
                 Text(
-                    text = item.subtitle,
+                    text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = UiPalette.TextSecondary,
                     maxLines = 3,

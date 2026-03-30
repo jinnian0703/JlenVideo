@@ -2092,25 +2092,31 @@ class AppleCmsRepository(
                 ) - 1
             val sources = parseSources(vod)
             val resolvedSource = sources.getOrNull(sourceIndex)
-            val sourceName = decodeSiteText(
+            val sourceName = sanitizeUserFacingToken(
+                decodeSiteText(
                 currentPlay?.firstString("from", "source_name").orEmpty()
                     .ifBlank { resolvedSource?.name.orEmpty() }
+                )
             )
-            val episodeName = decodeSiteText(
+            val episodeName = sanitizeUserFacingToken(
+                decodeSiteText(
                 currentPlay?.firstString("name", "episode_name").orEmpty().ifBlank {
                     resolvedSource?.episodes?.getOrNull(episodeIndex)?.name.orEmpty()
                 }
+                )
             )
             rememberPreviewItems(listOf(vod))
             UserCenterItem(
                 recordId = row.firstString("ulog_id", "id"),
                 vodId = vod.vodId,
                 title = vod.displayTitle,
-                subtitle = listOf(
+                subtitle = sanitizeUserFacingComposite(
+                    listOf(
                     sourceName.takeIf(String::isNotBlank),
                     episodeName.takeIf(String::isNotBlank),
                     vod.subtitle.takeIf(String::isNotBlank)
-                ).joinToString(" | "),
+                    ).joinToString(" | ")
+                ),
                 actionLabel = if (currentPlay?.firstString("url", "source_url").isNullOrBlank()) "查看详情" else "继续观看",
                 actionUrl = buildVodDetailUrl(vod),
                 playUrl = currentPlay?.firstString("url", "source_url").orEmpty(),
@@ -2365,7 +2371,7 @@ class AppleCmsRepository(
         val sourceNames = item.vodPlayFrom
             .orEmpty()
             .split("$$$")
-            .map { it.trim() }
+            .map(::sanitizeUserFacingToken)
             .filter { it.isNotBlank() }
 
         val groups = item.vodPlayUrl
@@ -2387,6 +2393,11 @@ class AppleCmsRepository(
                     }
             }
             .filter { it.isNotEmpty() }
+            .map { episodes ->
+                episodes.map { episode ->
+                    episode.copy(name = sanitizeUserFacingToken(episode.name).ifBlank { "播放" })
+                }
+            }
 
         return groups.mapIndexed { index, episodes ->
             PlaySource(

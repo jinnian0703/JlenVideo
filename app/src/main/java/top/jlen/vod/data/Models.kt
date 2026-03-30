@@ -150,6 +150,24 @@ data class VodItem(
             .orEmpty()
 }
 
+fun sanitizeUserFacingToken(value: String?): String =
+    value.orEmpty()
+        .trim()
+        .takeUnless {
+            it.isBlank() ||
+                it.equals("null", ignoreCase = true) ||
+                it.equals("undefined", ignoreCase = true) ||
+                it.equals("none", ignoreCase = true)
+        }
+        .orEmpty()
+
+fun sanitizeUserFacingComposite(value: String?): String =
+    value.orEmpty()
+        .split("|")
+        .map(::sanitizeUserFacingToken)
+        .filter(String::isNotBlank)
+        .joinToString(" | ")
+
 data class PlaySource(
     val name: String,
     val episodes: List<Episode>
