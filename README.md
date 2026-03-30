@@ -24,7 +24,7 @@
 
 - [项目特点](#项目特点)
 - [适配说明](#适配说明)
-- [数据来源](#数据来源)
+- [接口说明](#接口说明)
 - [模板文件](#模板文件)
 - [模板预览](#模板预览)
 - [主要功能](#主要功能)
@@ -52,7 +52,7 @@
 ## 项目特点
 
 - 原生首页、片库、详情、搜索、播放、账号页，不直接套用网页界面
-- 支持苹果 CMS JSON 接口和 HTML 页面双通道解析
+- 新版主链路基于 API 接口，首页、搜索、详情、用户中心等功能统一走接口数据
 - 首页推荐位可直接读取苹果 CMS 推荐数据
 - 原生播放器接管网页播放，支持全屏、倍速、暂停、下一集和自动连播
 - 支持登录、注册、找回密码、邮箱绑定、资料修改、收藏、历史、会员信息
@@ -63,8 +63,9 @@
 
 这个客户端是围绕苹果 CMS 站点能力做的原生封装，整体适配思路如下：
 
-- 能走 JSON 接口的页面优先走接口，保证速度和稳定性
-- 接口没有覆盖的功能，通过 HTML 页面解析补齐
+- 新版功能链路以 API 接口为核心，首页、分类、搜索、详情、用户中心、会员、收藏、历史均优先使用接口返回
+- 搜索端由新后端提供接口支持，底层已切到 `Meilisearch` 检索引擎
+- 前端主要关注接口字段兼容与播放链路衔接，不再依赖模板页面结构作为主数据源
 - 播放页解析出真实播放地址后，交给原生播放器继续处理
 
 目前已接入或适配的内容包括：
@@ -78,25 +79,108 @@
 - 原生接管播放
 - 用户中心相关功能
 
-## 数据来源
+## 接口说明
 
-当前版本的数据读取逻辑大致如下：
+当前版本以接口驱动为主，主要分为 4 组：
 
-- 首页推荐：读取站点推荐位 `level=1`
-- 最近更新：解析 `https://cms.jlen.top/label/new/`
-- 片库列表：当前使用 `vodshow/...` 网页分类页解析
-- 搜索、详情、用户中心、收藏、历史、会员等：以页面解析为主
-- 更新检测：读取 GitHub Release 最新发布
+- 主站视频接口：`{APPLE_CMS_BASE_URL}/api.php/video/...`
+- 主站用户接口：`{APPLE_CMS_BASE_URL}/api.php/user/...`
+- 内容中心接口：`https://user.jlen.top/api.php?action=...`
+- 更新检测接口：GitHub Releases `releases/latest`
 
 当前线上后端与接口改造可参考：
 
 - 后端仓库：[`jinnian0703/ys`](https://github.com/jinnian0703/ys)
 
-首页推荐说明：
+### 1. 主站视频接口
 
-- 首页顶部推荐区只读取苹果 CMS 推荐位 `level=1`
-- 当前版本不再使用 `level=8` 热播位和 `level=9` 轮播位
-- 如果后台已经设置了推荐位但前端仍为空，请优先确认对应影片是否确实设置为 `level=1`
+接口基址：
+
+- `https://cms.jlen.top/api.php/video`
+
+当前客户端主要使用这些接口：
+
+- `GET /api.php/video/categories`
+  用途：获取片库分类列表。
+- `GET /api.php/video/recommends?limit=16`
+  用途：获取首页推荐内容，前端会按可播放内容过滤后展示。
+- `GET /api.php/video/latest?page=1&limit=36`
+  用途：获取首页“最近更新”与最近更新分页列表。
+- `GET /api.php/video/list?type_id={typeId}&page=1&limit=36`
+  用途：获取指定分类下的片库分页数据。
+- `GET /api.php/video/search?wd={keyword}&page=1&limit=60`
+  用途：搜索影片。
+  说明：新版后端的搜索实现已切换为 `Meilisearch`。
+- `GET /api.php/video/detail?vod_id={vodId}`
+  用途：获取影片详情、线路、选集等播放前数据。
+- `GET /api.php/video/memberInfo`
+  用途：获取当前登录用户的会员信息、基础资料、头像、套餐等聚合数据。
+- `GET /api.php/video/favorites?user_id={userId}&page=1&limit=20`
+  用途：获取收藏列表。
+- `GET /api.php/video/history?user_id={userId}&page=1&limit=20`
+  用途：获取播放历史列表。
+- `POST /api.php/video/favorite`
+  用途：新增或删除收藏。
+  常用参数：`user_id`、`vod_id`、`action=add|delete`。
+- `POST /api.php/video/historyRecord`
+  用途：新增或删除播放记录。
+  常用参数：
+  新增记录：`user_id`、`vod_id`、`sid`、`nid`、`action=add`
+  删除记录：`user_id`、`ulog_id`、`action=delete`
+- `POST /api.php/video/portrait`
+  用途：上传头像。
+  支持两种上传方式：
+  1. `multipart/form-data` 的 `file`
+  2. 表单字段 `imgdata=data:image/...;base64,...`
+
+### 2. 主站用户接口
+
+接口基址：
+
+- `https://cms.jlen.top/api.php/user`
+
+当前客户端主要使用这些接口：
+
+- `GET /api.php/user/get_detail?id={userId}`
+  用途：获取用户详情。
+  返回内容通常包括：用户名、用户组、积分、到期时间、头像、邮箱、手机号、QQ 等。
+
+### 3. 内容中心接口
+
+接口基址：
+
+- `https://user.jlen.top/api.php`
+
+当前客户端主要使用这些接口：
+
+- `GET /api.php?action=me`
+  用途：获取聚合后的用户资料、会员信息、会员套餐。
+- `GET /api.php?action=notices&app_version={version}&user_id={userId}`
+  用途：获取公告列表、弹窗公告、置顶公告等。
+- `POST /api.php?action=heartbeat`
+  用途：上报在线心跳、页面路由、影片与剧集位置信息。
+  常用参数：`device_id`、`platform`、`app_version`、`route`、`user_id`、`vod_id`、`sid`、`nid`。
+- `POST /api.php?action=user_profile`
+  用途：统一处理用户资料相关写操作。
+  当前前端已使用它处理：
+  保存资料：`user_pwd`、`user_pwd1`、`user_pwd2`、`user_qq`、`user_email`、`user_phone`、`user_question`、`user_answer`
+  发送邮箱验证码：`op=send_bind_code`
+  绑定邮箱：`op=bind_email`
+  解绑邮箱：`op=unbind_email`
+  升级会员：`op=upgrade_membership`，并提交 `group_id`、`long`
+
+### 4. 更新检测接口
+
+当前应用内更新读取：
+
+- `https://api.github.com/repos/jinnian0703/JlenVideo/releases/latest`
+
+前端使用字段：
+
+- `tag_name`：最新版本号
+- `html_url`：Release 页面地址
+- `body`：更新日志
+- `assets[].browser_download_url`：APK 下载地址
 
 ## 模板文件
 
@@ -107,9 +191,9 @@
 
 推荐使用方式：
 
-- 如果你准备复刻 `cms.jlen.top` 这一套站点结构，优先使用 [templates/v2.zip](templates/v2.zip)
+- 如果你准备复刻旧版站点结构或对照历史模板，优先使用 [templates/v2.zip](templates/v2.zip)
 - 如果你需要查看模板解压后的目录、页面和静态资源，可以直接参考 [templates/DYXS2](templates/DYXS2)
-- 如果你更换成别的苹果 CMS 模板，客户端仍可继续适配，但搜索、详情、播放、用户中心等 HTML 解析规则通常需要一起调整
+- 新版客户端主链路并不依赖模板 HTML 结构，但如果你保留了旧版兼容兜底逻辑，替换模板时仍需注意少量页面解析兼容
 
 ## 模板预览
 
@@ -169,24 +253,30 @@
 
 - [app/build.gradle.kts](app/build.gradle.kts)
 
-找到这一行：
+默认配置如下：
 
 ```kotlin
 buildConfigField("String", "APPLE_CMS_BASE_URL", "\"https://cms.jlen.top/\"")
+buildConfigField("String", "APPLE_CMS_FALLBACK_BASE_URL", "\"http://82.157.207.243:39888/\"")
 ```
 
-替换成你自己的苹果 CMS 站点，例如：
+如果你要替换主站视频接口地址，可以改成自己的域名，例如：
 
 ```kotlin
 buildConfigField("String", "APPLE_CMS_BASE_URL", "\"https://your-domain.com/\"")
 ```
+
+如果你连内容中心接口也要一起替换，还需要同步修改：
+
+- [app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt](app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt) 中的 `APP_CENTER_API_URL`
+- GitHub Release 检测地址
 
 修改时建议注意这些点：
 
 - 必须带协议头，例如 `https://`
 - 末尾建议保留 `/`
 - 如果站点开启了 Cloudflare、人机验证或额外反爬，部分功能可能需要补充适配
-- 如果你更换了模板，HTML 解析逻辑通常也要一起改
+- 如果你替换后端，建议优先保持上面列出的接口路径和字段兼容
 
 ## 苹果 CMS 路由规则
 
