@@ -95,6 +95,12 @@ class AppleCmsRepository(
     @Volatile
     private var preferBackupApiUntilMs = 0L
 
+    init {
+        if (!isAppCacheEnabled()) {
+            clearAllAppCaches()
+        }
+    }
+
     private data class PortraitUploadPayload(
         val bytes: ByteArray,
         val fileName: String,
@@ -118,6 +124,19 @@ class AppleCmsRepository(
         val membershipInfo: MembershipInfo = MembershipInfo(),
         val membershipPlans: List<MembershipPlan> = emptyList()
     )
+
+    private fun clearAllAppCaches() {
+        homeCache = null
+        hotSearchCache = null
+        noticeCache = null
+        browsableCategoriesCache = null
+        categoryPageCache.clear()
+        detailCache.clear()
+        searchCache.clear()
+        historySourceCache.clear()
+        previewItemCache.clear()
+        pageCachePrefs.edit().clear().apply()
+    }
 
     suspend fun loadHome(forceRefresh: Boolean = false): HomePayload {
         if (!forceRefresh) {
@@ -2844,6 +2863,7 @@ class AppleCmsRepository(
     }
 
     private fun cachePagePayload(cacheKey: String, payload: PagedVodItems) {
+        if (!isAppCacheEnabled()) return
         val cachedValue = CachedValue(
             value = payload,
             timestampMs = System.currentTimeMillis()
@@ -2865,6 +2885,7 @@ class AppleCmsRepository(
     }
 
     private fun readPersistedPageCache(cacheKey: String): CachedValue<PagedVodItems>? {
+        if (!isAppCacheEnabled()) return null
         val raw = pageCachePrefs.getString(cacheKey, null).orEmpty()
         if (raw.isBlank()) return null
         val persisted = parsePersistedPageCache(raw) ?: return null
@@ -2880,6 +2901,10 @@ class AppleCmsRepository(
         }.getOrNull()
 
     private fun cleanupCachesIfNeeded() {
+        if (!isAppCacheEnabled()) {
+            clearAllAppCaches()
+            return
+        }
         val now = System.currentTimeMillis()
         if (now - lastMemoryCacheCleanupAt >= MEMORY_CACHE_CLEANUP_INTERVAL_MS) {
             cleanupMemoryCaches(now)
@@ -2966,6 +2991,7 @@ class AppleCmsRepository(
     }
 
     private fun rememberPreviewItems(items: Collection<VodItem>) {
+        if (!isAppCacheEnabled()) return
         val now = System.currentTimeMillis()
         items.forEach { item ->
             val vodId = item.vodId.trim()
@@ -2976,7 +3002,8 @@ class AppleCmsRepository(
     }
 
     private fun findPreviewItem(vodId: String): VodItem? =
-        previewItemCache[vodId]
+        if (!isAppCacheEnabled()) null
+        else previewItemCache[vodId]
             ?.takeIf { isCacheValid(it.timestampMs, PREVIEW_ITEM_CACHE_TTL_MS) }
             ?.value
 
@@ -4461,6 +4488,7 @@ class AppleCmsRepository(
 
     companion object {
         private const val APP_CENTER_API_URL = "https://user.jlen.top/api.php"
+        private const val DISABLE_APP_CACHE = true
         private const val KEY_DISMISSED_NOTICE_IDS = "dismissed_notice_ids"
         private const val HEARTBEAT_DEVICE_ID_KEY = "device_id"
         private const val HOME_CACHE_TTL_MS = 60_000L
@@ -4489,11 +4517,13 @@ class AppleCmsRepository(
                 "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 " +
                 "Mobile/15E148 Safari/604.1"
 
+        private fun isAppCacheEnabled(): Boolean = !DISABLE_APP_CACHE
+
         private fun isCacheValid(timestampMs: Long, ttlMs: Long): Boolean =
             isCacheValid(timestampMs, ttlMs, System.currentTimeMillis())
 
         private fun isCacheValid(timestampMs: Long, ttlMs: Long, now: Long): Boolean =
-            now - timestampMs <= ttlMs
+            isAppCacheEnabled() && ttlMs > 0 && now - timestampMs <= ttlMs
 
         private fun createClient(cookieJar: PersistentCookieJar): OkHttpClient {
             val logging = HttpLoggingInterceptor().apply {
