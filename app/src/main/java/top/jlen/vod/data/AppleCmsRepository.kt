@@ -143,6 +143,8 @@ class AppleCmsRepository(
             val latestDeferred = async {
                 runCatching {
                     loadLatestUpdatesFromLabelPage()
+                }.recoverCatching {
+                    loadLatestPage(page = 1)
                 }.getOrElse {
                     loadAllCategoryPage(page = 1, forceRefresh = forceRefresh)
                 }
@@ -169,11 +171,11 @@ class AppleCmsRepository(
         val featured = homeDocument?.let { parseLevelOneItemsFromHomePage(it, limit = 16) }
             .orEmpty()
             .ifEmpty { recommendedItems }
+        val categories = loadBrowsableCategories(homeDocument = homeDocument, forceRefresh = forceRefresh)
 
-        if (latest.isEmpty()) {
+        if (latest.isEmpty() && featured.isEmpty() && categories.isEmpty()) {
             throw IOException("首页内容解析失败")
         }
-        val categories = loadBrowsableCategories(homeDocument = homeDocument, forceRefresh = forceRefresh)
         return HomePayload(
             slides = emptyList(),
             hot = emptyList(),
