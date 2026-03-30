@@ -1225,6 +1225,10 @@ class AppleCmsRepository(
             .getOrNull()
             ?.let { return it }
 
+        runCatching { loadUserProfileFromVideoMemberInfoApi() }
+            .getOrNull()
+            ?.let { return it }
+
         val profileDocument = fetchUserDocument("/index.php/user/index.html")
         val editorDocument = fetchUserDocument("/index.php/user/info.html")
         return UserProfilePage(
@@ -1245,6 +1249,24 @@ class AppleCmsRepository(
         )
 
     suspend fun loadMembershipPage(): MembershipPage {
+        runCatching { loadMembershipPageFromVideoMemberInfoApi() }
+            .getOrNull()
+            ?.let { return it }
+
+        currentSession().userId
+            .takeIf(String::isNotBlank)
+            ?.let { userId ->
+                runCatching { loadMembershipInfoFromUserDetailApi(userId) }
+                    .getOrNull()
+                    ?.takeIf { it.info.groupName.isNotBlank() || it.info.points.isNotBlank() || it.info.expiry.isNotBlank() }
+                    ?.let { return it }
+            }
+
+        runCatching { loadMembershipPageFromUserCenterJson() }
+            .getOrNull()
+            ?.takeIf { it.info.groupName.isNotBlank() || it.info.points.isNotBlank() || it.info.expiry.isNotBlank() || it.plans.isNotEmpty() }
+            ?.let { return it }
+
         runCatching { loadMembershipPageFromAppCenter() }
             .getOrNull()
             ?.let { return it }
@@ -1308,6 +1330,23 @@ class AppleCmsRepository(
         )
     }
 
+    private suspend fun loadUserProfileFromVideoMemberInfoApi(): UserProfilePage {
+        val snapshot = loadVideoMemberInfoSnapshot()
+        return UserProfilePage(
+            fields = snapshot.profileFields,
+            editor = snapshot.profileEditor,
+            session = snapshot.session
+        )
+    }
+
+    private suspend fun loadMembershipPageFromVideoMemberInfoApi(): MembershipPage {
+        val snapshot = loadVideoMemberInfoSnapshot()
+        return MembershipPage(
+            info = snapshot.membershipInfo,
+            plans = snapshot.membershipPlans
+        )
+    }
+
     private suspend fun submitUserProfileToAppCenter(editor: UserProfileEditor): String {
         return submitAppCenterUserProfileMutation(
             FormBody.Builder()
@@ -1348,6 +1387,20 @@ class AppleCmsRepository(
         val json = requestAppCenterJson(action = "me")
         return parseAppCenterUserSnapshot(json)
             ?: throw IOException("内容服务返回的用户资料为空")
+    }
+
+    private suspend fun loadVideoMemberInfoSnapshot(): AppCenterUserSnapshot {
+        val json = requestVideoApiJson(path = "api.php/video/memberInfo")
+        val code = json.firstInt("code", "status")
+        val message = json.firstString("msg", "message")
+        if (code == 401 || message.equals("login required", ignoreCase = true)) {
+            throw IOException("璇峰厛鐧诲綍")
+        }
+        if (code != null && code !in setOf(1, 200)) {
+            throw IOException(message.ifBlank { "浼氬憳淇℃伅鍔犺浇澶辫触" })
+        }
+        return parseVideoMemberInfoSnapshot(json)
+            ?: throw IOException("浼氬憳淇℃伅涓虹┖")
     }
 
     suspend fun sendEmailBindCode(email: String): String {
@@ -1653,6 +1706,16 @@ class AppleCmsRepository(
     }
 
     suspend fun loadUserProfileForApp(): UserProfilePage {
+        runCatching { loadUserProfileFromUserDetailApi(currentSession()) }
+            .getOrNull()
+            ?.takeIf { it.session.isLoggedIn }
+            ?.let { return it }
+
+        runCatching { loadUserProfileFromVideoMemberInfoApi() }
+            .getOrNull()
+            ?.takeIf { it.session.isLoggedIn }
+            ?.let { return it }
+
         runCatching { loadUserProfileFromAppCenter() }
             .getOrNull()
             ?.takeIf { it.session.isLoggedIn }
@@ -1708,6 +1771,25 @@ class AppleCmsRepository(
     }
 
     suspend fun loadMembershipPageForApp(): MembershipPage {
+        runCatching { loadMembershipPageFromVideoMemberInfoApi() }
+            .getOrNull()
+            ?.takeIf { it.info.groupName.isNotBlank() || it.info.points.isNotBlank() || it.info.expiry.isNotBlank() || it.plans.isNotEmpty() }
+            ?.let { return it }
+
+        currentSession().userId
+            .takeIf(String::isNotBlank)
+            ?.let { userId ->
+                runCatching { loadMembershipInfoFromUserDetailApi(userId) }
+                    .getOrNull()
+                    ?.takeIf { it.info.groupName.isNotBlank() || it.info.points.isNotBlank() || it.info.expiry.isNotBlank() }
+                    ?.let { return it }
+            }
+
+        runCatching { loadMembershipPageFromUserCenterJson() }
+            .getOrNull()
+            ?.takeIf { it.info.groupName.isNotBlank() || it.info.points.isNotBlank() || it.info.expiry.isNotBlank() || it.plans.isNotEmpty() }
+            ?.let { return it }
+
         runCatching { loadMembershipPageFromAppCenter() }
             .getOrNull()
             ?.let { return it }
@@ -1731,8 +1813,13 @@ class AppleCmsRepository(
 
         return mergeMembershipPages(
             base = MembershipPage(info = MembershipInfo(groupName = session.groupName)),
-            fallback = runCatching { loadMembershipPageFromAppCenter() }.getOrNull()
+            fallback = runCatching { loadMembershipPageFromVideoMemberInfoApi() }.getOrNull()
         ).let { merged ->
+            mergeMembershipPages(
+                base = merged,
+                fallback = runCatching { loadMembershipInfoFromUserDetailApi(session.userId) }.getOrNull()
+            )
+        }.let { merged ->
             mergeMembershipPages(
                 base = merged,
                 fallback = runCatching { loadMembershipPageFromUserCenterJson() }.getOrNull()
@@ -1740,7 +1827,7 @@ class AppleCmsRepository(
         }.let { merged ->
             mergeMembershipPages(
                 base = merged,
-                fallback = runCatching { loadMembershipInfoFromUserDetailApi(session.userId) }.getOrNull()
+                fallback = runCatching { loadMembershipPageFromAppCenter() }.getOrNull()
             )
         }.let { merged ->
             mergeMembershipPages(
@@ -4160,6 +4247,126 @@ class AppleCmsRepository(
 
         val session = AuthSession(
             isLoggedIn = isLoggedIn,
+            userId = userId,
+            userName = userName,
+            groupName = groupName,
+            portraitUrl = portraitUrl
+        )
+        val membershipInfo = MembershipInfo(
+            groupName = groupName,
+            points = points,
+            expiry = expiry
+        )
+        val profileFields = buildList {
+            userId.takeIf(String::isNotBlank)?.let { add("User ID" to it) }
+            userName.takeIf(String::isNotBlank)?.let { add("Username" to it) }
+            groupName.takeIf(String::isNotBlank)?.let { add("Group" to it) }
+            points.takeIf(String::isNotBlank)?.let { add("Points" to it) }
+            expiry.takeIf(String::isNotBlank)?.let { add("Expiry" to it) }
+            email.takeIf(String::isNotBlank)?.let { add("Email" to it) }
+            phone.takeIf(String::isNotBlank)?.let { add("Phone" to it) }
+            qq.takeIf(String::isNotBlank)?.let { add("QQ" to it) }
+        }
+
+        if (
+            session.userId.isBlank() &&
+            session.userName.isBlank() &&
+            membershipInfo.groupName.isBlank() &&
+            membershipInfo.points.isBlank() &&
+            membershipInfo.expiry.isBlank() &&
+            plans.isEmpty()
+        ) {
+            return null
+        }
+
+        return AppCenterUserSnapshot(
+            session = session,
+            profileFields = profileFields,
+            profileEditor = UserProfileEditor(
+                qq = qq,
+                email = email,
+                phone = phone,
+                question = question,
+                answer = answer
+            ),
+            membershipInfo = membershipInfo,
+            membershipPlans = plans
+        )
+    }
+
+    private fun parseVideoMemberInfoSnapshot(root: JsonObject): AppCenterUserSnapshot? {
+        val data = root.firstObject("data") ?: return null
+        val userObject = data.firstObject("user", "member", "profile", "account", "info") ?: data
+        val membershipObject = userObject.firstObject("current_group", "group", "membership", "member_info")
+            ?: userObject
+
+        val userId = userObject.firstString("user_id", "uid", "id", "userId")
+        val userName = decodeSiteText(
+            userObject.firstString("user_name", "username", "nickname", "name", "userName")
+        )
+        val groupName = decodeSiteText(
+            userObject.firstString(
+                "group_name",
+                "member_name",
+                "vip_name",
+                "current_group_name",
+                "group"
+            ).ifBlank {
+                membershipObject.firstString(
+                    "group_name",
+                    "member_name",
+                    "vip_name",
+                    "current_group_name",
+                    "group"
+                )
+            }
+        )
+        val portraitUrl = normalizePortraitUrl(
+            userObject.firstString(
+                "user_portrait",
+                "portrait",
+                "avatar",
+                "avatar_url",
+                "headimg",
+                "face"
+            )
+        )
+        val qq = decodeSiteText(userObject.firstString("user_qq", "qq", "im_qq"))
+        val email = normalizeBoundEmail(
+            decodeSiteText(userObject.firstString("user_email", "email", "mail"))
+        )
+        val phone = decodeSiteText(userObject.firstString("user_phone", "phone", "mobile"))
+        val question = decodeSiteText(userObject.firstString("user_question", "question", "security_question"))
+        val answer = decodeSiteText(userObject.firstString("user_answer", "answer", "security_answer"))
+        val points = decodeSiteText(
+            userObject.firstString(
+                "user_points",
+                "points",
+                "score",
+                "integral",
+                "point_balance"
+            ).ifBlank {
+                membershipObject.firstString(
+                    "user_points",
+                    "points",
+                    "score",
+                    "integral",
+                    "point_balance"
+                )
+            }
+        )
+        val expiry = resolveMembershipExpiryText(
+            payload = data,
+            membershipObject = membershipObject,
+            userObject = userObject
+        )
+
+        val plans = data.firstArray("packages", "plans", "list", "items", "groups", "group_list")
+            .flatMap(::parseUserCenterMembershipPlans)
+            .distinctBy { "${it.groupId}:${it.duration}:${it.points}" }
+
+        val session = AuthSession(
+            isLoggedIn = true,
             userId = userId,
             userName = userName,
             groupName = groupName,
