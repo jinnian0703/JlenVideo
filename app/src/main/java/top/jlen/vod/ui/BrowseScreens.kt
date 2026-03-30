@@ -578,7 +578,11 @@ fun SearchResultsScreen(
     onSearch: () -> Unit,
     onOpenDetail: (String) -> Unit
 ) {
+    val listState = rememberSaveable(state.submittedQuery, saver = LazyListState.Saver) {
+        LazyListState()
+    }
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),

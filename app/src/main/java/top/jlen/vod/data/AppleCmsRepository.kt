@@ -95,12 +95,6 @@ class AppleCmsRepository(
     @Volatile
     private var preferBackupApiUntilMs = 0L
 
-    init {
-        if (!isAppCacheEnabled()) {
-            clearAllAppCaches()
-        }
-    }
-
     private data class PortraitUploadPayload(
         val bytes: ByteArray,
         val fileName: String,
@@ -136,6 +130,10 @@ class AppleCmsRepository(
         historySourceCache.clear()
         previewItemCache.clear()
         pageCachePrefs.edit().clear().apply()
+    }
+
+    fun clearRuntimeCaches() {
+        clearAllAppCaches()
     }
 
     suspend fun loadHome(forceRefresh: Boolean = false): HomePayload {
@@ -4488,7 +4486,7 @@ class AppleCmsRepository(
 
     companion object {
         private const val APP_CENTER_API_URL = "https://user.jlen.top/api.php"
-        private const val DISABLE_APP_CACHE = true
+        private const val DISABLE_APP_CACHE = false
         private const val KEY_DISMISSED_NOTICE_IDS = "dismissed_notice_ids"
         private const val HEARTBEAT_DEVICE_ID_KEY = "device_id"
         private const val HOME_CACHE_TTL_MS = 60_000L
@@ -4518,6 +4516,10 @@ class AppleCmsRepository(
                 "Mobile/15E148 Safari/604.1"
 
         private fun isAppCacheEnabled(): Boolean = !DISABLE_APP_CACHE
+
+        fun clearAllCaches(context: Context) {
+            AppleCmsRepository(context.applicationContext).clearRuntimeCaches()
+        }
 
         private fun isCacheValid(timestampMs: Long, ttlMs: Long): Boolean =
             isCacheValid(timestampMs, ttlMs, System.currentTimeMillis())
