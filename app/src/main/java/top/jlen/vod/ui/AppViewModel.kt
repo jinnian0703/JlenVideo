@@ -287,6 +287,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun refreshHomeAndClearCaches() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { repository.clearRuntimeCaches() }
+            searchResultScrollPositions.clear()
+            refreshHome(forceRefresh = true)
+        }
+    }
+
     fun selectCategory(category: AppleCmsCategory, forceRefresh: Boolean = false) {
         if (!forceRefresh && category.typeId == homeState.selectedCategory?.typeId && homeState.categoryVideos.isNotEmpty()) {
             return

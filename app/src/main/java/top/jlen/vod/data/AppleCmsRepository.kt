@@ -129,7 +129,11 @@ class AppleCmsRepository(
         searchCache.clear()
         historySourceCache.clear()
         previewItemCache.clear()
+        inFlightRequests.clear()
         pageCachePrefs.edit().clear().apply()
+        preferBackupApiUntilMs = 0L
+        lastMemoryCacheCleanupAt = 0L
+        lastDiskCacheCleanupAt = 0L
     }
 
     fun clearRuntimeCaches() {
@@ -1737,8 +1741,13 @@ class AppleCmsRepository(
 
         return mergeMembershipPages(
             base = MembershipPage(info = MembershipInfo(groupName = session.groupName)),
-            fallback = runCatching { loadMembershipPageFromUserCenterJson() }.getOrNull()
+            fallback = runCatching { loadMembershipPageFromAppCenter() }.getOrNull()
         ).let { merged ->
+            mergeMembershipPages(
+                base = merged,
+                fallback = runCatching { loadMembershipPageFromUserCenterJson() }.getOrNull()
+            )
+        }.let { merged ->
             mergeMembershipPages(
                 base = merged,
                 fallback = runCatching { loadMembershipInfoFromUserDetailApi(session.userId) }.getOrNull()
@@ -1896,16 +1905,25 @@ class AppleCmsRepository(
         val items = rows.mapNotNull { element ->
             val row = element.takeIf { it.isJsonObject }?.asJsonObject ?: return@mapNotNull null
             val vod = parseUserCenterVod(row) ?: return@mapNotNull null
-            val currentPlay = row.firstObject("current_play")
-            val sourceIndex = (currentPlay?.firstInt("sid") ?: 0) - 1
-            val episodeIndex = (currentPlay?.firstInt("nid") ?: 0) - 1
+            val currentPlay = row.firstObjectOrFirstArrayObject("current_play")
+            val sourceIndex = (
+                currentPlay?.firstInt("sid")
+                    ?: row.firstInt("ulog_sid", "sid")
+                    ?: 0
+                ) - 1
+            val episodeIndex = (
+                currentPlay?.firstInt("nid")
+                    ?: row.firstInt("ulog_nid", "nid")
+                    ?: 0
+                ) - 1
             val sources = parseSources(vod)
             val resolvedSource = sources.getOrNull(sourceIndex)
             val sourceName = decodeSiteText(
-                resolvedSource?.name.orEmpty().ifBlank { currentPlay?.firstString("from").orEmpty() }
+                currentPlay?.firstString("from", "source_name").orEmpty()
+                    .ifBlank { resolvedSource?.name.orEmpty() }
             )
             val episodeName = decodeSiteText(
-                currentPlay?.firstString("name").orEmpty().ifBlank {
+                currentPlay?.firstString("name", "episode_name").orEmpty().ifBlank {
                     resolvedSource?.episodes?.getOrNull(episodeIndex)?.name.orEmpty()
                 }
             )
@@ -4984,6 +5002,11 @@ class AppleCmsRepository(
                         }.getOrNull()
                     }
                     ?.trim()
+                    ?.takeUnless {
+                        it.equals("null", ignoreCase = true) ||
+                            it.equals("undefined", ignoreCase = true) ||
+                            it.equals("none", ignoreCase = true)
+                    }
                     ?.takeIf(String::isNotBlank)
             }
             .firstOrNull()
@@ -5033,6 +5056,18 @@ class AppleCmsRepository(
                 get(name)
                     ?.takeIf { it.isJsonObject }
                     ?.asJsonObject
+            }
+            .firstOrNull()
+
+    private fun JsonObject.firstObjectOrFirstArrayObject(vararg names: String): JsonObject? =
+        names.asSequence()
+            .mapNotNull { name ->
+                val value = get(name) ?: return@mapNotNull null
+                when {
+                    value.isJsonObject -> value.asJsonObject
+                    value.isJsonArray -> value.asJsonArray.firstOrNull { it.isJsonObject }?.asJsonObject
+                    else -> null
+                }
             }
             .firstOrNull()
 

@@ -244,7 +244,7 @@ fun JlenVideoApp() {
                             HomeScreen(
                                 state = viewModel.homeState,
                                 noticeState = viewModel.noticeState,
-                                onRefresh = { viewModel.refreshHome(forceRefresh = true) },
+                                onRefresh = viewModel::refreshHomeAndClearCaches,
                                 onRefreshAnnouncements = { viewModel.refreshNotices(forceRefresh = true) },
                                 onLoadMore = viewModel::loadMoreHome,
                                 onOpenDetail = { navController.navigate("detail/$it") },
