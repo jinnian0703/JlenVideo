@@ -1751,7 +1751,7 @@ class AppleCmsRepository(
         }.let { merged ->
             mergeMembershipPages(
                 base = merged,
-                fallback = runCatching { loadMembershipPage() }.getOrNull()
+                fallback = runCatching { loadMembershipPageFromHtml() }.getOrNull()
             )
         }.let { merged ->
             mergeMembershipPages(
@@ -4214,17 +4214,19 @@ class AppleCmsRepository(
     }
 
     private suspend fun loadMembershipInfoFromProfileHtml(): MembershipPage {
-        val profilePage = loadUserProfile()
-        val groupName = profilePage.fields
+        val profileDocument = fetchUserDocument("/index.php/user/index.html")
+        val session = parseUserProfileSession(profileDocument)
+        val profileFields = parseUserProfileFields(profileDocument)
+        val groupName = profileFields
             .firstOrNull { (label, _) -> label.contains("鎵€灞") || label.contains("鐢ㄦ埛缁") }
             ?.second
             .orEmpty()
-            .ifBlank { profilePage.session.groupName }
-        val expiry = profilePage.fields
+            .ifBlank { session.groupName }
+        val expiry = profileFields
             .firstOrNull { (label, _) -> label.contains("浼氬憳鏈") || label.contains("鍒版湡") }
             ?.second
             .orEmpty()
-        val points = profilePage.fields
+        val points = profileFields
             .firstOrNull { (label, _) -> label.contains("绉垎") || label.contains("璐︽埛") }
             ?.second
             .orEmpty()
