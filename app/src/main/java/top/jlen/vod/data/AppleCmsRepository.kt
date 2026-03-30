@@ -59,6 +59,7 @@ class AppleCmsRepository(
 ) {
     private val appContext = context.applicationContext
     private val pageCachePrefs = appContext.getSharedPreferences("library_page_cache", Context.MODE_PRIVATE)
+    private val homeCachePrefs = appContext.getSharedPreferences("home_cache_store", Context.MODE_PRIVATE)
     private val noticePrefs = appContext.getSharedPreferences("app_notice_store", Context.MODE_PRIVATE)
     private val heartbeatPrefs = appContext.getSharedPreferences("app_heartbeat_store", Context.MODE_PRIVATE)
     private val defaultCategories = listOf(
@@ -111,6 +112,11 @@ class AppleCmsRepository(
         val payload: PagedVodItems
     )
 
+    private data class PersistedHomeCache(
+        val timestampMs: Long,
+        val payload: HomePayload
+    )
+
     private data class AppCenterUserSnapshot(
         val session: AuthSession = AuthSession(),
         val profileFields: List<Pair<String, String>> = emptyList(),
@@ -119,7 +125,7 @@ class AppleCmsRepository(
         val membershipPlans: List<MembershipPlan> = emptyList()
     )
 
-    private fun clearAllAppCaches() {
+    private fun clearMemoryCaches() {
         homeCache = null
         hotSearchCache = null
         noticeCache = null
@@ -130,10 +136,19 @@ class AppleCmsRepository(
         historySourceCache.clear()
         previewItemCache.clear()
         inFlightRequests.clear()
-        pageCachePrefs.edit().clear().apply()
         preferBackupApiUntilMs = 0L
         lastMemoryCacheCleanupAt = 0L
         lastDiskCacheCleanupAt = 0L
+    }
+
+    private fun clearAllAppCaches() {
+        clearMemoryCaches()
+        pageCachePrefs.edit().clear().apply()
+        homeCachePrefs.edit().clear().apply()
+    }
+
+    fun clearProcessMemoryCaches() {
+        clearMemoryCaches()
     }
 
     fun clearRuntimeCaches() {
@@ -144,6 +159,11 @@ class AppleCmsRepository(
         if (!forceRefresh) {
             homeCache
                 ?.takeIf { isCacheValid(it.timestampMs, HOME_CACHE_TTL_MS) }
+                ?.value
+                ?.let { return it }
+            readPersistedHomeCache()
+                ?.takeIf { isCacheValid(it.timestampMs, HOME_CACHE_TTL_MS) }
+                ?.also { cached -> homeCache = cached }
                 ?.value
                 ?.let { return it }
         }
@@ -231,10 +251,7 @@ class AppleCmsRepository(
             categoryTotal = categoryPage.totalItems,
             categoryHasNextPage = categoryPage.hasNextPage
         ).also { payload ->
-            homeCache = CachedValue(
-                value = payload,
-                timestampMs = System.currentTimeMillis()
-            )
+            cacheHomePayload(payload)
             cleanupCachesIfNeeded()
         }
     }
@@ -301,10 +318,7 @@ class AppleCmsRepository(
             categoryTotal = selectedCategoryPage?.totalItems ?: 0,
             categoryHasNextPage = selectedCategoryPage?.hasNextPage ?: true
         ).also { payload ->
-            homeCache = CachedValue(
-                value = payload,
-                timestampMs = System.currentTimeMillis()
-            )
+            cacheHomePayload(payload)
             cleanupCachesIfNeeded()
         }
     }
@@ -2896,6 +2910,39 @@ class AppleCmsRepository(
         )
     }
 
+    private fun cacheHomePayload(payload: HomePayload) {
+        if (!isAppCacheEnabled()) return
+        val cachedValue = CachedValue(
+            value = payload,
+            timestampMs = System.currentTimeMillis()
+        )
+        homeCache = cachedValue
+        homeCachePrefs.edit()
+            .putString(
+                HOME_CACHE_PREF_KEY,
+                gson.toJson(
+                    PersistedHomeCache(
+                        timestampMs = cachedValue.timestampMs,
+                        payload = payload
+                    )
+                )
+            )
+            .apply()
+    }
+
+    private fun readPersistedHomeCache(): CachedValue<HomePayload>? {
+        if (!isAppCacheEnabled()) return null
+        val raw = homeCachePrefs.getString(HOME_CACHE_PREF_KEY, null).orEmpty()
+        if (raw.isBlank()) return null
+        val persisted = runCatching {
+            gson.fromJson(raw, PersistedHomeCache::class.java)
+        }.getOrNull() ?: return null
+        return CachedValue(
+            value = persisted.payload,
+            timestampMs = persisted.timestampMs
+        )
+    }
+
     private fun parsePersistedPageCache(raw: String): PersistedPageCache? =
         runCatching {
             gson.fromJson(raw, PersistedPageCache::class.java)
@@ -5120,6 +5167,7 @@ class AppleCmsRepository(
 
     companion object {
         private const val APP_CENTER_API_URL = "https://user.jlen.top/api.php"
+        private const val HOME_CACHE_PREF_KEY = "home_payload"
         private val SUPPORTED_MEMBERSHIP_DURATIONS = listOf("day", "week", "month", "year")
         private const val DISABLE_APP_CACHE = false
         private const val KEY_DISMISSED_NOTICE_IDS = "dismissed_notice_ids"
@@ -5154,6 +5202,10 @@ class AppleCmsRepository(
 
         fun clearAllCaches(context: Context) {
             AppleCmsRepository(context.applicationContext).clearRuntimeCaches()
+        }
+
+        fun clearMemoryCaches(context: Context) {
+            AppleCmsRepository(context.applicationContext).clearProcessMemoryCaches()
         }
 
         private fun isCacheValid(timestampMs: Long, ttlMs: Long): Boolean =
