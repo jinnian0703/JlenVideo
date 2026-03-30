@@ -76,6 +76,7 @@ class AppleCmsRepository(
     private val detailCache = ConcurrentHashMap<String, CachedValue<VodItem?>>()
     private val searchCache = ConcurrentHashMap<String, CachedValue<List<VodItem>>>()
     private val historySourceCache = ConcurrentHashMap<String, CachedValue<List<PlaySource>>>()
+    private val previewItemCache = ConcurrentHashMap<String, CachedValue<VodItem>>()
     private val inFlightRequests = ConcurrentHashMap<String, Deferred<Any>>()
     @Volatile
     private var homeCache: CachedValue<HomePayload>? = null
@@ -184,6 +185,7 @@ class AppleCmsRepository(
         val featuredItems = recommendedItems
             .ifEmpty { cachedHome?.featured.orEmpty() }
             .ifEmpty { latestItems.take(16) }
+        rememberPreviewItems(latestItems + featuredItems + categoryPage.items)
 
         return HomePayload(
             slides = emptyList(),
@@ -243,6 +245,7 @@ class AppleCmsRepository(
             homeDocument?.let { parseLevelOneItemsFromHomePage(it, limit = 16) }.orEmpty()
         }
         val categories = loadBrowsableCategories(homeDocument = homeDocument, forceRefresh = forceRefresh)
+        rememberPreviewItems(latest + featured)
 
         if (latest.isEmpty() && featured.isEmpty() && categories.isEmpty()) {
             throw IOException("首页内容解析失败")
@@ -380,7 +383,9 @@ class AppleCmsRepository(
     }
 
     suspend fun loadLatestPage(page: Int): PagedVodItems =
-        requestApi { getLatest(page = page.coerceAtLeast(1)) }.toPagedVodItems()
+        requestApi { getLatest(page = page.coerceAtLeast(1)) }
+            .toPagedVodItems()
+            .also { payload -> rememberPreviewItems(payload.items) }
 
     private suspend fun loadLatestUpdatesFromLabelPage(): PagedVodItems {
         val document = fetchDocument("$baseUrl/label/new/")
@@ -486,11 +491,12 @@ class AppleCmsRepository(
             }.getOrDefault(emptyList())
         }.also { results ->
             searchCache[cacheKey] = CachedValue(
-                value = results,
-                timestampMs = System.currentTimeMillis()
-            )
-            cleanupCachesIfNeeded()
-        }
+            value = results,
+            timestampMs = System.currentTimeMillis()
+        )
+        rememberPreviewItems(results)
+        cleanupCachesIfNeeded()
+    }
     }
 
     suspend fun enrichSearchResults(items: List<VodItem>, limit: Int = 8): List<VodItem> {
@@ -1367,16 +1373,21 @@ class AppleCmsRepository(
 
     private suspend fun loadFreshDetail(normalizedId: String): VodItem? {
         if (normalizedId.all(Char::isDigit)) {
-            val apiItem = requestApi { getDetail(vodId = normalizedId) }
-                .data
-                ?.takeIf { it.isJsonObject }
-                ?.let { json -> gson.fromJson(json, VodItem::class.java) }
+            val previewItem = findPreviewItem(normalizedId)
+            val apiItem = loadDetailFromApi(normalizedId)
+            val resolvedItem = when {
+                apiItem == null -> previewItem?.let { resolveDetailMismatch(it, excludedVodId = normalizedId) }
+                previewItem != null && !detailMatchesPreview(apiItem, previewItem) ->
+                    resolveDetailMismatch(previewItem, excludedVodId = normalizedId)
+                else -> apiItem
+            }
             detailCache[normalizedId] = CachedValue(
-                value = apiItem,
+                value = resolvedItem,
                 timestampMs = System.currentTimeMillis()
             )
+            resolvedItem?.let { rememberPreviewItems(listOf(it)) }
             cleanupCachesIfNeeded()
-            return apiItem
+            return resolvedItem
         }
 
         return parseDetail(fetchDocument("$baseUrl/voddetail/$normalizedId/")).also { item ->
@@ -1387,6 +1398,67 @@ class AppleCmsRepository(
             cleanupCachesIfNeeded()
         }
     }
+
+    private suspend fun loadDetailFromApi(vodId: String): VodItem? =
+        requestApi { getDetail(vodId = vodId) }
+            .data
+            ?.takeIf { it.isJsonObject }
+            ?.let { json -> gson.fromJson(json, VodItem::class.java) }
+
+    private suspend fun resolveDetailMismatch(
+        previewItem: VodItem,
+        excludedVodId: String
+    ): VodItem? {
+        val targetTitle = canonicalTitle(previewItem.vodName)
+        if (targetTitle.isBlank()) return null
+
+        val candidates = runCatching {
+            requestApi { search(keyword = previewItem.vodName, page = 1, limit = 10) }
+                .data
+                ?.rows
+                .orEmpty()
+        }.getOrDefault(emptyList())
+            .filter { candidate ->
+                candidate.vodId != excludedVodId &&
+                    canonicalTitle(candidate.vodName) == targetTitle
+            }
+            .sortedByDescending { candidate ->
+                searchCandidateScore(candidate, previewItem)
+            }
+
+        for (candidate in candidates.take(5)) {
+            val detail = runCatching { loadDetailFromApi(candidate.vodId) }.getOrNull() ?: continue
+            if (detailMatchesPreview(detail, previewItem)) {
+                return detail
+            }
+        }
+        return null
+    }
+
+    private fun detailMatchesPreview(detail: VodItem, preview: VodItem): Boolean {
+        val detailTitle = canonicalTitle(detail.vodName)
+        val previewTitle = canonicalTitle(preview.vodName)
+        if (detailTitle.isBlank() || previewTitle.isBlank()) return false
+        if (detailTitle != previewTitle) return false
+        val previewYear = preview.vodYear.orEmpty().trim()
+        val detailYear = detail.vodYear.orEmpty().trim()
+        return previewYear.isBlank() || detailYear.isBlank() || previewYear == detailYear
+    }
+
+    private fun searchCandidateScore(candidate: VodItem, preview: VodItem): Int {
+        var score = 0
+        if (canonicalTitle(candidate.vodName) == canonicalTitle(preview.vodName)) score += 100
+        if (candidate.vodPic.orEmpty() == preview.vodPic.orEmpty()) score += 25
+        if (candidate.vodYear.orEmpty() == preview.vodYear.orEmpty() && preview.vodYear.orEmpty().isNotBlank()) {
+            score += 10
+        }
+        return score
+    }
+
+    private fun canonicalTitle(raw: String): String =
+        raw.lowercase(Locale.ROOT)
+            .replace(Regex("[\\s\\p{Punct}·：:～~]+"), "")
+            .trim()
 
     suspend fun resolvePlayUrl(playPageUrl: String): ResolvedPlayUrl {
         val normalizedPageUrl = resolveUrl(playPageUrl)
@@ -2125,6 +2197,7 @@ class AppleCmsRepository(
             timestampMs = System.currentTimeMillis()
         )
         categoryPageCache[cacheKey] = cachedValue
+        rememberPreviewItems(payload.items)
         pageCachePrefs.edit()
             .putString(
                 cacheKey,
@@ -2171,10 +2244,12 @@ class AppleCmsRepository(
         pruneExpiredEntries(detailCache, now, DETAIL_CACHE_TTL_MS)
         pruneExpiredEntries(searchCache, now, SEARCH_CACHE_TTL_MS)
         pruneExpiredEntries(historySourceCache, now, HISTORY_SOURCE_CACHE_TTL_MS)
+        pruneExpiredEntries(previewItemCache, now, PREVIEW_ITEM_CACHE_TTL_MS)
         trimToSize(categoryPageCache, MAX_MEMORY_PAGE_CACHE_ENTRIES)
         trimToSize(detailCache, MAX_DETAIL_CACHE_ENTRIES)
         trimToSize(searchCache, MAX_SEARCH_CACHE_ENTRIES)
         trimToSize(historySourceCache, MAX_HISTORY_SOURCE_CACHE_ENTRIES)
+        trimToSize(previewItemCache, MAX_PREVIEW_ITEM_CACHE_ENTRIES)
 
         if (homeCache?.let { !isCacheValid(it.timestampMs, HOME_CACHE_TTL_MS, now) } == true) {
             homeCache = null
@@ -2237,6 +2312,21 @@ class AppleCmsRepository(
             .drop(maxSize)
             .forEach { entry -> cache.remove(entry.key, entry.value) }
     }
+
+    private fun rememberPreviewItems(items: Collection<VodItem>) {
+        val now = System.currentTimeMillis()
+        items.forEach { item ->
+            val vodId = item.vodId.trim()
+            if (vodId.isNotBlank()) {
+                previewItemCache[vodId] = CachedValue(item, now)
+            }
+        }
+    }
+
+    private fun findPreviewItem(vodId: String): VodItem? =
+        previewItemCache[vodId]
+            ?.takeIf { isCacheValid(it.timestampMs, PREVIEW_ITEM_CACHE_TTL_MS) }
+            ?.value
 
     @Suppress("UNCHECKED_CAST")
     private suspend fun <T> awaitSharedRequest(
@@ -3729,6 +3819,7 @@ class AppleCmsRepository(
         private const val SEARCH_CACHE_TTL_MS = 30_000L
         private const val DETAIL_CACHE_TTL_MS = 60_000L
         private const val HISTORY_SOURCE_CACHE_TTL_MS = 600_000L
+        private const val PREVIEW_ITEM_CACHE_TTL_MS = 600_000L
         private const val HOT_SEARCH_CACHE_TTL_MS = 300_000L
         private const val MEMORY_CACHE_CLEANUP_INTERVAL_MS = 60_000L
         private const val DISK_CACHE_CLEANUP_INTERVAL_MS = 300_000L
@@ -3738,6 +3829,7 @@ class AppleCmsRepository(
         private const val MAX_DETAIL_CACHE_ENTRIES = 48
         private const val MAX_SEARCH_CACHE_ENTRIES = 24
         private const val MAX_HISTORY_SOURCE_CACHE_ENTRIES = 96
+        private const val MAX_PREVIEW_ITEM_CACHE_ENTRIES = 256
         private val TRANSIENT_API_STATUS_CODES = setOf(500, 502, 503, 504, 521, 522, 523, 524)
         private const val HOT_SEARCH_MOBILE_UA =
             "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) " +
