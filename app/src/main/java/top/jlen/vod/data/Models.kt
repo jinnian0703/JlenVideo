@@ -78,7 +78,8 @@ data class VodItem(
 
     val subtitle: String
         get() = listOf(vodRemarks, vodSub, typeName, vodYear, vodArea)
-            .filterNot { it.isNullOrBlank() }
+            .map(::sanitizeDisplayValue)
+            .filter { it.isNotBlank() }
             .joinToString(" | ")
 
     val badgeText: String
@@ -124,6 +125,17 @@ data class VodItem(
     private fun splitTags(value: String?): List<String> =
         value.orEmpty().split(",", "/", "|", " ")
 
+    private fun sanitizeDisplayValue(value: String?): String =
+        value.orEmpty()
+            .trim()
+            .takeUnless {
+                it.isBlank() ||
+                    it.equals("null", ignoreCase = true) ||
+                    it.equals("undefined", ignoreCase = true) ||
+                    it.equals("none", ignoreCase = true)
+            }
+            .orEmpty()
+
     private fun cleanText(value: String?): String =
         HtmlCompat.fromHtml(value.orEmpty(), HtmlCompat.FROM_HTML_MODE_LEGACY)
             .toString()
@@ -132,7 +144,10 @@ data class VodItem(
             .trim()
 
     private fun firstNotBlank(vararg values: String?): String =
-        values.firstOrNull { !it.isNullOrBlank() }.orEmpty()
+        values
+            .map(::sanitizeDisplayValue)
+            .firstOrNull { it.isNotBlank() }
+            .orEmpty()
 }
 
 data class PlaySource(

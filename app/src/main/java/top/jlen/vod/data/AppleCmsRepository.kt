@@ -4217,19 +4217,40 @@ class AppleCmsRepository(
         val profileDocument = fetchUserDocument("/index.php/user/index.html")
         val session = parseUserProfileSession(profileDocument)
         val profileFields = parseUserProfileFields(profileDocument)
+        val profileBodyText = decodeSiteText(profileDocument.body().text())
         val groupName = profileFields
-            .firstOrNull { (label, _) -> label.contains("鎵€灞") || label.contains("鐢ㄦ埛缁") }
+            .firstOrNull { (label, _) ->
+                label.contains("鎵€灞") || label.contains("鐢ㄦ埛缁") || label.contains("分组") || label.contains("用户组")
+            }
             ?.second
             .orEmpty()
+            .ifBlank {
+                extractLooseMembershipValue(
+                    bodyText = profileBodyText,
+                    labels = listOf("当前分组", "所属用户组", "会员组", "用户组")
+                )
+            }
             .ifBlank { session.groupName }
         val expiry = profileFields
-            .firstOrNull { (label, _) -> label.contains("浼氬憳鏈") || label.contains("鍒版湡") }
+            .firstOrNull { (label, _) -> label.contains("浼氬憳鏈") || label.contains("鍒版湡") || label.contains("期限") }
             ?.second
             .orEmpty()
+            .ifBlank {
+                extractLooseMembershipValue(
+                    bodyText = profileBodyText,
+                    labels = listOf("到期时间", "会员期限", "会员到期", "到期")
+                )
+            }
         val points = profileFields
-            .firstOrNull { (label, _) -> label.contains("绉垎") || label.contains("璐︽埛") }
+            .firstOrNull { (label, _) -> label.contains("绉垎") || label.contains("璐︽埛") || label.contains("积分") }
             ?.second
             .orEmpty()
+            .ifBlank {
+                extractLooseMembershipValue(
+                    bodyText = profileBodyText,
+                    labels = listOf("剩余积分", "账户积分", "积分余额", "积分")
+                )
+            }
 
         return MembershipPage(
             info = MembershipInfo(
@@ -4455,6 +4476,22 @@ class AppleCmsRepository(
             ?.groupValues
             ?.getOrNull(1)
             .orEmpty()
+
+    private fun extractLooseMembershipValue(bodyText: String, labels: List<String>): String {
+        if (bodyText.isBlank()) return ""
+        return labels.asSequence()
+            .mapNotNull { label ->
+                Regex("${Regex.escape(label)}\\s*[：: ]+([^：:]+?)(?=\\s+(?:当前分组|所属用户组|会员组|用户组|剩余积分|账户积分|积分余额|积分|到期时间|会员期限|会员到期|到期|QQ|Email|注册时间|登录IP|登录时间|$))")
+                    .find(bodyText)
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    ?.trim()
+                    ?.let(::decodeSiteText)
+                    ?.takeIf(String::isNotBlank)
+            }
+            .firstOrNull()
+            .orEmpty()
+    }
 
     private fun parseMembershipPlansFromUserCenter(root: JsonObject): List<MembershipPlan> {
         val payload = unwrapUserCenterPayload(root)
@@ -4787,7 +4824,13 @@ class AppleCmsRepository(
 
     private fun decodeSiteText(raw: String): String {
         val cleaned = raw.trim()
-        if (cleaned.isBlank() || cleaned == "deleted") return ""
+        if (
+            cleaned.isBlank() ||
+                cleaned == "deleted" ||
+                cleaned.equals("null", ignoreCase = true) ||
+                cleaned.equals("undefined", ignoreCase = true) ||
+                cleaned.equals("none", ignoreCase = true)
+        ) return ""
 
         val decoded = runCatching {
             URLDecoder.decode(cleaned, StandardCharsets.UTF_8.name())

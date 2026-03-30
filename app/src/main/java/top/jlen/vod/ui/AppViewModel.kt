@@ -91,7 +91,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         if (session.isLoggedIn) {
+            hydrateAccountSession()
             selectAccountSection(accountState.selectedSection, forceRefresh = true)
+        }
+    }
+
+    private fun hydrateAccountSession() {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { repository.loadUserProfile() }
+            }.onSuccess { page ->
+                accountState = accountState.copy(
+                    session = mergeAccountSession(page.session)
+                )
+            }
         }
     }
 
