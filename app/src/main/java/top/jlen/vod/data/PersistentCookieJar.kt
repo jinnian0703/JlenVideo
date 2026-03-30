@@ -49,6 +49,11 @@ class PersistentCookieJar(context: Context) : CookieJar {
         cookies.toList()
     }
 
+    fun cookieHeader(url: HttpUrl): String =
+        loadForRequest(url).joinToString(separator = "; ") { cookie ->
+            "${cookie.name}=${cookie.value}"
+        }
+
     fun clear() {
         synchronized(lock) {
             cookies.clear()

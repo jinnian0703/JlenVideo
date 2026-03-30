@@ -69,6 +69,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -107,13 +108,18 @@ import org.jsoup.parser.Parser
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.data.AppNotice
 import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.HotSearchGroup
 import top.jlen.vod.data.MembershipPlan
+import top.jlen.vod.data.PersistentCookieJar
 import top.jlen.vod.data.RegisterEditor
 import top.jlen.vod.data.UserProfileEditor
 import top.jlen.vod.data.VodItem
@@ -1425,8 +1431,8 @@ fun AccountScreen(
                             horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             if (state.session.portraitUrl.isNotBlank()) {
-                                AsyncImage(
-                                    model = state.session.portraitUrl,
+                                AuthenticatedAvatar(
+                                    imageUrl = state.session.portraitUrl,
                                     contentDescription = state.session.userName,
                                     modifier = Modifier
                                         .size(64.dp)
@@ -2656,7 +2662,7 @@ private fun AccountProfilePane(
                     onValueChange = { value -> onEditorChange { it.copy(qq = value) } }
                 )
                 ProfileEditorField(
-                    label = "Email",
+                    label = "邮箱",
                     value = editor.email,
                     onValueChange = { value -> onEditorChange { it.copy(email = value) } }
                 )
@@ -4190,6 +4196,58 @@ private fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AuthenticatedAvatar(
+    imageUrl: String,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop
+) {
+    val context = LocalContext.current
+    val imageBytes by produceState<ByteArray?>(initialValue = null, context, imageUrl) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val client = OkHttpClient.Builder()
+                    .cookieJar(PersistentCookieJar(context.applicationContext))
+                    .build()
+                val request = Request.Builder()
+                    .url(imageUrl)
+                    .header("Referer", BuildConfig.APPLE_CMS_BASE_URL)
+                    .header("Origin", BuildConfig.APPLE_CMS_BASE_URL.trimEnd('/'))
+                    .header("User-Agent", PLAYER_DESKTOP_UA)
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use null
+                    response.body?.bytes()
+                }
+            }.getOrNull()
+        }
+    }
+    val bitmap = remember(imageBytes) {
+        imageBytes?.let { bytes ->
+            runCatching {
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            }.getOrNull()
+        }
+    }
+
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap,
+            contentDescription = contentDescription,
+            modifier = modifier,
+            contentScale = contentScale
+        )
+    } else {
+        AsyncImage(
+            model = imageUrl,
+            contentDescription = contentDescription,
+            modifier = modifier,
+            contentScale = contentScale
+        )
     }
 }
 

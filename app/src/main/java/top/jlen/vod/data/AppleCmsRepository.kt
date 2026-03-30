@@ -1109,21 +1109,28 @@ class AppleCmsRepository(
 
         val request = Request.Builder()
             .url("$baseUrl/index.php/user/portrait")
-            .header("Referer", "$baseUrl/index.php/user/head.html")
+            .header("Referer", "$baseUrl/index.php/user/portrait")
+            .header("Origin", baseUrl)
+            .header("User-Agent", PLAYER_DESKTOP_UA)
             .header("X-Requested-With", "XMLHttpRequest")
             .post(body)
             .build()
 
         client.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
+            if (isUserLoginResponse(response, responseBody)) {
+                throw IOException("请先登录")
+            }
             if (!response.isSuccessful) {
                 throw IOException("涓婁紶澶村儚澶辫触锛欻TTP ${response.code}")
             }
-
-            val responseBody = response.body?.string().orEmpty()
             val authResponse = runCatching { gson.fromJson(responseBody, AuthResponse::class.java) }.getOrNull()
             if (authResponse != null && authResponse.msg.isNotBlank()) {
                 if (authResponse.code == 1) {
                     return authResponse.msg
+                }
+                if (isLoginMessage(authResponse.msg) || authResponse.url.orEmpty().contains("/index.php/user/login")) {
+                    throw IOException("请先登录")
                 }
                 throw IOException(authResponse.msg)
             }
@@ -1136,6 +1143,14 @@ class AppleCmsRepository(
 
     suspend fun uploadPortraitOptimized(uri: Uri): String {
         val payload = preparePortraitUpload(uri)
+        runCatching { uploadPortraitViaVideoApi(payload) }
+            .getOrNull()
+            ?.let { return it }
+
+        runCatching { uploadPortraitViaVideoApiBase64(payload) }
+            .getOrNull()
+            ?.let { return it }
+
         val body = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart(
@@ -1173,6 +1188,78 @@ class AppleCmsRepository(
                 return "头像更新成功"
             }
             throw IOException("头像上传失败，请换一张图片重试")
+        }
+    }
+
+    private fun uploadPortraitViaVideoApi(payload: PortraitUploadPayload): String {
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart(
+                "file",
+                payload.fileName,
+                payload.bytes.toRequestBody(payload.mimeType.toMediaTypeOrNull())
+            )
+            .build()
+
+        val request = Request.Builder()
+            .url("$baseUrl/api.php/video/portrait")
+            .header("Referer", "$baseUrl/")
+            .header("Origin", baseUrl)
+            .header("User-Agent", PLAYER_DESKTOP_UA)
+            .header("X-Requested-With", "XMLHttpRequest")
+            .header("Accept", "application/json")
+            .post(body)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw IOException("HTTP ${response.code}")
+            }
+            return parsePortraitUploadResult(parseVideoApiResponseBody(responseBody))
+        }
+    }
+
+    private fun uploadPortraitViaVideoApiBase64(payload: PortraitUploadPayload): String {
+        val body = FormBody.Builder()
+            .add("imgdata", Base64.encodeToString(payload.bytes, Base64.NO_WRAP))
+            .build()
+
+        val request = Request.Builder()
+            .url("$baseUrl/api.php/video/portrait")
+            .header("Referer", "$baseUrl/")
+            .header("Origin", baseUrl)
+            .header("User-Agent", PLAYER_DESKTOP_UA)
+            .header("X-Requested-With", "XMLHttpRequest")
+            .header("Accept", "application/json")
+            .post(body)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw IOException("HTTP ${response.code}")
+            }
+            return parsePortraitUploadResult(parseVideoApiResponseBody(responseBody))
+        }
+    }
+
+    private fun parsePortraitUploadResult(json: JsonObject): String {
+        val code = json.firstInt("code", "status")
+        val message = json.firstString("msg", "message")
+        if (code == 401 || message.equals("login required", ignoreCase = true) || isLoginMessage(message)) {
+            throw IOException("请先登录")
+        }
+        if (code != null && code !in setOf(1, 200)) {
+            throw IOException(message.ifBlank { "头像上传失败" })
+        }
+        val payload = unwrapApiPayload(json)
+        val portrait = payload?.firstString("user_portrait_with_version", "user_portrait", "portrait", "avatar")
+            .orEmpty()
+        return if (portrait.isNotBlank() || message.isBlank() || message.equals("ok", ignoreCase = true)) {
+            "头像更新成功"
+        } else {
+            message
         }
     }
 
@@ -1732,11 +1819,11 @@ class AppleCmsRepository(
         }
 
         return UserProfilePage(
-            fields = buildList {
-                session.userId.takeIf(String::isNotBlank)?.let { add("User ID" to it) }
-                session.userName.takeIf(String::isNotBlank)?.let { add("Username" to it) }
-                session.groupName.takeIf(String::isNotBlank)?.let { add("Group" to it) }
-            },
+            fields = buildProfileFields(
+                userId = session.userId,
+                userName = session.userName,
+                groupName = session.groupName
+            ),
             editor = UserProfileEditor(),
             session = session
         )
@@ -4257,16 +4344,16 @@ class AppleCmsRepository(
             points = points,
             expiry = expiry
         )
-        val profileFields = buildList {
-            userId.takeIf(String::isNotBlank)?.let { add("User ID" to it) }
-            userName.takeIf(String::isNotBlank)?.let { add("Username" to it) }
-            groupName.takeIf(String::isNotBlank)?.let { add("Group" to it) }
-            points.takeIf(String::isNotBlank)?.let { add("Points" to it) }
-            expiry.takeIf(String::isNotBlank)?.let { add("Expiry" to it) }
-            email.takeIf(String::isNotBlank)?.let { add("Email" to it) }
-            phone.takeIf(String::isNotBlank)?.let { add("Phone" to it) }
-            qq.takeIf(String::isNotBlank)?.let { add("QQ" to it) }
-        }
+        val profileFields = buildProfileFields(
+            userId = userId,
+            userName = userName,
+            groupName = groupName,
+            points = points,
+            expiry = expiry,
+            email = email,
+            phone = phone,
+            qq = qq
+        )
 
         if (
             session.userId.isBlank() &&
@@ -4377,16 +4464,16 @@ class AppleCmsRepository(
             points = points,
             expiry = expiry
         )
-        val profileFields = buildList {
-            userId.takeIf(String::isNotBlank)?.let { add("User ID" to it) }
-            userName.takeIf(String::isNotBlank)?.let { add("Username" to it) }
-            groupName.takeIf(String::isNotBlank)?.let { add("Group" to it) }
-            points.takeIf(String::isNotBlank)?.let { add("Points" to it) }
-            expiry.takeIf(String::isNotBlank)?.let { add("Expiry" to it) }
-            email.takeIf(String::isNotBlank)?.let { add("Email" to it) }
-            phone.takeIf(String::isNotBlank)?.let { add("Phone" to it) }
-            qq.takeIf(String::isNotBlank)?.let { add("QQ" to it) }
-        }
+        val profileFields = buildProfileFields(
+            userId = userId,
+            userName = userName,
+            groupName = groupName,
+            points = points,
+            expiry = expiry,
+            email = email,
+            phone = phone,
+            qq = qq
+        )
 
         if (
             session.userId.isBlank() &&
@@ -4467,19 +4554,17 @@ class AppleCmsRepository(
         )
 
         return UserProfilePage(
-            fields = buildList {
-                normalizedUserId.let { add("User ID" to it) }
-                decodeSiteText(payload.firstString("user_name", "username", "nickname", "name"))
-                    .ifBlank { session.userName }
-                    .takeIf(String::isNotBlank)
-                    ?.let { add("Username" to it) }
-                groupName.takeIf(String::isNotBlank)?.let { add("Group" to it) }
-                points.takeIf(String::isNotBlank)?.let { add("Points" to it) }
-                expiry.takeIf(String::isNotBlank)?.let { add("Expiry" to it) }
-                email.takeIf(String::isNotBlank)?.let { add("Email" to it) }
-                phone.takeIf(String::isNotBlank)?.let { add("Phone" to it) }
-                qq.takeIf(String::isNotBlank)?.let { add("QQ" to it) }
-            },
+            fields = buildProfileFields(
+                userId = normalizedUserId,
+                userName = decodeSiteText(payload.firstString("user_name", "username", "nickname", "name"))
+                    .ifBlank { session.userName },
+                groupName = groupName,
+                points = points,
+                expiry = expiry,
+                email = email,
+                phone = phone,
+                qq = qq
+            ),
             editor = UserProfileEditor(
                 qq = qq,
                 email = email,
@@ -4960,6 +5045,42 @@ class AppleCmsRepository(
                 }
                 .distinctBy { "${it.groupId}:${it.groupName}:${it.duration}:${it.points}" }
         )
+    }
+
+    private fun buildProfileFields(
+        userId: String = "",
+        userName: String = "",
+        groupName: String = "",
+        points: String = "",
+        expiry: String = "",
+        email: String = "",
+        phone: String = "",
+        qq: String = ""
+    ): List<Pair<String, String>> = buildList {
+        userId.takeIf(String::isNotBlank)?.let { add("用户 ID" to it) }
+        userName.takeIf(String::isNotBlank)?.let { add("用户名" to it) }
+        groupName.takeIf(String::isNotBlank)?.let { add("会员组" to it) }
+        points.takeIf(String::isNotBlank)?.let { add("积分" to it) }
+        expiry.takeIf(String::isNotBlank)?.let { add("到期时间" to it) }
+        email.takeIf(String::isNotBlank)?.let { add("邮箱" to it) }
+        phone.takeIf(String::isNotBlank)?.let { add("手机号" to it) }
+        qq.takeIf(String::isNotBlank)?.let { add("QQ号" to it) }
+    }
+
+    private fun isUserLoginResponse(response: okhttp3.Response, body: String): Boolean {
+        val resolvedPath = response.request.url.encodedPath
+        return resolvedPath.contains("/index.php/user/login") ||
+            body.contains("/index.php/user/login", ignoreCase = true) ||
+            body.contains("login required", ignoreCase = true) ||
+            isLoginMessage(body)
+    }
+
+    private fun isLoginMessage(message: String): Boolean {
+        val normalized = message.trim()
+        return normalized.contains("请先登录") ||
+            normalized.contains("未登录") ||
+            normalized.contains("登录失效") ||
+            normalized.contains("login required", ignoreCase = true)
     }
 
     private fun parseAppCenterMembershipPlan(element: JsonElement): MembershipPlan? {
