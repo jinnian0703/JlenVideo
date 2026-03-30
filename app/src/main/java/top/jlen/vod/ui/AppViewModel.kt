@@ -41,6 +41,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = AppleCmsRepository(application)
     private val searchHistoryStore = SearchHistoryStore(application)
     private val searchResultScrollPositions = mutableMapOf<String, SearchResultScrollPosition>()
+    private var hasEnteredAccountScreen = false
     private var searchJob: Job? = null
     private var searchEnrichJob: Job? = null
     private var historyEnrichJob: Job? = null
@@ -69,7 +70,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         searchState = searchState.copy(history = searchHistoryStore.load())
         refreshCrashLog()
         refreshAccount()
-        refreshNotices()
         refreshHome()
         checkAppUpdate()
     }
@@ -91,9 +91,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         if (session.isLoggedIn) {
-            hydrateAccountSession()
-            selectAccountSection(accountState.selectedSection, forceRefresh = true)
+            if (hasEnteredAccountScreen) {
+                hydrateAccountSession()
+                selectAccountSection(accountState.selectedSection, forceRefresh = true)
+            }
         }
+    }
+
+    fun ensureAccountScreenReady() {
+        if (hasEnteredAccountScreen) return
+        hasEnteredAccountScreen = true
+        if (!accountState.session.isLoggedIn) return
+        hydrateAccountSession()
+        selectAccountSection(accountState.selectedSection, forceRefresh = true)
     }
 
     private fun hydrateAccountSession() {
@@ -272,10 +282,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     categoryTotalCount = cachedSelectedPage?.totalItems ?: payload.categoryTotal,
                     hasMoreCategoryPages = cachedSelectedPage?.hasNextPage ?: payload.categoryHasNextPage
                 )
-                viewModelScope.launch(Dispatchers.IO) {
-                    repository.prewarmCategoryFirstPages(forceRefresh = false)
-                }
-                if (defaultSelected != null && (cachedSelectedPage == null || forceRefresh)) {
+                if (
+                    defaultSelected != null &&
+                    (cachedSelectedPage == null || forceRefresh) &&
+                    payload.categoryVideos.isEmpty()
+                ) {
                     selectCategory(defaultSelected, forceRefresh = forceRefresh)
                 }
             }.onFailure { error ->

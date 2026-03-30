@@ -306,6 +306,9 @@ fun JlenVideoApp() {
                             )
                         }
                         composable("account") {
+                            LaunchedEffect(Unit) {
+                                viewModel.ensureAccountScreenReady()
+                            }
                             AccountScreen(
                                 state = viewModel.accountState,
                                 onUserNameChange = viewModel::updateLoginUserName,

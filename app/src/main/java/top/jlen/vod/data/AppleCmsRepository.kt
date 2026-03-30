@@ -272,7 +272,13 @@ class AppleCmsRepository(
             homeDocument?.let { parseLevelOneItemsFromHomePage(it, limit = 16) }.orEmpty()
         }
         val categories = loadBrowsableCategories(homeDocument = homeDocument, forceRefresh = forceRefresh)
-        rememberPreviewItems(latest + featured)
+        val selectedCategory = categories.firstOrNull()
+        val selectedCategoryPage = selectedCategory?.let { category ->
+            runCatching {
+                loadCategoryPage(typeId = category.typeId, page = 1, forceRefresh = forceRefresh)
+            }.getOrNull()
+        }
+        rememberPreviewItems(latest + featured + selectedCategoryPage?.items.orEmpty())
 
         if (latest.isEmpty() && featured.isEmpty() && categories.isEmpty()) {
             throw IOException("首页内容解析失败")
@@ -284,16 +290,16 @@ class AppleCmsRepository(
             latest = latest,
             sections = emptyList(),
             categories = categories,
-            selectedCategory = categories.firstOrNull(),
-            categoryVideos = emptyList(),
+            selectedCategory = selectedCategory,
+            categoryVideos = selectedCategoryPage?.items.orEmpty(),
             latestPage = latestPage.page,
             latestPageCount = latestPage.pageCount,
             latestTotal = latestPage.totalItems,
             latestHasNextPage = latestPage.hasNextPage,
-            categoryPage = 1,
-            categoryPageCount = 1,
-            categoryTotal = 0,
-            categoryHasNextPage = true
+            categoryPage = selectedCategoryPage?.page ?: 1,
+            categoryPageCount = selectedCategoryPage?.pageCount ?: 1,
+            categoryTotal = selectedCategoryPage?.totalItems ?: 0,
+            categoryHasNextPage = selectedCategoryPage?.hasNextPage ?: true
         ).also { payload ->
             homeCache = CachedValue(
                 value = payload,
