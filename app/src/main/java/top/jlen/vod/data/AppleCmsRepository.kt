@@ -159,6 +159,7 @@ class AppleCmsRepository(
         val recommendedItems = runCatching {
             requestApi { getRecommendations(limit = 16) }
                 .data
+                ?.rows
                 .orEmpty()
                 .distinctBy { it.vodId }
         }.getOrElse {
@@ -225,6 +226,7 @@ class AppleCmsRepository(
                 runCatching {
                     requestApi { getRecommendations(limit = 16) }
                         .data
+                        ?.rows
                         .orEmpty()
                         .distinctBy { it.vodId }
                 }.getOrDefault(emptyList())
@@ -1365,18 +1367,16 @@ class AppleCmsRepository(
 
     private suspend fun loadFreshDetail(normalizedId: String): VodItem? {
         if (normalizedId.all(Char::isDigit)) {
-            val apiItem = runCatching {
-                requestApi { getDetail(vodId = normalizedId) }
-                    .data
-            }.getOrNull()
-            if (apiItem != null) {
-                detailCache[normalizedId] = CachedValue(
-                    value = apiItem,
-                    timestampMs = System.currentTimeMillis()
-                )
-                cleanupCachesIfNeeded()
-                return apiItem
-            }
+            val apiItem = requestApi { getDetail(vodId = normalizedId) }
+                .data
+                ?.takeIf { it.isJsonObject }
+                ?.let { json -> gson.fromJson(json, VodItem::class.java) }
+            detailCache[normalizedId] = CachedValue(
+                value = apiItem,
+                timestampMs = System.currentTimeMillis()
+            )
+            cleanupCachesIfNeeded()
+            return apiItem
         }
 
         return parseDetail(fetchDocument("$baseUrl/voddetail/$normalizedId/")).also { item ->

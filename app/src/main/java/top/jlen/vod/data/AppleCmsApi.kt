@@ -1,5 +1,6 @@
 package top.jlen.vod.data
 
+import com.google.gson.JsonElement
 import retrofit2.http.GET
 import retrofit2.http.Query
 
@@ -10,7 +11,7 @@ interface AppleCmsApi {
     @GET("api.php/video/recommends")
     suspend fun getRecommendations(
         @Query("limit") limit: Int = 12
-    ): VideoApiEnvelope<List<VodItem>>
+    ): VideoApiEnvelope<VideoApiPagedRows<VodItem>>
 
     @GET("api.php/video/latest")
     suspend fun getLatest(
@@ -35,5 +36,5 @@ interface AppleCmsApi {
     @GET("api.php/video/detail")
     suspend fun getDetail(
         @Query("vod_id") vodId: String
-    ): VideoApiEnvelope<VodItem>
+    ): VideoApiEnvelope<JsonElement>
 }
