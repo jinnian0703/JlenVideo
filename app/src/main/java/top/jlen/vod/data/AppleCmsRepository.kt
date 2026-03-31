@@ -3201,6 +3201,20 @@ class AppleCmsRepository(
         if (!isAppCacheEnabled()) return null
         val raw = homeCachePrefs.getString(HOME_CACHE_PREF_KEY, null).orEmpty()
         if (raw.isBlank()) return null
+        val root = runCatching {
+            JsonParser.parseString(raw).asJsonObject
+        }.getOrNull() ?: return null
+        val payloadObject = root.getAsJsonObject("payload") ?: return null
+        if (
+            !payloadObject.has("latestCursor") ||
+                !payloadObject.has("latestHasMore") ||
+                !payloadObject.has("categoryCursor") ||
+                !payloadObject.has("categoryHasMore")
+        ) {
+            homeCachePrefs.edit().remove(HOME_CACHE_PREF_KEY).apply()
+            homeCache = null
+            return null
+        }
         val persisted = runCatching {
             gson.fromJson(raw, PersistedHomeCache::class.java)
         }.getOrNull() ?: return null
