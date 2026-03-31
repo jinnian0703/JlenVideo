@@ -437,15 +437,15 @@ fun NativeVideoPlayer(
         hasCompletedInitialOverlayDelay = true
     }
 
-    LaunchedEffect(fullscreenMode, controlsVisible, playerLocked, controlsVersion) {
+    LaunchedEffect(fullscreenMode, controlsVisible, playerLocked, lastInteractionAt) {
         if (!fullscreenMode || playerLocked || !controlsVisible) return@LaunchedEffect
-        val version = controlsVersion
-        delay(5_000L)
+        val interactionAt = lastInteractionAt
+        delay(3_000L)
         if (
             fullscreenMode &&
             !playerLocked &&
             controlsVisible &&
-            version == controlsVersion
+            interactionAt == lastInteractionAt
         ) {
             controlsVisible = false
         }
@@ -733,15 +733,15 @@ fun NativeVideoPlayer(
                 Surface(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = if (fullscreenMode) 72.dp else 24.dp)
+                        .padding(top = if (fullscreenMode) 8.dp else 24.dp)
                         .widthIn(min = 124.dp, max = 184.dp),
                     shape = RoundedCornerShape(20.dp),
                     color = Color.Black.copy(alpha = 0.68f)
                 ) {
                     Column(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
                             text = feedback.title,
