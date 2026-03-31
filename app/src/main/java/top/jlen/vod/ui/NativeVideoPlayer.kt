@@ -304,21 +304,22 @@ fun NativeVideoPlayer(
             dispatchSnapshot(force = true)
         }
 
+        val isSimpleTap = !cancelled && !gestureMoved && gestureMode == PlayerGestureMode.None
         if (playerLocked) {
-            if (!gestureMoved && gestureMode == PlayerGestureMode.None && !lockActionPressed) {
+            if (isSimpleTap && !lockActionPressed) {
                 if (unlockHintVisible) {
                     hideUnlockHint()
                 } else {
                     showUnlockHint()
                 }
             }
-        } else if (!gestureMoved && gestureMode == PlayerGestureMode.None) {
+        } else if (isSimpleTap) {
             controlsVisible = !controlsVisible
             if (controlsVisible) {
                 lastInteractionAt = SystemClock.elapsedRealtime()
             }
             controlsVersion++
-        } else {
+        } else if (!cancelled) {
             markInteraction(forceControlsVisible = false)
         }
 
