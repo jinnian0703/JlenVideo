@@ -437,15 +437,15 @@ fun NativeVideoPlayer(
         hasCompletedInitialOverlayDelay = true
     }
 
-    LaunchedEffect(fullscreenMode, controlsVisible, playerLocked, lastInteractionAt) {
+    LaunchedEffect(fullscreenMode, controlsVisible, playerLocked, controlsVersion) {
         if (!fullscreenMode || playerLocked || !controlsVisible) return@LaunchedEffect
-        val waitMs = (5_000L - (SystemClock.elapsedRealtime() - lastInteractionAt)).coerceAtLeast(0L)
-        delay(waitMs)
+        val version = controlsVersion
+        delay(5_000L)
         if (
             fullscreenMode &&
             !playerLocked &&
             controlsVisible &&
-            SystemClock.elapsedRealtime() - lastInteractionAt >= 5_000L
+            version == controlsVersion
         ) {
             controlsVisible = false
         }
@@ -804,21 +804,6 @@ fun NativeVideoPlayer(
                     }
                 }
 
-                if (playerLocked && unlockHintVisible) {
-                    Surface(
-                        modifier = Modifier.align(Alignment.Center),
-                        shape = RoundedCornerShape(18.dp),
-                        color = Color.Black.copy(alpha = 0.68f)
-                    ) {
-                        Text(
-                            text = "解锁",
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
-                        )
-                    }
-                }
             }
 
             if (controlsShown) {
