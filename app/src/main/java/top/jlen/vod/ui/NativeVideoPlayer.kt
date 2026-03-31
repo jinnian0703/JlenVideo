@@ -775,7 +775,7 @@ fun NativeVideoPlayer(
                 IconButton(
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .size(if (fullscreenMode) 92.dp else 84.dp),
+                        .size(if (fullscreenMode) 112.dp else 104.dp),
                     onClick = {
                         player.play()
                         isPlaying = true
@@ -788,7 +788,7 @@ fun NativeVideoPlayer(
                         imageVector = Icons.Rounded.PlayArrow,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(if (fullscreenMode) 42.dp else 38.dp)
+                        modifier = Modifier.size(if (fullscreenMode) 56.dp else 52.dp)
                     )
                 }
             }
