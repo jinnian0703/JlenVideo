@@ -165,6 +165,7 @@ fun NativeVideoPlayer(
     var gestureMoved by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
     var longPressBoostActive by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
     var longPressJob by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Job?>(null) }
+    var autoHideJob by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Job?>(null) }
     val longPressTimeoutMs = remember { ViewConfiguration.getLongPressTimeout().toLong() }
     val touchSlopPx = remember { 24f }
     var lastInteractionAt by remember(playbackIdentity, fullscreenMode) {
@@ -203,6 +204,15 @@ fun NativeVideoPlayer(
             controlsVisible = true
         }
         controlsVersion++
+        autoHideJob?.cancel()
+        autoHideJob = null
+        if (fullscreenMode && controlsVisible && !playerLocked) {
+            autoHideJob = scope.launch {
+                delay(3_000L)
+                controlsVisible = false
+                autoHideJob = null
+            }
+        }
     }
 
     fun updateBrightness(value: Float) {
@@ -234,6 +244,8 @@ fun NativeVideoPlayer(
 
     fun setPlayerLocked(locked: Boolean) {
         playerLocked = locked
+        autoHideJob?.cancel()
+        autoHideJob = null
         if (locked) {
             controlsVisible = false
             unlockHintVisible = false
@@ -437,18 +449,31 @@ fun NativeVideoPlayer(
         hasCompletedInitialOverlayDelay = true
     }
 
-    LaunchedEffect(fullscreenMode, controlsVisible, playerLocked, lastInteractionAt) {
-        if (!fullscreenMode || playerLocked || !controlsVisible) return@LaunchedEffect
-        val interactionAt = lastInteractionAt
-        delay(3_000L)
-        if (
-            fullscreenMode &&
-            !playerLocked &&
-            controlsVisible &&
-            interactionAt == lastInteractionAt
-        ) {
-            controlsVisible = false
+    LaunchedEffect(fullscreenMode, controlsVisible, playerLocked) {
+        if (!fullscreenMode) {
+            autoHideJob?.cancel()
+            autoHideJob = null
+            if (playerLocked) {
+                playerLocked = false
+                unlockHintVisible = false
+                gestureFeedback = null
+                gestureProgress = null
+                gestureMode = PlayerGestureMode.None
+                longPressJob?.cancel()
+                longPressJob = null
+                if (longPressBoostActive) {
+                    player?.playbackParameters = PlaybackParameters(speed)
+                    longPressBoostActive = false
+                }
+            }
+            return@LaunchedEffect
         }
+        if (!controlsVisible || playerLocked) {
+            autoHideJob?.cancel()
+            autoHideJob = null
+            return@LaunchedEffect
+        }
+        markInteraction(forceControlsVisible = false)
     }
 
     LaunchedEffect(fullscreenMode, playerLocked, unlockHintVisible, unlockHintVersion) {
