@@ -1,7 +1,14 @@
 package top.jlen.vod.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.media.AudioManager
+import android.provider.Settings
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.ViewGroup
+import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import android.os.SystemClock
 
@@ -49,17 +56,22 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -73,8 +85,11 @@ import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun NativeVideoPlayer(
     url: String,
@@ -93,6 +108,9 @@ fun NativeVideoPlayer(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
+    val hostActivity = remember(context) { context.findActivity() }
+    val audioManager = remember(context) { context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager }
     val playbackIdentity = remember(url, episodeName) { "$url|$episodeName" }
     val player = remember(playbackIdentity) {
         runCatching { createNativePlayer(context, url, initialSnapshot) }.getOrNull()
@@ -127,6 +145,24 @@ fun NativeVideoPlayer(
     var isUserPaused by remember(playbackIdentity) { mutableStateOf(false) }
     var lastReportedSnapshot by remember(playbackIdentity) { mutableStateOf<PlaybackSnapshot?>(null) }
     var lastSnapshotDispatchAt by remember(playbackIdentity) { mutableLongStateOf(0L) }
+    var contentSize by remember(playbackIdentity, fullscreenMode) { mutableStateOf(IntSize.Zero) }
+    var playerLocked by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
+    var unlockHintVisible by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
+    var unlockHintVersion by remember(playbackIdentity, fullscreenMode) { mutableLongStateOf(0L) }
+    var gestureFeedback by remember(playbackIdentity, fullscreenMode) { mutableStateOf<PlayerGestureFeedback?>(null) }
+    var gestureMode by remember(playbackIdentity, fullscreenMode) { mutableStateOf(PlayerGestureMode.None) }
+    var gestureStartX by remember(playbackIdentity, fullscreenMode) { mutableFloatStateOf(0f) }
+    var gestureStartY by remember(playbackIdentity, fullscreenMode) { mutableFloatStateOf(0f) }
+    var gestureSeekPreviewMs by remember(playbackIdentity, fullscreenMode) { mutableLongStateOf(0L) }
+    var gestureStartPositionMs by remember(playbackIdentity, fullscreenMode) { mutableLongStateOf(0L) }
+    var gestureWasPlaying by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
+    var gestureBrightnessStart by remember(playbackIdentity, fullscreenMode) { mutableFloatStateOf(0.5f) }
+    var gestureVolumeStart by remember(playbackIdentity, fullscreenMode) { mutableFloatStateOf(0.5f) }
+    var gestureMoved by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
+    var longPressBoostActive by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
+    var longPressJob by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Job?>(null) }
+    val longPressTimeoutMs = remember { ViewConfiguration.getLongPressTimeout().toLong() }
+    val touchSlopPx = remember { 24f }
 
     fun currentSnapshot(): PlaybackSnapshot = PlaybackSnapshot(
         positionMs = player?.currentPosition?.coerceAtLeast(0L) ?: 0L,
@@ -152,6 +188,88 @@ fun NativeVideoPlayer(
             latestSnapshotCallback.value?.invoke(snapshot)
         }
         return snapshot
+    }
+
+    fun markInteraction(forceControlsVisible: Boolean = fullscreenMode && !playerLocked) {
+        if (forceControlsVisible) {
+            controlsVisible = true
+        }
+        controlsVersion++
+    }
+
+    fun updateBrightness(value: Float) {
+        val safeValue = value.coerceIn(0.05f, 1f)
+        hostActivity?.setScreenBrightness(safeValue)
+        gestureFeedback = PlayerGestureFeedback(
+            title = "亮度",
+            detail = "${(safeValue * 100).toInt()}%"
+        )
+    }
+
+    fun updateVolume(value: Float) {
+        val safeManager = audioManager ?: return
+        val maxVolume = safeManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+        val target = (value.coerceIn(0f, 1f) * maxVolume).toInt().coerceIn(0, maxVolume)
+        safeManager.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
+        gestureFeedback = PlayerGestureFeedback(
+            title = "音量",
+            detail = "${((target.toFloat() / maxVolume) * 100).toInt()}%"
+        )
+    }
+
+    fun showUnlockHint() {
+        unlockHintVisible = true
+        unlockHintVersion++
+    }
+
+    fun setPlayerLocked(locked: Boolean) {
+        playerLocked = locked
+        if (locked) {
+            controlsVisible = false
+            unlockHintVisible = false
+            gestureFeedback = null
+            gestureMode = PlayerGestureMode.None
+            longPressJob?.cancel()
+            longPressJob = null
+            if (longPressBoostActive) {
+                player?.playbackParameters = PlaybackParameters(speed)
+                longPressBoostActive = false
+            }
+        } else {
+            controlsVisible = true
+        }
+        controlsVersion++
+    }
+
+    fun finishGesture(cancelled: Boolean) {
+        longPressJob?.cancel()
+        longPressJob = null
+
+        if (longPressBoostActive) {
+            player?.playbackParameters = PlaybackParameters(speed)
+            longPressBoostActive = false
+        } else if (!cancelled && gestureMode == PlayerGestureMode.Seek) {
+            val target = gestureSeekPreviewMs.coerceIn(0L, duration.coerceAtLeast(0L))
+            player?.seekTo(target)
+            currentPosition = target
+            if (gestureWasPlaying && playbackState != Player.STATE_ENDED) {
+                player?.play()
+            }
+            dispatchSnapshot(force = true)
+        }
+
+        if (playerLocked) {
+            showUnlockHint()
+        } else if (!gestureMoved && gestureMode == PlayerGestureMode.None) {
+            controlsVisible = !controlsVisible
+            controlsVersion++
+        } else {
+            controlsVersion++
+        }
+
+        gestureMode = PlayerGestureMode.None
+        gestureMoved = false
+        gestureFeedback = null
     }
 
     DisposableEffect(player) {
@@ -305,12 +423,21 @@ fun NativeVideoPlayer(
         hasCompletedInitialOverlayDelay = true
     }
 
-    LaunchedEffect(fullscreenMode, controlsVisible, controlsVersion, isPlaying) {
-        if (!fullscreenMode || !controlsVisible || !isPlaying) return@LaunchedEffect
+    LaunchedEffect(fullscreenMode, controlsVisible, controlsVersion, isPlaying, playerLocked) {
+        if (!fullscreenMode || playerLocked || !controlsVisible || !isPlaying) return@LaunchedEffect
         val version = controlsVersion
-        delay(2500)
+        delay(5_000L)
         if (version == controlsVersion) {
             controlsVisible = false
+        }
+    }
+
+    LaunchedEffect(fullscreenMode, playerLocked, unlockHintVisible, unlockHintVersion) {
+        if (!fullscreenMode || !playerLocked || !unlockHintVisible) return@LaunchedEffect
+        val version = unlockHintVersion
+        delay(2_500L)
+        if (version == unlockHintVersion) {
+            unlockHintVisible = false
         }
     }
 
@@ -357,6 +484,7 @@ fun NativeVideoPlayer(
     val controlPillTextStyle = if (fullscreenMode) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelMedium
     val controlChipHeight = if (fullscreenMode) 36.dp else 32.dp
     val controlChipWidth = if (fullscreenMode) 76.dp else 64.dp
+    val controlsShown = controlsVisible && !playerLocked
 
     Card(
         modifier = Modifier
@@ -379,12 +507,7 @@ fun NativeVideoPlayer(
                     else Modifier.heightIn(min = embeddedPlayerHeight).height(embeddedPlayerHeight)
                 )
                 .background(if (fullscreenMode) Color.Black else UiPalette.BackgroundBottom)
-                .clickableWithoutRipple {
-                    if (fullscreenMode) {
-                        controlsVisible = !controlsVisible
-                        controlsVersion++
-                    }
-                }
+                .onSizeChanged { contentSize = it }
         ) {
             key(playbackIdentity) {
                 AndroidView(
@@ -418,6 +541,133 @@ fun NativeVideoPlayer(
                 )
             }
 
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInteropFilter { event ->
+                        when (event.actionMasked) {
+                            MotionEvent.ACTION_DOWN -> {
+                                gestureStartX = event.x
+                                gestureStartY = event.y
+                                gestureStartPositionMs = player.currentPosition.coerceAtLeast(0L)
+                                gestureSeekPreviewMs = gestureStartPositionMs
+                                gestureWasPlaying = player.isPlaying
+                                gestureBrightnessStart = hostActivity?.currentScreenBrightness() ?: 0.5f
+                                gestureVolumeStart = audioManager.currentVolumeFraction()
+                                gestureMoved = false
+                                gestureMode = PlayerGestureMode.None
+                                gestureFeedback = null
+                                longPressBoostActive = false
+                                longPressJob?.cancel()
+                                longPressJob = null
+
+                                if (playerLocked) {
+                                    showUnlockHint()
+                                    return@pointerInteropFilter true
+                                }
+
+                                if (
+                                    fullscreenMode &&
+                                    contentSize.width > 0 &&
+                                    event.x >= contentSize.width / 2f &&
+                                    playbackState != Player.STATE_ENDED
+                                ) {
+                                    longPressJob = scope.launch {
+                                        delay(longPressTimeoutMs)
+                                        if (!gestureMoved && gestureMode == PlayerGestureMode.None && !playerLocked) {
+                                            longPressBoostActive = true
+                                            controlsVisible = false
+                                            player.playbackParameters = PlaybackParameters(2f)
+                                            gestureFeedback = PlayerGestureFeedback(
+                                                title = "2.0x",
+                                                detail = "长按加速"
+                                            )
+                                        }
+                                    }
+                                }
+                                true
+                            }
+
+                            MotionEvent.ACTION_MOVE -> {
+                                if (playerLocked) {
+                                    return@pointerInteropFilter true
+                                }
+
+                                val deltaX = event.x - gestureStartX
+                                val deltaY = event.y - gestureStartY
+                                val absDeltaX = kotlin.math.abs(deltaX)
+                                val absDeltaY = kotlin.math.abs(deltaY)
+                                val travel = maxOf(absDeltaX, absDeltaY)
+
+                                if (!gestureMoved && travel > touchSlopPx) {
+                                    gestureMoved = true
+                                    longPressJob?.cancel()
+                                    longPressJob = null
+                                }
+
+                                if (longPressBoostActive) {
+                                    return@pointerInteropFilter true
+                                }
+
+                                if (!gestureMoved || contentSize.width == 0 || contentSize.height == 0) {
+                                    return@pointerInteropFilter true
+                                }
+
+                                if (gestureMode == PlayerGestureMode.None) {
+                                    gestureMode = when {
+                                        absDeltaX >= absDeltaY && duration > 0L -> PlayerGestureMode.Seek
+                                        gestureStartX < contentSize.width / 2f -> PlayerGestureMode.Brightness
+                                        else -> PlayerGestureMode.Volume
+                                    }
+                                    if (fullscreenMode) {
+                                        controlsVisible = false
+                                    }
+                                }
+
+                                when (gestureMode) {
+                                    PlayerGestureMode.Seek -> {
+                                        val width = contentSize.width.coerceAtLeast(1)
+                                        val preview = (
+                                            gestureStartPositionMs +
+                                                (duration.toFloat() * (deltaX / width.toFloat()) * 0.9f).toLong()
+                                            ).coerceIn(0L, duration.coerceAtLeast(0L))
+                                        gestureSeekPreviewMs = preview
+                                        gestureFeedback = PlayerGestureFeedback(
+                                            title = formatMillis(preview),
+                                            detail = formatSignedDuration(preview - gestureStartPositionMs)
+                                        )
+                                    }
+
+                                    PlayerGestureMode.Brightness -> {
+                                        val height = contentSize.height.coerceAtLeast(1)
+                                        updateBrightness(gestureBrightnessStart - (deltaY / height.toFloat()))
+                                    }
+
+                                    PlayerGestureMode.Volume -> {
+                                        val height = contentSize.height.coerceAtLeast(1)
+                                        updateVolume(gestureVolumeStart - (deltaY / height.toFloat()))
+                                    }
+
+                                    PlayerGestureMode.None -> Unit
+                                }
+                                true
+                            }
+
+                            MotionEvent.ACTION_UP -> {
+                                finishGesture(cancelled = false)
+                                true
+                            }
+
+                            MotionEvent.ACTION_CANCEL -> {
+                                finishGesture(cancelled = true)
+                                true
+                            }
+
+                            else -> false
+                        }
+                    }
+            )
+
             if (showLoadingOverlay) {
                 Surface(
                     modifier = Modifier
@@ -437,7 +687,7 @@ fun NativeVideoPlayer(
                 }
             }
 
-            if (playbackState != Player.STATE_ENDED && showPausedOverlay) {
+            if (playbackState != Player.STATE_ENDED && showPausedOverlay && !playerLocked) {
                 Surface(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -448,7 +698,7 @@ fun NativeVideoPlayer(
                             isPlaying = true
                             showPausedOverlay = false
                             isUserPaused = false
-                            controlsVersion++
+                            markInteraction()
                         },
                     shape = RoundedCornerShape(999.dp),
                     color = Color.Black.copy(alpha = 0.62f)
@@ -464,7 +714,7 @@ fun NativeVideoPlayer(
                 }
             }
 
-            if (!fullscreenMode || controlsVisible) {
+            if (controlsShown) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -480,7 +730,7 @@ fun NativeVideoPlayer(
                 )
             }
 
-            if (!fullscreenMode || controlsVisible) {
+            if (controlsShown) {
                 Text(
                     text = "视频来源于第三方，切勿相信任何广告信息",
                     color = Color.White.copy(alpha = 0.88f),
@@ -627,7 +877,7 @@ fun NativeVideoPlayer(
                         onValueChange = {
                             isDragging = true
                             sliderPosition = it
-                            controlsVersion++
+                            markInteraction()
                         },
                         onValueChangeFinished = {
                             val target = (duration * sliderPosition).toLong()
@@ -641,7 +891,7 @@ fun NativeVideoPlayer(
                             currentPosition = target
                             isDragging = false
                             dispatchSnapshot(force = true)
-                            controlsVersion++
+                            markInteraction()
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -666,7 +916,7 @@ fun NativeVideoPlayer(
                                         showPausedOverlay = false
                                     }
                                     isPlaying = player.isPlaying
-                                    controlsVersion++
+                                    markInteraction()
                                 }
                             ) {
                                 Icon(
@@ -695,7 +945,7 @@ fun NativeVideoPlayer(
                                     textStyle = controlPillTextStyle,
                                     onClick = {
                                         fullscreenResizeMode = nextResizeMode(fullscreenResizeMode)
-                                        controlsVersion++
+                                        markInteraction()
                                     }
                                 )
                             }
@@ -707,7 +957,7 @@ fun NativeVideoPlayer(
                                 onClick = {
                                     speed = nextSpeed(speed)
                                     player.playbackParameters = PlaybackParameters(speed)
-                                    controlsVersion++
+                                    markInteraction()
                                 }
                             )
                             if (hasNextEpisode && onNextEpisode != null) {
@@ -717,7 +967,7 @@ fun NativeVideoPlayer(
                                     width = controlChipWidth,
                                     height = controlChipHeight,
                                     onClick = {
-                                        controlsVersion++
+                                        markInteraction()
                                         onNextEpisode()
                                     }
                                 )
@@ -942,6 +1192,69 @@ private fun speedLabel(speed: Float): String = when (speed) {
     1.5f -> "1.5x"
     2f -> "2.0x"
     else -> "${speed}x"
+}
+
+private data class PlayerGestureFeedback(
+    val title: String,
+    val detail: String? = null
+)
+
+private enum class PlayerGestureMode {
+    None,
+    Seek,
+    Brightness,
+    Volume
+}
+
+private fun Context.findActivity(): Activity? {
+    var current: Context? = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        current = current.baseContext
+    }
+    return null
+}
+
+private fun Activity.currentScreenBrightness(): Float {
+    val lp = window.attributes
+    val current = if (lp.screenBrightness in 0f..1f) {
+        lp.screenBrightness
+    } else {
+        runCatching {
+            val system = Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS)
+            system / 255f
+        }.getOrDefault(0.5f)
+    }
+    return current.coerceIn(0.05f, 1f)
+}
+
+private fun Activity.setScreenBrightness(value: Float) {
+    val lp = window.attributes
+    lp.screenBrightness = value.coerceIn(0.05f, 1f)
+    window.attributes = lp
+}
+
+private fun AudioManager?.currentVolumeFraction(): Float {
+    val manager = this ?: return 0.5f
+    val maxVolume = manager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+    val current = manager.getStreamVolume(AudioManager.STREAM_MUSIC)
+    return (current.toFloat() / maxVolume.toFloat()).coerceIn(0f, 1f)
+}
+
+private fun formatSignedDuration(deltaMs: Long): String {
+    if (deltaMs == 0L) return "+0s"
+    val sign = if (deltaMs > 0) "+" else "-"
+    val value = kotlin.math.abs(deltaMs)
+    val totalSeconds = value / 1000
+    val seconds = totalSeconds % 60
+    val minutes = (totalSeconds / 60) % 60
+    val hours = totalSeconds / 3600
+    val base = if (hours > 0) {
+        "%d:%02d:%02d".format(hours, minutes, seconds)
+    } else {
+        "%d:%02d".format(minutes, seconds)
+    }
+    return sign + base
 }
 
 private fun VideoSize.isLandscapeVideo(): Boolean? {
