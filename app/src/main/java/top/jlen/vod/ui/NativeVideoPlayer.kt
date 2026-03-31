@@ -242,6 +242,11 @@ fun NativeVideoPlayer(
         unlockHintVersion++
     }
 
+    fun hideUnlockHint() {
+        unlockHintVisible = false
+        unlockHintVersion++
+    }
+
     fun setPlayerLocked(locked: Boolean) {
         playerLocked = locked
         autoHideJob?.cancel()
@@ -281,7 +286,13 @@ fun NativeVideoPlayer(
         }
 
         if (playerLocked) {
-            showUnlockHint()
+            if (!gestureMoved && gestureMode == PlayerGestureMode.None) {
+                if (unlockHintVisible) {
+                    hideUnlockHint()
+                } else {
+                    showUnlockHint()
+                }
+            }
         } else if (!gestureMoved && gestureMode == PlayerGestureMode.None) {
             controlsVisible = !controlsVisible
             if (controlsVisible) {
@@ -479,7 +490,7 @@ fun NativeVideoPlayer(
     LaunchedEffect(fullscreenMode, playerLocked, unlockHintVisible, unlockHintVersion) {
         if (!fullscreenMode || !playerLocked || !unlockHintVisible) return@LaunchedEffect
         val version = unlockHintVersion
-        delay(2_500L)
+        delay(3_000L)
         if (version == unlockHintVersion) {
             unlockHintVisible = false
         }
