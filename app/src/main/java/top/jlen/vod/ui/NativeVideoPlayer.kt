@@ -783,47 +783,33 @@ fun NativeVideoPlayer(
                 val lockIcon = if (playerLocked) Icons.Rounded.Lock else Icons.Rounded.LockOpen
                 val lockActionVisible = if (playerLocked) unlockHintVisible else true
                 if (lockActionVisible) {
-                    Surface(
+                    IconButton(
                         modifier = Modifier
                             .align(Alignment.CenterStart)
                             .padding(start = 18.dp)
-                            .size(52.dp)
-                            .clip(RoundedCornerShape(999.dp))
-                            .clickableWithoutRipple {
-                                setPlayerLocked(!playerLocked)
-                            },
-                        shape = RoundedCornerShape(999.dp),
-                        color = Color.Black.copy(alpha = 0.5f)
+                            .size(52.dp),
+                        onClick = { setPlayerLocked(!playerLocked) }
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = lockIcon,
-                                contentDescription = if (playerLocked) "解锁播放器" else "锁定播放器",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = lockIcon,
+                            contentDescription = if (playerLocked) "解锁播放器" else "锁定播放器",
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp)
+                        )
                     }
-                    Surface(
+                    IconButton(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .padding(end = 18.dp)
-                            .size(52.dp)
-                            .clip(RoundedCornerShape(999.dp))
-                            .clickableWithoutRipple {
-                                setPlayerLocked(!playerLocked)
-                            },
-                        shape = RoundedCornerShape(999.dp),
-                        color = Color.Black.copy(alpha = 0.5f)
+                            .size(52.dp),
+                        onClick = { setPlayerLocked(!playerLocked) }
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = lockIcon,
-                                contentDescription = if (playerLocked) "解锁播放器" else "锁定播放器",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = lockIcon,
+                            contentDescription = if (playerLocked) "解锁播放器" else "锁定播放器",
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp)
+                        )
                     }
                 }
 
