@@ -208,8 +208,9 @@ fun NativeVideoPlayer(
     fun updateBrightness(value: Float) {
         val safeValue = value.coerceIn(0.05f, 1f)
         hostActivity?.setScreenBrightness(safeValue)
+        gestureProgress = safeValue
         gestureFeedback = PlayerGestureFeedback(
-            title = "浜害",
+            title = "亮度",
             detail = "${(safeValue * 100).toInt()}%"
         )
     }
@@ -219,8 +220,9 @@ fun NativeVideoPlayer(
         val maxVolume = safeManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
         val target = (value.coerceIn(0f, 1f) * maxVolume).toInt().coerceIn(0, maxVolume)
         safeManager.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
+        gestureProgress = (target.toFloat() / maxVolume.toFloat()).coerceIn(0f, 1f)
         gestureFeedback = PlayerGestureFeedback(
-            title = "闊抽噺",
+            title = "音量",
             detail = "${((target.toFloat() / maxVolume) * 100).toInt()}%"
         )
     }
@@ -778,41 +780,49 @@ fun NativeVideoPlayer(
             }
 
             if (fullscreenMode) {
-                val lockIcon = if (playerLocked && unlockHintVisible) {
-                    Icons.Rounded.LockOpen
-                } else {
-                    Icons.Rounded.Lock
-                }
+                val lockIcon = if (playerLocked) Icons.Rounded.Lock else Icons.Rounded.LockOpen
                 val lockActionVisible = if (playerLocked) unlockHintVisible else true
                 if (lockActionVisible) {
-                    Row(
+                    Surface(
                         modifier = Modifier
-                            .align(Alignment.Center)
-                            .fillMaxWidth()
-                            .padding(horizontal = 18.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .align(Alignment.CenterStart)
+                            .padding(start = 18.dp)
+                            .size(52.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .clickableWithoutRipple {
+                                setPlayerLocked(!playerLocked)
+                            },
+                        shape = RoundedCornerShape(999.dp),
+                        color = Color.Black.copy(alpha = 0.5f)
                     ) {
-                        repeat(2) {
-                            Surface(
-                                modifier = Modifier
-                                    .size(52.dp)
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .clickableWithoutRipple {
-                                        setPlayerLocked(!playerLocked)
-                                    },
-                                shape = RoundedCornerShape(999.dp),
-                                color = Color.Black.copy(alpha = 0.5f)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = lockIcon,
-                                        contentDescription = if (playerLocked) "解锁播放器" else "锁定播放器",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
-                            }
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = lockIcon,
+                                contentDescription = if (playerLocked) "解锁播放器" else "锁定播放器",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 18.dp)
+                            .size(52.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .clickableWithoutRipple {
+                                setPlayerLocked(!playerLocked)
+                            },
+                        shape = RoundedCornerShape(999.dp),
+                        color = Color.Black.copy(alpha = 0.5f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = lockIcon,
+                                contentDescription = if (playerLocked) "解锁播放器" else "锁定播放器",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
                     }
                 }
@@ -889,7 +899,7 @@ fun NativeVideoPlayer(
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             if (fullscreenMode) {
                                 Text(
-                                text = title.ifBlank { "濮濓絽婀幘顓熸杹" },
+                                text = title.ifBlank { "视频播放" },
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Color.White
@@ -901,7 +911,7 @@ fun NativeVideoPlayer(
                                         append(sourceName)
                                     }
                                     if (episodeName.isNotBlank()) {
-                                        if (isNotEmpty()) append(" 璺?")
+                                        if (isNotEmpty()) append(" · ")
                                         append(episodeName)
                                     }
                                     if (isNotEmpty()) append("\n")
@@ -931,7 +941,7 @@ fun NativeVideoPlayer(
                             }
                             if (false) {
                                 Text(
-                                    text = "鍏ㄥ睆",
+                                    text = "全屏",
                                     color = Color.White,
                                     style = controlPillTextStyle,
                                     fontWeight = FontWeight.Medium,
@@ -956,7 +966,7 @@ fun NativeVideoPlayer(
                             }
                             if (false && !fullscreenMode && onToggleFullscreen != null) {
                                 Text(
-                                    text = "鍏ㄥ睆",
+                                    text = "全屏",
                                     color = Color.White,
                                     style = controlPillTextStyle,
                                     fontWeight = FontWeight.Medium,
@@ -1300,10 +1310,10 @@ private fun nextResizeMode(current: Int): Int = when (current) {
 }
 
 private fun resizeModeLabel(mode: Int): String = when (mode) {
-    AspectRatioFrameLayout.RESIZE_MODE_FIT -> "閫傚簲"
-    AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> "瑁佸壀"
-    AspectRatioFrameLayout.RESIZE_MODE_FILL -> "鎷変几"
-    else -> "閫傚簲"
+    AspectRatioFrameLayout.RESIZE_MODE_FIT -> "适应"
+    AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> "裁剪"
+    AspectRatioFrameLayout.RESIZE_MODE_FILL -> "拉伸"
+    else -> "适应"
 }
 
 private fun speedLabel(speed: Float): String = when (speed) {
