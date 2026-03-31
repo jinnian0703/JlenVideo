@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Rect
 import android.net.Uri
@@ -3410,8 +3411,8 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
             AsyncImage(
                 model = rememberPosterRequest(
                     data = item.vodPic,
-                    width = 960,
-                    height = 576
+                    width = 720,
+                    height = 432
                 ),
                 contentDescription = item.displayTitle,
                 modifier = Modifier
@@ -4312,6 +4313,7 @@ internal fun rememberPosterRequest(
         ImageRequest.Builder(context)
             .data(data.orEmpty())
             .size(width, height)
+            .bitmapConfig(Bitmap.Config.RGB_565)
             .precision(Precision.INEXACT)
             .scale(Scale.FILL)
             .allowHardware(true)
