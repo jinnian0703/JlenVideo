@@ -1,4 +1,4 @@
-package top.jlen.vod.ui
+﻿package top.jlen.vod.ui
 
 import android.app.Activity
 import android.content.Context
@@ -34,6 +34,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Fullscreen
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
@@ -42,6 +44,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Slider
@@ -150,6 +153,7 @@ fun NativeVideoPlayer(
     var unlockHintVisible by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
     var unlockHintVersion by remember(playbackIdentity, fullscreenMode) { mutableLongStateOf(0L) }
     var gestureFeedback by remember(playbackIdentity, fullscreenMode) { mutableStateOf<PlayerGestureFeedback?>(null) }
+    var gestureProgress by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Float?>(null) }
     var gestureMode by remember(playbackIdentity, fullscreenMode) { mutableStateOf(PlayerGestureMode.None) }
     var gestureStartX by remember(playbackIdentity, fullscreenMode) { mutableFloatStateOf(0f) }
     var gestureStartY by remember(playbackIdentity, fullscreenMode) { mutableFloatStateOf(0f) }
@@ -163,6 +167,9 @@ fun NativeVideoPlayer(
     var longPressJob by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Job?>(null) }
     val longPressTimeoutMs = remember { ViewConfiguration.getLongPressTimeout().toLong() }
     val touchSlopPx = remember { 24f }
+    var lastInteractionAt by remember(playbackIdentity, fullscreenMode) {
+        mutableLongStateOf(SystemClock.elapsedRealtime())
+    }
 
     fun currentSnapshot(): PlaybackSnapshot = PlaybackSnapshot(
         positionMs = player?.currentPosition?.coerceAtLeast(0L) ?: 0L,
@@ -191,6 +198,7 @@ fun NativeVideoPlayer(
     }
 
     fun markInteraction(forceControlsVisible: Boolean = fullscreenMode && !playerLocked) {
+        lastInteractionAt = SystemClock.elapsedRealtime()
         if (forceControlsVisible) {
             controlsVisible = true
         }
@@ -201,7 +209,7 @@ fun NativeVideoPlayer(
         val safeValue = value.coerceIn(0.05f, 1f)
         hostActivity?.setScreenBrightness(safeValue)
         gestureFeedback = PlayerGestureFeedback(
-            title = "亮度",
+            title = "浜害",
             detail = "${(safeValue * 100).toInt()}%"
         )
     }
@@ -212,7 +220,7 @@ fun NativeVideoPlayer(
         val target = (value.coerceIn(0f, 1f) * maxVolume).toInt().coerceIn(0, maxVolume)
         safeManager.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
         gestureFeedback = PlayerGestureFeedback(
-            title = "音量",
+            title = "闊抽噺",
             detail = "${((target.toFloat() / maxVolume) * 100).toInt()}%"
         )
     }
@@ -238,7 +246,7 @@ fun NativeVideoPlayer(
         } else {
             controlsVisible = true
         }
-        controlsVersion++
+        markInteraction(forceControlsVisible = !locked)
     }
 
     fun finishGesture(cancelled: Boolean) {
@@ -262,14 +270,18 @@ fun NativeVideoPlayer(
             showUnlockHint()
         } else if (!gestureMoved && gestureMode == PlayerGestureMode.None) {
             controlsVisible = !controlsVisible
+            if (controlsVisible) {
+                lastInteractionAt = SystemClock.elapsedRealtime()
+            }
             controlsVersion++
         } else {
-            controlsVersion++
+            markInteraction(forceControlsVisible = false)
         }
 
         gestureMode = PlayerGestureMode.None
         gestureMoved = false
         gestureFeedback = null
+        gestureProgress = null
     }
 
     DisposableEffect(player) {
@@ -423,11 +435,17 @@ fun NativeVideoPlayer(
         hasCompletedInitialOverlayDelay = true
     }
 
-    LaunchedEffect(fullscreenMode, controlsVisible, controlsVersion, isPlaying, playerLocked) {
+    LaunchedEffect(fullscreenMode, controlsVisible, isPlaying, playerLocked, lastInteractionAt) {
         if (!fullscreenMode || playerLocked || !controlsVisible || !isPlaying) return@LaunchedEffect
-        val version = controlsVersion
-        delay(5_000L)
-        if (version == controlsVersion) {
+        val waitMs = (5_000L - (SystemClock.elapsedRealtime() - lastInteractionAt)).coerceAtLeast(0L)
+        delay(waitMs)
+        if (
+            fullscreenMode &&
+            !playerLocked &&
+            controlsVisible &&
+            isPlaying &&
+            SystemClock.elapsedRealtime() - lastInteractionAt >= 5_000L
+        ) {
             controlsVisible = false
         }
     }
@@ -460,8 +478,8 @@ fun NativeVideoPlayer(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("閹绢厽鏂侀崳銊ュ灥婵瀵叉径杈Е", color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("鏉╂瑦娼痪鑳熅閺嗗倹妞傞弮鐘崇《閸樼喓鏁撻幘顓熸杹", color = Color.White.copy(alpha = 0.78f))
+                    Text("播放器加载失败", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("当前视频暂时无法播放，请稍后重试或切换线路", color = Color.White.copy(alpha = 0.78f))
                 }
             }
         }
@@ -632,6 +650,11 @@ fun NativeVideoPlayer(
                                                 (duration.toFloat() * (deltaX / width.toFloat()) * 0.9f).toLong()
                                             ).coerceIn(0L, duration.coerceAtLeast(0L))
                                         gestureSeekPreviewMs = preview
+                                        gestureProgress = if (duration > 0L) {
+                                            preview.toFloat() / duration.toFloat()
+                                        } else {
+                                            null
+                                        }
                                         gestureFeedback = PlayerGestureFeedback(
                                             title = formatMillis(preview),
                                             detail = formatSignedDuration(preview - gestureStartPositionMs)
@@ -714,6 +737,103 @@ fun NativeVideoPlayer(
                 }
             }
 
+            gestureFeedback?.let { feedback ->
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .widthIn(min = 148.dp, max = 220.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color.Black.copy(alpha = 0.68f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = feedback.title,
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                        feedback.detail?.takeIf(String::isNotBlank)?.let { detail ->
+                            Text(
+                                text = detail,
+                                color = Color.White.copy(alpha = 0.88f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        gestureProgress?.let { progress ->
+                            LinearProgressIndicator(
+                                progress = { progress.coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth(),
+                                color = Color.White,
+                                trackColor = Color.White.copy(alpha = 0.18f)
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (fullscreenMode) {
+                val lockIcon = if (playerLocked && unlockHintVisible) {
+                    Icons.Rounded.LockOpen
+                } else {
+                    Icons.Rounded.Lock
+                }
+                val lockActionVisible = if (playerLocked) unlockHintVisible else true
+                if (lockActionVisible) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        repeat(2) {
+                            Surface(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .clickableWithoutRipple {
+                                        setPlayerLocked(!playerLocked)
+                                    },
+                                shape = RoundedCornerShape(999.dp),
+                                color = Color.Black.copy(alpha = 0.5f)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = lockIcon,
+                                        contentDescription = if (playerLocked) "解锁播放器" else "锁定播放器",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (playerLocked && unlockHintVisible) {
+                    Surface(
+                        modifier = Modifier.align(Alignment.Center),
+                        shape = RoundedCornerShape(18.dp),
+                        color = Color.Black.copy(alpha = 0.68f)
+                    ) {
+                        Text(
+                            text = "解锁",
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+                        )
+                    }
+                }
+            }
+
             if (controlsShown) {
                 Box(
                     modifier = Modifier
@@ -769,7 +889,7 @@ fun NativeVideoPlayer(
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             if (fullscreenMode) {
                                 Text(
-                                text = title.ifBlank { "姝ｅ湪鎾斁" },
+                                text = title.ifBlank { "濮濓絽婀幘顓熸杹" },
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Color.White
@@ -781,7 +901,7 @@ fun NativeVideoPlayer(
                                         append(sourceName)
                                     }
                                     if (episodeName.isNotBlank()) {
-                                        if (isNotEmpty()) append(" 路 ")
+                                        if (isNotEmpty()) append(" 璺?")
                                         append(episodeName)
                                     }
                                     if (isNotEmpty()) append("\n")
@@ -811,7 +931,7 @@ fun NativeVideoPlayer(
                             }
                             if (false) {
                                 Text(
-                                    text = "全屏",
+                                    text = "鍏ㄥ睆",
                                     color = Color.White,
                                     style = controlPillTextStyle,
                                     fontWeight = FontWeight.Medium,
@@ -836,7 +956,7 @@ fun NativeVideoPlayer(
                             }
                             if (false && !fullscreenMode && onToggleFullscreen != null) {
                                 Text(
-                                    text = "全屏",
+                                    text = "鍏ㄥ睆",
                                     color = Color.White,
                                     style = controlPillTextStyle,
                                     fontWeight = FontWeight.Medium,
@@ -974,7 +1094,7 @@ fun NativeVideoPlayer(
                             }
                             if (false && hasNextEpisode && onNextEpisode != null) {
                                 Text(
-                                    text = "≫",
+                                    text = "下一集",
                                     color = Color.White,
                                     style = controlPillTextStyle,
                                     fontWeight = FontWeight.Medium,
@@ -1013,7 +1133,7 @@ fun NativeVideoPlayer(
                             }
                             if (false && !fullscreenMode && onToggleFullscreen != null) {
                                 Text(
-                                    text = "⛶",
+                                    text = "全屏",
                                     color = Color.White,
                                     style = controlPillTextStyle,
                                     fontWeight = FontWeight.Medium,
@@ -1180,10 +1300,10 @@ private fun nextResizeMode(current: Int): Int = when (current) {
 }
 
 private fun resizeModeLabel(mode: Int): String = when (mode) {
-    AspectRatioFrameLayout.RESIZE_MODE_FIT -> "适应"
-    AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> "裁剪"
-    AspectRatioFrameLayout.RESIZE_MODE_FILL -> "拉伸"
-    else -> "适应"
+    AspectRatioFrameLayout.RESIZE_MODE_FIT -> "閫傚簲"
+    AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> "瑁佸壀"
+    AspectRatioFrameLayout.RESIZE_MODE_FILL -> "鎷変几"
+    else -> "閫傚簲"
 }
 
 private fun speedLabel(speed: Float): String = when (speed) {
@@ -1196,7 +1316,8 @@ private fun speedLabel(speed: Float): String = when (speed) {
 
 private data class PlayerGestureFeedback(
     val title: String,
-    val detail: String? = null
+    val detail: String? = null,
+    val progress: Float? = null
 )
 
 private enum class PlayerGestureMode {
