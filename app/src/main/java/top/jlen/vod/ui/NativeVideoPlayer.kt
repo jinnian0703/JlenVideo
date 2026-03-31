@@ -693,21 +693,17 @@ fun NativeVideoPlayer(
             )
 
             if (showLoadingOverlay) {
-                Surface(
+                Box(
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .size(if (fullscreenMode) 86.dp else 78.dp)
-                        .clip(RoundedCornerShape(999.dp)),
-                    shape = RoundedCornerShape(999.dp),
-                    color = Color.Black.copy(alpha = 0.56f)
+                        .size(if (fullscreenMode) 86.dp else 78.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(if (fullscreenMode) 34.dp else 30.dp),
-                            color = Color.White,
-                            strokeWidth = 3.dp
-                        )
-                    }
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(if (fullscreenMode) 34.dp else 30.dp),
+                        color = Color.White,
+                        strokeWidth = 3.dp
+                    )
                 }
             }
 
