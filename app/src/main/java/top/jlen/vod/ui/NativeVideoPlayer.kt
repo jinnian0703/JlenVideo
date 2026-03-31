@@ -437,15 +437,14 @@ fun NativeVideoPlayer(
         hasCompletedInitialOverlayDelay = true
     }
 
-    LaunchedEffect(fullscreenMode, controlsVisible, isPlaying, playerLocked, lastInteractionAt) {
-        if (!fullscreenMode || playerLocked || !controlsVisible || !isPlaying) return@LaunchedEffect
+    LaunchedEffect(fullscreenMode, controlsVisible, playerLocked, lastInteractionAt) {
+        if (!fullscreenMode || playerLocked || !controlsVisible) return@LaunchedEffect
         val waitMs = (5_000L - (SystemClock.elapsedRealtime() - lastInteractionAt)).coerceAtLeast(0L)
         delay(waitMs)
         if (
             fullscreenMode &&
             !playerLocked &&
             controlsVisible &&
-            isPlaying &&
             SystemClock.elapsedRealtime() - lastInteractionAt >= 5_000L
         ) {
             controlsVisible = false
@@ -777,7 +776,7 @@ fun NativeVideoPlayer(
 
             if (fullscreenMode) {
                 val lockIcon = if (playerLocked) Icons.Rounded.Lock else Icons.Rounded.LockOpen
-                val lockActionVisible = if (playerLocked) unlockHintVisible else true
+                val lockActionVisible = if (playerLocked) unlockHintVisible else controlsShown
                 if (lockActionVisible) {
                     IconButton(
                         modifier = Modifier
