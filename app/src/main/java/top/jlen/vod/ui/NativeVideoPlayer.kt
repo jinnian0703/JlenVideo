@@ -742,20 +742,21 @@ fun NativeVideoPlayer(
             gestureFeedback?.let { feedback ->
                 Surface(
                     modifier = Modifier
-                        .align(Alignment.Center)
-                        .widthIn(min = 148.dp, max = 220.dp),
-                    shape = RoundedCornerShape(24.dp),
+                        .align(Alignment.TopCenter)
+                        .padding(top = if (fullscreenMode) 104.dp else 48.dp)
+                        .widthIn(min = 124.dp, max = 184.dp),
+                    shape = RoundedCornerShape(20.dp),
                     color = Color.Black.copy(alpha = 0.68f)
                 ) {
                     Column(
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
                             text = feedback.title,
                             color = Color.White,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
                         )
@@ -763,7 +764,7 @@ fun NativeVideoPlayer(
                             Text(
                                 text = detail,
                                 color = Color.White.copy(alpha = 0.88f),
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodySmall,
                                 textAlign = TextAlign.Center
                             )
                         }
