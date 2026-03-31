@@ -73,6 +73,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.text.TextStyle
@@ -111,6 +112,7 @@ fun NativeVideoPlayer(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val hostActivity = remember(context) { context.findActivity() }
     val audioManager = remember(context) { context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager }
@@ -166,8 +168,11 @@ fun NativeVideoPlayer(
     var longPressBoostActive by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
     var longPressJob by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Job?>(null) }
     var autoHideJob by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Job?>(null) }
+    var lockActionPressed by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
     val longPressTimeoutMs = remember { ViewConfiguration.getLongPressTimeout().toLong() }
     val touchSlopPx = remember { 24f }
+    val lockButtonSizePx = with(density) { 52.dp.toPx() }
+    val lockButtonSidePaddingPx = with(density) { 18.dp.toPx() }
     var lastInteractionAt by remember(playbackIdentity, fullscreenMode) {
         mutableLongStateOf(SystemClock.elapsedRealtime())
     }
@@ -247,8 +252,22 @@ fun NativeVideoPlayer(
         unlockHintVersion++
     }
 
+    fun isWithinLockAction(x: Float, y: Float): Boolean {
+        if (!fullscreenMode || !playerLocked || !unlockHintVisible) return false
+        if (contentSize.width <= 0 || contentSize.height <= 0) return false
+        val top = (contentSize.height - lockButtonSizePx) / 2f
+        val bottom = top + lockButtonSizePx
+        if (y !in top..bottom) return false
+        val leftStart = lockButtonSidePaddingPx
+        val leftEnd = leftStart + lockButtonSizePx
+        val rightEnd = contentSize.width - lockButtonSidePaddingPx
+        val rightStart = rightEnd - lockButtonSizePx
+        return x in leftStart..leftEnd || x in rightStart..rightEnd
+    }
+
     fun setPlayerLocked(locked: Boolean) {
         playerLocked = locked
+        lockActionPressed = false
         autoHideJob?.cancel()
         autoHideJob = null
         if (locked) {
@@ -286,7 +305,7 @@ fun NativeVideoPlayer(
         }
 
         if (playerLocked) {
-            if (!gestureMoved && gestureMode == PlayerGestureMode.None) {
+            if (!gestureMoved && gestureMode == PlayerGestureMode.None && !lockActionPressed) {
                 if (unlockHintVisible) {
                     hideUnlockHint()
                 } else {
@@ -307,6 +326,7 @@ fun NativeVideoPlayer(
         gestureMoved = false
         gestureFeedback = null
         gestureProgress = null
+        lockActionPressed = false
     }
 
     DisposableEffect(player) {
@@ -615,9 +635,9 @@ fun NativeVideoPlayer(
                                 longPressBoostActive = false
                                 longPressJob?.cancel()
                                 longPressJob = null
+                                lockActionPressed = isWithinLockAction(event.x, event.y)
 
                                 if (playerLocked) {
-                                    showUnlockHint()
                                     return@pointerInteropFilter true
                                 }
 
@@ -645,6 +665,13 @@ fun NativeVideoPlayer(
 
                             MotionEvent.ACTION_MOVE -> {
                                 if (playerLocked) {
+                                    val deltaX = event.x - gestureStartX
+                                    val deltaY = event.y - gestureStartY
+                                    val travel = maxOf(kotlin.math.abs(deltaX), kotlin.math.abs(deltaY))
+                                    if (!gestureMoved && travel > touchSlopPx) {
+                                        gestureMoved = true
+                                        lockActionPressed = false
+                                    }
                                     return@pointerInteropFilter true
                                 }
 
