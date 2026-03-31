@@ -733,7 +733,7 @@ fun NativeVideoPlayer(
                 Surface(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = if (fullscreenMode) 104.dp else 48.dp)
+                        .padding(top = if (fullscreenMode) 72.dp else 24.dp)
                         .widthIn(min = 124.dp, max = 184.dp),
                     shape = RoundedCornerShape(20.dp),
                     color = Color.Black.copy(alpha = 0.68f)
