@@ -713,29 +713,24 @@ fun NativeVideoPlayer(
             }
 
             if (playbackState != Player.STATE_ENDED && showPausedOverlay && !playerLocked) {
-                Surface(
+                IconButton(
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .size(if (fullscreenMode) 92.dp else 84.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .clickableWithoutRipple {
-                            player.play()
-                            isPlaying = true
-                            showPausedOverlay = false
-                            isUserPaused = false
-                            markInteraction()
-                        },
-                    shape = RoundedCornerShape(999.dp),
-                    color = Color.Black.copy(alpha = 0.62f)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Rounded.PlayArrow,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(if (fullscreenMode) 42.dp else 38.dp)
-                        )
+                        .size(if (fullscreenMode) 92.dp else 84.dp),
+                    onClick = {
+                        player.play()
+                        isPlaying = true
+                        showPausedOverlay = false
+                        isUserPaused = false
+                        markInteraction()
                     }
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(if (fullscreenMode) 42.dp else 38.dp)
+                    )
                 }
             }
 
