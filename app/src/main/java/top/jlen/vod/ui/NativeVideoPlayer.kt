@@ -345,6 +345,8 @@ fun NativeVideoPlayer(
                 lastSimpleTapAt = 0L
                 if (player?.isPlaying == true) {
                     pausePlaybackByUser()
+                } else {
+                    resumePlaybackByUser()
                 }
             } else {
                 lastSimpleTapAt = now
