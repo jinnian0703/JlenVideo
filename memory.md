@@ -4,6 +4,7 @@
 
 - For any new feature or small code/config change, automatically create a git commit and push it after the change is completed and verified when possible.
 - Reply to the user in Chinese throughout the whole collaboration.
+- After app code changes, provide the debug APK when applicable and include the pushed commit hash/message in the reply.
 
 ## Release Rules
 
