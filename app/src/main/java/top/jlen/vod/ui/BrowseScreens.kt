@@ -300,6 +300,7 @@ fun CategoryScreen(
     state: HomeUiState,
     onSelectCategory: (AppleCmsCategory) -> Unit,
     onSelectFilter: (String, String) -> Unit,
+    onRetryCategory: () -> Unit,
     onLoadMore: () -> Unit,
     onOpenDetail: (String) -> Unit
 ) {
@@ -355,18 +356,10 @@ fun CategoryScreen(
                     key = { it.typeId.ifBlank { it.typeName } },
                     contentType = { "category" }
                 ) { category ->
-                    val selected = category.typeId == state.selectedCategory?.typeId
-                    AssistChip(
-                        onClick = { onSelectCategory(category) },
-                        label = { Text(category.typeName, fontWeight = FontWeight.SemiBold) },
-                        colors = AssistChipDefaults.assistChipColors(
-                            containerColor = if (selected) UiPalette.Ink else UiPalette.Surface,
-                            labelColor = if (selected) UiPalette.Surface else UiPalette.Ink
-                        ),
-                        border = AssistChipDefaults.assistChipBorder(
-                            borderColor = if (selected) UiPalette.Ink else UiPalette.BorderSoft,
-                            enabled = true
-                        )
+                    SelectableAssistChip(
+                        text = category.typeName,
+                        selected = category.typeId == state.selectedCategory?.typeId,
+                        onClick = { onSelectCategory(category) }
                     )
                 }
             }
@@ -399,7 +392,7 @@ fun CategoryScreen(
             state.error?.let { message ->
                 ErrorBanner(
                     message = message,
-                    onRetry = { state.selectedCategory?.let(onSelectCategory) }
+                    onRetry = onRetryCategory
                 )
             } ?: when {
                 state.isCategoryLoading -> LoadingPane("分类加载中...")
@@ -449,18 +442,10 @@ private fun CategoryFilterPanel(
                 )
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     item(key = "${group.key}_all") {
-                        val selected = selectedFilters[group.key].isNullOrBlank()
-                        AssistChip(
-                            onClick = { onSelectFilter(group.key, "") },
-                            label = { Text("全部", fontWeight = FontWeight.SemiBold) },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = if (selected) UiPalette.Ink else UiPalette.Surface,
-                                labelColor = if (selected) UiPalette.Surface else UiPalette.Ink
-                            ),
-                            border = AssistChipDefaults.assistChipBorder(
-                                borderColor = if (selected) UiPalette.Ink else UiPalette.BorderSoft,
-                                enabled = true
-                            )
+                        SelectableAssistChip(
+                            text = "全部",
+                            selected = selectedFilters[group.key].isNullOrBlank(),
+                            onClick = { onSelectFilter(group.key, "") }
                         )
                     }
                     items(
@@ -468,24 +453,36 @@ private fun CategoryFilterPanel(
                         key = { option -> "${group.key}_$option" },
                         contentType = { "category_filter_option" }
                     ) { option ->
-                        val selected = selectedFilters[group.key] == option
-                        AssistChip(
-                            onClick = { onSelectFilter(group.key, option) },
-                            label = { Text(option, fontWeight = FontWeight.SemiBold) },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = if (selected) UiPalette.Ink else UiPalette.Surface,
-                                labelColor = if (selected) UiPalette.Surface else UiPalette.Ink
-                            ),
-                            border = AssistChipDefaults.assistChipBorder(
-                                borderColor = if (selected) UiPalette.Ink else UiPalette.BorderSoft,
-                                enabled = true
-                            )
+                        SelectableAssistChip(
+                            text = option,
+                            selected = selectedFilters[group.key] == option,
+                            onClick = { onSelectFilter(group.key, option) }
                         )
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SelectableAssistChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    AssistChip(
+        onClick = onClick,
+        label = { Text(text, fontWeight = FontWeight.SemiBold) },
+        colors = AssistChipDefaults.assistChipColors(
+            containerColor = if (selected) UiPalette.Ink else UiPalette.Surface,
+            labelColor = if (selected) UiPalette.Surface else UiPalette.Ink
+        ),
+        border = AssistChipDefaults.assistChipBorder(
+            borderColor = if (selected) UiPalette.Ink else UiPalette.BorderSoft,
+            enabled = true
+        )
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -262,6 +262,7 @@ fun JlenVideoApp() {
                                 state = viewModel.homeState,
                                 onSelectCategory = viewModel::selectCategory,
                                 onSelectFilter = viewModel::updateCategoryFilter,
+                                onRetryCategory = { viewModel.refreshCategoryTab(forceRefresh = true) },
                                 onLoadMore = viewModel::loadMoreCategory,
                                 onOpenDetail = { navController.navigate("detail/$it") }
                             )

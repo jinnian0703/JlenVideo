@@ -3,6 +3,7 @@ package top.jlen.vod.data
 import androidx.core.text.HtmlCompat
 import com.google.gson.JsonParser
 import com.google.gson.annotations.SerializedName
+import kotlin.LazyThreadSafetyMode
 
 data class AppleCmsResponse(
     @SerializedName("code") val code: Int = 0,
@@ -61,22 +62,21 @@ data class AppleCmsCategory(
     @SerializedName("type_extend") val typeExtend: String? = null,
     @SerializedName("child") val children: List<AppleCmsCategory> = emptyList()
 ) {
-    val filterGroups: List<CategoryFilterGroup>
-        get() {
-            val parsed = runCatching { JsonParser.parseString(typeExtend.orEmpty()).asJsonObject }.getOrNull()
-                ?: return emptyList()
-            return CATEGORY_FILTER_LABELS.mapNotNull { (key, label) ->
-                val options = parsed.get(key)
-                    ?.takeIf { it.isJsonPrimitive }
-                    ?.asString
-                    .orEmpty()
-                    .split(",")
-                    .map(::sanitizeUserFacingToken)
-                    .distinct()
-                    .filter(String::isNotBlank)
-                if (options.isEmpty()) null else CategoryFilterGroup(key = key, label = label, options = options)
-            }
+    val filterGroups: List<CategoryFilterGroup> by lazy(LazyThreadSafetyMode.NONE) {
+        val parsed = runCatching { JsonParser.parseString(typeExtend.orEmpty()).asJsonObject }.getOrNull()
+            ?: return@lazy emptyList()
+        CATEGORY_FILTER_LABELS.mapNotNull { (key, label) ->
+            val options = parsed.get(key)
+                ?.takeIf { it.isJsonPrimitive }
+                ?.asString
+                .orEmpty()
+                .split(",")
+                .map(::sanitizeUserFacingToken)
+                .distinct()
+                .filter(String::isNotBlank)
+            if (options.isEmpty()) null else CategoryFilterGroup(key = key, label = label, options = options)
         }
+    }
 }
 
 data class CategoryFilterGroup(
