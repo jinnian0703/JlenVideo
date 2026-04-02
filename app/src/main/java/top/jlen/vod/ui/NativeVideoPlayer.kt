@@ -817,7 +817,7 @@ fun NativeVideoPlayer(
                 }
             }
 
-            if (playbackState != Player.STATE_ENDED && showPausedOverlay && !playerLocked) {
+            if (playbackState != Player.STATE_ENDED && showPausedOverlay && controlsShown) {
                 IconButton(
                     modifier = Modifier
                         .align(Alignment.Center)
