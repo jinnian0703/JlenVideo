@@ -1752,9 +1752,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun selectPlayerSource(index: Int) {
         if (playerState.sources.isEmpty()) return
         val safeIndex = index.coerceIn(0, playerState.sources.lastIndex)
+        val targetEpisodes = playerState.sources.getOrNull(safeIndex)?.episodes.orEmpty()
+        val preservedEpisodeIndex = playerState.selectedEpisodeIndex
+            .coerceIn(0, (targetEpisodes.size - 1).coerceAtLeast(0))
         playerState = playerState.copy(
             selectedSourceIndex = safeIndex,
-            selectedEpisodeIndex = 0,
+            selectedEpisodeIndex = preservedEpisodeIndex,
             playbackSnapshot = PlaybackSnapshot()
         )
         resolveCurrentPlayerUrl()
