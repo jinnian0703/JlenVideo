@@ -167,9 +167,12 @@ fun NativeVideoPlayer(
     var gestureMoved by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
     var longPressBoostActive by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
     var longPressJob by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Job?>(null) }
+    var pendingSingleTapJob by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Job?>(null) }
+    var lastSimpleTapAt by remember(playbackIdentity, fullscreenMode) { mutableLongStateOf(0L) }
     var autoHideJob by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Job?>(null) }
     var lockActionPressed by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
     val longPressTimeoutMs = remember { ViewConfiguration.getLongPressTimeout().toLong() }
+    val doubleTapTimeoutMs = remember { ViewConfiguration.getDoubleTapTimeout().toLong() }
     val touchSlopPx = remember { 24f }
     val lockButtonSizePx = with(density) { 52.dp.toPx() }
     val lockButtonSidePaddingPx = with(density) { 18.dp.toPx() }
@@ -220,6 +223,24 @@ fun NativeVideoPlayer(
         }
     }
 
+    fun pausePlaybackByUser() {
+        player?.pause()
+        isUserPaused = true
+        showPausedOverlay = true
+        isPlaying = player?.isPlaying == true
+        dispatchSnapshot(force = true)
+    }
+
+    fun resumePlaybackByUser() {
+        if (playbackState != Player.STATE_ENDED) {
+            player?.play()
+        }
+        isUserPaused = false
+        showPausedOverlay = false
+        isPlaying = player?.isPlaying == true
+        dispatchSnapshot(force = true)
+    }
+
     fun updateBrightness(value: Float) {
         val safeValue = value.coerceIn(0.05f, 1f)
         hostActivity?.setScreenBrightness(safeValue)
@@ -268,6 +289,9 @@ fun NativeVideoPlayer(
     fun setPlayerLocked(locked: Boolean) {
         playerLocked = locked
         lockActionPressed = false
+        pendingSingleTapJob?.cancel()
+        pendingSingleTapJob = null
+        lastSimpleTapAt = 0L
         autoHideJob?.cancel()
         autoHideJob = null
         if (locked) {
@@ -314,12 +338,31 @@ fun NativeVideoPlayer(
                 }
             }
         } else if (isSimpleTap) {
-            controlsVisible = !controlsVisible
-            if (controlsVisible) {
-                lastInteractionAt = SystemClock.elapsedRealtime()
+            val now = SystemClock.elapsedRealtime()
+            if (pendingSingleTapJob != null && now - lastSimpleTapAt <= doubleTapTimeoutMs) {
+                pendingSingleTapJob?.cancel()
+                pendingSingleTapJob = null
+                lastSimpleTapAt = 0L
+                if (player?.isPlaying == true) {
+                    pausePlaybackByUser()
+                }
+            } else {
+                lastSimpleTapAt = now
+                pendingSingleTapJob?.cancel()
+                pendingSingleTapJob = scope.launch {
+                    delay(doubleTapTimeoutMs)
+                    controlsVisible = !controlsVisible
+                    if (controlsVisible) {
+                        lastInteractionAt = SystemClock.elapsedRealtime()
+                    }
+                    controlsVersion++
+                    pendingSingleTapJob = null
+                }
             }
-            controlsVersion++
         } else if (!cancelled) {
+            pendingSingleTapJob?.cancel()
+            pendingSingleTapJob = null
+            lastSimpleTapAt = 0L
             markInteraction(forceControlsVisible = false)
         }
 
@@ -331,7 +374,10 @@ fun NativeVideoPlayer(
     }
 
     DisposableEffect(player) {
-        onDispose { player?.release() }
+        onDispose {
+            pendingSingleTapJob?.cancel()
+            player?.release()
+        }
     }
 
     DisposableEffect(player, fullscreenMode, latestOrientationCallback.value, latestFullscreenToggleCallback.value) {
@@ -777,10 +823,7 @@ fun NativeVideoPlayer(
                         .align(Alignment.Center)
                         .size(if (fullscreenMode) 112.dp else 104.dp),
                     onClick = {
-                        player.play()
-                        isPlaying = true
-                        showPausedOverlay = false
-                        isUserPaused = false
+                        resumePlaybackByUser()
                         markInteraction()
                     }
                 ) {
@@ -1063,15 +1106,10 @@ fun NativeVideoPlayer(
                             IconButton(
                                 onClick = {
                                     if (player.isPlaying) {
-                                        player.pause()
-                                        isUserPaused = true
-                                        showPausedOverlay = true
+                                        pausePlaybackByUser()
                                     } else {
-                                        player.play()
-                                        isUserPaused = false
-                                        showPausedOverlay = false
+                                        resumePlaybackByUser()
                                     }
-                                    isPlaying = player.isPlaying
                                     markInteraction()
                                 }
                             ) {
