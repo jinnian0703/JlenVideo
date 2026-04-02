@@ -153,7 +153,6 @@ fun NativeVideoPlayer(
     var contentSize by remember(playbackIdentity, fullscreenMode) { mutableStateOf(IntSize.Zero) }
     var playerLocked by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
     var unlockHintVisible by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
-    var unlockHintVersion by remember(playbackIdentity, fullscreenMode) { mutableLongStateOf(0L) }
     var gestureFeedback by remember(playbackIdentity, fullscreenMode) { mutableStateOf<PlayerGestureFeedback?>(null) }
     var gestureProgress by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Float?>(null) }
     var gestureMode by remember(playbackIdentity, fullscreenMode) { mutableStateOf(PlayerGestureMode.None) }
@@ -167,6 +166,7 @@ fun NativeVideoPlayer(
     var gestureMoved by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
     var longPressBoostActive by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
     var longPressJob by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Job?>(null) }
+    var unlockHintAutoHideJob by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Job?>(null) }
     var pendingSingleTapJob by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Job?>(null) }
     var lastSimpleTapAt by remember(playbackIdentity, fullscreenMode) { mutableLongStateOf(0L) }
     var autoHideJob by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Job?>(null) }
@@ -264,13 +264,19 @@ fun NativeVideoPlayer(
     }
 
     fun showUnlockHint() {
+        unlockHintAutoHideJob?.cancel()
         unlockHintVisible = true
-        unlockHintVersion++
+        unlockHintAutoHideJob = scope.launch {
+            delay(3_000L)
+            unlockHintVisible = false
+            unlockHintAutoHideJob = null
+        }
     }
 
     fun hideUnlockHint() {
+        unlockHintAutoHideJob?.cancel()
+        unlockHintAutoHideJob = null
         unlockHintVisible = false
-        unlockHintVersion++
     }
 
     fun isWithinLockAction(x: Float, y: Float): Boolean {
@@ -292,6 +298,8 @@ fun NativeVideoPlayer(
         pendingSingleTapJob?.cancel()
         pendingSingleTapJob = null
         lastSimpleTapAt = 0L
+        unlockHintAutoHideJob?.cancel()
+        unlockHintAutoHideJob = null
         autoHideJob?.cancel()
         autoHideJob = null
         if (locked) {
@@ -378,6 +386,7 @@ fun NativeVideoPlayer(
     DisposableEffect(player) {
         onDispose {
             pendingSingleTapJob?.cancel()
+            unlockHintAutoHideJob?.cancel()
             player?.release()
         }
     }
@@ -536,6 +545,8 @@ fun NativeVideoPlayer(
             if (playerLocked) {
                 playerLocked = false
                 unlockHintVisible = false
+                unlockHintAutoHideJob?.cancel()
+                unlockHintAutoHideJob = null
                 gestureFeedback = null
                 gestureProgress = null
                 gestureMode = PlayerGestureMode.None
@@ -554,15 +565,6 @@ fun NativeVideoPlayer(
             return@LaunchedEffect
         }
         markInteraction(forceControlsVisible = false)
-    }
-
-    LaunchedEffect(fullscreenMode, playerLocked, unlockHintVisible, unlockHintVersion) {
-        if (!fullscreenMode || !playerLocked || !unlockHintVisible) return@LaunchedEffect
-        val version = unlockHintVersion
-        delay(3_000L)
-        if (version == unlockHintVersion) {
-            unlockHintVisible = false
-        }
     }
 
     if (player == null) {
