@@ -1082,13 +1082,20 @@ fun NativeVideoPlayer(
                         },
                         onValueChangeFinished = {
                             val target = (duration * sliderPosition).toLong()
+                            val wasPlayingBeforeSeek = player.isPlaying
+                            val wasPausedByUser = isUserPaused
                             player.seekTo(target)
-                            if (playbackState != Player.STATE_ENDED) {
+                            if (wasPlayingBeforeSeek && playbackState != Player.STATE_ENDED) {
                                 player.play()
                                 isPlaying = true
+                                showPausedOverlay = false
+                                isUserPaused = false
+                            } else {
+                                player.pause()
+                                isPlaying = false
+                                showPausedOverlay = wasPausedByUser && playbackState != Player.STATE_ENDED
+                                isUserPaused = wasPausedByUser
                             }
-                            showPausedOverlay = false
-                            isUserPaused = false
                             currentPosition = target
                             isDragging = false
                             dispatchSnapshot(force = true)
