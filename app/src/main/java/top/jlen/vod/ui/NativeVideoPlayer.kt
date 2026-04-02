@@ -128,6 +128,7 @@ fun NativeVideoPlayer(
     var duration by remember(player) { mutableLongStateOf(0L) }
     var sliderPosition by remember(playbackIdentity) { mutableFloatStateOf(0f) }
     var isDragging by remember(playbackIdentity) { mutableStateOf(false) }
+    var sliderDragStartPositionMs by remember(playbackIdentity) { mutableLongStateOf(0L) }
     var speed by remember(playbackIdentity) { mutableFloatStateOf(initialSnapshot.speed) }
     var shouldResumeOnStart by remember(playbackIdentity) { mutableStateOf(false) }
     var controlsVisible by remember(fullscreenMode, playbackIdentity) { mutableStateOf(true) }
@@ -1078,8 +1079,17 @@ fun NativeVideoPlayer(
                     Slider(
                         value = sliderPosition,
                         onValueChange = {
+                            if (!isDragging) {
+                                sliderDragStartPositionMs = currentPosition.coerceAtLeast(0L)
+                            }
                             isDragging = true
                             sliderPosition = it
+                            val previewPosition = (duration * it).toLong().coerceIn(0L, duration.coerceAtLeast(0L))
+                            gestureProgress = it.coerceIn(0f, 1f)
+                            gestureFeedback = PlayerGestureFeedback(
+                                title = formatMillis(previewPosition),
+                                detail = formatSignedDuration(previewPosition - sliderDragStartPositionMs)
+                            )
                             markInteraction()
                         },
                         onValueChangeFinished = {
@@ -1100,6 +1110,8 @@ fun NativeVideoPlayer(
                             }
                             currentPosition = target
                             isDragging = false
+                            gestureFeedback = null
+                            gestureProgress = null
                             dispatchSnapshot(force = true)
                             markInteraction()
                         },
