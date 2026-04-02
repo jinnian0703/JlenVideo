@@ -1,6 +1,7 @@
 package top.jlen.vod.data
 
 import androidx.core.text.HtmlCompat
+import com.google.gson.JsonParser
 import com.google.gson.annotations.SerializedName
 
 data class AppleCmsResponse(
@@ -56,7 +57,32 @@ data class CursorPagedVodItems(
 data class AppleCmsCategory(
     @SerializedName("type_id") val typeId: String = "",
     @SerializedName("type_name") val typeName: String = "",
-    @SerializedName("type_pid") val parentId: String? = null
+    @SerializedName("type_pid") val parentId: String? = null,
+    @SerializedName("type_extend") val typeExtend: String? = null,
+    @SerializedName("child") val children: List<AppleCmsCategory> = emptyList()
+) {
+    val filterGroups: List<CategoryFilterGroup>
+        get() {
+            val parsed = runCatching { JsonParser.parseString(typeExtend.orEmpty()).asJsonObject }.getOrNull()
+                ?: return emptyList()
+            return CATEGORY_FILTER_LABELS.mapNotNull { (key, label) ->
+                val options = parsed.get(key)
+                    ?.takeIf { it.isJsonPrimitive }
+                    ?.asString
+                    .orEmpty()
+                    .split(",")
+                    .map(::sanitizeUserFacingToken)
+                    .distinct()
+                    .filter(String::isNotBlank)
+                if (options.isEmpty()) null else CategoryFilterGroup(key = key, label = label, options = options)
+            }
+        }
+}
+
+data class CategoryFilterGroup(
+    val key: String,
+    val label: String,
+    val options: List<String>
 )
 
 data class VodItem(
@@ -176,6 +202,15 @@ fun sanitizeUserFacingComposite(value: String?): String =
         .map(::sanitizeUserFacingToken)
         .filter(String::isNotBlank)
         .joinToString(" | ")
+
+private val CATEGORY_FILTER_LABELS = linkedMapOf(
+    "class" to "类型",
+    "area" to "地区",
+    "year" to "年份",
+    "lang" to "语言",
+    "state" to "状态",
+    "version" to "版本"
+)
 
 data class PlaySource(
     val name: String,

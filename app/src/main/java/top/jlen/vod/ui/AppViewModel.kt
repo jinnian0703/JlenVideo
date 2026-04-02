@@ -24,6 +24,7 @@ import top.jlen.vod.data.AppUpdateInfo
 import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.AppleCmsRepository
 import top.jlen.vod.data.AuthSession
+import top.jlen.vod.data.CategoryFilterGroup
 import top.jlen.vod.data.Episode
 import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.HotSearchGroup
@@ -295,9 +296,41 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (!forceRefresh && sameCategory && homeState.categoryFirstLoaded) {
             return
         }
+        loadCategoryContent(
+            category = category,
+            filters = emptyMap()
+        )
+    }
+
+    fun updateCategoryFilter(key: String, value: String) {
+        val category = homeState.selectedCategory ?: return
+        val normalizedKey = key.trim()
+        if (normalizedKey.isBlank()) return
+        val normalizedValue = value.trim()
+        val updatedFilters = homeState.selectedCategoryFilters.toMutableMap().apply {
+            if (normalizedValue.isBlank()) {
+                remove(normalizedKey)
+            } else {
+                put(normalizedKey, normalizedValue)
+            }
+        }
+        if (updatedFilters == homeState.selectedCategoryFilters && homeState.categoryFirstLoaded) {
+            return
+        }
+        loadCategoryContent(
+            category = category,
+            filters = updatedFilters
+        )
+    }
+
+    private fun loadCategoryContent(
+        category: AppleCmsCategory,
+        filters: Map<String, String>
+    ) {
         viewModelScope.launch {
             homeState = homeState.copy(
                 selectedCategory = category,
+                selectedCategoryFilters = filters,
                 categoryVideos = emptyList(),
                 categoryVisibleCount = 0,
                 categoryCursor = "",
@@ -310,7 +343,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             )
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.loadCategoryCursorPage(typeId = category.typeId, cursor = "")
+                    repository.loadCategoryCursorPage(
+                        typeId = category.typeId,
+                        cursor = "",
+                        filters = filters
+                    )
                 }
             }.onSuccess { payload ->
                 homeState = homeState.copy(
@@ -416,7 +453,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             homeState = homeState.copy(isCategoryAppending = true, categoryAppendError = null)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.loadCategoryCursorPage(typeId = category.typeId, cursor = homeState.categoryCursor)
+                    repository.loadCategoryCursorPage(
+                        typeId = category.typeId,
+                        cursor = homeState.categoryCursor,
+                        filters = homeState.selectedCategoryFilters
+                    )
                 }
             }.onSuccess { payload ->
                 val mergedVideos = (homeState.categoryVideos + payload.items).distinctBy { it.vodId }
@@ -645,7 +686,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshCategoryTab(forceRefresh: Boolean = false) {
         val selectedCategory = homeState.selectedCategory ?: homeState.categories.firstOrNull() ?: return
-        selectCategory(selectedCategory, forceRefresh = forceRefresh)
+        if (forceRefresh || homeState.selectedCategoryFilters.isNotEmpty()) {
+            loadCategoryContent(
+                category = selectedCategory,
+                filters = homeState.selectedCategoryFilters
+            )
+        } else {
+            selectCategory(selectedCategory, forceRefresh = forceRefresh)
+        }
     }
 
     fun updateRegisterEditor(transform: (RegisterEditor) -> RegisterEditor) {
@@ -1894,6 +1942,7 @@ data class HomeUiState(
     val homeFirstLoaded: Boolean = false,
     val categories: List<AppleCmsCategory> = emptyList(),
     val selectedCategory: AppleCmsCategory? = null,
+    val selectedCategoryFilters: Map<String, String> = emptyMap(),
     val categoryVideos: List<VodItem> = emptyList(),
     val categoryVisibleCount: Int = 0,
     val categoryCursor: String = "",
@@ -1911,6 +1960,9 @@ data class HomeUiState(
 
     val hasMoreCategoryVideos: Boolean
         get() = categoryVisibleCount < categoryVideos.size || hasMoreCategoryItems
+
+    val categoryFilterGroups: List<CategoryFilterGroup>
+        get() = selectedCategory?.filterGroups.orEmpty()
 }
 
 data class NoticeUiState(

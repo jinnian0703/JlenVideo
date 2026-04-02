@@ -261,6 +261,7 @@ fun JlenVideoApp() {
                             CategoryScreen(
                                 state = viewModel.homeState,
                                 onSelectCategory = viewModel::selectCategory,
+                                onSelectFilter = viewModel::updateCategoryFilter,
                                 onLoadMore = viewModel::loadMoreCategory,
                                 onOpenDetail = { navController.navigate("detail/$it") }
                             )

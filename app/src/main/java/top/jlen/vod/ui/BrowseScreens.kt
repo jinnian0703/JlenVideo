@@ -117,6 +117,7 @@ import okhttp3.Request
 import top.jlen.vod.BuildConfig
 import top.jlen.vod.data.AppNotice
 import top.jlen.vod.data.AppleCmsCategory
+import top.jlen.vod.data.CategoryFilterGroup
 import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.HotSearchGroup
 import top.jlen.vod.data.MembershipPlan
@@ -298,6 +299,7 @@ fun HomeScreen(
 fun CategoryScreen(
     state: HomeUiState,
     onSelectCategory: (AppleCmsCategory) -> Unit,
+    onSelectFilter: (String, String) -> Unit,
     onLoadMore: () -> Unit,
     onOpenDetail: (String) -> Unit
 ) {
@@ -384,6 +386,15 @@ fun CategoryScreen(
                 onAction = {}
             )
         }
+        if (state.categoryFilterGroups.isNotEmpty()) {
+            item {
+                CategoryFilterPanel(
+                    groups = state.categoryFilterGroups,
+                    selectedFilters = state.selectedCategoryFilters,
+                    onSelectFilter = onSelectFilter
+                )
+            }
+        }
         item {
             state.error?.let { message ->
                 ErrorBanner(
@@ -411,6 +422,67 @@ fun CategoryScreen(
                     errorMessage = state.categoryAppendError,
                     onLoadMore = onLoadMore
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryFilterPanel(
+    groups: List<CategoryFilterGroup>,
+    selectedFilters: Map<String, String>,
+    onSelectFilter: (String, String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        groups.forEach { group ->
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = group.label,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = UiPalette.Ink
+                )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item(key = "${group.key}_all") {
+                        val selected = selectedFilters[group.key].isNullOrBlank()
+                        AssistChip(
+                            onClick = { onSelectFilter(group.key, "") },
+                            label = { Text("全部", fontWeight = FontWeight.SemiBold) },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = if (selected) UiPalette.Ink else UiPalette.Surface,
+                                labelColor = if (selected) UiPalette.Surface else UiPalette.Ink
+                            ),
+                            border = AssistChipDefaults.assistChipBorder(
+                                borderColor = if (selected) UiPalette.Ink else UiPalette.BorderSoft,
+                                enabled = true
+                            )
+                        )
+                    }
+                    items(
+                        items = group.options,
+                        key = { option -> "${group.key}_$option" },
+                        contentType = { "category_filter_option" }
+                    ) { option ->
+                        val selected = selectedFilters[group.key] == option
+                        AssistChip(
+                            onClick = { onSelectFilter(group.key, option) },
+                            label = { Text(option, fontWeight = FontWeight.SemiBold) },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = if (selected) UiPalette.Ink else UiPalette.Surface,
+                                labelColor = if (selected) UiPalette.Surface else UiPalette.Ink
+                            ),
+                            border = AssistChipDefaults.assistChipBorder(
+                                borderColor = if (selected) UiPalette.Ink else UiPalette.BorderSoft,
+                                enabled = true
+                            )
+                        )
+                    }
+                }
             }
         }
     }
