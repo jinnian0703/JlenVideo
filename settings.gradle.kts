@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "JlenVideo"
 include(":app")
+include(":core:model")
