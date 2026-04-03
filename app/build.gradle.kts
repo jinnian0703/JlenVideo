@@ -109,7 +109,7 @@ dependencies {
     androidTestImplementation(composeBom)
     implementation(project(":core:common"))
     implementation(project(":core:data"))
-    implementation(project(":feature:main"))
+    implementation(project(":feature:shell"))
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
