@@ -302,6 +302,128 @@ internal fun parseNoticeTimeToMillis(raw: String): Long? {
         .firstOrNull()
 }
 
+internal fun extractVodId(detailHref: String): String =
+    detailHref.trim()
+        .removeSuffix("/")
+        .substringAfterLast("/voddetail/", "")
+        .substringBefore('/')
+
+internal fun extractCategorySlug(typeId: String): String =
+    typeId.trim()
+        .removeSuffix("/")
+        .substringAfterLast("/vodtype/", typeId.trim().removeSuffix("/"))
+        .substringAfterLast('/')
+
+internal fun normalizeCategory(category: AppleCmsCategory): AppleCmsCategory {
+    val normalizedTypeId = extractCategorySlug(category.typeId)
+        .ifBlank { category.typeId.trim().removeSuffix("/") }
+    val rawParentId = category.parentId.orEmpty().trim()
+    val normalizedParentId = when {
+        rawParentId.isBlank() -> null
+        rawParentId == "0" -> "0"
+        else -> extractCategorySlug(rawParentId).ifBlank { rawParentId.removeSuffix("/") }
+    }
+    return category.copy(
+        typeId = normalizedTypeId,
+        typeName = category.typeName.trim(),
+        parentId = normalizedParentId
+    )
+}
+
+internal fun formatMembershipExpiry(raw: String): String {
+    val value = raw.trim()
+    if (value.isBlank() || value == "0") return ""
+
+    value.toLongOrNull()?.let { numeric ->
+        if (numeric <= 0L) return ""
+        val millis = if (value.length <= 10) numeric * 1000 else numeric
+        return SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(millis)
+    }
+
+    return decodeSiteText(value)
+}
+
+internal fun normalizeRecordTitle(rawTitle: String, rowText: String): String {
+    val decodedTitle = decodeSiteText(rawTitle)
+        .replace(Regex("^\\[[^\\]]+\\]\\s*"), "")
+        .trim()
+    if (decodedTitle.isNotBlank()) return decodedTitle
+
+    return rowText
+        .substringBefore("类型：")
+        .substringBefore("积分：")
+        .substringBefore("时间：")
+        .substringBefore("[")
+        .replace("继续观看", "")
+        .replace("查看详情", "")
+        .replace("删除", "")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+}
+
+internal fun buildUserRecordSubtitle(rowText: String, title: String): String =
+    rowText
+        .removePrefix(title)
+        .replace(title, "")
+        .replace("继续观看", "")
+        .replace("查看详情", "")
+        .replace("删除", "")
+        .replace("重播", "")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+
+internal fun buildUserRecordSubtitleEnhanced(
+    rowText: String,
+    title: String,
+    route: PlayRoute?
+): String {
+    val metaText = rowText
+        .removePrefix(title)
+        .replace(title, "")
+        .replace(Regex("\\[\\d+-\\d+-\\d+]"), "")
+        .replace("继续观看", "")
+        .replace("查看详情", "")
+        .replace("删除", "")
+        .replace("重播", "")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+
+    return listOfNotNull(
+        route?.let(::formatHistoryRouteLabel),
+        metaText.takeIf { it.isNotBlank() }
+    ).joinToString(" | ")
+}
+
+internal fun formatHistoryRouteLabel(route: PlayRoute): String {
+    val episodeNumber = route.nid.toIntOrNull()
+    val sourceNumber = route.sid.toIntOrNull()
+    return buildString {
+        if (sourceNumber != null && sourceNumber > 0) {
+            append("线路")
+            append(sourceNumber)
+        }
+        if (episodeNumber != null && episodeNumber > 0) {
+            if (isNotEmpty()) append(" · ")
+            append("第")
+            append(episodeNumber)
+            append("集")
+        }
+    }.ifBlank {
+        listOf(route.sid.takeIf { it.isNotBlank() }, route.nid.takeIf { it.isNotBlank() })
+            .joinToString(" - ")
+    }
+}
+
+internal fun replaceHistorySourceLabel(subtitle: String, sourceName: String): String {
+    if (subtitle.isBlank() || sourceName.isBlank()) return subtitle
+    val replaced = subtitle.replaceFirst(Regex("^线路\\d+"), sourceName)
+    return if (replaced == subtitle) {
+        "$sourceName | $subtitle"
+    } else {
+        replaced
+    }
+}
+
 data class HomePayload(
     val slides: List<VodItem>,
     val hot: List<VodItem>,
