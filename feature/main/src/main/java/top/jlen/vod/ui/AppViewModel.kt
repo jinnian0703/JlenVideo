@@ -17,8 +17,8 @@ import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.net.ssl.SSLException
+import top.jlen.vod.AppRuntimeInfo
 import top.jlen.vod.data.AppNotice
-import top.jlen.vod.BuildConfig
 import top.jlen.vod.CrashLogger
 import top.jlen.vod.data.AppUpdateInfo
 import top.jlen.vod.data.AppleCmsCategory
@@ -144,7 +144,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             accountState = accountState.copy(isUpdateLoading = true)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.loadLatestRelease(BuildConfig.VERSION_NAME)
+                    repository.loadLatestRelease(AppRuntimeInfo.versionName)
                 }
             }.onSuccess { updateInfo ->
                 accountState = accountState.copy(
@@ -169,7 +169,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             runCatching {
                 withContext(Dispatchers.IO) {
                     repository.loadNotices(
-                        appVersion = BuildConfig.VERSION_NAME,
+                        appVersion = AppRuntimeInfo.versionName,
                         userId = userId,
                         forceRefresh = forceRefresh
                     )
@@ -2113,14 +2113,3 @@ data class PlayerUiState(
         get() = selectedEpisodeIndex < episodes.lastIndex
 }
 
-data class PlaybackSnapshot(
-    val positionMs: Long = 0L,
-    val speed: Float = 1f,
-    val playWhenReady: Boolean = true
-)
-
-data class FullscreenPlaybackResult(
-    val episodeIndex: Int,
-    val resolvedUrl: String,
-    val snapshot: PlaybackSnapshot
-)

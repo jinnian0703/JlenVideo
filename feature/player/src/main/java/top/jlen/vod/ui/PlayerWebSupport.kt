@@ -8,10 +8,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import top.jlen.vod.BuildConfig
-
-internal const val PLAYER_DESKTOP_UA =
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36"
+import top.jlen.vod.AppConfig
+import top.jlen.vod.PLAYER_DESKTOP_UA
 
 internal fun createNativePlayer(
     context: Context,
@@ -23,8 +21,8 @@ internal fun createNativePlayer(
         .setAllowCrossProtocolRedirects(true)
         .setDefaultRequestProperties(
             mapOf(
-                "Referer" to BuildConfig.APPLE_CMS_BASE_URL,
-                "Origin" to BuildConfig.APPLE_CMS_BASE_URL.trimEnd('/')
+                "Referer" to AppConfig.appleCmsBaseUrl,
+                "Origin" to AppConfig.appleCmsBaseUrl.trimEnd('/')
             )
         )
 

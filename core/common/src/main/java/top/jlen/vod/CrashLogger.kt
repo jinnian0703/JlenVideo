@@ -60,9 +60,9 @@ object CrashLogger {
         val content = buildString {
             appendLine("time=$displayTimestamp")
             appendLine("thread=${thread.name}")
-            appendLine("versionName=${BuildConfig.VERSION_NAME}")
-            appendLine("versionCode=${BuildConfig.VERSION_CODE}")
-            appendLine("package=${BuildConfig.APPLICATION_ID}")
+            appendLine("versionName=${AppRuntimeInfo.versionName}")
+            appendLine("versionCode=${AppRuntimeInfo.versionCode}")
+            appendLine("package=${AppRuntimeInfo.applicationId}")
             appendLine()
             appendLine(stackTrace)
         }

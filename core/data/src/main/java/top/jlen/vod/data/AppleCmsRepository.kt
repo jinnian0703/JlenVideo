@@ -48,8 +48,9 @@ import org.jsoup.nodes.Element
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.HttpException
-import top.jlen.vod.BuildConfig
-import top.jlen.vod.ui.PLAYER_DESKTOP_UA
+import top.jlen.vod.AppConfig
+import top.jlen.vod.AppRuntimeInfo
+import top.jlen.vod.PLAYER_DESKTOP_UA
 import javax.net.ssl.SSLException
 
 class AppleCmsRepository(
@@ -68,8 +69,8 @@ class AppleCmsRepository(
         AppleCmsCategory(typeId = "GCCCCV", typeName = "综艺", parentId = "GCCCCV"),
         AppleCmsCategory(typeId = "GCCCCW", typeName = "动漫", parentId = "GCCCCW")
     )
-    private val baseUrl = BuildConfig.APPLE_CMS_BASE_URL.trimEnd('/')
-    private val fallbackApiBaseUrl = BuildConfig.APPLE_CMS_FALLBACK_BASE_URL
+    private val baseUrl = AppConfig.appleCmsBaseUrl.trimEnd('/')
+    private val fallbackApiBaseUrl = AppConfig.appleCmsFallbackBaseUrl
         .trimEnd('/')
         .takeIf { it.isNotBlank() && !it.equals(baseUrl, ignoreCase = true) }
     private val gson = Gson()
@@ -841,7 +842,7 @@ class AppleCmsRepository(
                 FormBody.Builder()
                     .add("device_id", ensureHeartbeatDeviceId())
                     .add("platform", "android")
-                    .add("app_version", BuildConfig.VERSION_NAME)
+                    .add("app_version", AppRuntimeInfo.versionName)
                     .add("route", route.trim().ifBlank { "home" })
                     .apply {
                         userId.trim()
@@ -907,7 +908,7 @@ class AppleCmsRepository(
     }
 
     suspend fun loadNotices(
-        appVersion: String = BuildConfig.VERSION_NAME,
+        appVersion: String = AppRuntimeInfo.versionName,
         userId: String = "",
         forceRefresh: Boolean = false
     ): List<AppNotice> {
@@ -977,7 +978,7 @@ class AppleCmsRepository(
         val url = Uri.parse(APP_CENTER_API_URL)
             .buildUpon()
             .appendQueryParameter("action", "notices")
-            .appendQueryParameter("app_version", appVersion.trim().ifBlank { BuildConfig.VERSION_NAME })
+            .appendQueryParameter("app_version", appVersion.trim().ifBlank { AppRuntimeInfo.versionName })
             .apply {
                 userId.trim()
                     .takeIf(String::isNotBlank)

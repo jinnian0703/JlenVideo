@@ -114,7 +114,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import top.jlen.vod.BuildConfig
+import top.jlen.vod.AppConfig
+import top.jlen.vod.AppRuntimeInfo
+import top.jlen.vod.PLAYER_DESKTOP_UA
 import top.jlen.vod.data.AppNotice
 import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.CategoryFilterGroup
@@ -1714,8 +1716,8 @@ fun AccountScreen(
                         onUpgrade = onUpgradeMembership
                     )
                     AccountSection.About -> AboutPane(
-                        currentVersion = state.updateInfo?.currentVersion?.ifBlank { BuildConfig.VERSION_NAME }
-                            ?: BuildConfig.VERSION_NAME,
+                        currentVersion = state.updateInfo?.currentVersion?.ifBlank { AppRuntimeInfo.versionName }
+                            ?: AppRuntimeInfo.versionName,
                         latestVersion = state.updateInfo?.latestVersion.orEmpty(),
                         notes = state.updateInfo?.notes.orEmpty(),
                         hasUpdate = state.updateInfo?.hasUpdate == true,
@@ -1845,8 +1847,8 @@ fun AccountScreen(
 
                         AccountAuthMode.About -> {
                             AboutPane(
-                                currentVersion = state.updateInfo?.currentVersion?.ifBlank { BuildConfig.VERSION_NAME }
-                                    ?: BuildConfig.VERSION_NAME,
+                                currentVersion = state.updateInfo?.currentVersion?.ifBlank { AppRuntimeInfo.versionName }
+                                    ?: AppRuntimeInfo.versionName,
                                 latestVersion = state.updateInfo?.latestVersion.orEmpty(),
                                 notes = state.updateInfo?.notes.orEmpty(),
                                 hasUpdate = state.updateInfo?.hasUpdate == true,
@@ -4335,8 +4337,8 @@ private fun AuthenticatedAvatar(
                     .build()
                 val request = Request.Builder()
                     .url(imageUrl)
-                    .header("Referer", BuildConfig.APPLE_CMS_BASE_URL)
-                    .header("Origin", BuildConfig.APPLE_CMS_BASE_URL.trimEnd('/'))
+                    .header("Referer", AppConfig.appleCmsBaseUrl)
+                    .header("Origin", AppConfig.appleCmsBaseUrl.trimEnd('/'))
                     .header("User-Agent", PLAYER_DESKTOP_UA)
                     .build()
                 client.newCall(request).execute().use { response ->
