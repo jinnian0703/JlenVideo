@@ -12,11 +12,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
-import java.io.InterruptedIOException
-import java.net.ConnectException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
-import javax.net.ssl.SSLException
 import top.jlen.vod.AppRuntimeInfo
 import top.jlen.vod.data.AppNotice
 import top.jlen.vod.CrashLogger
@@ -28,7 +23,6 @@ import top.jlen.vod.data.CategoryFilterGroup
 import top.jlen.vod.data.Episode
 import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.HotSearchGroup
-import top.jlen.vod.data.HomePayload
 import top.jlen.vod.data.HomeSection
 import top.jlen.vod.data.MembershipInfo
 import top.jlen.vod.data.MembershipPlan
@@ -80,7 +74,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val session = repository.currentSession()
         accountState = if (session.isLoggedIn) {
             accountState.copy(
-                session = mergeAccountSession(session),
+                session = mergeAccountSession(session, accountState.session),
                 error = null
             )
         } else {
@@ -114,7 +108,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 withContext(Dispatchers.IO) { repository.loadUserProfileForApp() }
             }.onSuccess { page ->
                 accountState = accountState.copy(
-                    session = mergeAccountSession(page.session)
+                    session = mergeAccountSession(page.session, accountState.session)
                 )
             }
         }
@@ -217,26 +211,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun findNotice(noticeId: String): AppNotice? =
         noticeState.notices.firstOrNull { it.id == noticeId }
 
-    private fun resolveHeartbeatVodId(): String {
-        val item = playerState.item
-        return item?.siteVodId
-            .orEmpty()
-            .ifBlank { item?.vodId?.takeIf { it.all(Char::isDigit) }.orEmpty() }
-            .ifBlank {
-                Regex("""/vodplay/([^/]+?)-\d+-\d+(?:\.html)?/?(?:\?.*)?$""")
-                    .find(playerState.episodePageUrl)
-                    ?.groupValues
-                    ?.getOrNull(1)
-                    .orEmpty()
-                    .takeIf { it.all(Char::isDigit) }
-                    .orEmpty()
-            }
-    }
-
     fun reportHeartbeat(route: String) {
         val normalizedRoute = route.trim().ifBlank { "home" }
         val userId = accountState.session.userId
-        val vodId = if (normalizedRoute == "player") resolveHeartbeatVodId() else ""
+        val vodId = if (normalizedRoute == "player") resolveHeartbeatVodId(playerState) else ""
         val sid = if (normalizedRoute == "player") playerState.selectedSourceIndex + 1 else null
         val nid = if (normalizedRoute == "player") playerState.selectedEpisodeIndex + 1 else null
         viewModelScope.launch(Dispatchers.IO) {
@@ -367,33 +345,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
-    }
-
-    private fun homeStateFromPayload(
-        payload: HomePayload
-    ): HomeUiState {
-        val defaultSelected = payload.categories.firstOrNull()
-        val categoryVideos = payload.categoryVideos
-        return HomeUiState(
-            isLoading = false,
-            slides = payload.slides,
-            hot = payload.hot,
-            featured = payload.featured,
-            latest = payload.latest,
-            sections = payload.sections,
-            homeVisibleCount = payload.latest.initialGridVisibleCount(),
-            homeCursor = payload.latestCursor,
-            hasMoreHomeItems = payload.latestHasMore,
-            homeFirstLoaded = true,
-            categories = payload.categories,
-            selectedCategory = defaultSelected,
-            categoryVideos = categoryVideos,
-            categoryVisibleCount = categoryVideos.initialGridVisibleCount(),
-            categoryCursor = payload.categoryCursor,
-            hasMoreCategoryItems = payload.categoryHasMore,
-            categoryFirstLoaded = true,
-            error = null
-        )
     }
 
     fun loadMoreHome() {
@@ -1261,7 +1212,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     isContentLoading = false,
                     profileFields = page.fields,
                     profileEditor = page.editor,
-                    session = mergeAccountSession(page.session)
+                    session = mergeAccountSession(page.session, accountState.session)
                 )
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
@@ -1360,7 +1311,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadMembershipDataForApp() }
             }.onSuccess { page ->
-                val refreshedSession = mergeAccountSession(repository.currentSession()).let { session ->
+                val refreshedSession = mergeAccountSession(
+                    repository.currentSession(),
+                    accountState.session
+                ).let { session ->
                     session.copy(groupName = page.info.groupName.ifBlank { session.groupName })
                 }
                 accountState = accountState.copy(
@@ -1408,13 +1362,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun mergeAccountSession(session: AuthSession): AuthSession =
-        session.copy(
-            userName = session.userName.ifBlank { accountState.session.userName },
-            groupName = session.groupName.ifBlank { accountState.session.groupName },
-            portraitUrl = session.portraitUrl.ifBlank { accountState.session.portraitUrl }
-        )
-
     private fun handleAccountSessionExpired(error: Throwable): Boolean {
         val message = error.message.orEmpty()
         val isExpired = message.contains("请先登录") || message.contains("登录已失效")
@@ -1431,69 +1378,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
         return true
     }
-
-    private fun toUserFacingMessage(
-        error: Throwable,
-        fallback: String,
-        serviceLabel: String? = null
-    ): String {
-        val host = serviceLabel?.trim()?.takeIf(String::isNotBlank) ?: "内容服务"
-        val rawMessage = error.message.orEmpty().trim()
-
-        return when {
-            error is UnknownHostException || rawMessage.contains("Unable to resolve host", ignoreCase = true) ->
-                "无法连接到 $host，请检查网络或站点状态"
-
-            error is SocketTimeoutException ||
-                error is InterruptedIOException ||
-                rawMessage.contains("timeout", ignoreCase = true) ||
-                rawMessage.contains("timed out", ignoreCase = true) ->
-                "连接 $host 超时，请稍后重试"
-
-            error is ConnectException ||
-                rawMessage.contains("failed to connect", ignoreCase = true) ||
-                rawMessage.contains("connection refused", ignoreCase = true) ->
-                "无法连接到 $host，请稍后重试"
-
-            error is SSLException || rawMessage.contains("ssl", ignoreCase = true) ->
-                "与 $host 的安全连接失败，请稍后重试"
-
-            rawMessage.any { it in '\u4e00'..'\u9fff' } -> rawMessage
-
-            fallback.isNotBlank() -> "$fallback，请稍后重试"
-
-            else -> "请求失败，请稍后重试"
-        }
-    }
-
-    private fun normalizeFavoriteActionMessage(rawMessage: String): String {
-        val message = rawMessage.trim()
-        if (message.isBlank()) return "已加入收藏"
-        return when {
-            isDuplicateFavoriteMessage(message) -> "已在收藏中"
-            message.contains("成功") || message.contains("获取成功") || message.contains("操作成功") -> "已加入收藏"
-            else -> "已加入收藏"
-        }
-    }
-
-    private fun isDuplicateFavoriteMessage(rawMessage: String): Boolean {
-        val message = rawMessage.trim()
-        if (message.isBlank()) return false
-        return message.contains("已收藏") ||
-            message.contains("已经收藏") ||
-            message.contains("已存在") ||
-            message.contains("重复")
-    }
-
-    private fun mergeAccountItems(
-        current: List<UserCenterItem>,
-        incoming: List<UserCenterItem>
-    ): List<UserCenterItem> = (current + incoming)
-        .distinctBy { item -> "${item.recordId}:${item.actionUrl}:${item.vodId}" }
-
-    private fun historyRecordKey(item: UserCenterItem): String =
-        listOf(item.recordId, item.actionUrl, item.playUrl, item.title)
-            .joinToString("|")
 
     fun openHistoryRecord(item: UserCenterItem) {
         val resolvedVodId = item.vodId.ifBlank {
@@ -1922,16 +1806,4 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
 }
-
-private fun List<VodItem>.initialGridVisibleCount(): Int =
-    size.coerceAtMost(GRID_BATCH_ITEM_COUNT)
-
-private const val GRID_BATCH_ROWS = 12
-private const val GRID_BATCH_COLUMNS = 3
-private const val GRID_BATCH_ITEM_COUNT = GRID_BATCH_ROWS * GRID_BATCH_COLUMNS
-
-data class SearchResultScrollPosition(
-    val index: Int = 0,
-    val offset: Int = 0
-)
 
