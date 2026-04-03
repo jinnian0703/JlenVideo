@@ -1,4 +1,4 @@
-package top.jlen.vod.ui
+﻿package top.jlen.vod.ui
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -638,7 +638,7 @@ private fun SearchLandingContent(
             when {
                 state.isHotSearchLoading && state.hotSearchGroups.isEmpty() -> LoadingPane("热搜加载中..")
                 !state.hotSearchError.isNullOrBlank() && state.hotSearchGroups.isEmpty() ->
-                    ErrorBanner(message = state.hotSearchError, onRetry = onLoadHotSearches)
+                    ErrorBanner(message = state.hotSearchError.orEmpty(), onRetry = onLoadHotSearches)
                 state.hotSearchGroups.isEmpty() -> EmptyPane("暂无热搜")
                 else -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     state.hotSearchGroups.forEach { group ->
@@ -806,9 +806,9 @@ fun SearchResultsScreen(
         when {
             state.isLoading -> item { LoadingPane("搜索中..") }
             !state.error.isNullOrBlank() && state.submittedQuery.isBlank() && state.results.isEmpty() ->
-                item { SearchEmptyState(query = "", message = state.error) }
+                item { SearchEmptyState(query = "", message = state.error.orEmpty()) }
             !state.error.isNullOrBlank() && state.results.isEmpty() ->
-                item { ErrorBanner(message = state.error, onRetry = onSearch) }
+                item { ErrorBanner(message = state.error.orEmpty(), onRetry = onSearch) }
             state.results.isEmpty() ->
                 item { SearchEmptyState(query = state.submittedQuery) }
             else -> items(
@@ -1023,7 +1023,7 @@ fun AnnouncementListScreen(
             }
         }
         if (!state.error.isNullOrBlank() && state.notices.isEmpty()) {
-            item { ErrorBanner(message = state.error, onRetry = onRefresh) }
+            item { ErrorBanner(message = state.error.orEmpty(), onRetry = onRefresh) }
         }
         when {
             state.isLoading && state.notices.isEmpty() -> item { LoadingPane("公告加载中...") }
@@ -3315,7 +3315,7 @@ private fun AnnouncementTickerStrip(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = state.error,
+                            text = state.error.orEmpty(),
                             modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.bodyMedium,
                             color = UiPalette.DangerText,
@@ -3424,48 +3424,6 @@ private fun CircleActionButton(icon: ImageVector, onClick: () -> Unit) {
     }
 }
 
-@Composable
-fun SectionTitle(
-    title: String,
-    action: String?,
-    icon: @Composable (() -> Unit)? = null,
-    onAction: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (icon != null) {
-                icon()
-                Spacer(modifier = Modifier.width(6.dp))
-            }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = UiPalette.Ink
-            )
-        }
-        if (!action.isNullOrBlank()) {
-            TextButton(
-                onClick = onAction,
-                colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
-            ) {
-                Text(action, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.width(2.dp))
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-    }
-}
 
 @Composable
 fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
@@ -3950,11 +3908,11 @@ private fun String.formatNoticeTime(): String {
 private fun isAnnouncementListLine(text: String): Boolean =
     text.startsWith("- ") ||
         text.startsWith("* ") ||
-        text.startsWith("•") ||
+        text.startsWith("?") ||
         Regex("^\\d+[.、]\\s*.+").matches(text)
 
 private fun String.removeAnnouncementListPrefix(): String =
-    replaceFirst(Regex("^(-|\\*|•)\\s*"), "")
+    replaceFirst(Regex("^(-|\\*|?)\\s*"), "")
         .replaceFirst(Regex("^\\d+[.、]\\s*"), "")
         .trim()
 
@@ -4008,7 +3966,7 @@ private fun Node.toAnnouncementBlocks(): List<AnnouncementRichBlock> {
                 if (childText.isBlank()) {
                     emptyList()
                 } else {
-                    val prefix = if (tagName().equals("ol", ignoreCase = true)) "${index + 1}. " else "• "
+                    val prefix = if (tagName().equals("ol", ignoreCase = true)) "${index + 1}. " else "? "
                     listOf(
                         AnnouncementRichBlock(
                             text = buildAnnotatedString {
@@ -4187,7 +4145,7 @@ private fun compactPosterBadgeText(raw: String): String {
     }
 
     return when {
-        compactEpisodeBadge.matches(Regex("^[.。·•…-]+$")) -> ""
+        compactEpisodeBadge.matches(Regex("^[.。·?…-]+$")) -> ""
         compactEpisodeBadge.isBlank() -> ""
         else -> compactEpisodeBadge
     }
@@ -4210,7 +4168,7 @@ private fun normalizePosterBadgeText(raw: String): String {
     }
 
     return when {
-        normalizedEpisodeBadge.matches(Regex("^[.。·•…-]+$")) -> ""
+        normalizedEpisodeBadge.matches(Regex("^[.。·?…-]+$")) -> ""
         normalizedEpisodeBadge.isBlank() -> ""
         else -> normalizedEpisodeBadge
     }
@@ -4227,7 +4185,7 @@ private fun sanitizePosterBadge(raw: String): String {
         .trim()
 
     return when {
-        trimmedRankPrefix.matches(Regex("^[.。·•…-]+$")) -> ""
+        trimmedRankPrefix.matches(Regex("^[.。·?…-]+$")) -> ""
         trimmedRankPrefix.isBlank() -> ""
         else -> trimmedRankPrefix
     }
@@ -4373,26 +4331,5 @@ private fun AuthenticatedAvatar(
     }
 }
 
-@Composable
-internal fun rememberPosterRequest(
-    data: String?,
-    width: Int,
-    height: Int
-): ImageRequest {
-    val context = LocalContext.current
-    return remember(context, data, width, height) {
-        ImageRequest.Builder(context)
-            .data(data.orEmpty())
-            .size(width, height)
-            .bitmapConfig(Bitmap.Config.RGB_565)
-            .precision(Precision.INEXACT)
-            .scale(Scale.FILL)
-            .allowHardware(true)
-            .crossfade(false)
-            .diskCacheKey(data.orEmpty())
-            .memoryCacheKey("${data.orEmpty()}@$width@$height")
-            .build()
-    }
-}
-
 internal fun VodItem.stableKey(): String = vodId.ifBlank { "$displayTitle|${vodPic.orEmpty()}" }
+

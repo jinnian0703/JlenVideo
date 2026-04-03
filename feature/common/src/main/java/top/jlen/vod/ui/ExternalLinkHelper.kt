@@ -6,10 +6,10 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 
-internal fun openExternalUrl(
+fun openExternalUrl(
     context: Context,
     url: String,
-    failureMessage: String = "无法打开更新链接，请稍后重试"
+    failureMessage: String = "无法打开外部链接，请稍后重试"
 ): Boolean {
     val targetUrl = url.trim()
     if (targetUrl.isBlank()) {

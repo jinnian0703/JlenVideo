@@ -1,4 +1,4 @@
-package top.jlen.vod.ui
+﻿package top.jlen.vod.ui
 
 import android.app.Activity
 import android.content.Context
@@ -87,12 +87,14 @@ fun DetailScreen(
     onDismissActionMessage: () -> Unit,
     onPlay: (String, Int, Int) -> Unit
 ) {
+    val errorMessage = state.error
+    val detailItem = state.item
     when {
         state.isLoading -> LoadingPane("正在加载详情...")
-        !state.error.isNullOrBlank() -> ErrorBanner(message = state.error, onRetry = onBack, actionLabel = "返回")
-        state.item == null -> EmptyPane("没有找到影片详情")
+        !errorMessage.isNullOrBlank() -> ErrorBanner(message = errorMessage, onRetry = onBack, actionLabel = "返回")
+        detailItem == null -> EmptyPane("没有找到影片详情")
         else -> {
-            val item = state.item
+            val item = detailItem
             val source = state.selectedSource
             val detailListState = rememberLazyListState()
             LaunchedEffect(state.actionMessage, state.isActionError) {
@@ -910,88 +912,6 @@ fun DetailTopBar(title: String, onBack: () -> Unit, darkMode: Boolean = false) {
     }
 }
 
-@Composable
-fun LoadingPane(message: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(color = UiPalette.Accent)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(message, color = UiPalette.TextSecondary)
-        }
-    }
-}
-
-@Composable
-fun EmptyPane(message: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(message, color = UiPalette.TextMuted)
-    }
-}
-
-@Composable
-fun ErrorBanner(
-    message: String,
-    onRetry: () -> Unit,
-    actionLabel: String = "重试"
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        colors = CardDefaults.cardColors(containerColor = UiPalette.DangerSurface),
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, UiPalette.DangerBorder)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.42f)),
-                contentAlignment = Alignment.Center
-            ) {
-                androidx.compose.material3.Icon(
-                    imageVector = Icons.Rounded.ErrorOutline,
-                    contentDescription = null,
-                    tint = UiPalette.DangerText,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-            Text(
-                text = message,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
-                color = UiPalette.DangerText
-            )
-            OutlinedButton(
-                onClick = onRetry,
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, UiPalette.DangerBorder),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = UiPalette.DangerText)
-            ) {
-                androidx.compose.material3.Icon(
-                    imageVector = Icons.Rounded.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(actionLabel, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
 
 @Composable
 private fun DetailActionNotice(
@@ -1039,3 +959,4 @@ private fun DetailActionNotice(
         }
     }
 }
+
