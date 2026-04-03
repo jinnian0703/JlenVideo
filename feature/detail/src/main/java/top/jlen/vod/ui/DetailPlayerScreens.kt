@@ -1,4 +1,4 @@
-﻿package top.jlen.vod.ui
+package top.jlen.vod.ui
 
 import android.app.Activity
 import android.content.Context
@@ -77,417 +77,9 @@ import kotlinx.coroutines.delay
 import top.jlen.vod.data.Episode
 import top.jlen.vod.data.VodItem
 
-@Composable
-fun DetailScreen(
-    state: DetailUiState,
-    isLoggedIn: Boolean,
-    onBack: () -> Unit,
-    onSelectSource: (Int) -> Unit,
-    onFavorite: () -> Unit,
-    onDismissActionMessage: () -> Unit,
-    onPlay: (String, Int, Int) -> Unit
-) {
-    val errorMessage = state.error
-    val detailItem = state.item
-    when {
-        state.isLoading -> LoadingPane("正在加载详情...")
-        !errorMessage.isNullOrBlank() -> ErrorBanner(message = errorMessage, onRetry = onBack, actionLabel = "返回")
-        detailItem == null -> EmptyPane("没有找到影片详情")
-        else -> {
-            val item = detailItem
-            val source = state.selectedSource
-            val detailListState = rememberLazyListState()
-            LaunchedEffect(state.actionMessage, state.isActionError) {
-                if (!state.actionMessage.isNullOrBlank() && !state.isActionError) {
-                    delay(2200)
-                    onDismissActionMessage()
-                }
-            }
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                state = detailListState,
-                contentPadding = PaddingValues(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
-            ) {
-                item { DetailHero(item = item, onBack = onBack) }
-                item {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        Text(
-                            text = item.displayTitle,
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = UiPalette.Ink
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = item.subtitle.ifBlank { "站内资源" },
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = UiPalette.TextSecondary
-                        )
-                        Spacer(modifier = Modifier.height(18.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(
-                                onClick = {
-                                    if (source != null) {
-                                        onPlay(item.displayTitle, state.selectedSourceIndex, 0)
-                                    }
-                                },
-                                enabled = source != null,
-                                shape = RoundedCornerShape(20.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = UiPalette.Accent,
-                                    contentColor = UiPalette.AccentText
-                                )
-                            ) {
-                                Text("立即播放", fontWeight = FontWeight.ExtraBold)
-                            }
-                            OutlinedButton(
-                                onClick = onBack,
-                                shape = RoundedCornerShape(20.dp),
-                                border = BorderStroke(1.dp, UiPalette.BorderSoft),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = UiPalette.Ink)
-                            ) {
-                                Text("返回")
-                            }
-                            OutlinedButton(
-                                onClick = onFavorite,
-                                enabled = !state.isActionLoading,
-                                shape = RoundedCornerShape(20.dp),
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (state.isFavorited) UiPalette.Accent.copy(alpha = 0.28f) else UiPalette.BorderSoft
-                                ),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = if (state.isFavorited) UiPalette.AccentSoft.copy(alpha = 0.16f) else Color.Transparent,
-                                    contentColor = UiPalette.Accent
-                                )
-                            ) {
-                                Text(
-                                    if (!isLoggedIn) "登录后收藏"
-                                    else if (state.isActionLoading) "收藏中..."
-                                    else if (state.isFavorited) "已收藏"
-                                    else "收藏"
-                                )
-                            }
-                        }
-                    }
-                }
-                item {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        state.actionMessage?.takeIf { it.isNotBlank() }?.let { message ->
-                            DetailActionNotice(
-                                message = message,
-                                isError = state.isActionError
-                            )
-                        }
-                    }
-                }
-                item { DetailInfoCard(item = item) }
-                if (state.sources.isNotEmpty()) {
-                    item { SectionTitle(title = "播放线路", action = null, onAction = {}) }
-                    item {
-                        SourceRow(
-                            sourceNames = state.sources.map { it.name },
-                            selectedIndex = state.selectedSourceIndex,
-                            onSelectSource = onSelectSource
-                        )
-                    }
-                    source?.let { selected ->
-                        item { SectionTitle(title = "选集播放", action = selected.name, onAction = {}) }
-                        item {
-                            EpisodePanel(
-                                episodes = selected.episodes,
-                                selectedIndex = -1,
-                                pauseMarquee = detailListState.isScrollInProgress,
-                                onEpisodeClick = { episodeIndex ->
-                                    onPlay(item.displayTitle, state.selectedSourceIndex, episodeIndex)
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
-fun PlayerScreen(
-    state: PlayerUiState,
-    onBack: () -> Unit,
-    onSelectEpisode: (Int) -> Unit,
-    onSelectSource: (Int) -> Unit,
-    onPlayNext: () -> Unit,
-    onPlaybackSnapshotChange: (PlaybackSnapshot) -> Unit
-) {
-    val context = LocalContext.current
-    val activity = remember(context) { context.findActivity() }
-    val playUrl = state.playUrl
-    val directPlayable = playUrl.isNotBlank() && isDirectVideoUrl(playUrl)
-    var detectedLandscapeVideo by remember {
-        mutableStateOf<Boolean?>(null)
-    }
-    var isFullscreen by remember {
-        mutableStateOf(false)
-    }
-    var fullscreenTransitionLabel by remember {
-        mutableStateOf("")
-    }
-
-    fun setFullscreen(fullscreen: Boolean, snapshot: PlaybackSnapshot? = null, isLandscapeVideo: Boolean? = null) {
-        snapshot?.let(onPlaybackSnapshotChange)
-        detectedLandscapeVideo = isLandscapeVideo ?: detectedLandscapeVideo
-        isFullscreen = fullscreen
-    }
-
-    BackHandler(enabled = isFullscreen) {
-        isFullscreen = false
-    }
-
-    LaunchedEffect(isFullscreen, state.selectedEpisodeIndex, state.episodeName, state.sourceName) {
-        if (isFullscreen) {
-            fullscreenTransitionLabel = when {
-                state.episodeName.isNotBlank() && state.sourceName.isNotBlank() -> "${state.sourceName} · ${state.episodeName}"
-                state.episodeName.isNotBlank() -> state.episodeName
-                state.sourceName.isNotBlank() -> state.sourceName
-                else -> state.title
-            }
-        } else {
-            fullscreenTransitionLabel = ""
-        }
-    }
-
-    DisposableEffect(activity, isFullscreen) {
-        if (activity == null) {
-            onDispose { }
-        } else {
-            val window = activity.window
-            val controller = WindowInsetsControllerCompat(activity.window, activity.window.decorView)
-            val originalCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                window.attributes.layoutInDisplayCutoutMode
-            } else {
-                null
-            }
-            if (isFullscreen) {
-                WindowCompat.setDecorFitsSystemWindows(window, false)
-                window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    val attributes = window.attributes
-                    attributes.layoutInDisplayCutoutMode =
-                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-                    window.attributes = attributes
-                }
-                controller.hide(WindowInsetsCompat.Type.systemBars())
-                controller.systemBarsBehavior =
-                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-            } else {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && originalCutoutMode != null) {
-                    val attributes = window.attributes
-                    attributes.layoutInDisplayCutoutMode = originalCutoutMode
-                    window.attributes = attributes
-                }
-                controller.show(WindowInsetsCompat.Type.systemBars())
-                controller.isAppearanceLightStatusBars = true
-                controller.isAppearanceLightNavigationBars = true
-                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            }
-            onDispose {
-                if (isFullscreen) {
-                    window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && originalCutoutMode != null) {
-                        val attributes = window.attributes
-                        attributes.layoutInDisplayCutoutMode = originalCutoutMode
-                        window.attributes = attributes
-                    }
-                    controller.show(WindowInsetsCompat.Type.systemBars())
-                    controller.isAppearanceLightStatusBars = true
-                    controller.isAppearanceLightNavigationBars = true
-                    activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                }
-            }
-        }
-    }
-
-    val playerContent = remember(
-        playUrl,
-        state.title,
-        state.sourceName,
-        state.episodeName,
-        state.hasNextEpisode
-    ) {
-        movableContentOf<Boolean> { fullscreen ->
-            NativeVideoPlayer(
-                url = playUrl,
-                title = state.title,
-                sourceName = state.sourceName,
-                episodeName = state.episodeName,
-                hasNextEpisode = state.hasNextEpisode,
-                onNextEpisode = onPlayNext,
-                onToggleFullscreen = { snapshot, isLandscapeVideo ->
-                    setFullscreen(!fullscreen, snapshot, isLandscapeVideo)
-                },
-                fullscreenMode = fullscreen,
-                onVideoOrientationDetected = { detectedLandscapeVideo = it },
-                initialSnapshot = state.playbackSnapshot,
-                onPlaybackSnapshotChanged = onPlaybackSnapshotChange,
-                onPlaybackEnded = {
-                    if (state.hasNextEpisode) {
-                        onPlayNext()
-                    }
-                },
-                onClose = if (fullscreen) {
-                    { isFullscreen = false }
-                } else {
-                    null
-                }
-            )
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(UiPalette.BackgroundBottom)
-    ) {
-        val listState = rememberLazyListState()
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(if (isFullscreen) Modifier else Modifier.statusBarsPadding())
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(UiPalette.BackgroundBottom)
-            ) {
-                Column {
-                    DetailTopBar(
-                        title = state.title.ifBlank { "播放器" },
-                        onBack = onBack,
-                        darkMode = false
-                    )
-                    when {
-                        state.isResolving && !isFullscreen -> ResolveLoadingSurface(
-                            message = "正在获取播放地址..."
-                        )
-                        state.useWebPlayer && !isFullscreen -> ResolveUnavailableSurface()
-                        directPlayable && !isFullscreen -> playerContent(false)
-                        directPlayable -> Spacer(modifier = Modifier.height(0.dp))
-                        else -> EmptyPane("暂无可播放地址")
-                    }
-                }
-            }
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp),
-                state = listState,
-                contentPadding = PaddingValues(top = 18.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
-            ) {
-                item(key = "player_meta") {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        Text(
-                            text = state.title,
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = UiPalette.Ink
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = buildString {
-                                append("正在播放")
-                                if (state.sourceName.isNotBlank()) {
-                                    append(" · ")
-                                    append(state.sourceName)
-                                }
-                                if (state.episodeName.isNotBlank()) {
-                                    append(" · ")
-                                    append(state.episodeName)
-                                }
-                            },
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = UiPalette.TextSecondary
-                        )
-                    }
-                }
-
-                if (state.sources.isNotEmpty()) {
-                    item(key = "source_title") {
-                        SectionTitle(title = "切换线路", action = state.sourceName, onAction = {})
-                    }
-                    item(key = "source_row") {
-                        SourceRow(
-                            sourceNames = state.sources.map { it.name },
-                            selectedIndex = state.selectedSourceIndex,
-                            onSelectSource = onSelectSource
-                        )
-                    }
-                }
-
-                if (state.episodes.isNotEmpty()) {
-                    item(key = "episode_title") {
-                        SectionTitle(title = "切换选集", action = null, onAction = {})
-                    }
-                    item(key = "episode_panel") {
-                        EpisodePanel(
-                            episodes = state.episodes,
-                            selectedIndex = state.selectedEpisodeIndex,
-                            pauseMarquee = false,
-                            onEpisodeClick = onSelectEpisode
-                        )
-                    }
-                }
-            }
-        }
-
-        if (directPlayable && isFullscreen) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black)
-            ) {
-                playerContent(true)
-            }
-        } else if (state.isResolving && isFullscreen) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black)
-            ) {
-                ResolveLoadingSurface(
-                    message = "正在切换到 $fullscreenTransitionLabel",
-                    fullscreenMode = true,
-                    subtitle = "请稍候"
-                )
-            }
-        } else if (state.useWebPlayer && isFullscreen) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black)
-            ) {
-                ResolveUnavailableSurface(
-                    fullscreenMode = true,
-                    title = "该线路暂不支持",
-                    message = "请换个线路试试"
-                )
-            }
-        }
-    }
-}
-
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
-}
-
-@Composable
-private fun SourceRow(
+internal fun SourceRow(
     sourceNames: List<String>,
     selectedIndex: Int,
     onSelectSource: (Int) -> Unit
@@ -519,7 +111,7 @@ private fun SourceRow(
 }
 
 @Composable
-private fun DetailHero(item: VodItem, onBack: () -> Unit) {
+internal fun DetailHero(item: VodItem, onBack: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -575,7 +167,7 @@ private fun DetailHero(item: VodItem, onBack: () -> Unit) {
 }
 
 @Composable
-private fun DetailInfoCard(item: VodItem) {
+internal fun DetailInfoCard(item: VodItem) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -609,7 +201,7 @@ private fun DetailInfoCard(item: VodItem) {
 }
 
 @Composable
-private fun EpisodePanel(
+internal fun EpisodePanel(
     episodes: List<Episode>,
     selectedIndex: Int,
     pauseMarquee: Boolean,
@@ -754,7 +346,7 @@ private fun shouldMarqueeEpisodeLabel(text: String): Boolean =
     text.trim().length > 8 && text.any { !it.isDigit() }
 
 @Composable
-private fun ResolveLoadingSurface(
+internal fun ResolveLoadingSurface(
     message: String = "正在解析播放地址...",
     fullscreenMode: Boolean = false,
     subtitle: String = "请稍候"
@@ -806,7 +398,7 @@ private fun ResolveLoadingSurface(
 }
 
 @Composable
-private fun ResolveUnavailableSurface(
+internal fun ResolveUnavailableSurface(
     fullscreenMode: Boolean = false,
     title: String = "该线路暂不支持",
     message: String = "请换个线路试试"
@@ -857,7 +449,7 @@ private fun ResolveUnavailableSurface(
     }
 }
 
-private fun isDirectVideoUrl(url: String): Boolean {
+internal fun isDirectVideoUrl(url: String): Boolean {
     val lower = url.lowercase()
     return lower.endsWith(".m3u8") ||
         lower.endsWith(".mp4") ||
@@ -914,7 +506,7 @@ fun DetailTopBar(title: String, onBack: () -> Unit, darkMode: Boolean = false) {
 
 
 @Composable
-private fun DetailActionNotice(
+internal fun DetailActionNotice(
     message: String,
     isError: Boolean
 ) {
