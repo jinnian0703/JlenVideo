@@ -728,7 +728,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectAccountSection(section: AccountSection, forceRefresh: Boolean = false) {
-        accountState = accountState.copy(selectedSection = section, error = null, message = null)
+        accountState = selectAccountSectionState(accountState, section)
         if (!accountState.session.isLoggedIn) return
         when (section) {
             AccountSection.Profile -> {
@@ -775,9 +775,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             block = { deleteUserRecordForApp(recordIds = listOf(recordId), type = 2, clearAll = false) },
             onSuccess = {
                 val removedItem = accountState.favoriteItems.firstOrNull { item -> item.recordId == recordId }
-                accountState = accountState.copy(
-                    favoriteItems = accountState.favoriteItems.filterNot { item -> item.recordId == recordId }
-                )
+                accountState = accountStateRemovingFavorite(accountState, recordId)
                 if (removedItem?.vodId == detailState.item?.vodId) {
                     detailState = detailState.copy(isFavorited = false)
                 }
@@ -790,10 +788,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         runAccountAction(
             block = { deleteUserRecordForApp(recordIds = emptyList(), type = 2, clearAll = true) },
             onSuccess = {
-                accountState = accountState.copy(
-                    favoriteItems = emptyList(),
-                    favoriteNextPageUrl = null
-                )
+                accountState = accountStateClearingFavorites(accountState)
                 if (detailState.item != null) {
                     detailState = detailState.copy(isFavorited = false)
                 }
@@ -807,10 +802,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         runAccountAction(
             block = { deleteUserRecordForApp(recordIds = listOf(recordId), type = 4, clearAll = false) },
             onSuccess = {
-            accountState = accountState.copy(
-                historyItems = accountState.historyItems.filterNot { item -> item.recordId == recordId }
-            )
-            selectAccountSection(AccountSection.History, forceRefresh = true)
+                accountState = accountStateRemovingHistory(accountState, recordId)
+                selectAccountSection(AccountSection.History, forceRefresh = true)
             }
         )
     }
@@ -819,11 +812,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         runAccountAction(
             block = { deleteUserRecordForApp(recordIds = emptyList(), type = 4, clearAll = true) },
             onSuccess = {
-            accountState = accountState.copy(
-                historyItems = emptyList(),
-                historyNextPageUrl = null
-            )
-            selectAccountSection(AccountSection.History, forceRefresh = true)
+                accountState = accountStateClearingHistory(accountState)
+                selectAccountSection(AccountSection.History, forceRefresh = true)
             }
         )
     }
@@ -1126,14 +1116,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             runCatching {
                 withContext(Dispatchers.IO) { repository.logoutForApp() }
             }.onSuccess {
-                accountState = AccountUiState(
-                    userName = accountState.userName,
-                    session = AuthSession(),
-                    message = "已退出登录",
-                    updateInfo = accountState.updateInfo,
-                    hasCrashLog = accountState.hasCrashLog,
-                    latestCrashLog = accountState.latestCrashLog
-                )
+                accountState = loggedOutAccountState(accountState)
                 refreshNotices(forceRefresh = true)
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
@@ -1208,12 +1191,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadUserProfileForApp() }
             }.onSuccess { page ->
-                accountState = accountState.copy(
-                    isContentLoading = false,
-                    profileFields = page.fields,
-                    profileEditor = page.editor,
-                    session = mergeAccountSession(page.session, accountState.session)
-                )
+                accountState = accountStateWithProfilePage(accountState, page)
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
@@ -1230,14 +1208,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadFavoritePageForApp(pageUrl) }
             }.onSuccess { page ->
-                accountState = accountState.copy(
-                    isContentLoading = false,
-                    favoriteItems = mergeAccountItems(
-                        current = if (append) accountState.favoriteItems else emptyList(),
-                        incoming = page.items
-                    ),
-                    favoriteNextPageUrl = page.nextPageUrl
-                )
+                accountState = accountStateWithFavoritePage(accountState, page, append)
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
@@ -1254,16 +1225,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadHistoryPageForApp(pageUrl) }
             }.onSuccess { page ->
-                val mergedItems = mergeAccountItems(
-                    current = if (append) accountState.historyItems else emptyList(),
-                    incoming = page.items
-                )
-                accountState = accountState.copy(
-                    isContentLoading = false,
-                    historyItems = mergedItems,
-                    historyNextPageUrl = page.nextPageUrl
-                )
-                enrichHistoryRecords(mergedItems)
+                val historyPageState = accountStateWithHistoryPage(accountState, page, append)
+                accountState = historyPageState.accountState
+                enrichHistoryRecords(historyPageState.mergedItems)
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
                 accountState = accountState.copy(
@@ -1311,21 +1275,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadMembershipDataForApp() }
             }.onSuccess { page ->
-                val refreshedSession = mergeAccountSession(
-                    repository.currentSession(),
-                    accountState.session
-                ).let { session ->
-                    session.copy(groupName = page.info.groupName.ifBlank { session.groupName })
-                }
-                accountState = accountState.copy(
-                    isContentLoading = false,
-                    session = refreshedSession,
-                    membershipInfo = page.info.copy(
-                        groupName = page.info.groupName.ifBlank {
-                            refreshedSession.groupName
-                        }
-                    ),
-                    membershipPlans = page.plans
+                accountState = accountStateWithMembershipPage(
+                    accountState = accountState,
+                    page = page,
+                    currentSession = repository.currentSession()
                 )
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
@@ -1368,14 +1321,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (!isExpired) return false
 
         repository.clearSession()
-        accountState = AccountUiState(
-            userName = accountState.userName,
-            authMode = AccountAuthMode.Login,
-            message = "登录已失效，请重新登录",
-            updateInfo = accountState.updateInfo,
-            hasCrashLog = accountState.hasCrashLog,
-            latestCrashLog = accountState.latestCrashLog
-        )
+        accountState = expiredAccountState(accountState)
         return true
     }
 
