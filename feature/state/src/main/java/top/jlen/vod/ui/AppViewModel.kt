@@ -1656,42 +1656,27 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         sourceIndex: Int,
         episodeIndex: Int
     ) {
-        val safeSourceIndex = sourceIndex.coerceIn(0, (sources.size - 1).coerceAtLeast(0))
-        val safeEpisodes = sources.getOrNull(safeSourceIndex)?.episodes.orEmpty()
-        playerState = PlayerUiState(
+        playerState = buildPlayerState(
             title = title,
             item = item,
             sources = sources,
-            selectedSourceIndex = safeSourceIndex,
-            selectedEpisodeIndex = episodeIndex.coerceIn(0, (safeEpisodes.size - 1).coerceAtLeast(0)),
-            playbackSnapshot = PlaybackSnapshot()
+            sourceIndex = sourceIndex,
+            episodeIndex = episodeIndex
         )
         resolveCurrentPlayerUrl()
         recordCurrentPlayback()
     }
 
     fun selectPlayerEpisode(index: Int) {
-        val currentEpisodes = playerState.currentSource?.episodes.orEmpty()
-        if (currentEpisodes.isEmpty()) return
-        playerState = playerState.copy(
-            selectedEpisodeIndex = index.coerceIn(0, currentEpisodes.lastIndex),
-            playbackSnapshot = PlaybackSnapshot()
-        )
+        val updatedState = updatePlayerEpisodeSelection(playerState, index) ?: return
+        playerState = updatedState
         resolveCurrentPlayerUrl()
         recordCurrentPlayback()
     }
 
     fun selectPlayerSource(index: Int) {
-        if (playerState.sources.isEmpty()) return
-        val safeIndex = index.coerceIn(0, playerState.sources.lastIndex)
-        val targetEpisodes = playerState.sources.getOrNull(safeIndex)?.episodes.orEmpty()
-        val preservedEpisodeIndex = playerState.selectedEpisodeIndex
-            .coerceIn(0, (targetEpisodes.size - 1).coerceAtLeast(0))
-        playerState = playerState.copy(
-            selectedSourceIndex = safeIndex,
-            selectedEpisodeIndex = preservedEpisodeIndex,
-            playbackSnapshot = PlaybackSnapshot()
-        )
+        val updatedState = updatePlayerSourceSelection(playerState, index) ?: return
+        playerState = updatedState
         resolveCurrentPlayerUrl()
         recordCurrentPlayback()
     }
@@ -1704,47 +1689,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun adoptDetectedStream(streamUrl: String) {
-        if (streamUrl.isBlank()) return
-        playerState = playerState.copy(
-            resolvedUrl = streamUrl,
-            isResolving = false,
-            useWebPlayer = false,
-            resolveError = null
-        )
+        playerState = applyDetectedStream(playerState, streamUrl) ?: return
     }
 
     fun reportTakeoverFailure(message: String) {
-        playerState = playerState.copy(
-            isResolving = false,
-            useWebPlayer = false,
-            resolveError = message.ifBlank { "该线路暂不支持，请换个线路试试" }
-        )
+        playerState = applyTakeoverFailure(playerState, message)
     }
 
     fun updatePlaybackSnapshot(snapshot: PlaybackSnapshot) {
-        val currentSnapshot = playerState.playbackSnapshot
-        val hasMeaningfulChange =
-            kotlin.math.abs(snapshot.positionMs - currentSnapshot.positionMs) >= UiMotion.SnapshotPositionThresholdMillis ||
-                kotlin.math.abs(snapshot.speed - currentSnapshot.speed) > 0.01f ||
-                snapshot.playWhenReady != currentSnapshot.playWhenReady
-        if (!hasMeaningfulChange) return
+        if (!hasMeaningfulPlaybackChange(playerState.playbackSnapshot, snapshot)) return
         playerState = playerState.copy(playbackSnapshot = snapshot)
     }
 
     fun syncFromFullscreen(result: FullscreenPlaybackResult) {
-        val safeEpisodes = playerState.episodes
-        val safeEpisodeIndex = result.episodeIndex.coerceIn(0, (safeEpisodes.size - 1).coerceAtLeast(0))
-        playerState = playerState.copy(
-            selectedEpisodeIndex = safeEpisodeIndex,
-            resolvedUrl = result.resolvedUrl.ifBlank {
-                if (safeEpisodeIndex == playerState.selectedEpisodeIndex) playerState.resolvedUrl else ""
-            },
-            useWebPlayer = false,
-            isResolving = false,
-            resolveError = null,
-            playbackSnapshot = result.snapshot
-        )
-        if (result.resolvedUrl.isBlank() && safeEpisodeIndex != playerState.selectedEpisodeIndex) {
+        val syncState = syncPlayerStateFromFullscreen(playerState, result)
+        playerState = syncState.playerState
+        if (syncState.shouldResolveCurrentUrl) {
             resolveCurrentPlayerUrl()
         }
     }
