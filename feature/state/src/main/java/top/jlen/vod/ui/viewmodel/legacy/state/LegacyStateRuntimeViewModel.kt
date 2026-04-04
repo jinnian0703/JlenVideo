@@ -135,6 +135,9 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
         runAccountAction(block, onSuccess)
     }
 
+    internal fun runtimeHandleAccountSessionExpired(error: Throwable): Boolean =
+        handleAccountSessionExpired(error)
+
     internal fun searchHistoryStore(): SearchHistoryStore = searchHistoryStore
 
     internal fun getSearchResultScrollPosition(query: String): SearchResultScrollPosition? =
@@ -346,102 +349,11 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
 
     fun unbindEmail() = legacyUnbindEmail()
 
-    fun sendRegisterCode() {
-        val editor = accountState.registerEditor
-        val contact = editor.contact.trim()
-        if (contact.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "请输入${accountState.registerContactLabel}")
-            return
-        }
+    fun sendRegisterCode() = legacySendRegisterCode()
 
-        if (editor.channel == "email" && !contact.contains("@")) {
-            accountState = accountStateWithValidationError(accountState, "请输入正确的邮箱地址")
-            return
-        }
+    fun register() = legacyRegister()
 
-        runAccountAction(
-            block = { sendRegisterCodeForApp(editor.channel, contact) },
-            onSuccess = { }
-        )
-    }
-
-    fun register() {
-        val editor = accountState.registerEditor
-        if (editor.userName.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "请输入用户名")
-            return
-        }
-        if (editor.password.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "请输入密码")
-            return
-        }
-        if (editor.confirmPassword.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "请确认密码")
-            return
-        }
-        if (editor.password != editor.confirmPassword) {
-            accountState = accountStateWithValidationError(accountState, "两次输入的密码不一致")
-            return
-        }
-        if (editor.contact.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "请输入${accountState.registerContactLabel}")
-            return
-        }
-        if (accountState.registerRequiresCode && editor.code.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "请输入${accountState.registerCodeLabel}")
-            return
-        }
-        if (accountState.registerRequiresVerify && editor.verify.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "请输入图片验证码")
-            return
-        }
-
-        runAccountAction(
-            block = { registerForApp(editor.copy(channel = accountState.registerChannel)) },
-            onSuccess = {
-                accountState = accountStateAfterRegisterSuccess(accountState, editor.userName)
-            }
-        )
-    }
-
-    fun findPassword() {
-        val editor = accountState.findPasswordEditor
-        if (editor.userName.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "璇疯緭鍏ョ敤鎴峰悕")
-            return
-        }
-        if (editor.question.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "璇疯緭鍏ュ瘑淇濋棶棰?")
-            return
-        }
-        if (editor.answer.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "璇疯緭鍏ュ瘑淇濈瓟妗?")
-            return
-        }
-        if (editor.password.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "璇疯緭鍏ユ柊瀵嗙爜")
-            return
-        }
-        if (editor.confirmPassword.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "璇风‘璁ゆ柊瀵嗙爜")
-            return
-        }
-        if (editor.password != editor.confirmPassword) {
-            accountState = accountStateWithValidationError(accountState, "涓ゆ杈撳叆鐨勫瘑鐮佷笉涓€鑷?")
-            return
-        }
-        if (accountState.findPasswordRequiresVerify && editor.verify.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "璇疯緭鍏ュ浘鐗囬獙璇佺爜")
-            return
-        }
-
-        runAccountAction(
-            block = { findPasswordForApp(editor) },
-            onSuccess = {
-                accountState = accountStateAfterFindPasswordSuccess(accountState, editor.userName)
-            }
-        )
-    }
+    fun findPassword() = legacyFindPassword()
 
     fun addCurrentDetailFavorite() {
         val item = detailState.item ?: return
@@ -480,54 +392,9 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
         detailState = detailStateWithoutActionMessage(detailState)
     }
 
-    fun login() {
-        val userName = accountState.userName.trim()
-        val password = accountState.password
-        if (userName.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "请输入用户名")
-            return
-        }
-        if (password.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "请输入密码")
-            return
-        }
+    fun login() = legacyLogin()
 
-        viewModelScope.launch {
-            accountState = beginLogin(accountState)
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    repository.loginForApp(userName = userName, password = password)
-                }
-            }.onSuccess { session ->
-                accountState = loggedInAccountState(accountState, session)
-                selectAccountSection(AccountSection.Profile, forceRefresh = true)
-            }.onFailure { error ->
-                accountState = accountStateWithLoginError(
-                    accountState,
-                    toUserFacingMessage(error, "登录失败")
-                )
-            }
-        }
-    }
-
-    fun logout() {
-        if (accountState.isLoading) return
-        viewModelScope.launch {
-            accountState = beginLogout(accountState)
-            runCatching {
-                withContext(Dispatchers.IO) { repository.logoutForApp() }
-            }.onSuccess {
-                accountState = loggedOutAccountState(accountState)
-                refreshNotices(forceRefresh = true)
-            }.onFailure { error ->
-                if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountStateWithLogoutError(
-                    accountState,
-                    toUserFacingMessage(error, "退出登录失败")
-                )
-            }
-        }
-    }
+    fun logout() = legacyLogout()
 
     private fun loadRegisterPage(forceRefresh: Boolean = false) {
         if (accountState.isContentLoading && !forceRefresh) return
