@@ -1,45 +1,7 @@
-﻿package top.jlen.vod.ui
+package top.jlen.vod.ui
 
-import java.io.InterruptedIOException
-import java.net.ConnectException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
-import kotlin.math.abs
-import javax.net.ssl.SSLException
-import top.jlen.vod.data.AppleCmsCategory
-import top.jlen.vod.data.AuthSession
-import top.jlen.vod.data.CursorPagedVodItems
-import top.jlen.vod.data.HomePayload
-import top.jlen.vod.data.MembershipPage
 import top.jlen.vod.data.PlaySource
-import top.jlen.vod.data.UserCenterPage
-import top.jlen.vod.data.UserCenterItem
-import top.jlen.vod.data.UserProfilePage
 import top.jlen.vod.data.VodItem
-
-
-internal fun syncPlayerStateFromFullscreen(
-    playerState: PlayerUiState,
-    result: FullscreenPlaybackResult
-): FullscreenSyncState {
-    val safeEpisodes = playerState.episodes
-    val previousEpisodeIndex = playerState.selectedEpisodeIndex
-    val safeEpisodeIndex = result.episodeIndex.coerceIn(0, (safeEpisodes.size - 1).coerceAtLeast(0))
-    val nextState = playerState.copy(
-        selectedEpisodeIndex = safeEpisodeIndex,
-        resolvedUrl = result.resolvedUrl.ifBlank {
-            if (safeEpisodeIndex == previousEpisodeIndex) playerState.resolvedUrl else ""
-        },
-        useWebPlayer = false,
-        isResolving = false,
-        resolveError = null,
-        playbackSnapshot = result.snapshot
-    )
-    return FullscreenSyncState(
-        playerState = nextState,
-        shouldResolveCurrentUrl = result.resolvedUrl.isBlank() && safeEpisodeIndex != previousEpisodeIndex
-    )
-}
 
 internal fun playerStateWithRefreshedSources(
     playerState: PlayerUiState,
@@ -90,4 +52,3 @@ internal fun playerStateWithRefreshedSources(
         episodeChanged = episodeChanged
     )
 }
-
