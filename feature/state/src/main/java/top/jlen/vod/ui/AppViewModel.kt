@@ -135,22 +135,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun checkAppUpdate() {
         if (accountState.isUpdateLoading) return
         viewModelScope.launch {
-            accountState = accountState.copy(isUpdateLoading = true)
+            accountState = beginUpdateCheck(accountState)
             runCatching {
                 withContext(Dispatchers.IO) {
                     repository.loadLatestRelease(AppRuntimeInfo.versionName)
                 }
             }.onSuccess { updateInfo ->
-                accountState = accountState.copy(
-                    isUpdateLoading = false,
-                    updateInfo = updateInfo,
-                    error = null
-                )
+                accountState = accountStateWithUpdateInfo(accountState, updateInfo)
             }.onFailure {
-                accountState = accountState.copy(
-                    isUpdateLoading = false,
-                    message = "检查更新失败，请稍后重试"
-                )
+                accountState = accountStateWithUpdateError(accountState)
             }
         }
     }
@@ -159,7 +152,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (noticeState.isLoading && !forceRefresh) return
         val userId = accountState.session.userId
         viewModelScope.launch {
-            noticeState = noticeState.copy(isLoading = true, error = null)
+            noticeState = beginNoticeRefresh(noticeState)
             runCatching {
                 withContext(Dispatchers.IO) {
                     repository.loadNotices(
@@ -169,20 +162,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }.onSuccess { notices ->
-                val currentDialogId = noticeState.dialogNotice?.id.orEmpty()
-                val preservedDialog = notices.firstOrNull { it.id == currentDialogId }
                 val unreadNoticeIds = repository.unreadActiveNoticeIds(notices)
-                noticeState = noticeState.copy(
-                    isLoading = false,
-                    error = null,
+                noticeState = noticeStateWithLoadedNotices(
+                    noticeState = noticeState,
                     notices = notices,
                     unreadNoticeIds = unreadNoticeIds,
-                    dialogNotice = preservedDialog ?: repository.pickPendingNotice(notices)
+                    pendingNotice = repository.pickPendingNotice(notices)
                 )
             }.onFailure { error ->
-                noticeState = noticeState.copy(
-                    isLoading = false,
-                    error = toUserFacingMessage(error, "公告加载失败", serviceLabel = "公告服务")
+                noticeState = noticeStateWithRefreshError(
+                    noticeState = noticeState,
+                    errorMessage = toUserFacingMessage(error, "公告加载失败", serviceLabel = "公告服务")
                 )
             }
         }
@@ -191,8 +181,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun dismissNoticeDialog() {
         val dismissedNotice = noticeState.dialogNotice
         dismissedNotice?.let(repository::markNoticeDismissed)
-        noticeState = noticeState.copy(
-            dialogNotice = null,
+        noticeState = noticeStateAfterDialogDismiss(
+            noticeState = noticeState,
             unreadNoticeIds = repository.unreadActiveNoticeIds(noticeState.notices)
         )
     }
@@ -202,8 +192,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         noticeState.notices
             .firstOrNull { it.id == normalized }
             ?.let(repository::markNoticeDismissed)
-        noticeState = noticeState.copy(
-            dialogNotice = noticeState.dialogNotice?.takeUnless { it.id == normalized },
+        noticeState = noticeStateAfterNoticeOpened(
+            noticeState = noticeState,
+            noticeId = normalized,
             unreadNoticeIds = repository.unreadActiveNoticeIds(noticeState.notices)
         )
     }
