@@ -66,6 +66,23 @@ internal fun detailStateWithFavoriteFailure(
 internal fun detailStateWithoutActionMessage(detailState: DetailUiState): DetailUiState =
     detailState.copy(actionMessage = null, isActionError = false)
 
+internal fun detailStateWithActionMessage(
+    detailState: DetailUiState,
+    message: String,
+    isError: Boolean
+): DetailUiState = detailState.copy(
+    actionMessage = message,
+    isActionError = isError
+)
+
+internal fun detailStateWithoutFavorite(detailState: DetailUiState): DetailUiState =
+    detailState.copy(isFavorited = false)
+
+internal fun detailStateWithSelectedSource(
+    detailState: DetailUiState,
+    index: Int
+): DetailUiState = detailState.copy(selectedSourceIndex = index)
+
 internal fun resolvingHistoryPlayerState(title: String): PlayerUiState =
     PlayerUiState(
         title = title,

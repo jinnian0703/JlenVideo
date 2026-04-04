@@ -643,7 +643,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val removedItem = accountState.favoriteItems.firstOrNull { item -> item.recordId == recordId }
                 accountState = accountStateRemovingFavorite(accountState, recordId)
                 if (removedItem?.vodId == detailState.item?.vodId) {
-                    detailState = detailState.copy(isFavorited = false)
+                    detailState = detailStateWithoutFavorite(detailState)
                 }
                 selectAccountSection(AccountSection.Favorites, forceRefresh = true)
             }
@@ -656,7 +656,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             onSuccess = {
                 accountState = accountStateClearingFavorites(accountState)
                 if (detailState.item != null) {
-                    detailState = detailState.copy(isFavorited = false)
+                    detailState = detailStateWithoutFavorite(detailState)
                 }
                 selectAccountSection(AccountSection.Favorites, forceRefresh = true)
             }
@@ -859,17 +859,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun addCurrentDetailFavorite() {
         val item = detailState.item ?: return
         if (!accountState.session.isLoggedIn) {
-            detailState = detailState.copy(
-                actionMessage = "请先登录后再收藏",
-                isActionError = true
-            )
+            detailState = detailStateWithActionMessage(detailState, "请先登录后再收藏", true)
             return
         }
         if (detailState.isFavorited) {
-            detailState = detailState.copy(
-                actionMessage = "已在收藏中",
-                isActionError = false
-            )
+            detailState = detailStateWithActionMessage(detailState, "已在收藏中", false)
             return
         }
         if (detailState.isActionLoading) return
@@ -1323,7 +1317,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectSource(index: Int) {
-        detailState = detailState.copy(selectedSourceIndex = index)
+        detailState = detailStateWithSelectedSource(detailState, index)
     }
 
     fun openPlayer(
@@ -1375,7 +1369,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updatePlaybackSnapshot(snapshot: PlaybackSnapshot) {
         if (!hasMeaningfulPlaybackChange(playerState.playbackSnapshot, snapshot)) return
-        playerState = playerState.copy(playbackSnapshot = snapshot)
+        playerState = playerStateWithPlaybackSnapshot(playerState, snapshot)
     }
 
     fun syncFromFullscreen(result: FullscreenPlaybackResult) {

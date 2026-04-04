@@ -246,3 +246,8 @@ internal fun playerStateWithWebFallback(
     useWebPlayer = true,
     resolveError = "该线路暂不支持，请换个线路试试"
 )
+
+internal fun playerStateWithPlaybackSnapshot(
+    playerState: PlayerUiState,
+    snapshot: PlaybackSnapshot
+): PlayerUiState = playerState.copy(playbackSnapshot = snapshot)
