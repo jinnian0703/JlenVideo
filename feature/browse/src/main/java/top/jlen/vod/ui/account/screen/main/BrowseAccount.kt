@@ -622,7 +622,7 @@ fun AccountScreen(
     }
 }
 @Composable
-private fun AboutPane(
+internal fun LegacyAboutPane(
     currentVersion: String,
     latestVersion: String,
     notes: String,
@@ -722,7 +722,7 @@ private fun AboutPane(
 }
 
 @Composable
-private fun CrashLogCard(
+internal fun LegacyCrashLogCard(
     logText: String,
     onRefresh: () -> Unit,
     onClear: () -> Unit
@@ -1557,7 +1557,7 @@ private fun ReadonlyBindingField(
 }
 
 @Composable
-private fun AccountRecordPane(
+internal fun LegacyAccountRecordPane(
     title: String,
     emptyMessage: String,
     isLoading: Boolean,
@@ -1611,7 +1611,7 @@ private fun AccountRecordPane(
 }
 
 @Composable
-private fun AccountRecordCard(
+internal fun LegacyAccountRecordCard(
     item: top.jlen.vod.data.UserCenterItem,
     isActionLoading: Boolean,
     onPrimaryAction: (top.jlen.vod.data.UserCenterItem) -> Unit,
@@ -1665,7 +1665,7 @@ private fun AccountRecordCard(
 }
 
 @Composable
-private fun MembershipPaneV2(
+internal fun LegacyMembershipPaneV2(
     isLoading: Boolean,
     info: top.jlen.vod.data.MembershipInfo,
     plans: List<MembershipPlan>,
@@ -1745,7 +1745,7 @@ private fun MembershipPaneV2(
 }
 
 @Composable
-private fun MembershipPane(
+internal fun LegacyMembershipPane(
     isLoading: Boolean,
     info: top.jlen.vod.data.MembershipInfo,
     plans: List<MembershipPlan>,
@@ -1820,7 +1820,7 @@ private fun MembershipPane(
     }
 }
 
-private fun String.toMembershipDuration(): String = when (lowercase()) {
+internal fun String.toLegacyMembershipDuration(): String = when (lowercase()) {
     "day" -> "包天"
     "week" -> "包周"
     "month" -> "包月"
