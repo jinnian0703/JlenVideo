@@ -1,6 +1,7 @@
 package top.jlen.vod.data
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -285,6 +286,56 @@ open class LegacyAppleCmsRuntimeRepository(
     internal fun runtimeCacheCategoryPagePayload(cacheKey: String, payload: PagedVodItems) {
         cachePagePayload(cacheKey, payload)
     }
+
+    internal fun runtimeBaseUrl(): String = baseUrl
+
+    internal fun runtimeHttpClient(): OkHttpClient = client
+
+    internal fun runtimeGson(): Gson = gson
+
+    internal fun currentNoticeCacheEntry(): CachedValue<List<AppNotice>>? = noticeCache
+
+    internal fun updateNoticeCacheEntry(value: CachedValue<List<AppNotice>>?) {
+        noticeCache = value
+    }
+
+    internal fun runtimeNoticePrefs(): SharedPreferences = noticePrefs
+
+    internal fun runtimeHeartbeatPrefs(): SharedPreferences = heartbeatPrefs
+
+    internal fun runtimeAppCenterApiUrl(): String = APP_CENTER_API_URL
+
+    internal fun runtimeDismissedNoticeIdsKey(): String = KEY_DISMISSED_NOTICE_IDS
+
+    internal fun runtimeHeartbeatDeviceIdKey(): String = HEARTBEAT_DEVICE_ID_KEY
+
+    internal fun runtimeAppendTimestamp(url: String): String = appendTimestamp(url)
+
+    internal fun runtimeResolveUrl(pathOrUrl: String): String = resolveUrl(pathOrUrl)
+
+    internal fun runtimeNormalizeUrl(raw: String): String = normalizeUrl(raw)
+
+    internal suspend fun runtimeFetchDocument(url: String): Document = fetchDocument(url)
+
+    internal suspend fun runtimeSubmitPublicAction(
+        url: String,
+        referer: String,
+        formBody: FormBody
+    ): String = submitPublicAction(url, referer, formBody)
+
+    internal fun runtimeParseAuthResponse(body: String): AuthResponse? =
+        runCatching { gson.fromJson(body, AuthResponse::class.java) }.getOrNull()
+
+    internal fun runtimeExtractNoticeItems(json: JsonObject): List<JsonElement> =
+        json.extractNoticeItems()
+
+    internal fun runtimeParseNoticeItem(json: JsonObject): AppNotice? =
+        parseNoticeItem(json)
+
+    internal fun runtimeParseNoticeTimeToMillis(value: String): Long? =
+        parseNoticeTimeToMillis(value)
+
+    internal fun runtimeNoticeCacheTtlMs(): Long = NOTICE_CACHE_TTL_MS
 
     private fun clearMemoryCaches() = legacyClearMemoryCaches()
 
@@ -792,6 +843,51 @@ open class LegacyAppleCmsRuntimeRepository(
         vodId: String = "",
         sid: Int? = null,
         nid: Int? = null
+    ) = legacyReportHeartbeat(route, userId, vodId, sid, nid)
+
+    suspend fun login(userName: String, password: String): AuthSession =
+        legacyLogin(userName, password)
+
+    suspend fun loadNotices(
+        appVersion: String = AppRuntimeInfo.versionName,
+        userId: String = "",
+        forceRefresh: Boolean = false
+    ): List<AppNotice> = legacyLoadNotices(appVersion, userId, forceRefresh)
+
+    fun pickPendingNotice(notices: List<AppNotice>): AppNotice? = legacyPickPendingNotice(notices)
+
+    fun unreadActiveNoticeIds(notices: List<AppNotice>): Set<String> =
+        legacyUnreadActiveNoticeIds(notices)
+
+    fun markNoticeDismissed(notice: AppNotice) = legacyMarkNoticeDismissed(notice)
+
+    fun markNoticeDismissed(noticeId: String) = legacyMarkNoticeDismissed(noticeId)
+
+    suspend fun loadRegisterPage(): RegisterPage = legacyLoadRegisterPage()
+
+    suspend fun loadRegisterCaptcha(captchaUrl: String): ByteArray =
+        legacyLoadRegisterCaptcha(captchaUrl)
+
+    suspend fun loadFindPasswordPage(): FindPasswordPage = legacyLoadFindPasswordPage()
+
+    suspend fun loadFindPasswordCaptcha(captchaUrl: String): ByteArray =
+        legacyLoadFindPasswordCaptcha(captchaUrl)
+
+    suspend fun findPassword(editor: FindPasswordEditor): String = legacyFindPassword(editor)
+
+    suspend fun sendRegisterCode(channel: String, contact: String): String =
+        legacySendRegisterCode(channel, contact)
+
+    suspend fun register(editor: RegisterEditor): String = legacyRegister(editor)
+
+    suspend fun logout() = legacyLogout()
+
+    private fun reportHeartbeatOriginal(
+        route: String,
+        userId: String = currentSession().userId,
+        vodId: String = "",
+        sid: Int? = null,
+        nid: Int? = null
     ) {
         val request = Request.Builder()
             .url(
@@ -803,7 +899,7 @@ open class LegacyAppleCmsRuntimeRepository(
             )
             .post(
                 FormBody.Builder()
-                    .add("device_id", ensureHeartbeatDeviceId())
+                    .add("device_id", ensureHeartbeatDeviceIdOriginal())
                     .add("platform", "android")
                     .add("app_version", AppRuntimeInfo.versionName)
                     .add("route", route.trim().ifBlank { "home" })
@@ -832,7 +928,7 @@ open class LegacyAppleCmsRuntimeRepository(
         }
     }
 
-    suspend fun login(userName: String, password: String): AuthSession {
+    private suspend fun loginOriginal(userName: String, password: String): AuthSession {
         val payload = FormBody.Builder()
             .add("user_name", userName.trim())
             .add("user_pwd", password)
@@ -870,7 +966,7 @@ open class LegacyAppleCmsRuntimeRepository(
         }
     }
 
-    suspend fun loadNotices(
+    private suspend fun loadNoticesOriginal(
         appVersion: String = AppRuntimeInfo.versionName,
         userId: String = "",
         forceRefresh: Boolean = false
@@ -890,18 +986,18 @@ open class LegacyAppleCmsRuntimeRepository(
         }
 
         return if (forceRefresh) {
-            loadFreshNotices(appVersion = appVersion, userId = userId)
+            loadFreshNoticesOriginal(appVersion = appVersion, userId = userId)
         } else {
             awaitSharedRequest(requestKey) {
                 noticeCache
                     ?.takeIf { isCacheValid(it.timestampMs, NOTICE_CACHE_TTL_MS) }
                     ?.value
-                    ?: loadFreshNotices(appVersion = appVersion, userId = userId)
+                    ?: loadFreshNoticesOriginal(appVersion = appVersion, userId = userId)
             }
         }
     }
 
-    fun pickPendingNotice(notices: List<AppNotice>): AppNotice? {
+    private fun pickPendingNoticeOriginal(notices: List<AppNotice>): AppNotice? {
         val dismissedIds = noticePrefs.getStringSet(KEY_DISMISSED_NOTICE_IDS, emptySet()).orEmpty()
         return notices.firstOrNull { notice ->
             notice.isActive &&
@@ -910,7 +1006,7 @@ open class LegacyAppleCmsRuntimeRepository(
         }
     }
 
-    fun unreadActiveNoticeIds(notices: List<AppNotice>): Set<String> {
+    private fun unreadActiveNoticeIdsOriginal(notices: List<AppNotice>): Set<String> {
         val dismissedIds = noticePrefs.getStringSet(KEY_DISMISSED_NOTICE_IDS, emptySet()).orEmpty()
         return notices.asSequence()
             .filter { notice ->
@@ -922,12 +1018,12 @@ open class LegacyAppleCmsRuntimeRepository(
             .toSet()
     }
 
-    fun markNoticeDismissed(notice: AppNotice) {
+    private fun markNoticeDismissedOriginal(notice: AppNotice) {
         if (notice.alwaysShowDialog) return
         markNoticeDismissed(notice.id)
     }
 
-    fun markNoticeDismissed(noticeId: String) {
+    private fun markNoticeDismissedOriginal(noticeId: String) {
         val normalized = noticeId.trim()
         if (normalized.isBlank()) return
         val currentIds = noticePrefs.getStringSet(KEY_DISMISSED_NOTICE_IDS, emptySet()).orEmpty()
@@ -937,7 +1033,7 @@ open class LegacyAppleCmsRuntimeRepository(
             .apply()
     }
 
-    private fun loadFreshNotices(appVersion: String, userId: String): List<AppNotice> {
+    private fun loadFreshNoticesOriginal(appVersion: String, userId: String): List<AppNotice> {
         val url = Uri.parse(APP_CENTER_API_URL)
             .buildUpon()
             .appendQueryParameter("action", "notices")
@@ -980,7 +1076,7 @@ open class LegacyAppleCmsRuntimeRepository(
         }
     }
 
-    private fun ensureHeartbeatDeviceId(): String {
+    private fun ensureHeartbeatDeviceIdOriginal(): String {
         heartbeatPrefs.getString(HEARTBEAT_DEVICE_ID_KEY, null)
             ?.takeIf(String::isNotBlank)
             ?.let { return it }
@@ -989,7 +1085,7 @@ open class LegacyAppleCmsRuntimeRepository(
         return generated
     }
 
-    private fun normalizeLoginFailureMessage(rawMessage: String): String {
+    private fun normalizeLoginFailureMessageOriginal(rawMessage: String): String {
         val message = rawMessage.trim()
         return when {
             message.isBlank() -> ""
@@ -998,7 +1094,7 @@ open class LegacyAppleCmsRuntimeRepository(
         }
     }
 
-    suspend fun loadRegisterPage(): RegisterPage {
+    private suspend fun loadRegisterPageOriginal(): RegisterPage {
         val document = fetchDocument("$baseUrl/index.php/user/reg.html")
         val channel = document.selectFirst("input[name=ac]")?.attr("value")?.trim().orEmpty()
             .ifBlank { "email" }
@@ -1019,7 +1115,7 @@ open class LegacyAppleCmsRuntimeRepository(
         )
     }
 
-    suspend fun loadRegisterCaptcha(captchaUrl: String): ByteArray {
+    private suspend fun loadRegisterCaptchaOriginal(captchaUrl: String): ByteArray {
         val request = Request.Builder()
             .url(appendTimestamp(captchaUrl))
             .header("Referer", "$baseUrl/index.php/user/reg.html")
@@ -1033,7 +1129,7 @@ open class LegacyAppleCmsRuntimeRepository(
         }
     }
 
-    suspend fun loadFindPasswordPage(): FindPasswordPage {
+    private suspend fun loadFindPasswordPageOriginal(): FindPasswordPage {
         val document = fetchDocument("$baseUrl/index.php/user/findpass.html")
         val requiresVerify = document.selectFirst("input[name=verify]") != null
         val captchaUrl = document.selectFirst("img[src*=/verify/], img.mac_verify_img")
@@ -1047,7 +1143,7 @@ open class LegacyAppleCmsRuntimeRepository(
         )
     }
 
-    suspend fun loadFindPasswordCaptcha(captchaUrl: String): ByteArray {
+    private suspend fun loadFindPasswordCaptchaOriginal(captchaUrl: String): ByteArray {
         val request = Request.Builder()
             .url(appendTimestamp(captchaUrl))
             .header("Referer", "$baseUrl/index.php/user/findpass.html")
@@ -1061,7 +1157,7 @@ open class LegacyAppleCmsRuntimeRepository(
         }
     }
 
-    suspend fun findPassword(editor: FindPasswordEditor): String {
+    private suspend fun findPasswordOriginal(editor: FindPasswordEditor): String {
         val form = FormBody.Builder()
             .add("user_name", editor.userName.trim())
             .add("user_question", editor.question.trim())
@@ -1265,7 +1361,7 @@ open class LegacyAppleCmsRuntimeRepository(
         }
     }
 
-    suspend fun sendRegisterCode(channel: String, contact: String): String {
+    private suspend fun sendRegisterCodeOriginal(channel: String, contact: String): String {
         val form = FormBody.Builder()
             .add("ac", channel.trim())
             .add("to", contact.trim())
@@ -1277,7 +1373,7 @@ open class LegacyAppleCmsRuntimeRepository(
         )
     }
 
-    suspend fun register(editor: RegisterEditor): String {
+    private suspend fun registerOriginal(editor: RegisterEditor): String {
         val form = FormBody.Builder()
             .add("user_name", editor.userName.trim())
             .add("user_pwd", editor.password)
@@ -1294,7 +1390,7 @@ open class LegacyAppleCmsRuntimeRepository(
         )
     }
 
-    suspend fun logout() {
+    private suspend fun logoutOriginal() {
         val request = Request.Builder()
             .url("$baseUrl/index.php/user/logout")
             .header("Referer", "$baseUrl/index.php/user")
