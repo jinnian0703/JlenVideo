@@ -98,6 +98,30 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
         searchResultScrollPositions.clear()
     }
 
+    internal fun runtimeLoadRegisterPage(forceRefresh: Boolean = false) {
+        loadRegisterPage(forceRefresh)
+    }
+
+    internal fun runtimeLoadFindPasswordPage(forceRefresh: Boolean = false) {
+        loadFindPasswordPage(forceRefresh)
+    }
+
+    internal fun runtimeLoadAccountProfile() {
+        loadAccountProfile()
+    }
+
+    internal fun runtimeLoadFavoriteRecords(pageUrl: String? = null, append: Boolean = false) {
+        loadFavoriteRecords(pageUrl, append)
+    }
+
+    internal fun runtimeLoadHistoryRecords(pageUrl: String? = null, append: Boolean = false) {
+        loadHistoryRecords(pageUrl, append)
+    }
+
+    internal fun runtimeLoadMembership() {
+        loadMembership()
+    }
+
     internal fun searchHistoryStore(): SearchHistoryStore = searchHistoryStore
 
     internal fun getSearchResultScrollPosition(query: String): SearchResultScrollPosition? =
@@ -215,32 +239,16 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
 
     fun loadMoreSearchResults() = legacyLoadMoreSearchResults()
 
-    fun updateLoginUserName(value: String) {
-        accountState = accountStateWithUserName(accountState, value)
-    }
+    fun updateLoginUserName(value: String) = legacyUpdateLoginUserName(value)
 
-    fun updateLoginPassword(value: String) {
-        accountState = accountStateWithPassword(accountState, value)
-    }
+    fun updateLoginPassword(value: String) = legacyUpdateLoginPassword(value)
 
-    fun setAccountAuthMode(mode: AccountAuthMode) {
-        accountState = accountStateWithAuthMode(accountState, mode)
-        when (mode) {
-            AccountAuthMode.Login -> Unit
-            AccountAuthMode.Register -> loadRegisterPage(forceRefresh = true)
-            AccountAuthMode.FindPassword -> loadFindPasswordPage(forceRefresh = true)
-            AccountAuthMode.About -> refreshCrashLog()
-        }
-    }
+    fun setAccountAuthMode(mode: AccountAuthMode) = legacySetAccountAuthMode(mode)
 
     fun refreshCategoryTab(forceRefresh: Boolean = false) = legacyRefreshCategoryTab(forceRefresh)
 
-    fun updateRegisterEditor(transform: (RegisterEditor) -> RegisterEditor) {
-        accountState = accountStateWithRegisterEditor(
-            accountState,
-            transform(accountState.registerEditor)
-        )
-    }
+    fun updateRegisterEditor(transform: (RegisterEditor) -> RegisterEditor) =
+        legacyUpdateRegisterEditor(transform)
 
     fun refreshRegisterCaptcha() {
         val captchaUrl = accountState.registerCaptchaUrl
@@ -265,12 +273,8 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
         }
     }
 
-    fun updateFindPasswordEditor(transform: (FindPasswordEditor) -> FindPasswordEditor) {
-        accountState = accountStateWithFindPasswordEditor(
-            accountState,
-            transform(accountState.findPasswordEditor)
-        )
-    }
+    fun updateFindPasswordEditor(transform: (FindPasswordEditor) -> FindPasswordEditor) =
+        legacyUpdateFindPasswordEditor(transform)
 
     fun refreshFindPasswordCaptcha() {
         val captchaUrl = accountState.findPasswordCaptchaUrl
@@ -295,58 +299,19 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
         }
     }
 
-    fun updateProfileEditor(transform: (UserProfileEditor) -> UserProfileEditor) {
-        accountState = accountStateWithProfileEditor(
-            accountState,
-            transform(accountState.profileEditor)
-        )
-    }
+    fun updateProfileEditor(transform: (UserProfileEditor) -> UserProfileEditor) =
+        legacyUpdateProfileEditor(transform)
 
-    fun setProfileEditTab(editMode: Boolean) {
-        accountState = accountStateWithProfileEditTab(accountState, editMode)
-    }
+    fun setProfileEditTab(editMode: Boolean) = legacySetProfileEditTab(editMode)
 
-    fun selectAccountSection(section: AccountSection, forceRefresh: Boolean = false) {
-        accountState = selectAccountSectionState(accountState, section)
-        if (!accountState.session.isLoggedIn) return
-        when (section) {
-            AccountSection.Profile -> {
-                if (forceRefresh || accountState.profileFields.isEmpty()) {
-                    loadAccountProfile()
-                }
-            }
-            AccountSection.Favorites -> {
-                if (forceRefresh || accountState.favoriteItems.isEmpty()) {
-                    loadFavoriteRecords()
-                }
-            }
-            AccountSection.History -> {
-                if (forceRefresh || accountState.historyItems.isEmpty()) {
-                    loadHistoryRecords()
-                }
-            }
-            AccountSection.Member -> {
-                if (forceRefresh || accountState.membershipPlans.isEmpty()) {
-                    loadMembership()
-                }
-            }
-            AccountSection.About -> refreshCrashLog()
-        }
-    }
+    fun selectAccountSection(section: AccountSection, forceRefresh: Boolean = false) =
+        legacySelectAccountSection(section, forceRefresh)
 
-    fun refreshSelectedAccountSection() {
-        selectAccountSection(accountState.selectedSection, forceRefresh = true)
-    }
+    fun refreshSelectedAccountSection() = legacyRefreshSelectedAccountSection()
 
-    fun loadMoreFavorites() {
-        if (accountState.isContentLoading || accountState.favoriteNextPageUrl.isNullOrBlank()) return
-        loadFavoriteRecords(pageUrl = accountState.favoriteNextPageUrl, append = true)
-    }
+    fun loadMoreFavorites() = legacyLoadMoreFavorites()
 
-    fun loadMoreHistory() {
-        if (accountState.isContentLoading || accountState.historyNextPageUrl.isNullOrBlank()) return
-        loadHistoryRecords(pageUrl = accountState.historyNextPageUrl, append = true)
-    }
+    fun loadMoreHistory() = legacyLoadMoreHistory()
 
     fun deleteFavorite(recordId: String) {
         if (recordId.isBlank()) return
