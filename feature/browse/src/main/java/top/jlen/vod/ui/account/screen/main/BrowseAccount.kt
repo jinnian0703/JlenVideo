@@ -787,7 +787,7 @@ internal fun LegacyCrashLogCard(
 }
 
 @Composable
-private fun AccountRegisterPane(
+internal fun LegacyAccountRegisterPane(
     state: AccountUiState,
     onEditorChange: ((RegisterEditor) -> RegisterEditor) -> Unit,
     onRefreshCaptcha: () -> Unit,
@@ -994,7 +994,7 @@ private fun AccountRegisterPane(
 }
 
 @Composable
-private fun AccountFindPasswordPane(
+internal fun LegacyAccountFindPasswordPane(
     state: AccountUiState,
     onEditorChange: ((FindPasswordEditor) -> FindPasswordEditor) -> Unit,
     onRefreshCaptcha: () -> Unit,
@@ -1191,7 +1191,7 @@ private enum class AccountProfileTab {
 }
 
 @Composable
-private fun AccountProfilePaneV2(
+internal fun LegacyAccountProfilePaneV2(
     isLoading: Boolean,
     fields: List<Pair<String, String>>,
     editor: UserProfileEditor,
@@ -1392,7 +1392,7 @@ private fun AccountProfilePaneV2(
 }
 
 @Composable
-private fun AccountProfilePane(
+internal fun LegacyAccountProfilePane(
     isLoading: Boolean,
     fields: List<Pair<String, String>>,
     editor: UserProfileEditor,
@@ -1497,7 +1497,7 @@ private fun AccountProfilePane(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProfileEditorField(
+internal fun LegacyProfileEditorField(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
@@ -1527,7 +1527,7 @@ private fun ProfileEditorField(
 }
 
 @Composable
-private fun ReadonlyBindingField(
+internal fun LegacyReadonlyBindingField(
     label: String,
     value: String,
     actionText: String? = null,
