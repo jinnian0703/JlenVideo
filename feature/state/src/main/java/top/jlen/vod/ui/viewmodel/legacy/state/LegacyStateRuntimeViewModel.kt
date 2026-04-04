@@ -88,6 +88,12 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
         searchState = value
     }
 
+    internal fun currentDetailState(): DetailUiState = detailState
+
+    internal fun updateDetailState(value: DetailUiState) {
+        detailState = value
+    }
+
     internal fun hasEnteredAccountScreenFlag(): Boolean = hasEnteredAccountScreen
 
     internal fun markAccountScreenEntered() {
@@ -120,6 +126,13 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
 
     internal fun runtimeLoadMembership() {
         loadMembership()
+    }
+
+    internal fun runtimeRunAccountAction(
+        block: suspend AppleCmsRepository.() -> String,
+        onSuccess: () -> Unit
+    ) {
+        runAccountAction(block, onSuccess)
     }
 
     internal fun searchHistoryStore(): SearchHistoryStore = searchHistoryStore
@@ -313,129 +326,25 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
 
     fun loadMoreHistory() = legacyLoadMoreHistory()
 
-    fun deleteFavorite(recordId: String) {
-        if (recordId.isBlank()) return
-        runAccountAction(
-            block = { deleteUserRecordForApp(recordIds = listOf(recordId), type = 2, clearAll = false) },
-            onSuccess = {
-                val removedItem = accountState.favoriteItems.firstOrNull { item -> item.recordId == recordId }
-                accountState = accountStateRemovingFavorite(accountState, recordId)
-                if (removedItem?.vodId == detailState.item?.vodId) {
-                    detailState = detailStateWithoutFavorite(detailState)
-                }
-                selectAccountSection(AccountSection.Favorites, forceRefresh = true)
-            }
-        )
-    }
+    fun deleteFavorite(recordId: String) = legacyDeleteFavorite(recordId)
 
-    fun clearFavorites() {
-        runAccountAction(
-            block = { deleteUserRecordForApp(recordIds = emptyList(), type = 2, clearAll = true) },
-            onSuccess = {
-                accountState = accountStateClearingFavorites(accountState)
-                if (detailState.item != null) {
-                    detailState = detailStateWithoutFavorite(detailState)
-                }
-                selectAccountSection(AccountSection.Favorites, forceRefresh = true)
-            }
-        )
-    }
+    fun clearFavorites() = legacyClearFavorites()
 
-    fun deleteHistory(recordId: String) {
-        if (recordId.isBlank()) return
-        runAccountAction(
-            block = { deleteUserRecordForApp(recordIds = listOf(recordId), type = 4, clearAll = false) },
-            onSuccess = {
-                accountState = accountStateRemovingHistory(accountState, recordId)
-                selectAccountSection(AccountSection.History, forceRefresh = true)
-            }
-        )
-    }
+    fun deleteHistory(recordId: String) = legacyDeleteHistory(recordId)
 
-    fun clearHistory() {
-        runAccountAction(
-            block = { deleteUserRecordForApp(recordIds = emptyList(), type = 4, clearAll = true) },
-            onSuccess = {
-                accountState = accountStateClearingHistory(accountState)
-                selectAccountSection(AccountSection.History, forceRefresh = true)
-            }
-        )
-    }
+    fun clearHistory() = legacyClearHistory()
 
-    fun upgradeMembership(plan: MembershipPlan) {
-        if (plan.groupId.isBlank() || plan.duration.isBlank()) return
-        runAccountAction(
-            block = { upgradeMembership(plan) },
-            onSuccess = { selectAccountSection(AccountSection.Member, forceRefresh = true) }
-        )
-    }
+    fun upgradeMembership(plan: MembershipPlan) = legacyUpgradeMembership(plan)
 
-    fun saveProfile() {
-        runAccountAction(
-            block = { saveUserProfile(accountState.profileEditor) },
-            onSuccess = {
-                accountState = accountStateAfterProfileSaved(accountState)
-                selectAccountSection(AccountSection.Profile, forceRefresh = true)
-                refreshAccount()
-            }
-        )
-    }
+    fun saveProfile() = legacySaveProfile()
 
-    fun uploadPortrait(uri: Uri) {
-        if (!accountState.session.isLoggedIn) {
-            accountState = accountStateWithValidationError(accountState, "璇峰厛鐧诲綍")
-            return
-        }
-        runAccountAction(
-            block = { uploadPortraitOptimized(uri) },
-            onSuccess = {
-                refreshNotices(forceRefresh = true)
-                selectAccountSection(AccountSection.Profile, forceRefresh = true)
-            }
-        )
-    }
+    fun uploadPortrait(uri: Uri) = legacyUploadPortrait(uri)
 
-    fun sendEmailBindCode() {
-        val email = accountState.profileEditor.pendingEmail.trim()
-        if (email.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "请输入邮箱地址")
-            return
-        }
-        runAccountAction(
-            block = { sendEmailBindCode(email) },
-            onSuccess = { }
-        )
-    }
+    fun sendEmailBindCode() = legacySendEmailBindCode()
 
-    fun bindEmail() {
-        val email = accountState.profileEditor.pendingEmail.trim()
-        val code = accountState.profileEditor.emailCode.trim()
-        if (email.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "请输入邮箱地址")
-            return
-        }
-        if (code.isBlank()) {
-            accountState = accountStateWithValidationError(accountState, "请输入邮箱验证码")
-            return
-        }
-        runAccountAction(
-            block = { bindEmail(email, code) },
-            onSuccess = {
-                accountState = accountStateAfterEmailBound(accountState, email)
-                selectAccountSection(AccountSection.Profile, forceRefresh = true)
-            }
-        )
-    }
+    fun bindEmail() = legacyBindEmail()
 
-    fun unbindEmail() {
-        runAccountAction(
-            block = { unbindEmail() },
-            onSuccess = {
-                accountState = accountStateAfterEmailUnbound(accountState)
-                selectAccountSection(AccountSection.Profile, forceRefresh = true)
-            }
-        )
-    }
+    fun unbindEmail() = legacyUnbindEmail()
 
     fun sendRegisterCode() {
         val editor = accountState.registerEditor
