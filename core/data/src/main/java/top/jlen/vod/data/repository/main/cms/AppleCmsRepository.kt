@@ -814,14 +814,8 @@ class AppleCmsRepository(
         }
     }
 
-    private fun extractVideoApiMessage(json: JsonObject, fallbackMessage: String): String {
-        val code = json.firstInt("code", "status")
-        val message = json.firstString("msg", "message")
-        if (code != null && code !in setOf(1, 200)) {
-            throw IOException(message.ifBlank { fallbackMessage })
-        }
-        return message.ifBlank { fallbackMessage }
-    }
+    private fun extractVideoApiMessage(json: JsonObject, fallbackMessage: String): String =
+        top.jlen.vod.data.extractVideoApiMessage(json, fallbackMessage)
 
     fun reportHeartbeat(
         route: String,

@@ -1,6 +1,7 @@
 package top.jlen.vod.data
 
 import android.net.Uri
+import android.util.Base64
 import androidx.core.text.HtmlCompat
 import com.google.gson.Gson
 import com.google.gson.JsonElement
@@ -135,6 +136,123 @@ internal fun parseUserCenterVod(
         siteVodId = rawItem.siteVodId.ifBlank { resolvedVodId },
         detailUrl = buildVodDetailUrl(rawItem.copy(vodId = resolvedVodId), baseUrl)
     )
+}
+
+internal fun extractVideoApiMessage(json: JsonObject, fallbackMessage: String): String {
+    val code = json.firstInt("code", "status")
+    val message = json.firstString("msg", "message")
+    if (code != null && code !in setOf(1, 200)) {
+        throw IOException(message.ifBlank { fallbackMessage })
+    }
+    return message.ifBlank { fallbackMessage }
+}
+
+internal fun normalizeLoginFailureMessage(rawMessage: String): String {
+    val message = rawMessage.trim()
+    return when {
+        message.isBlank() -> ""
+        message.contains("鑾峰彇鐢ㄦ埛淇℃伅澶辫触") -> "鐢ㄦ埛鍚嶄笉瀛樺湪鎴栧瘑鐮侀敊璇?"
+        else -> message
+    }
+}
+
+internal fun decodePlayerUrl(rawUrl: String, encrypt: Int): String {
+    val cleaned = rawUrl.trim().replace("\\/", "/")
+    if (cleaned.isBlank()) return ""
+
+    return when (encrypt) {
+        1 -> Uri.decode(cleaned)
+        2 -> runCatching {
+            val decodedBase64 = String(Base64.decode(cleaned, Base64.DEFAULT))
+            Uri.decode(decodedBase64)
+        }.getOrElse { cleaned }
+        else -> cleaned
+    }
+}
+
+internal fun extractPlayerConfig(html: String): Pair<String, Int>? {
+    val block = Regex("""player_aaaa\s*=\s*(\{.*?\})</script>""", setOf(RegexOption.DOT_MATCHES_ALL))
+        .find(html)
+        ?.groupValues
+        ?.getOrNull(1)
+        .orEmpty()
+    if (block.isBlank()) return null
+
+    val rawUrl = Regex(""""url"\s*:\s*"([^"]*)"""")
+        .find(block)
+        ?.groupValues
+        ?.getOrNull(1)
+        .orEmpty()
+    val encrypt = Regex(""""encrypt"\s*:\s*(\d+)""")
+        .find(block)
+        ?.groupValues
+        ?.getOrNull(1)
+        ?.toIntOrNull()
+        ?: 0
+
+    return rawUrl to encrypt
+}
+
+internal fun extractEmbeddedMediaUrls(html: String): List<String> {
+    val patterns = listOf(
+        Regex("""const\s+url\s*=\s*"([^"]+)""""),
+        Regex("""var\s+url\s*=\s*"([^"]+)""""),
+        Regex(""""url"\s*:\s*"([^"]+)""""),
+        Regex("""src\s*:\s*"([^"]+\.m3u8[^"]*)""""),
+        Regex("""loadSource\(\s*"([^"]+)"\s*\)"""),
+        Regex("""video\.src\s*=\s*"([^"]+)""""),
+        Regex("""<iframe[^>]+src=["']([^"']+)["']""", setOf(RegexOption.IGNORE_CASE)),
+        Regex("""["']((?:https?:)?//[^"']+\.m3u8[^"']*)["']"""),
+        Regex("""["']((?:https?:)?//[^"']+\.mp4[^"']*)["']"""),
+        Regex("""["']([^"']+\.m3u8[^"']*)["']"""),
+        Regex("""["']([^"']+\.mp4[^"']*)["']"""),
+        Regex("""<source[^>]+src=["']([^"']+)["']""", setOf(RegexOption.IGNORE_CASE))
+    )
+    return buildList {
+        patterns.forEach { regex ->
+            regex.findAll(html).forEach { match ->
+                match.groupValues.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
+            }
+        }
+    }
+}
+
+internal fun extractAssignedJsonObject(html: String, variableName: String): String {
+    val markerIndex = html.indexOf("$variableName=")
+    if (markerIndex < 0) return ""
+
+    val startIndex = html.indexOf('{', markerIndex)
+    if (startIndex < 0) return ""
+
+    var depth = 0
+    var inString = false
+    var escaped = false
+    for (index in startIndex until html.length) {
+        val char = html[index]
+        if (inString) {
+            if (escaped) {
+                escaped = false
+            } else if (char == '\\') {
+                escaped = true
+            } else if (char == '"') {
+                inString = false
+            }
+            continue
+        }
+
+        when (char) {
+            '"' -> inString = true
+            '{' -> depth += 1
+            '}' -> {
+                depth -= 1
+                if (depth == 0) {
+                    return html.substring(startIndex, index + 1)
+                }
+            }
+        }
+    }
+
+    return ""
 }
 
 internal fun JsonObject.extractNoticeItems(): List<JsonElement> {
