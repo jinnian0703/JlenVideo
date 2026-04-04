@@ -135,6 +135,7 @@ fun PlayerScreen(
             } else {
                 null
             }
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             if (isFullscreen) {
                 WindowCompat.setDecorFitsSystemWindows(window, false)
                 window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
@@ -161,6 +162,7 @@ fun PlayerScreen(
                 activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
             onDispose {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 if (isFullscreen) {
                     window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && originalCutoutMode != null) {

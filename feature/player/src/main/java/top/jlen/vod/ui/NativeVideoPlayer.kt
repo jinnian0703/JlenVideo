@@ -647,6 +647,7 @@ fun NativeVideoPlayer(
                                     embeddedResizeMode
                                 }
                             )
+                            keepScreenOn = true
                             this.player = player
                         }
                     },
@@ -658,6 +659,7 @@ fun NativeVideoPlayer(
                                 embeddedResizeMode
                             }
                         )
+                        playerView.keepScreenOn = true
                         if (playerView.player !== player) {
                             playerView.player = player
                         }
