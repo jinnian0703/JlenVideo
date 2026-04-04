@@ -3388,25 +3388,6 @@ class AppleCmsRepository(
         }
     }
 
-    private fun readLabeledValue(document: Document, label: String): Pair<String, String>? {
-        val value = readLabeledText(document, label)
-        return value.takeIf { it.isNotBlank() }?.let { label to it }
-    }
-
-    private fun readLabeledText(document: Document, label: String): String {
-        document.select("p, li, div, span").forEach { element ->
-            val text = element.text()
-                .replace('\u00A0', ' ')
-                .replace(Regex("\\s+"), " ")
-                .trim()
-            val match = Regex("$label[：: ]+(.+)").find(text)
-            if (match != null) {
-                return match.groupValues.getOrNull(1).orEmpty().trim()
-            }
-        }
-        return ""
-    }
-
     private fun parseDetail(document: Document): VodItem? {
         val infoRoot = document.selectFirst(".vod-info") ?: return null
         val metaMap = LinkedHashMap<String, String>()
@@ -3450,36 +3431,6 @@ class AppleCmsRepository(
                 .orEmpty(),
             detailUrl = document.location()
         )
-    }
-
-    private fun extractDetailMeta(span: Element): Pair<String, String>? {
-        val normalizedOwnText = span.ownText().replace(Regex("\\s+"), " ").trim()
-        val normalizedText = span.text().replace(Regex("\\s+"), " ").trim()
-        val label = normalizedOwnText
-            .substringBefore('：')
-            .substringBefore(':')
-            .trim()
-            .ifBlank {
-                normalizedText.substringBefore('：').substringBefore(':').trim()
-            }
-        if (label.isBlank()) return null
-
-        val childValues = span.children()
-            .mapNotNull { child ->
-                child.text()
-                    .replace(Regex("\\s+"), " ")
-                    .trim()
-                    .takeIf { it.isNotBlank() }
-            }
-            .distinct()
-
-        if (childValues.isNotEmpty()) {
-            return label to childValues.joinToString(" / ")
-        }
-
-        val parts = normalizedText.split(Regex("[:\\uFF1A]"), limit = 2)
-        if (parts.size != 2) return null
-        return label to parts[1].trim()
     }
 
     private fun parseDetailSources(document: Document): List<PlaySource> {
