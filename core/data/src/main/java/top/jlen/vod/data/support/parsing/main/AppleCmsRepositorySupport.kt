@@ -2,6 +2,7 @@ package top.jlen.vod.data
 
 import android.net.Uri
 import androidx.core.text.HtmlCompat
+import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
@@ -110,6 +111,30 @@ internal fun normalizePortraitUrl(baseUrl: String, raw: String): String {
     val value = raw.trim()
     if (value.isBlank() || value == "deleted") return ""
     return appendTimestamp(normalizeUrl(baseUrl, value))
+}
+
+internal fun parseUserCenterVod(
+    row: JsonObject,
+    gson: Gson,
+    baseUrl: String
+): VodItem? {
+    val vodObject = row.firstObject("vod", "video", "item") ?: row
+    val rawItem = runCatching { gson.fromJson(vodObject, VodItem::class.java) }.getOrNull() ?: return null
+    val resolvedVodId = rawItem.vodId.ifBlank { vodObject.firstString("vod_id", "id") }
+    val resolvedTypeName = rawItem.typeName.orEmpty().ifBlank {
+        vodObject.firstObject("type")?.firstString("type_name").orEmpty()
+    }
+    if (resolvedVodId.isBlank() && rawItem.vodName.isBlank() && vodObject === row) {
+        return null
+    }
+    return rawItem.copy(
+        vodId = resolvedVodId,
+        vodName = decodeSiteText(rawItem.vodName.ifBlank { vodObject.firstString("vod_name", "name", "title") }),
+        vodPic = rawItem.vodPic?.let { normalizeAgainst(it, "$baseUrl/", baseUrl) },
+        typeName = resolvedTypeName,
+        siteVodId = rawItem.siteVodId.ifBlank { resolvedVodId },
+        detailUrl = buildVodDetailUrl(rawItem.copy(vodId = resolvedVodId), baseUrl)
+    )
 }
 
 internal fun JsonObject.extractNoticeItems(): List<JsonElement> {

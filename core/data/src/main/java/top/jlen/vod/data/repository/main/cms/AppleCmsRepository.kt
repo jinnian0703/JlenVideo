@@ -2158,25 +2158,8 @@ class AppleCmsRepository(
         )
     }
 
-    private fun parseUserCenterVod(row: JsonObject): VodItem? {
-        val vodObject = row.firstObject("vod", "video", "item") ?: row
-        val rawItem = runCatching { gson.fromJson(vodObject, VodItem::class.java) }.getOrNull() ?: return null
-        val resolvedVodId = rawItem.vodId.ifBlank { vodObject.firstString("vod_id", "id") }
-        val resolvedTypeName = rawItem.typeName.orEmpty().ifBlank {
-            vodObject.firstObject("type")?.firstString("type_name").orEmpty()
-        }
-        if (resolvedVodId.isBlank() && rawItem.vodName.isBlank() && vodObject === row) {
-            return null
-        }
-        return rawItem.copy(
-            vodId = resolvedVodId,
-            vodName = decodeSiteText(rawItem.vodName.ifBlank { vodObject.firstString("vod_name", "name", "title") }),
-            vodPic = rawItem.vodPic?.let { normalizeAgainst(it, "$baseUrl/") },
-            typeName = resolvedTypeName,
-            siteVodId = rawItem.siteVodId.ifBlank { resolvedVodId },
-            detailUrl = buildVodDetailUrl(rawItem.copy(vodId = resolvedVodId))
-        )
-    }
+    private fun parseUserCenterVod(row: JsonObject): VodItem? =
+        top.jlen.vod.data.parseUserCenterVod(row, gson, baseUrl)
 
     private fun buildVodDetailUrl(item: VodItem): String =
         top.jlen.vod.data.buildVodDetailUrl(item, baseUrl)
