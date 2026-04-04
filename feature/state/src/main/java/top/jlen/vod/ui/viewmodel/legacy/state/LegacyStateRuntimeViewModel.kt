@@ -214,24 +214,7 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
     fun findNotice(noticeId: String): AppNotice? =
         noticeState.notices.firstOrNull { it.id == noticeId }
 
-    fun reportHeartbeat(route: String) {
-        val normalizedRoute = route.trim().ifBlank { "home" }
-        val userId = accountState.session.userId
-        val vodId = if (normalizedRoute == "player") resolveHeartbeatVodId(playerState) else ""
-        val sid = if (normalizedRoute == "player") playerState.selectedSourceIndex + 1 else null
-        val nid = if (normalizedRoute == "player") playerState.selectedEpisodeIndex + 1 else null
-        viewModelScope.launch(Dispatchers.IO) {
-            runCatching {
-                repository.reportHeartbeat(
-                    route = normalizedRoute,
-                    userId = userId,
-                    vodId = vodId,
-                    sid = sid,
-                    nid = nid
-                )
-            }
-        }
-    }
+    fun reportHeartbeat(route: String) = legacyReportHeartbeat(route)
 
     fun refreshHome(forceRefresh: Boolean = false) = legacyRefreshHome(forceRefresh)
 
@@ -359,34 +342,10 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
     private fun runAccountAction(
         block: suspend AppleCmsRepository.() -> String,
         onSuccess: () -> Unit
-    ) {
-        if (accountState.isActionLoading) return
-        viewModelScope.launch {
-            accountState = beginAccountAction(accountState)
-            runCatching {
-                withContext(Dispatchers.IO) { repository.block() }
-            }.onSuccess { message ->
-                accountState = accountStateWithActionSuccess(accountState, message)
-                onSuccess()
-            }.onFailure { error ->
-                if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountStateWithActionError(
-                    accountState,
-                    toUserFacingMessage(error, "操作失败")
-                )
-            }
-        }
-    }
+    ) = legacyRunAccountAction(block, onSuccess)
 
-    private fun handleAccountSessionExpired(error: Throwable): Boolean {
-        val message = error.message.orEmpty()
-        val isExpired = message.contains("请先登录") || message.contains("登录已失效")
-        if (!isExpired) return false
-
-        repository.clearSession()
-        accountState = expiredAccountState(accountState)
-        return true
-    }
+    private fun handleAccountSessionExpired(error: Throwable): Boolean =
+        legacyHandleAccountSessionExpired(error)
 
     fun openHistoryRecord(item: UserCenterItem) = legacyOpenHistoryRecord(item)
 
