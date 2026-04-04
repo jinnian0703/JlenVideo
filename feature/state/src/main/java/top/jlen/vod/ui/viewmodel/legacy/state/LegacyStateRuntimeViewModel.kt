@@ -94,6 +94,12 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
         detailState = value
     }
 
+    internal fun currentPlayerState(): PlayerUiState = playerState
+
+    internal fun updatePlayerState(value: PlayerUiState) {
+        playerState = value
+    }
+
     internal fun hasEnteredAccountScreenFlag(): Boolean = hasEnteredAccountScreen
 
     internal fun markAccountScreenEntered() {
@@ -326,42 +332,9 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
 
     fun findPassword() = legacyFindPassword()
 
-    fun addCurrentDetailFavorite() {
-        val item = detailState.item ?: return
-        if (!accountState.session.isLoggedIn) {
-            detailState = detailStateWithActionMessage(detailState, "请先登录后再收藏", true)
-            return
-        }
-        if (detailState.isFavorited) {
-            detailState = detailStateWithActionMessage(detailState, "已在收藏中", false)
-            return
-        }
-        if (detailState.isActionLoading) return
-        viewModelScope.launch {
-            detailState = beginDetailFavoriteAction(detailState)
-            runCatching {
-                withContext(Dispatchers.IO) { repository.addFavoriteForApp(item) }
-            }.onSuccess { message ->
-                val normalizedMessage = normalizeFavoriteActionMessage(message)
-                detailState = detailStateWithFavoriteSuccess(detailState, normalizedMessage)
-                if (accountState.selectedSection == AccountSection.Favorites) {
-                    selectAccountSection(AccountSection.Favorites, forceRefresh = true)
-                }
-            }.onFailure { error ->
-                val isDuplicate = isDuplicateFavoriteMessage(error.message.orEmpty())
-                detailState = detailStateWithFavoriteFailure(
-                    detailState = detailState,
-                    message = if (isDuplicate) "已在收藏中" else toUserFacingMessage(error, "收藏失败"),
-                    isDuplicate = isDuplicate
-                )
-            }
-        }
-    }
+    fun addCurrentDetailFavorite() = legacyAddCurrentDetailFavorite()
 
-    fun dismissDetailActionMessage() {
-        if (detailState.actionMessage.isNullOrBlank()) return
-        detailState = detailStateWithoutActionMessage(detailState)
-    }
+    fun dismissDetailActionMessage() = legacyDismissDetailActionMessage()
 
     fun login() = legacyLogin()
 
@@ -415,170 +388,17 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
         return true
     }
 
-    fun openHistoryRecord(item: UserCenterItem) {
-        val resolvedVodId = resolveHistoryVodId(item)
+    fun openHistoryRecord(item: UserCenterItem) = legacyOpenHistoryRecord(item)
 
-        if (resolvedVodId.isBlank()) {
-            openHistoryRecordDirectly(item)
-            return
-        }
+    fun resumeHistoryRecord(item: UserCenterItem) = legacyResumeHistoryRecord(item)
 
-        if (false) {
-            playerState = failedHistoryPlayerState(item.title, "无法定位到影片详情")
-            return
-        }
+    private fun openHistoryRecordDirectly(item: UserCenterItem) = legacyOpenHistoryRecordDirectly(item)
 
-        playerState = resolvingHistoryPlayerState(item.title)
+    fun loadDetail(vodId: String) = legacyLoadDetail(vodId)
 
-        viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) { repository.loadDetail(item.vodId) }
-            }.onSuccess { detailItem ->
-                if (detailItem == null) {
-                    playerState = PlayerUiState(
-                        title = item.title,
-                        isResolving = false,
-                        resolveError = "未找到影片详情"
-                    )
-                    return@onSuccess
-                }
+    fun refreshPlayerSources() = legacyRefreshPlayerSources()
 
-                val sources = repository.parseSources(detailItem)
-                val selection = resolveHistoryResumeSelection(item, sources)
-
-                openPlayer(
-                    title = detailItem.displayTitle,
-                    item = detailItem,
-                    sources = sources,
-                    sourceIndex = selection.sourceIndex,
-                    episodeIndex = selection.episodeIndex
-                )
-            }.onFailure { error ->
-                playerState = failedHistoryPlayerState(item.title, error.message ?: "继续观看失败")
-            }
-        }
-    }
-
-    fun resumeHistoryRecord(item: UserCenterItem) {
-        val resolvedVodId = resolveHistoryVodId(item)
-
-        if (resolvedVodId.isBlank()) {
-            openHistoryRecordDirectly(item)
-            return
-        }
-
-        playerState = resolvingHistoryPlayerState(item.title)
-
-        viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) { repository.loadDetail(resolvedVodId) }
-            }.onSuccess { detailItem ->
-                if (detailItem == null) {
-                    openHistoryRecordDirectly(item)
-                    return@onSuccess
-                }
-
-                val sources = repository.parseSources(detailItem)
-                val selection = resolveHistoryResumeSelection(item, sources)
-
-                openPlayer(
-                    title = detailItem.displayTitle,
-                    item = detailItem,
-                    sources = sources,
-                    sourceIndex = selection.sourceIndex,
-                    episodeIndex = selection.episodeIndex
-                )
-            }.onFailure {
-                openHistoryRecordDirectly(item)
-            }
-        }
-    }
-
-    private fun openHistoryRecordDirectly(item: UserCenterItem) {
-        val resumeUrl = item.playUrl.ifBlank { item.actionUrl }
-        if (resumeUrl.isBlank()) {
-            playerState = failedHistoryPlayerState(item.title, "无法恢复该条播放记录")
-            return
-        }
-
-        openPlayer(
-            title = item.title,
-            item = null,
-            sources = buildHistoryFallbackSources(item, resumeUrl),
-            sourceIndex = 0,
-            episodeIndex = 0
-        )
-    }
-
-    fun loadDetail(vodId: String) {
-        viewModelScope.launch {
-            val keepCurrentContent = detailState.item?.vodId == vodId
-            detailState = beginDetailLoad(detailState, keepCurrentContent)
-            runCatching {
-                withContext(Dispatchers.IO) { repository.loadDetail(vodId) }
-            }.onSuccess { item ->
-                if (item == null) {
-                    detailState = missingDetailState()
-                } else {
-                    detailState = loadedDetailState(
-                        item = item,
-                        sources = repository.parseSources(item),
-                        isFavorited = accountState.favoriteItems.any { favorite -> favorite.vodId == item.vodId }
-                    )
-                }
-            }.onFailure { error ->
-                detailState = detailStateWithLoadError(
-                    toUserFacingMessage(error, "详情加载失败")
-                )
-            }
-        }
-    }
-
-    fun refreshPlayerSources() {
-        val currentItem = playerState.item ?: return
-        val vodId = currentItem.vodId
-        if (vodId.isBlank()) return
-
-        val currentSourceName = playerState.currentSource?.name.orEmpty()
-        val currentEpisodeUrl = playerState.currentEpisode?.url.orEmpty()
-        val currentEpisodeName = playerState.currentEpisode?.name.orEmpty()
-
-        viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) { repository.loadDetail(vodId) }
-            }.onSuccess { detailItem ->
-                if (detailItem == null || playerState.item?.vodId != vodId) {
-                    return@onSuccess
-                }
-
-                val refreshedSources = repository.parseSources(detailItem)
-                val refreshedState = playerStateWithRefreshedSources(
-                    playerState = playerState,
-                    detailItem = detailItem,
-                    refreshedSources = refreshedSources,
-                    currentSourceName = currentSourceName,
-                    currentEpisodeUrl = currentEpisodeUrl,
-                    currentEpisodeName = currentEpisodeName
-                )
-                playerState = refreshedState.playerState
-
-                if (refreshedSources.isEmpty()) {
-                    playerState = playerStateWithoutPlayableSource(playerState)
-                    return@onSuccess
-                }
-
-                if (refreshedState.episodeChanged || playerState.resolvedUrl.isBlank()) {
-                    resolveCurrentPlayerUrl()
-                } else if (refreshedState.sourcesChanged) {
-                    playerState = playerStateAfterSourceRefresh(playerState)
-                }
-            }
-        }
-    }
-
-    fun selectSource(index: Int) {
-        detailState = detailStateWithSelectedSource(detailState, index)
-    }
+    fun selectSource(index: Int) = legacySelectSource(index)
 
     fun openPlayer(
         title: String,
@@ -586,95 +406,25 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
         sources: List<PlaySource>,
         sourceIndex: Int,
         episodeIndex: Int
-    ) {
-        playerState = buildPlayerState(
-            title = title,
-            item = item,
-            sources = sources,
-            sourceIndex = sourceIndex,
-            episodeIndex = episodeIndex
-        )
-        resolveCurrentPlayerUrl()
-        recordCurrentPlayback()
-    }
+    ) = legacyOpenPlayer(title, item, sources, sourceIndex, episodeIndex)
 
-    fun selectPlayerEpisode(index: Int) {
-        val updatedState = updatePlayerEpisodeSelection(playerState, index) ?: return
-        playerState = updatedState
-        resolveCurrentPlayerUrl()
-        recordCurrentPlayback()
-    }
+    fun selectPlayerEpisode(index: Int) = legacySelectPlayerEpisode(index)
 
-    fun selectPlayerSource(index: Int) {
-        val updatedState = updatePlayerSourceSelection(playerState, index) ?: return
-        playerState = updatedState
-        resolveCurrentPlayerUrl()
-        recordCurrentPlayback()
-    }
+    fun selectPlayerSource(index: Int) = legacySelectPlayerSource(index)
 
-    fun playNextEpisode() {
-        val nextIndex = playerState.selectedEpisodeIndex + 1
-        if (nextIndex <= playerState.episodes.lastIndex) {
-            selectPlayerEpisode(nextIndex)
-        }
-    }
+    fun playNextEpisode() = legacyPlayNextEpisode()
 
-    fun adoptDetectedStream(streamUrl: String) {
-        playerState = applyDetectedStream(playerState, streamUrl) ?: return
-    }
+    fun adoptDetectedStream(streamUrl: String) = legacyAdoptDetectedStream(streamUrl)
 
-    fun reportTakeoverFailure(message: String) {
-        playerState = applyTakeoverFailure(playerState, message)
-    }
+    fun reportTakeoverFailure(message: String) = legacyReportTakeoverFailure(message)
 
-    fun updatePlaybackSnapshot(snapshot: PlaybackSnapshot) {
-        if (!hasMeaningfulPlaybackChange(playerState.playbackSnapshot, snapshot)) return
-        playerState = playerStateWithPlaybackSnapshot(playerState, snapshot)
-    }
+    fun updatePlaybackSnapshot(snapshot: PlaybackSnapshot) = legacyUpdatePlaybackSnapshot(snapshot)
 
-    fun syncFromFullscreen(result: FullscreenPlaybackResult) {
-        val syncState = syncPlayerStateFromFullscreen(playerState, result)
-        playerState = syncState.playerState
-        if (syncState.shouldResolveCurrentUrl) {
-            resolveCurrentPlayerUrl()
-        }
-    }
+    fun syncFromFullscreen(result: FullscreenPlaybackResult) = legacySyncFromFullscreen(result)
 
-    private fun recordCurrentPlayback() {
-        val item = playerState.item ?: return
-        val episodePageUrl = playerState.episodePageUrl
-        if (!accountState.session.isLoggedIn || episodePageUrl.isBlank()) return
+    private fun recordCurrentPlayback() = legacyRecordCurrentPlayback()
 
-        viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) { repository.addPlayRecordForApp(item, episodePageUrl) }
-            }.onSuccess {
-                if (accountState.selectedSection == AccountSection.History) {
-                    selectAccountSection(AccountSection.History, forceRefresh = true)
-                }
-            }
-        }
-    }
-
-    private fun resolveCurrentPlayerUrl() {
-        val currentEpisode = playerState.currentEpisode ?: run {
-            playerState = playerStateWithoutEpisode(playerState.title)
-            return
-        }
-        val episodePageUrl = currentEpisode.url
-        playerState = beginPlayerResolution(playerState)
-        viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) { repository.resolvePlayUrl(episodePageUrl) }
-            }.onSuccess { resolved ->
-                if (playerState.currentEpisode?.url != episodePageUrl) return@onSuccess
-                playerState = playerStateWithResolvedUrl(playerState, resolved)
-            }.onFailure {
-                if (playerState.currentEpisode?.url != episodePageUrl) return@onFailure
-                playerState = playerStateWithWebFallback(playerState, episodePageUrl)
-            }
-        }
-    }
+    private fun resolveCurrentPlayerUrl() = legacyResolveCurrentPlayerUrl()
 
 }
 
