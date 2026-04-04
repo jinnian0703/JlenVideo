@@ -103,7 +103,7 @@ open class LegacyAppleCmsRuntimeRepository(
         val mimeType: String
     )
 
-    private data class CachedValue<T>(
+    internal data class CachedValue<T>(
         val value: T,
         val timestampMs: Long
     )
@@ -126,123 +126,149 @@ open class LegacyAppleCmsRuntimeRepository(
         val membershipPlans: List<MembershipPlan> = emptyList()
     )
 
-    private fun clearMemoryCaches() {
+    internal fun runtimeClearHomeCacheEntry() {
         homeCache = null
+    }
+
+    internal fun runtimeClearHotSearchCacheEntry() {
         hotSearchCache = null
+    }
+
+    internal fun runtimeClearNoticeCacheEntry() {
         noticeCache = null
+    }
+
+    internal fun runtimeClearBrowsableCategoriesCacheEntry() {
         browsableCategoriesCache = null
+    }
+
+    internal fun runtimeClearCategoryPageCache() {
         categoryPageCache.clear()
+    }
+
+    internal fun runtimeClearDetailCache() {
         detailCache.clear()
+    }
+
+    internal fun runtimeClearSearchCache() {
         searchCache.clear()
+    }
+
+    internal fun runtimeClearHistorySourceCache() {
         historySourceCache.clear()
+    }
+
+    internal fun runtimeClearPreviewItemCache() {
         previewItemCache.clear()
+    }
+
+    internal fun runtimeClearInFlightRequests() {
         inFlightRequests.clear()
+    }
+
+    internal fun runtimeResetRequestPreference() {
         preferBackupApiUntilMs = 0L
+    }
+
+    internal fun runtimeResetCleanupTimestamps() {
         lastMemoryCacheCleanupAt = 0L
         lastDiskCacheCleanupAt = 0L
     }
 
-    private fun clearAllAppCaches() {
-        clearMemoryCaches()
+    internal fun runtimeClearPersistedPageCache() {
         pageCachePrefs.edit().clear().apply()
+    }
+
+    internal fun runtimeClearPersistedHomeCache() {
         homeCachePrefs.edit().clear().apply()
     }
 
-    fun clearProcessMemoryCaches() {
-        clearMemoryCaches()
+    internal fun runtimePeekHomeCacheEntry(): CachedValue<HomePayload>? = homeCache
+
+    internal fun runtimeUpdateHomeCacheEntry(value: CachedValue<HomePayload>?) {
+        homeCache = value
     }
 
-    fun clearRuntimeCaches() {
-        clearAllAppCaches()
+    internal fun runtimeReadPersistedHomeCache(): CachedValue<HomePayload>? = readPersistedHomeCache()
+
+    internal fun runtimeHomeCacheTtlMs(allowStale: Boolean): Long =
+        if (allowStale) DISK_HOME_CACHE_TTL_MS else HOME_CACHE_TTL_MS
+
+    internal fun runtimeIsCacheValid(timestampMs: Long, ttlMs: Long): Boolean =
+        isCacheValid(timestampMs, ttlMs)
+
+    internal suspend fun <T> runtimeAwaitSharedRequest(
+        key: String,
+        block: suspend () -> T
+    ): T = awaitSharedRequest(key, block)
+
+    internal suspend fun runtimeLoadLatestCursorPage(cursor: String): CursorPagedVodItems =
+        loadLatestCursorPage(cursor)
+
+    internal suspend fun runtimeLoadRecommendedPreviewItems(limit: Int): List<VodItem> {
+        val rawItems = requestApi { getRecommendations(limit = limit) }
+            .data
+            ?.rows
+            .orEmpty()
+            .distinctBy { it.vodId }
+        return filterPlayablePreviewItems(rawItems)
     }
 
-    fun peekHomePayload(allowStale: Boolean = false): HomePayload? {
-        val ttlMs = if (allowStale) DISK_HOME_CACHE_TTL_MS else HOME_CACHE_TTL_MS
-        homeCache
-            ?.takeIf { isCacheValid(it.timestampMs, ttlMs) }
-            ?.value
-            ?.let { return it }
-        return readPersistedHomeCache()
-            ?.takeIf { isCacheValid(it.timestampMs, ttlMs) }
-            ?.also { cached -> homeCache = cached }
-            ?.value
+    internal suspend fun runtimeLoadBrowsableCategories(
+        homeDocument: Document? = null,
+        forceRefresh: Boolean = false
+    ): List<AppleCmsCategory> = loadBrowsableCategories(homeDocument, forceRefresh)
+
+    internal fun runtimeGetCachedBrowsableCategories(): List<AppleCmsCategory> =
+        getCachedBrowsableCategories()
+
+    internal fun runtimeDefaultCategories(): List<AppleCmsCategory> = defaultCategories
+
+    internal fun runtimeNormalizeCategory(category: AppleCmsCategory): AppleCmsCategory =
+        normalizeCategory(category)
+
+    internal suspend fun runtimeLoadCategoryCursorPage(
+        typeId: String,
+        cursor: String
+    ): CursorPagedVodItems = loadCategoryCursorPage(typeId, cursor)
+
+    internal fun runtimeRememberPreviewItems(items: Collection<VodItem>) {
+        rememberPreviewItems(items)
     }
 
-    suspend fun loadHome(forceRefresh: Boolean = false): HomePayload {
-        if (!forceRefresh) {
-            peekHomePayload()?.let { return it }
-        }
-
-        return runCatching {
-            if (forceRefresh) {
-                loadFreshHome(forceRefresh = true)
-            } else {
-                awaitSharedRequest("home") {
-                    peekHomePayload() ?: loadFreshHome(forceRefresh = false)
-                }
-            }
-        }.getOrElse {
-            loadEmergencyHome()
-        }
+    internal fun runtimeCacheHomePayload(payload: HomePayload) {
+        cacheHomePayload(payload)
     }
 
-    private suspend fun loadEmergencyHome(): HomePayload {
-        val cachedHome = homeCache?.value
-        val latestPage = runCatching { loadLatestCursorPage(cursor = "") }
-            .getOrNull()
-            ?: CursorPagedVodItems(
-                items = cachedHome?.latest.orEmpty(),
-                limit = cachedHome?.latest?.size ?: 0,
-                nextCursor = cachedHome?.latestCursor.orEmpty(),
-                hasMore = cachedHome?.latestHasMore ?: false
-            )
-        val recommendedItems = runCatching {
-            val rawItems = requestApi { getRecommendations(limit = 16) }
-                .data
-                ?.rows
-                .orEmpty()
-                .distinctBy { it.vodId }
-            filterPlayablePreviewItems(rawItems)
-        }.getOrElse {
-            cachedHome?.featured.orEmpty()
-        }
-        val categories = runCatching { loadBrowsableCategories(forceRefresh = false) }
-            .getOrElse { getCachedBrowsableCategories() }
-            .ifEmpty { defaultCategories.map(::normalizeCategory) }
-        val selectedCategory = categories.firstOrNull()
-        val categoryPage = selectedCategory?.let { category ->
-            runCatching { loadCategoryCursorPage(typeId = category.typeId, cursor = "") }.getOrNull()
-        } ?: CursorPagedVodItems()
-        val latestItems = latestPage.items.ifEmpty { recommendedItems.take(36) }
-        val featuredItems = recommendedItems
-            .ifEmpty { cachedHome?.featured.orEmpty() }
-            .ifEmpty { latestItems.take(16) }
-        rememberPreviewItems(buildList {
-            addAll(latestItems)
-            addAll(featuredItems)
-            addAll(categoryPage.items)
-        })
-
-        return HomePayload(
-            slides = emptyList(),
-            hot = emptyList(),
-            featured = featuredItems,
-            latest = latestItems,
-            sections = emptyList(),
-            categories = categories,
-            selectedCategory = selectedCategory,
-            categoryVideos = categoryPage.items,
-            latestCursor = latestPage.nextCursor,
-            latestHasMore = latestPage.hasMore,
-            categoryCursor = categoryPage.nextCursor,
-            categoryHasMore = categoryPage.hasMore
-        ).also { payload ->
-            cacheHomePayload(payload)
-            cleanupCachesIfNeeded()
-        }
+    internal fun runtimeCleanupCachesIfNeeded() {
+        cleanupCachesIfNeeded()
     }
 
-    private suspend fun loadFreshHome(forceRefresh: Boolean): HomePayload {
+    internal suspend fun runtimeFetchHomeDocument(): Document =
+        fetchDocument("$baseUrl/")
+
+    internal fun runtimeParseLevelOneItemsFromHomePage(
+        document: Document,
+        limit: Int
+    ): List<VodItem> = parseLevelOneItemsFromHomePage(document, limit)
+
+    private fun clearMemoryCaches() = legacyClearMemoryCaches()
+
+    private fun clearAllAppCaches() = legacyClearAllAppCaches()
+
+    fun clearProcessMemoryCaches() = legacyClearProcessMemoryCaches()
+
+    fun clearRuntimeCaches() = legacyClearRuntimeCaches()
+
+    fun peekHomePayload(allowStale: Boolean = false): HomePayload? = legacyPeekHomePayload(allowStale)
+
+    suspend fun loadHome(forceRefresh: Boolean = false): HomePayload = legacyLoadHome(forceRefresh)
+
+    private suspend fun loadEmergencyHome(): HomePayload = legacyLoadEmergencyHome()
+
+    private suspend fun loadFreshHome(forceRefresh: Boolean): HomePayload =
+        legacyLoadFreshHome(forceRefresh)
+/*
         val (latestPage, recommendedItems) = coroutineScope {
             val latestDeferred = async {
                 runCatching {
@@ -302,6 +328,7 @@ open class LegacyAppleCmsRuntimeRepository(
             cleanupCachesIfNeeded()
         }
     }
+*/
 
     suspend fun loadByCategory(typeId: String): List<VodItem> =
         loadCategoryPage(typeId = typeId, page = 1).items
