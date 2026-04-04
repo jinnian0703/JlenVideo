@@ -2984,51 +2984,6 @@ class AppleCmsRepository(
         }
     }
 
-    private fun interleaveCategoryItems(responses: List<AppleCmsResponse>): List<VodItem> {
-        val buckets = responses.map { response ->
-            ArrayDeque(response.list.distinctBy { it.vodId })
-        }
-        val seenIds = LinkedHashSet<String>()
-        val mergedItems = mutableListOf<VodItem>()
-
-        while (buckets.any { it.isNotEmpty() }) {
-            buckets.forEach { bucket ->
-                while (bucket.isNotEmpty()) {
-                    val item = bucket.removeFirst()
-                    if (seenIds.add(item.vodId)) {
-                        mergedItems += item
-                        break
-                    }
-                }
-            }
-        }
-
-        return mergedItems
-    }
-
-    private fun buildMergedCategoryPage(
-        pages: List<PagedVodItems>,
-        page: Int
-    ): PagedVodItems {
-        val mergedItems = interleaveCategoryItems(pages.map { pagePayload ->
-            AppleCmsResponse(
-                page = pagePayload.page,
-                pageCount = pagePayload.pageCount,
-                limit = pagePayload.limit,
-                total = pagePayload.totalItems,
-                list = pagePayload.items
-            )
-        })
-        return PagedVodItems(
-            items = mergedItems,
-            page = page,
-            pageCount = pages.maxOfOrNull { it.pageCount } ?: page,
-            totalItems = pages.sumOf { it.totalItems },
-            limit = pages.sumOf { it.limit }.takeIf { it > 0 } ?: mergedItems.size,
-            hasNextPage = pages.any { it.hasNextPage }
-        )
-    }
-
     private fun cachePagePayload(cacheKey: String, payload: PagedVodItems) {
         if (!isAppCacheEnabled()) return
         val cachedValue = CachedValue(
