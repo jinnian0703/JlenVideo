@@ -675,8 +675,34 @@ internal fun extractCategoryTotal(document: Document): Int {
                 ?.groupValues
                 ?.getOrNull(1)
                 ?.toIntOrNull()
-        }
+    }
     return headerTotal ?: 0
+}
+
+internal fun isBrowsableCategory(category: AppleCmsCategory): Boolean {
+    val parentId = category.parentId.orEmpty().trim()
+    return category.typeId.isNotBlank() &&
+        category.typeName.isNotBlank() &&
+        (parentId.isBlank() || parentId == "0" || parentId == category.typeId)
+}
+
+internal fun parseCategories(homeDocument: Document, mapDocument: Document?): List<AppleCmsCategory> {
+    val homeCategories = homeDocument.select(".clist-left-tabs-title[href*=/vodtype/]")
+        .mapNotNull { anchor ->
+            val href = anchor.attr("href")
+            if (href.isBlank()) null else AppleCmsCategory(typeId = href, typeName = anchor.text())
+        }
+        .distinctBy { it.typeId }
+
+    if (homeCategories.isNotEmpty()) return homeCategories
+
+    return mapDocument?.select(".vod-list h2 a[href*=/vodtype/]")
+        .orEmpty()
+        .mapNotNull { anchor ->
+            val href = anchor.attr("href")
+            if (href.isBlank()) null else AppleCmsCategory(typeId = href, typeName = anchor.text())
+        }
+        .distinctBy { it.typeId }
 }
 
 data class HomePayload(
