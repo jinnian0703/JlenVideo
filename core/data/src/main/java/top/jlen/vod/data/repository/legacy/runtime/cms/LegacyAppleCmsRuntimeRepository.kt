@@ -252,6 +252,40 @@ open class LegacyAppleCmsRuntimeRepository(
         limit: Int
     ): List<VodItem> = parseLevelOneItemsFromHomePage(document, limit)
 
+    internal fun runtimePeekCategoryPageCacheEntry(cacheKey: String): CachedValue<PagedVodItems>? =
+        categoryPageCache[cacheKey]
+
+    internal fun runtimeUpdateCategoryPageCacheEntry(
+        cacheKey: String,
+        value: CachedValue<PagedVodItems>
+    ) {
+        categoryPageCache[cacheKey] = value
+    }
+
+    internal fun runtimeReadPersistedCategoryPageCache(cacheKey: String): CachedValue<PagedVodItems>? =
+        readPersistedPageCache(cacheKey)
+
+    internal fun runtimePageCacheTtlMs(allowStale: Boolean = false): Long =
+        if (allowStale) DISK_PAGE_CACHE_TTL_MS else PAGE_CACHE_TTL_MS
+
+    internal suspend fun runtimeGetBrowsableCategories(forceRefresh: Boolean = false): List<AppleCmsCategory> =
+        getBrowsableCategories(forceRefresh = forceRefresh)
+
+    internal suspend fun runtimeLoadCategoryPage(
+        typeId: String,
+        page: Int,
+        forceRefresh: Boolean = false
+    ): PagedVodItems = loadCategoryPage(typeId, page, forceRefresh)
+
+    internal fun runtimeBuildMergedCategoryPage(
+        pages: List<PagedVodItems>,
+        page: Int
+    ): PagedVodItems = buildMergedCategoryPage(pages, page)
+
+    internal fun runtimeCacheCategoryPagePayload(cacheKey: String, payload: PagedVodItems) {
+        cachePagePayload(cacheKey, payload)
+    }
+
     private fun clearMemoryCaches() = legacyClearMemoryCaches()
 
     private fun clearAllAppCaches() = legacyClearAllAppCaches()
@@ -330,113 +364,21 @@ open class LegacyAppleCmsRuntimeRepository(
     }
 */
 
-    suspend fun loadByCategory(typeId: String): List<VodItem> =
-        loadCategoryPage(typeId = typeId, page = 1).items
+    suspend fun loadByCategory(typeId: String): List<VodItem> = legacyLoadByCategory(typeId)
 
-    suspend fun loadAllCategoryPage(page: Int, forceRefresh: Boolean = false): PagedVodItems {
-        val safePage = page.coerceAtLeast(1)
-        val cacheKey = "all:$safePage"
-        if (!forceRefresh) {
-            categoryPageCache[cacheKey]
-                ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
-                ?.value
-                ?.let { return it }
-            readPersistedPageCache(cacheKey)
-                ?.takeIf { isCacheValid(it.timestampMs, DISK_PAGE_CACHE_TTL_MS) }
-                ?.also { cached ->
-                    categoryPageCache[cacheKey] = cached
-                    return cached.value
-                }
-        }
-        return if (forceRefresh) {
-            loadFreshAllCategoryPage(page = safePage, forceRefresh = true)
-        } else {
-            awaitSharedRequest("all_page:$safePage") {
-                categoryPageCache[cacheKey]
-                    ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
-                    ?.value
-                    ?: readPersistedPageCache(cacheKey)
-                        ?.takeIf { isCacheValid(it.timestampMs, DISK_PAGE_CACHE_TTL_MS) }
-                        ?.also { cached -> categoryPageCache[cacheKey] = cached }
-                        ?.value
-                    ?: loadFreshAllCategoryPage(page = safePage, forceRefresh = false)
-            }
-        }
-    }
+    suspend fun loadAllCategoryPage(page: Int, forceRefresh: Boolean = false): PagedVodItems =
+        legacyLoadAllCategoryPage(page, forceRefresh)
 
-    private suspend fun loadFreshAllCategoryPage(page: Int, forceRefresh: Boolean): PagedVodItems {
-        val pages = coroutineScope {
-            getBrowsableCategories(forceRefresh = forceRefresh)
-                .map { category -> async { loadCategoryPage(category.typeId, page, forceRefresh = forceRefresh) } }
-                .awaitAll()
-        }
-        return buildMergedCategoryPage(pages, page).also { payload ->
-            cachePagePayload("all:$page", payload)
-        }
-    }
+    private suspend fun loadFreshAllCategoryPage(page: Int, forceRefresh: Boolean): PagedVodItems =
+        legacyLoadFreshAllCategoryPage(page, forceRefresh)
 
-    fun peekAllCategoryPage(page: Int): PagedVodItems? {
-        val safePage = page.coerceAtLeast(1)
-        val allCacheKey = "all:$safePage"
-        categoryPageCache[allCacheKey]
-            ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
-            ?.value
-            ?.let { return it }
+    fun peekAllCategoryPage(page: Int): PagedVodItems? = legacyPeekAllCategoryPage(page)
 
-        readPersistedPageCache(allCacheKey)
-            ?.takeIf { isCacheValid(it.timestampMs, DISK_PAGE_CACHE_TTL_MS) }
-            ?.also { cached ->
-                categoryPageCache[allCacheKey] = cached
-                return cached.value
-            }
+    fun peekCategoryPage(typeId: String, page: Int, allowStale: Boolean = false): PagedVodItems? =
+        legacyPeekCategoryPage(typeId, page, allowStale)
 
-        val cachedPages = getCachedBrowsableCategories().mapNotNull { category ->
-            categoryPageCache["${category.typeId}:$safePage"]
-                ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
-                ?.value
-                ?: readPersistedPageCache("${category.typeId}:$safePage")
-                    ?.takeIf { isCacheValid(it.timestampMs, DISK_PAGE_CACHE_TTL_MS) }
-                    ?.also { cached -> categoryPageCache["${category.typeId}:$safePage"] = cached }
-                    ?.value
-        }
-        if (cachedPages.isEmpty()) return null
-        return buildMergedCategoryPage(cachedPages, safePage).also { payload ->
-            cachePagePayload(allCacheKey, payload)
-        }
-    }
-
-    fun peekCategoryPage(typeId: String, page: Int, allowStale: Boolean = false): PagedVodItems? {
-        val safePage = page.coerceAtLeast(1)
-        val cacheKey = "$typeId:$safePage"
-        val ttlMs = if (allowStale) DISK_PAGE_CACHE_TTL_MS else PAGE_CACHE_TTL_MS
-        categoryPageCache[cacheKey]
-            ?.takeIf { isCacheValid(it.timestampMs, ttlMs) }
-            ?.value
-            ?.let { return it }
-        readPersistedPageCache(cacheKey)
-            ?.takeIf { isCacheValid(it.timestampMs, ttlMs) }
-            ?.also { cached -> categoryPageCache[cacheKey] = cached }
-            ?.value
-            ?.let { return it }
-        return null
-    }
-
-    suspend fun prewarmCategoryFirstPages(forceRefresh: Boolean = false) {
-        val categories = getBrowsableCategories(forceRefresh = forceRefresh)
-        coroutineScope {
-            categories.map { category ->
-                async {
-                    runCatching {
-                        loadCategoryPage(
-                            typeId = category.typeId,
-                            page = 1,
-                            forceRefresh = forceRefresh
-                        )
-                    }
-                }
-            }.awaitAll()
-        }
-    }
+    suspend fun prewarmCategoryFirstPages(forceRefresh: Boolean = false) =
+        legacyPrewarmCategoryFirstPages(forceRefresh)
 
     suspend fun loadLatestCursorPage(cursor: String): CursorPagedVodItems {
         val payload = requestApi {
