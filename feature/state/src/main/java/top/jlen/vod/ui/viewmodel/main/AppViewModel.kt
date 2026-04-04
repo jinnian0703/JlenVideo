@@ -493,19 +493,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateLoginUserName(value: String) {
-        accountState = accountState.copy(userName = value)
+        accountState = accountStateWithUserName(accountState, value)
     }
 
     fun updateLoginPassword(value: String) {
-        accountState = accountState.copy(password = value)
+        accountState = accountStateWithPassword(accountState, value)
     }
 
     fun setAccountAuthMode(mode: AccountAuthMode) {
-        accountState = accountState.copy(
-            authMode = mode,
-            error = null,
-            message = null
-        )
+        accountState = accountStateWithAuthMode(accountState, mode)
         when (mode) {
             AccountAuthMode.Login -> Unit
             AccountAuthMode.Register -> loadRegisterPage(forceRefresh = true)
@@ -527,10 +523,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateRegisterEditor(transform: (RegisterEditor) -> RegisterEditor) {
-        accountState = accountState.copy(
-            registerEditor = transform(accountState.registerEditor),
-            error = null,
-            message = null
+        accountState = accountStateWithRegisterEditor(
+            accountState,
+            transform(accountState.registerEditor)
         )
     }
 
@@ -542,29 +537,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         viewModelScope.launch {
-            accountState = accountState.copy(isContentLoading = true, error = null)
+            accountState = beginAccountContentLoad(accountState)
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadRegisterCaptcha(captchaUrl) }
             }.onSuccess { bytes ->
-                accountState = accountState.copy(
-                    isContentLoading = false,
-                    registerCaptcha = bytes
-                )
+                accountState = accountStateWithRegisterCaptcha(accountState, bytes)
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountState.copy(
-                    isContentLoading = false,
-                    error = toUserFacingMessage(error, "验证码加载失败")
+                accountState = accountStateWithContentError(
+                    accountState,
+                    toUserFacingMessage(error, "验证码加载失败")
                 )
             }
         }
     }
 
     fun updateFindPasswordEditor(transform: (FindPasswordEditor) -> FindPasswordEditor) {
-        accountState = accountState.copy(
-            findPasswordEditor = transform(accountState.findPasswordEditor),
-            error = null,
-            message = null
+        accountState = accountStateWithFindPasswordEditor(
+            accountState,
+            transform(accountState.findPasswordEditor)
         )
     }
 
@@ -576,34 +567,30 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         viewModelScope.launch {
-            accountState = accountState.copy(isContentLoading = true, error = null)
+            accountState = beginAccountContentLoad(accountState)
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadFindPasswordCaptcha(captchaUrl) }
             }.onSuccess { bytes ->
-                accountState = accountState.copy(
-                    isContentLoading = false,
-                    findPasswordCaptcha = bytes
-                )
+                accountState = accountStateWithFindPasswordCaptcha(accountState, bytes)
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountState.copy(
-                    isContentLoading = false,
-                    error = toUserFacingMessage(error, "验证码加载失败")
+                accountState = accountStateWithContentError(
+                    accountState,
+                    toUserFacingMessage(error, "验证码加载失败")
                 )
             }
         }
     }
 
     fun updateProfileEditor(transform: (UserProfileEditor) -> UserProfileEditor) {
-        accountState = accountState.copy(
-            profileEditor = transform(accountState.profileEditor),
-            error = null,
-            message = null
+        accountState = accountStateWithProfileEditor(
+            accountState,
+            transform(accountState.profileEditor)
         )
     }
 
     fun setProfileEditTab(editMode: Boolean) {
-        accountState = accountState.copy(isProfileEditTab = editMode)
+        accountState = accountStateWithProfileEditTab(accountState, editMode)
     }
 
     fun selectAccountSection(section: AccountSection, forceRefresh: Boolean = false) {
@@ -709,13 +696,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         runAccountAction(
             block = { saveUserProfile(accountState.profileEditor) },
             onSuccess = {
-                accountState = accountState.copy(
-                    profileEditor = accountState.profileEditor.copy(
-                        currentPassword = "",
-                        newPassword = "",
-                        confirmPassword = ""
-                    )
-                )
+                accountState = accountStateAfterProfileSaved(accountState)
                 selectAccountSection(AccountSection.Profile, forceRefresh = true)
                 refreshAccount()
             }
@@ -724,7 +705,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun uploadPortrait(uri: Uri) {
         if (!accountState.session.isLoggedIn) {
-            accountState = accountState.copy(error = "璇峰厛鐧诲綍")
+            accountState = accountStateWithValidationError(accountState, "璇峰厛鐧诲綍")
             return
         }
         runAccountAction(
@@ -739,7 +720,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun sendEmailBindCode() {
         val email = accountState.profileEditor.pendingEmail.trim()
         if (email.isBlank()) {
-            accountState = accountState.copy(error = "请输入邮箱地址")
+            accountState = accountStateWithValidationError(accountState, "请输入邮箱地址")
             return
         }
         runAccountAction(
@@ -752,23 +733,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val email = accountState.profileEditor.pendingEmail.trim()
         val code = accountState.profileEditor.emailCode.trim()
         if (email.isBlank()) {
-            accountState = accountState.copy(error = "请输入邮箱地址")
+            accountState = accountStateWithValidationError(accountState, "请输入邮箱地址")
             return
         }
         if (code.isBlank()) {
-            accountState = accountState.copy(error = "请输入邮箱验证码")
+            accountState = accountStateWithValidationError(accountState, "请输入邮箱验证码")
             return
         }
         runAccountAction(
             block = { bindEmail(email, code) },
             onSuccess = {
-                accountState = accountState.copy(
-                    profileEditor = accountState.profileEditor.copy(
-                        email = email,
-                        pendingEmail = "",
-                        emailCode = ""
-                    )
-                )
+                accountState = accountStateAfterEmailBound(accountState, email)
                 selectAccountSection(AccountSection.Profile, forceRefresh = true)
             }
         )
@@ -778,14 +753,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         runAccountAction(
             block = { unbindEmail() },
             onSuccess = {
-                accountState = accountState.copy(
-                    isProfileEditTab = true,
-                    profileEditor = accountState.profileEditor.copy(
-                        email = "",
-                        pendingEmail = "",
-                        emailCode = ""
-                    )
-                )
+                accountState = accountStateAfterEmailUnbound(accountState)
                 selectAccountSection(AccountSection.Profile, forceRefresh = true)
             }
         )
@@ -795,12 +763,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val editor = accountState.registerEditor
         val contact = editor.contact.trim()
         if (contact.isBlank()) {
-            accountState = accountState.copy(error = "请输入${accountState.registerContactLabel}")
+            accountState = accountStateWithValidationError(accountState, "请输入${accountState.registerContactLabel}")
             return
         }
 
         if (editor.channel == "email" && !contact.contains("@")) {
-            accountState = accountState.copy(error = "请输入正确的邮箱地址")
+            accountState = accountStateWithValidationError(accountState, "请输入正确的邮箱地址")
             return
         }
 
@@ -813,43 +781,38 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun register() {
         val editor = accountState.registerEditor
         if (editor.userName.isBlank()) {
-            accountState = accountState.copy(error = "请输入用户名")
+            accountState = accountStateWithValidationError(accountState, "请输入用户名")
             return
         }
         if (editor.password.isBlank()) {
-            accountState = accountState.copy(error = "请输入密码")
+            accountState = accountStateWithValidationError(accountState, "请输入密码")
             return
         }
         if (editor.confirmPassword.isBlank()) {
-            accountState = accountState.copy(error = "请确认密码")
+            accountState = accountStateWithValidationError(accountState, "请确认密码")
             return
         }
         if (editor.password != editor.confirmPassword) {
-            accountState = accountState.copy(error = "两次输入的密码不一致")
+            accountState = accountStateWithValidationError(accountState, "两次输入的密码不一致")
             return
         }
         if (editor.contact.isBlank()) {
-            accountState = accountState.copy(error = "请输入${accountState.registerContactLabel}")
+            accountState = accountStateWithValidationError(accountState, "请输入${accountState.registerContactLabel}")
             return
         }
         if (accountState.registerRequiresCode && editor.code.isBlank()) {
-            accountState = accountState.copy(error = "请输入${accountState.registerCodeLabel}")
+            accountState = accountStateWithValidationError(accountState, "请输入${accountState.registerCodeLabel}")
             return
         }
         if (accountState.registerRequiresVerify && editor.verify.isBlank()) {
-            accountState = accountState.copy(error = "请输入图片验证码")
+            accountState = accountStateWithValidationError(accountState, "请输入图片验证码")
             return
         }
 
         runAccountAction(
             block = { registerForApp(editor.copy(channel = accountState.registerChannel)) },
             onSuccess = {
-                accountState = accountState.copy(
-                    authMode = AccountAuthMode.Login,
-                    userName = editor.userName,
-                    password = "",
-                    registerEditor = RegisterEditor(channel = accountState.registerChannel)
-                )
+                accountState = accountStateAfterRegisterSuccess(accountState, editor.userName)
             }
         )
     }
@@ -857,43 +820,38 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun findPassword() {
         val editor = accountState.findPasswordEditor
         if (editor.userName.isBlank()) {
-            accountState = accountState.copy(error = "璇疯緭鍏ョ敤鎴峰悕")
+            accountState = accountStateWithValidationError(accountState, "璇疯緭鍏ョ敤鎴峰悕")
             return
         }
         if (editor.question.isBlank()) {
-            accountState = accountState.copy(error = "璇疯緭鍏ュ瘑淇濋棶棰?")
+            accountState = accountStateWithValidationError(accountState, "璇疯緭鍏ュ瘑淇濋棶棰?")
             return
         }
         if (editor.answer.isBlank()) {
-            accountState = accountState.copy(error = "璇疯緭鍏ュ瘑淇濈瓟妗?")
+            accountState = accountStateWithValidationError(accountState, "璇疯緭鍏ュ瘑淇濈瓟妗?")
             return
         }
         if (editor.password.isBlank()) {
-            accountState = accountState.copy(error = "璇疯緭鍏ユ柊瀵嗙爜")
+            accountState = accountStateWithValidationError(accountState, "璇疯緭鍏ユ柊瀵嗙爜")
             return
         }
         if (editor.confirmPassword.isBlank()) {
-            accountState = accountState.copy(error = "璇风‘璁ゆ柊瀵嗙爜")
+            accountState = accountStateWithValidationError(accountState, "璇风‘璁ゆ柊瀵嗙爜")
             return
         }
         if (editor.password != editor.confirmPassword) {
-            accountState = accountState.copy(error = "涓ゆ杈撳叆鐨勫瘑鐮佷笉涓€鑷?")
+            accountState = accountStateWithValidationError(accountState, "涓ゆ杈撳叆鐨勫瘑鐮佷笉涓€鑷?")
             return
         }
         if (accountState.findPasswordRequiresVerify && editor.verify.isBlank()) {
-            accountState = accountState.copy(error = "璇疯緭鍏ュ浘鐗囬獙璇佺爜")
+            accountState = accountStateWithValidationError(accountState, "璇疯緭鍏ュ浘鐗囬獙璇佺爜")
             return
         }
 
         runAccountAction(
             block = { findPasswordForApp(editor) },
             onSuccess = {
-                accountState = accountState.copy(
-                    authMode = AccountAuthMode.Login,
-                    userName = editor.userName,
-                    password = "",
-                    findPasswordEditor = FindPasswordEditor()
-                )
+                accountState = accountStateAfterFindPasswordSuccess(accountState, editor.userName)
             }
         )
     }
@@ -955,34 +913,27 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val userName = accountState.userName.trim()
         val password = accountState.password
         if (userName.isBlank()) {
-            accountState = accountState.copy(error = "请输入用户名")
+            accountState = accountStateWithValidationError(accountState, "请输入用户名")
             return
         }
         if (password.isBlank()) {
-            accountState = accountState.copy(error = "请输入密码")
+            accountState = accountStateWithValidationError(accountState, "请输入密码")
             return
         }
 
         viewModelScope.launch {
-            accountState = accountState.copy(isLoading = true, error = null, message = null)
+            accountState = beginLogin(accountState)
             runCatching {
                 withContext(Dispatchers.IO) {
                     repository.loginForApp(userName = userName, password = password)
                 }
             }.onSuccess { session ->
-                accountState = accountState.copy(
-                    isLoading = false,
-                    session = session,
-                    password = "",
-                    error = null,
-                    message = "登录成功"
-                )
+                accountState = loggedInAccountState(accountState, session)
                 selectAccountSection(AccountSection.Profile, forceRefresh = true)
             }.onFailure { error ->
-                accountState = accountState.copy(
-                    isLoading = false,
-                    message = null,
-                    error = toUserFacingMessage(error, "登录失败")
+                accountState = accountStateWithLoginError(
+                    accountState,
+                    toUserFacingMessage(error, "登录失败")
                 )
             }
         }
@@ -991,7 +942,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun logout() {
         if (accountState.isLoading) return
         viewModelScope.launch {
-            accountState = accountState.copy(isLoading = true, error = null)
+            accountState = beginLogout(accountState)
             runCatching {
                 withContext(Dispatchers.IO) { repository.logoutForApp() }
             }.onSuccess {
@@ -999,9 +950,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 refreshNotices(forceRefresh = true)
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountState.copy(
-                    isLoading = false,
-                    error = toUserFacingMessage(error, "退出登录失败")
+                accountState = accountStateWithLogoutError(
+                    accountState,
+                    toUserFacingMessage(error, "退出登录失败")
                 )
             }
         }
@@ -1010,29 +961,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun loadRegisterPage(forceRefresh: Boolean = false) {
         if (accountState.isContentLoading && !forceRefresh) return
         viewModelScope.launch {
-            accountState = accountState.copy(isContentLoading = true, error = null)
+            accountState = beginAccountContentLoad(accountState)
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadRegisterPageForApp() }
             }.onSuccess { page ->
-                accountState = accountState.copy(
-                    isContentLoading = false,
-                    registerChannel = page.channel,
-                    registerContactLabel = page.contactLabel,
-                    registerCodeLabel = page.codeLabel,
-                    registerRequiresCode = page.requiresCode,
-                    registerRequiresVerify = page.requiresVerify,
-                    registerCaptchaUrl = page.captchaUrl,
-                    registerCaptcha = page.captchaBytes,
-                    registerEditor = accountState.registerEditor.copy(channel = page.channel)
-                )
+                accountState = accountStateWithRegisterPage(accountState, page)
                 if (page.requiresVerify && page.captchaUrl.isNotBlank()) {
                     refreshRegisterCaptcha()
                 }
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountState.copy(
-                    isContentLoading = false,
-                    error = toUserFacingMessage(error, "注册页面加载失败")
+                accountState = accountStateWithContentError(
+                    accountState,
+                    toUserFacingMessage(error, "注册页面加载失败")
                 )
             }
         }
@@ -1041,24 +982,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun loadFindPasswordPage(forceRefresh: Boolean = false) {
         if (accountState.isContentLoading && !forceRefresh) return
         viewModelScope.launch {
-            accountState = accountState.copy(isContentLoading = true, error = null)
+            accountState = beginAccountContentLoad(accountState)
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadFindPasswordPageForApp() }
             }.onSuccess { page ->
-                accountState = accountState.copy(
-                    isContentLoading = false,
-                    findPasswordRequiresVerify = page.requiresVerify,
-                    findPasswordCaptchaUrl = page.captchaUrl,
-                    findPasswordCaptcha = page.captchaBytes
-                )
+                accountState = accountStateWithFindPasswordPage(accountState, page)
                 if (page.requiresVerify && page.captchaUrl.isNotBlank()) {
                     refreshFindPasswordCaptcha()
                 }
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountState.copy(
-                    isContentLoading = false,
-                    error = toUserFacingMessage(error, "找回密码页面加载失败")
+                accountState = accountStateWithContentError(
+                    accountState,
+                    toUserFacingMessage(error, "找回密码页面加载失败")
                 )
             }
         }
@@ -1066,16 +1002,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun loadAccountProfile() {
         viewModelScope.launch {
-            accountState = accountState.copy(isContentLoading = true, error = null)
+            accountState = beginAccountContentLoad(accountState)
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadUserProfileForApp() }
             }.onSuccess { page ->
                 accountState = accountStateWithProfilePage(accountState, page)
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountState.copy(
-                    isContentLoading = false,
-                    error = toUserFacingMessage(error, "加载资料失败")
+                accountState = accountStateWithContentError(
+                    accountState,
+                    toUserFacingMessage(error, "加载资料失败")
                 )
             }
         }
@@ -1083,16 +1019,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun loadFavoriteRecords(pageUrl: String? = null, append: Boolean = false) {
         viewModelScope.launch {
-            accountState = accountState.copy(isContentLoading = true, error = null)
+            accountState = beginAccountContentLoad(accountState)
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadFavoritePageForApp(pageUrl) }
             }.onSuccess { page ->
                 accountState = accountStateWithFavoritePage(accountState, page, append)
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountState.copy(
-                    isContentLoading = false,
-                    error = toUserFacingMessage(error, "加载收藏失败")
+                accountState = accountStateWithContentError(
+                    accountState,
+                    toUserFacingMessage(error, "加载收藏失败")
                 )
             }
         }
@@ -1134,23 +1070,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (requestVersion != historyEnrichVersion) return@launch
 
             val enrichedByKey = enrichedItems.associateBy(::historyRecordKey)
-            accountState = accountState.copy(
-                historyItems = accountState.historyItems.map { item ->
-                    enrichedByKey[historyRecordKey(item)]?.let { enriched ->
-                        item.copy(
-                            vodId = enriched.vodId.ifBlank { item.vodId },
-                            subtitle = enriched.subtitle.ifBlank { item.subtitle },
-                            sourceName = enriched.sourceName.ifBlank { item.sourceName }
-                        )
-                    } ?: item
-                }
-            )
+            accountState = accountStateWithEnrichedHistoryItems(accountState, enrichedByKey)
         }
     }
 
     private fun loadMembership() {
         viewModelScope.launch {
-            accountState = accountState.copy(isContentLoading = true, error = null)
+            accountState = beginAccountContentLoad(accountState)
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadMembershipDataForApp() }
             }.onSuccess { page ->
@@ -1161,9 +1087,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountState.copy(
-                    isContentLoading = false,
-                    error = toUserFacingMessage(error, "加载会员信息失败")
+                accountState = accountStateWithContentError(
+                    accountState,
+                    toUserFacingMessage(error, "加载会员信息失败")
                 )
             }
         }
@@ -1175,20 +1101,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         if (accountState.isActionLoading) return
         viewModelScope.launch {
-            accountState = accountState.copy(isActionLoading = true, error = null, message = null)
+            accountState = beginAccountAction(accountState)
             runCatching {
                 withContext(Dispatchers.IO) { repository.block() }
             }.onSuccess { message ->
-                accountState = accountState.copy(
-                    isActionLoading = false,
-                    message = message.ifBlank { "操作成功" }
-                )
+                accountState = accountStateWithActionSuccess(accountState, message)
                 onSuccess()
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountState.copy(
-                    isActionLoading = false,
-                    error = toUserFacingMessage(error, "操作失败")
+                accountState = accountStateWithActionError(
+                    accountState,
+                    toUserFacingMessage(error, "操作失败")
                 )
             }
         }
