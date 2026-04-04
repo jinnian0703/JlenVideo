@@ -396,6 +396,50 @@ open class LegacyAppleCmsRuntimeRepository(
 
     internal fun runtimeParsePlayRoute(episodePageUrl: String): PlayRoute? = parsePlayRoute(episodePageUrl)
 
+    internal fun runtimePeekSearchCacheEntry(cacheKey: String): CachedValue<List<VodItem>>? =
+        searchCache[cacheKey]
+
+    internal fun runtimeUpdateSearchCacheEntry(
+        cacheKey: String,
+        value: CachedValue<List<VodItem>>
+    ) {
+        searchCache[cacheKey] = value
+    }
+
+    internal fun runtimeSearchCacheTtlMs(): Long = SEARCH_CACHE_TTL_MS
+
+    internal suspend fun runtimeRequestSearch(keyword: String, page: Int = 1, limit: Int = 20): List<VodItem> =
+        requestApi { search(keyword = keyword, page = page, limit = limit) }
+            .data
+            ?.rows
+            .orEmpty()
+
+    internal suspend fun runtimeRequestSearchCursor(
+        query: String,
+        cursor: String
+    ): CursorPagedVodItems = requestApi {
+        searchCursor(
+            linkedMapOf(
+                "q" to query,
+                "limit" to SEARCH_CURSOR_PAGE_LIMIT.toString(),
+                "cursor" to cursor
+            )
+        )
+    }.toCursorPagedVodItems()
+
+    internal suspend fun runtimeFetchSearchDocument(keyword: String): Document =
+        fetchDocument("${runtimeBaseUrl()}/vodsearch/-------------/?wd=${Uri.encode(keyword)}")
+
+    internal fun runtimeParseSearchResults(document: Document, keyword: String = ""): List<VodItem> =
+        parseSearchResults(document, keyword)
+
+    internal suspend fun runtimeResolvePlayableDetailForPreview(previewItem: VodItem): VodItem? =
+        resolvePlayableDetailForPreview(previewItem)
+
+    internal fun runtimeCursorPageLimit(): Int = CATEGORY_CURSOR_PAGE_LIMIT
+
+    internal fun runtimeSearchCursorPageLimit(): Int = SEARCH_CURSOR_PAGE_LIMIT
+
     private fun clearMemoryCaches() = legacyClearMemoryCaches()
 
     private fun clearAllAppCaches() = legacyClearAllAppCaches()
@@ -602,70 +646,16 @@ open class LegacyAppleCmsRuntimeRepository(
             .also { rememberPreviewItems(it.items) }
     }
 
-    suspend fun search(keyword: String, forceRefresh: Boolean = false): List<VodItem> {
-        val normalizedKeyword = keyword.trim()
-        if (normalizedKeyword.isBlank()) return emptyList()
-        val cacheKey = normalizedKeyword.lowercase()
-        if (!forceRefresh) {
-            searchCache[cacheKey]
-                ?.takeIf { isCacheValid(it.timestampMs, SEARCH_CACHE_TTL_MS) }
-                ?.value
-                ?.let { return it }
-        }
+    suspend fun search(keyword: String, forceRefresh: Boolean = false): List<VodItem> =
+        legacySearch(keyword, forceRefresh)
 
-        return if (forceRefresh) {
-            performSearch(normalizedKeyword, cacheKey)
-        } else {
-            awaitSharedRequest("search:$cacheKey") {
-                searchCache[cacheKey]
-                    ?.takeIf { isCacheValid(it.timestampMs, SEARCH_CACHE_TTL_MS) }
-                    ?.value
-                    ?: performSearch(normalizedKeyword, cacheKey)
-            }
-        }
-    }
+    private suspend fun performSearch(keyword: String, cacheKey: String): List<VodItem> =
+        legacyPerformSearch(keyword, cacheKey)
 
-    private suspend fun performSearch(keyword: String, cacheKey: String): List<VodItem> {
-        val encodedKeyword = Uri.encode(keyword)
-        return runCatching {
-            requestApi { search(keyword = keyword) }
-                .data
-                ?.rows
-                .orEmpty()
-                .distinctBy { it.vodId }
-                .take(60)
-        }.getOrElse {
-            runCatching {
-                val document = fetchDocument("$baseUrl/vodsearch/-------------/?wd=$encodedKeyword")
-                parseSearchResults(document, keyword)
-                    .distinctBy { it.vodId }
-                    .take(60)
-            }.getOrDefault(emptyList())
-        }.also { results ->
-            searchCache[cacheKey] = CachedValue(
-            value = results,
-            timestampMs = System.currentTimeMillis()
-        )
-        rememberPreviewItems(results)
-        cleanupCachesIfNeeded()
-    }
-    }
+    suspend fun searchCursor(keyword: String, cursor: String): CursorPagedVodItems =
+        legacySearchCursor(keyword, cursor)
 
-    suspend fun searchCursor(keyword: String, cursor: String): CursorPagedVodItems {
-        val query = keyword.trim()
-        if (query.isBlank()) return CursorPagedVodItems()
-        return requestApi {
-            searchCursor(
-                linkedMapOf(
-                    "q" to query,
-                    "limit" to SEARCH_CURSOR_PAGE_LIMIT.toString(),
-                    "cursor" to cursor
-                )
-            )
-        }.toCursorPagedVodItems().also { rememberPreviewItems(it.items) }
-    }
-
-    suspend fun enrichSearchResults(items: List<VodItem>, limit: Int = 8): List<VodItem> {
+    private suspend fun enrichSearchResultsOriginal(items: List<VodItem>, limit: Int = 8): List<VodItem> {
         if (items.isEmpty()) return items
         val enrichTargets = items.take(limit)
         val enrichedById = coroutineScope {
@@ -688,6 +678,9 @@ open class LegacyAppleCmsRuntimeRepository(
         }
         return items.map { item -> enrichedById[item.vodId] ?: item }
     }
+
+    suspend fun enrichSearchResults(items: List<VodItem>, limit: Int = 8): List<VodItem> =
+        legacyEnrichSearchResults(items, limit)
 
     suspend fun loadHotSearchGroups(forceRefresh: Boolean = false): List<HotSearchGroup> {
         if (!forceRefresh) {
