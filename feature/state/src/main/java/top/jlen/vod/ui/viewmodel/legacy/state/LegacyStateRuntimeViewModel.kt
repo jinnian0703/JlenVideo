@@ -76,10 +76,20 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
         noticeState = value
     }
 
+    internal fun currentHomeState(): HomeUiState = homeState
+
+    internal fun updateHomeState(value: HomeUiState) {
+        homeState = value
+    }
+
     internal fun hasEnteredAccountScreenFlag(): Boolean = hasEnteredAccountScreen
 
     internal fun markAccountScreenEntered() {
         hasEnteredAccountScreen = true
+    }
+
+    internal fun clearSearchResultScrollPositions() {
+        searchResultScrollPositions.clear()
     }
 
     init {
@@ -130,154 +140,23 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
         }
     }
 
-    fun refreshHome(forceRefresh: Boolean = false) {
-        refreshNotices(forceRefresh = forceRefresh)
-        val cachedPayload = if (!forceRefresh) {
-            repository.peekHomePayload(allowStale = true)
-        } else {
-            null
-        }
-        homeState = loadingHomeState(cachedPayload)
-        viewModelScope.launch {
-            val shouldRefreshFromNetwork = forceRefresh || cachedPayload != null
-            runCatching {
-                withContext(Dispatchers.IO) { repository.loadHome(forceRefresh = shouldRefreshFromNetwork) }
-            }.onSuccess { payload ->
-                homeState = homeStateFromPayload(payload)
-            }.onFailure { error ->
-                homeState = homeStateWithHomeError(
-                    homeState = homeState,
-                    cachedPayload = cachedPayload,
-                    forceRefresh = forceRefresh,
-                    errorMessage = toUserFacingMessage(error, "首页加载失败")
-                )
-            }
-        }
-    }
+    fun refreshHome(forceRefresh: Boolean = false) = legacyRefreshHome(forceRefresh)
 
-    fun refreshHomeAndClearCaches() {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) { repository.clearRuntimeCaches() }
-            searchResultScrollPositions.clear()
-            refreshHome(forceRefresh = true)
-        }
-    }
+    fun refreshHomeAndClearCaches() = legacyRefreshHomeAndClearCaches()
 
-    fun selectCategory(category: AppleCmsCategory, forceRefresh: Boolean = false) {
-        val sameCategory = category.typeId == homeState.selectedCategory?.typeId
-        if (!forceRefresh && sameCategory && homeState.categoryFirstLoaded) {
-            return
-        }
-        loadCategoryContent(
-            category = category,
-            filters = emptyMap()
-        )
-    }
+    fun selectCategory(category: AppleCmsCategory, forceRefresh: Boolean = false) =
+        legacySelectCategory(category, forceRefresh)
 
-    fun updateCategoryFilter(key: String, value: String) {
-        val category = homeState.selectedCategory ?: return
-        val normalizedKey = key.trim()
-        if (normalizedKey.isBlank()) return
-        val normalizedValue = value.trim()
-        val updatedFilters = homeState.selectedCategoryFilters.toMutableMap().apply {
-            if (normalizedValue.isBlank()) {
-                remove(normalizedKey)
-            } else {
-                put(normalizedKey, normalizedValue)
-            }
-        }
-        if (updatedFilters == homeState.selectedCategoryFilters && homeState.categoryFirstLoaded) {
-            return
-        }
-        loadCategoryContent(
-            category = category,
-            filters = updatedFilters
-        )
-    }
+    fun updateCategoryFilter(key: String, value: String) = legacyUpdateCategoryFilter(key, value)
 
     private fun loadCategoryContent(
         category: AppleCmsCategory,
         filters: Map<String, String>
-    ) {
-        viewModelScope.launch {
-            homeState = beginCategoryLoadState(homeState, category, filters)
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    repository.loadCategoryCursorPage(
-                        typeId = category.typeId,
-                        cursor = "",
-                        filters = filters
-                    )
-                }
-            }.onSuccess { payload ->
-                homeState = homeStateWithCategoryPage(homeState, payload)
-            }.onFailure { error ->
-                homeState = homeStateWithCategoryError(
-                    homeState,
-                    toUserFacingMessage(error, "分类加载失败")
-                )
-            }
-        }
-    }
+    ) = legacyLoadCategoryContent(category, filters)
 
-    fun loadMoreHome() {
-        if (homeState.isHomeAppending) {
-            return
-        }
-        if (homeState.homeVisibleCount < homeState.latest.size) {
-            homeState = homeStateWithExpandedHomeVisibleCount(homeState)
-            return
-        }
-        if (!homeState.hasMoreHomeItems) return
-        viewModelScope.launch {
-            val previousVisibleCount = homeState.homeVisibleCount
-            homeState = beginHomeAppendState(homeState)
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    repository.loadLatestCursorPage(cursor = homeState.homeCursor)
-                }
-            }.onSuccess { payload ->
-                homeState = homeStateWithAppendedHomePage(homeState, previousVisibleCount, payload)
-            }.onFailure { error ->
-                homeState = homeStateWithHomeAppendError(
-                    homeState,
-                    toUserFacingMessage(error, "继续加载首页失败")
-                )
-            }
-        }
-    }
+    fun loadMoreHome() = legacyLoadMoreHome()
 
-    fun loadMoreCategory() {
-        if (homeState.isCategoryAppending) {
-            return
-        }
-        if (homeState.categoryVisibleCount < homeState.categoryVideos.size) {
-            homeState = homeStateWithExpandedCategoryVisibleCount(homeState)
-            return
-        }
-        if (!homeState.hasMoreCategoryItems) return
-        val category = homeState.selectedCategory ?: return
-        viewModelScope.launch {
-            val previousVisibleCount = homeState.categoryVisibleCount
-            homeState = beginCategoryAppendState(homeState)
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    repository.loadCategoryCursorPage(
-                        typeId = category.typeId,
-                        cursor = homeState.categoryCursor,
-                        filters = homeState.selectedCategoryFilters
-                    )
-                }
-            }.onSuccess { payload ->
-                homeState = homeStateWithAppendedCategoryPage(homeState, previousVisibleCount, payload)
-            }.onFailure { error ->
-                homeState = homeStateWithCategoryAppendError(
-                    homeState,
-                    toUserFacingMessage(error, "继续加载分类失败")
-                )
-            }
-        }
-    }
+    fun loadMoreCategory() = legacyLoadMoreCategory()
 
     fun updateQuery(query: String) {
         searchState = searchStateWithQuery(searchState, query)
@@ -442,17 +321,7 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
         }
     }
 
-    fun refreshCategoryTab(forceRefresh: Boolean = false) {
-        val selectedCategory = homeState.selectedCategory ?: homeState.categories.firstOrNull() ?: return
-        if (forceRefresh || homeState.selectedCategoryFilters.isNotEmpty()) {
-            loadCategoryContent(
-                category = selectedCategory,
-                filters = homeState.selectedCategoryFilters
-            )
-        } else {
-            selectCategory(selectedCategory, forceRefresh = forceRefresh)
-        }
-    }
+    fun refreshCategoryTab(forceRefresh: Boolean = false) = legacyRefreshCategoryTab(forceRefresh)
 
     fun updateRegisterEditor(transform: (RegisterEditor) -> RegisterEditor) {
         accountState = accountStateWithRegisterEditor(
