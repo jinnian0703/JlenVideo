@@ -874,31 +874,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
         if (detailState.isActionLoading) return
         viewModelScope.launch {
-            detailState = detailState.copy(
-                isActionLoading = true,
-                actionMessage = null,
-                isActionError = false
-            )
+            detailState = beginDetailFavoriteAction(detailState)
             runCatching {
                 withContext(Dispatchers.IO) { repository.addFavoriteForApp(item) }
             }.onSuccess { message ->
                 val normalizedMessage = normalizeFavoriteActionMessage(message)
-                detailState = detailState.copy(
-                    isActionLoading = false,
-                    actionMessage = normalizedMessage,
-                    isActionError = false,
-                    isFavorited = true
-                )
+                detailState = detailStateWithFavoriteSuccess(detailState, normalizedMessage)
                 if (accountState.selectedSection == AccountSection.Favorites) {
                     selectAccountSection(AccountSection.Favorites, forceRefresh = true)
                 }
             }.onFailure { error ->
                 val isDuplicate = isDuplicateFavoriteMessage(error.message.orEmpty())
-                detailState = detailState.copy(
-                    isActionLoading = false,
-                    actionMessage = if (isDuplicate) "已在收藏中" else toUserFacingMessage(error, "收藏失败"),
-                    isActionError = !isDuplicate,
-                    isFavorited = isDuplicate || detailState.isFavorited
+                detailState = detailStateWithFavoriteFailure(
+                    detailState = detailState,
+                    message = if (isDuplicate) "已在收藏中" else toUserFacingMessage(error, "收藏失败"),
+                    isDuplicate = isDuplicate
                 )
             }
         }
@@ -906,7 +896,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun dismissDetailActionMessage() {
         if (detailState.actionMessage.isNullOrBlank()) return
-        detailState = detailState.copy(actionMessage = null, isActionError = false)
+        detailState = detailStateWithoutActionMessage(detailState)
     }
 
     fun login() {
@@ -1036,7 +1026,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun loadHistoryRecords(pageUrl: String? = null, append: Boolean = false) {
         viewModelScope.launch {
-            accountState = accountState.copy(isContentLoading = true, error = null)
+            accountState = beginAccountContentLoad(accountState)
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadHistoryPageForApp(pageUrl) }
             }.onSuccess { page ->
@@ -1045,9 +1035,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 enrichHistoryRecords(historyPageState.mergedItems)
             }.onFailure { error ->
                 if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountState.copy(
-                    isContentLoading = false,
-                    error = toUserFacingMessage(error, "加载播放记录失败")
+                accountState = accountStateWithContentError(
+                    accountState,
+                    toUserFacingMessage(error, "加载播放记录失败")
                 )
             }
         }
@@ -1142,19 +1132,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (false) {
-            playerState = PlayerUiState(
-                title = item.title,
-                isResolving = false,
-                resolveError = "无法定位到影片详情"
-            )
+            playerState = failedHistoryPlayerState(item.title, "无法定位到影片详情")
             return
         }
 
-        playerState = PlayerUiState(
-            title = item.title,
-            isResolving = true,
-            resolveError = null
-        )
+        playerState = resolvingHistoryPlayerState(item.title)
 
         viewModelScope.launch {
             runCatching {
@@ -1189,11 +1171,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     episodeIndex = safeEpisodeIndex
                 )
             }.onFailure { error ->
-                playerState = PlayerUiState(
-                    title = item.title,
-                    isResolving = false,
-                    resolveError = error.message ?: "继续观看失败"
-                )
+                playerState = failedHistoryPlayerState(item.title, error.message ?: "继续观看失败")
             }
         }
     }
@@ -1255,11 +1233,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun openHistoryRecordDirectly(item: UserCenterItem) {
         val resumeUrl = item.playUrl.ifBlank { item.actionUrl }
         if (resumeUrl.isBlank()) {
-            playerState = PlayerUiState(
-                title = item.title,
-                isResolving = false,
-                resolveError = "无法恢复该条播放记录"
-            )
+            playerState = failedHistoryPlayerState(item.title, "无法恢复该条播放记录")
             return
         }
 
@@ -1285,31 +1259,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun loadDetail(vodId: String) {
         viewModelScope.launch {
             val keepCurrentContent = detailState.item?.vodId == vodId
-            detailState = if (keepCurrentContent) {
-                detailState.copy(isLoading = true, error = null)
-            } else {
-                DetailUiState(isLoading = true, error = null)
-            }
+            detailState = beginDetailLoad(detailState, keepCurrentContent)
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadDetail(vodId) }
             }.onSuccess { item ->
                 if (item == null) {
-                    detailState = DetailUiState(isLoading = false, error = "未找到影片详情")
+                    detailState = missingDetailState()
                 } else {
-                    detailState = DetailUiState(
-                        isLoading = false,
+                    detailState = loadedDetailState(
                         item = item,
                         sources = repository.parseSources(item),
-                        selectedSourceIndex = 0,
-                        actionMessage = null,
-                        isActionLoading = false,
                         isFavorited = accountState.favoriteItems.any { favorite -> favorite.vodId == item.vodId }
                     )
                 }
             }.onFailure { error ->
-                detailState = DetailUiState(
-                    isLoading = false,
-                    error = toUserFacingMessage(error, "详情加载失败")
+                detailState = detailStateWithLoadError(
+                    toUserFacingMessage(error, "详情加载失败")
                 )
             }
         }
