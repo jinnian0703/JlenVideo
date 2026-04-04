@@ -82,6 +82,12 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
         homeState = value
     }
 
+    internal fun currentSearchState(): SearchUiState = searchState
+
+    internal fun updateSearchState(value: SearchUiState) {
+        searchState = value
+    }
+
     internal fun hasEnteredAccountScreenFlag(): Boolean = hasEnteredAccountScreen
 
     internal fun markAccountScreenEntered() {
@@ -91,6 +97,34 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
     internal fun clearSearchResultScrollPositions() {
         searchResultScrollPositions.clear()
     }
+
+    internal fun searchHistoryStore(): SearchHistoryStore = searchHistoryStore
+
+    internal fun getSearchResultScrollPosition(query: String): SearchResultScrollPosition? =
+        searchResultScrollPositions[query]
+
+    internal fun putSearchResultScrollPosition(query: String, position: SearchResultScrollPosition) {
+        searchResultScrollPositions[query] = position
+    }
+
+    internal fun currentSearchJob(): Job? = searchJob
+
+    internal fun replaceSearchJob(value: Job?) {
+        searchJob = value
+    }
+
+    internal fun currentSearchEnrichJob(): Job? = searchEnrichJob
+
+    internal fun replaceSearchEnrichJob(value: Job?) {
+        searchEnrichJob = value
+    }
+
+    internal fun nextSearchRequestVersion(): Long {
+        searchRequestVersion += 1L
+        return searchRequestVersion
+    }
+
+    internal fun currentSearchRequestVersion(): Long = searchRequestVersion
 
     init {
         searchState = searchStateWithHistory(searchState, searchHistoryStore.load())
@@ -158,150 +192,28 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
 
     fun loadMoreCategory() = legacyLoadMoreCategory()
 
-    fun updateQuery(query: String) {
-        searchState = searchStateWithQuery(searchState, query)
-    }
+    fun updateQuery(query: String) = legacyUpdateQuery(query)
 
-    fun searchHistory(keyword: String) {
-        val normalized = keyword.trim()
-        if (normalized.isBlank()) return
-        searchState = searchStateWithQuery(searchState, normalized)
-    }
+    fun searchHistory(keyword: String) = legacySearchHistory(keyword)
 
-    fun clearSearchHistory() {
-        searchHistoryStore.clear()
-        searchState = searchStateWithHistory(searchState, emptyList())
-    }
+    fun clearSearchHistory() = legacyClearSearchHistory()
 
-    fun search(keyword: String) {
-        val normalized = keyword.trim()
-        searchState = searchStateWithQuery(searchState, normalized)
-        performSearch(normalized)
-    }
+    fun search(keyword: String) = legacySearch(keyword)
 
-    fun refreshHotSearches(forceRefresh: Boolean = false) {
-        if (!forceRefresh && (searchState.hotSearchGroups.isNotEmpty() || searchState.isHotSearchLoading)) {
-            return
-        }
-        viewModelScope.launch {
-            searchState = startHotSearchLoading(searchState)
-            runCatching {
-                withContext(Dispatchers.IO) { repository.loadHotSearchGroups(forceRefresh = forceRefresh) }
-            }.onSuccess { groups ->
-                searchState = searchStateWithHotSearchGroups(searchState, groups)
-            }.onFailure { error ->
-                searchState = searchStateWithHotSearchError(
-                    searchState,
-                    toUserFacingMessage(error, "热搜加载失败")
-                )
-            }
-        }
-    }
+    fun refreshHotSearches(forceRefresh: Boolean = false) = legacyRefreshHotSearches(forceRefresh)
 
-    fun search() {
-        performSearch(searchState.query)
-    }
+    fun search() = legacySearch()
 
-    fun getSearchResultScroll(query: String): SearchResultScrollPosition =
-        searchResultScrollPositions[query.trim()]
-            ?: SearchResultScrollPosition()
+    fun getSearchResultScroll(query: String): SearchResultScrollPosition = legacyGetSearchResultScroll(query)
 
-    fun updateSearchResultScroll(query: String, index: Int, offset: Int) {
-        val normalized = query.trim()
-        if (normalized.isBlank()) return
-        val current = searchResultScrollPositions[normalized]
-        if (current?.index == index && current.offset == offset) return
-        searchResultScrollPositions[normalized] = SearchResultScrollPosition(index = index, offset = offset)
-    }
+    fun updateSearchResultScroll(query: String, index: Int, offset: Int) =
+        legacyUpdateSearchResultScroll(query, index, offset)
 
-    fun ensureSearchResults(query: String) {
-        val normalized = query.trim()
-        if (normalized.isBlank()) return
-        val current = searchState
-        val alreadyShowingSameQuery = shouldReuseSearchResults(current, normalized)
-        if (alreadyShowingSameQuery) {
-            if (current.query != normalized) {
-                searchState = searchStateWithQuery(current, normalized)
-            }
-            return
-        }
-        performSearch(normalized)
-    }
+    fun ensureSearchResults(query: String) = legacyEnsureSearchResults(query)
 
-    private fun performSearch(keyword: String) {
-        val query = keyword.trim()
-        if (query.isBlank()) {
-            searchJob?.cancel()
-            searchEnrichJob?.cancel()
-            searchState = blankSearchState(searchState)
-            return
-        }
-        searchJob?.cancel()
-        searchEnrichJob?.cancel()
-        val requestVersion = ++searchRequestVersion
-        searchState = beginSearchState(searchState, query)
-        searchJob = viewModelScope.launch searchLaunch@{
-            try {
-                val firstPage = withContext(Dispatchers.IO) {
-                    repository.searchCursor(keyword = query, cursor = "")
-                }
-                if (requestVersion != searchRequestVersion) return@searchLaunch
+    private fun performSearch(keyword: String) = legacyPerformSearch(keyword)
 
-                searchHistoryStore.save(query)
-                searchState = searchStateWithFirstPage(
-                    searchState = searchState,
-                    history = searchHistoryStore.load(),
-                    page = firstPage
-                )
-
-                if (firstPage.items.isNotEmpty()) {
-                    searchEnrichJob = viewModelScope.launch searchEnrichLaunch@{
-                        val enrichedResults = withContext(Dispatchers.IO) {
-                            repository.enrichSearchResults(firstPage.items, limit = 8)
-                        }
-                        if (requestVersion != searchRequestVersion) return@searchEnrichLaunch
-                        searchState = searchStateWithEnrichedResults(searchState, enrichedResults)
-                    }
-                }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                if (requestVersion != searchRequestVersion) return@searchLaunch
-                searchState = searchStateWithError(
-                    searchState,
-                    toUserFacingMessage(error, "搜索失败")
-                )
-            }
-        }
-    }
-
-    fun loadMoreSearchResults() {
-        val query = searchState.submittedQuery.trim()
-        if (
-            query.isBlank() ||
-                searchState.isLoading ||
-                searchState.isAppending ||
-                !searchState.hasMore
-        ) {
-            return
-        }
-
-        viewModelScope.launch {
-            searchState = beginSearchAppend(searchState)
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    repository.searchCursor(keyword = query, cursor = searchState.cursor)
-                }
-            }.onSuccess { page ->
-                searchState = searchStateWithAppendedPage(searchState, page)
-            }.onFailure { error ->
-                searchState = searchStateWithAppendError(
-                    searchState,
-                    toUserFacingMessage(error, "继续加载搜索结果失败")
-                )
-            }
-        }
-    }
+    fun loadMoreSearchResults() = legacyLoadMoreSearchResults()
 
     fun updateLoginUserName(value: String) {
         accountState = accountStateWithUserName(accountState, value)
