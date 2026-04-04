@@ -1146,23 +1146,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val sources = repository.parseSources(detailItem)
-                val safeSourceIndex = item.sourceIndex.coerceIn(0, (sources.lastIndex).coerceAtLeast(0))
-                val episodes = sources.getOrNull(safeSourceIndex)?.episodes.orEmpty()
-                val matchedEpisodeIndex = episodes.indexOfFirst { episode ->
-                    item.playUrl.isNotBlank() && episode.url == item.playUrl
-                }
-                val safeEpisodeIndex = when {
-                    matchedEpisodeIndex >= 0 -> matchedEpisodeIndex
-                    item.episodeIndex >= 0 -> item.episodeIndex.coerceIn(0, (episodes.lastIndex).coerceAtLeast(0))
-                    else -> 0
-                }
+                val selection = resolveHistoryResumeSelection(item, sources)
 
                 openPlayer(
                     title = detailItem.displayTitle,
                     item = detailItem,
                     sources = sources,
-                    sourceIndex = safeSourceIndex,
-                    episodeIndex = safeEpisodeIndex
+                    sourceIndex = selection.sourceIndex,
+                    episodeIndex = selection.episodeIndex
                 )
             }.onFailure { error ->
                 playerState = failedHistoryPlayerState(item.title, error.message ?: "继续观看失败")
@@ -1200,23 +1191,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val sources = repository.parseSources(detailItem)
-                val safeSourceIndex = item.sourceIndex.coerceIn(0, (sources.lastIndex).coerceAtLeast(0))
-                val episodes = sources.getOrNull(safeSourceIndex)?.episodes.orEmpty()
-                val matchedEpisodeIndex = episodes.indexOfFirst { episode ->
-                    item.playUrl.isNotBlank() && episode.url == item.playUrl
-                }
-                val safeEpisodeIndex = when {
-                    matchedEpisodeIndex >= 0 -> matchedEpisodeIndex
-                    item.episodeIndex >= 0 -> item.episodeIndex.coerceIn(0, (episodes.lastIndex).coerceAtLeast(0))
-                    else -> 0
-                }
+                val selection = resolveHistoryResumeSelection(item, sources)
 
                 openPlayer(
                     title = detailItem.displayTitle,
                     item = detailItem,
                     sources = sources,
-                    sourceIndex = safeSourceIndex,
-                    episodeIndex = safeEpisodeIndex
+                    sourceIndex = selection.sourceIndex,
+                    episodeIndex = selection.episodeIndex
                 )
             }.onFailure {
                 openHistoryRecordDirectly(item)
@@ -1234,17 +1216,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         openPlayer(
             title = item.title,
             item = null,
-            sources = listOf(
-                PlaySource(
-                    name = item.sourceName.ifBlank { "继续观看" },
-                    episodes = listOf(
-                        Episode(
-                            name = item.subtitle.substringBefore("|").trim().ifBlank { "继续观看" },
-                            url = resumeUrl
-                        )
-                    )
-                )
-            ),
+            sources = buildHistoryFallbackSources(item, resumeUrl),
             sourceIndex = 0,
             episodeIndex = 0
         )
