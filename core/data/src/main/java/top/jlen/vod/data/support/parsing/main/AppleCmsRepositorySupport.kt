@@ -6,12 +6,14 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.io.IOException
+import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
+import okhttp3.Cookie
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 
@@ -33,6 +35,81 @@ internal fun decodeSiteText(raw: String): String {
         .replace('\u00A0', ' ')
         .replace(Regex("\\s+"), " ")
         .trim()
+}
+
+internal fun buildVodDetailUrl(item: VodItem, baseUrl: String): String =
+    item.detailUrl.ifBlank {
+        item.vodId
+            .takeIf(String::isNotBlank)
+            ?.let { normalizeUrl(baseUrl, "/voddetail/$it/") }
+            .orEmpty()
+    }
+
+internal fun extractVodIdFromUserUrl(pathOrUrl: String, baseUrl: String): String {
+    val normalized = resolveUrl(baseUrl, pathOrUrl)
+    return when {
+        normalized.contains("/voddetail/") -> extractVodId(normalized)
+        normalized.contains("/vodplay/") -> normalized
+            .substringAfter("/vodplay/")
+            .substringBefore('/')
+            .substringBefore('-')
+        else -> ""
+    }
+}
+
+internal fun resolveUrl(baseUrl: String, pathOrUrl: String): String {
+    val value = pathOrUrl.trim()
+    if (value.startsWith("http://") || value.startsWith("https://")) {
+        return value
+    }
+    return normalizeUrl(baseUrl, value)
+}
+
+internal fun normalizeAgainst(raw: String, base: String, baseUrl: String): String {
+    val value = raw.trim().replace("\\/", "/")
+    if (value.isBlank()) return ""
+    if (value.startsWith("http://") || value.startsWith("https://")) return value
+    if (value.startsWith("//")) return "https:$value"
+    return runCatching { URI(base).resolve(value).toString() }
+        .getOrElse { resolveUrl(baseUrl, value) }
+}
+
+internal fun normalizeUrl(baseUrl: String, raw: String): String {
+    val value = raw.trim()
+    if (value.isBlank()) return ""
+    if (value.startsWith("http://") || value.startsWith("https://")) return value
+    if (value.startsWith("//")) return "https:$value"
+    return if (value.startsWith("/")) {
+        baseUrl + value
+    } else {
+        Uri.parse("$baseUrl/").buildUpon().appendEncodedPath(value).build().toString()
+    }
+}
+
+internal fun appendTimestamp(url: String): String {
+    val separator = if (url.contains("?")) "&" else "?"
+    return "$url${separator}t=${System.currentTimeMillis()}"
+}
+
+internal fun isDirectMediaUrl(url: String): Boolean {
+    val lower = url.lowercase()
+    return lower.endsWith(".m3u8") ||
+        lower.endsWith(".mp4") ||
+        lower.contains(".m3u8?") ||
+        lower.contains("/index.m3u8")
+}
+
+internal fun List<Cookie>.firstCookieValue(name: String): String =
+    firstOrNull { it.name == name }
+        ?.value
+        .orEmpty()
+        .takeUnless { it == "deleted" }
+        .orEmpty()
+
+internal fun normalizePortraitUrl(baseUrl: String, raw: String): String {
+    val value = raw.trim()
+    if (value.isBlank() || value == "deleted") return ""
+    return appendTimestamp(normalizeUrl(baseUrl, value))
 }
 
 internal fun JsonObject.extractNoticeItems(): List<JsonElement> {

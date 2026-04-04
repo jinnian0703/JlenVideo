@@ -3716,26 +3716,6 @@ class AppleCmsRepository(
         }
     }
 
-    private fun appendTimestamp(url: String): String {
-        val separator = if (url.contains("?")) "&" else "?"
-        return "$url${separator}t=${System.currentTimeMillis()}"
-    }
-
-    private fun isDirectMediaUrl(url: String): Boolean {
-        val lower = url.lowercase()
-        return lower.endsWith(".m3u8") ||
-            lower.endsWith(".mp4") ||
-            lower.contains(".m3u8?") ||
-            lower.contains("/index.m3u8")
-    }
-
-    private fun List<okhttp3.Cookie>.firstCookieValue(name: String): String =
-        firstOrNull { it.name == name }
-            ?.value
-            .orEmpty()
-            .takeUnless { it == "deleted" }
-            .orEmpty()
-
     private fun normalizePortraitUrl(raw: String): String {
         val value = raw.trim()
         if (value.isBlank() || value == "deleted") return ""
