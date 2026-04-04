@@ -237,11 +237,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             null
         }
-        if (cachedPayload != null) {
-            homeState = homeStateFromPayload(payload = cachedPayload)
-        } else {
-            homeState = HomeUiState(isLoading = true)
-        }
+        homeState = loadingHomeState(cachedPayload)
         viewModelScope.launch {
             val shouldRefreshFromNetwork = forceRefresh || cachedPayload != null
             runCatching {
@@ -249,14 +245,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onSuccess { payload ->
                 homeState = homeStateFromPayload(payload)
             }.onFailure { error ->
-                homeState = if (cachedPayload != null && !forceRefresh) {
-                    homeState.copy(isLoading = false)
-                } else {
-                    homeState.copy(
-                    isLoading = false,
-                    error = toUserFacingMessage(error, "首页加载失败")
-                    )
-                }
+                homeState = homeStateWithHomeError(
+                    homeState = homeState,
+                    cachedPayload = cachedPayload,
+                    forceRefresh = forceRefresh,
+                    errorMessage = toUserFacingMessage(error, "首页加载失败")
+                )
             }
         }
     }
@@ -306,19 +300,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         filters: Map<String, String>
     ) {
         viewModelScope.launch {
-            homeState = homeState.copy(
-                selectedCategory = category,
-                selectedCategoryFilters = filters,
-                categoryVideos = emptyList(),
-                categoryVisibleCount = 0,
-                categoryCursor = "",
-                hasMoreCategoryItems = true,
-                categoryFirstLoaded = false,
-                isCategoryLoading = true,
-                isCategoryAppending = false,
-                categoryAppendError = null,
-                error = null
-            )
+            homeState = beginCategoryLoadState(homeState, category, filters)
             runCatching {
                 withContext(Dispatchers.IO) {
                     repository.loadCategoryCursorPage(
@@ -328,20 +310,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }.onSuccess { payload ->
-                homeState = homeState.copy(
-                    categoryVideos = payload.items,
-                    categoryVisibleCount = payload.items.initialGridVisibleCount(),
-                    categoryCursor = payload.nextCursor,
-                    hasMoreCategoryItems = payload.hasMore,
-                    categoryFirstLoaded = true,
-                    isCategoryAppending = false,
-                    isCategoryLoading = false
-                )
+                homeState = homeStateWithCategoryPage(homeState, payload)
             }.onFailure { error ->
-                homeState = homeState.copy(
-                    isCategoryAppending = false,
-                    isCategoryLoading = false,
-                    error = toUserFacingMessage(error, "分类加载失败")
+                homeState = homeStateWithCategoryError(
+                    homeState,
+                    toUserFacingMessage(error, "分类加载失败")
                 )
             }
         }
@@ -351,36 +324,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (homeState.isHomeAppending) {
             return
         }
-        val nextVisibleCount = homeState.homeVisibleCount + GRID_BATCH_ITEM_COUNT
         if (homeState.homeVisibleCount < homeState.latest.size) {
-            homeState = homeState.copy(
-                homeVisibleCount = nextVisibleCount.coerceAtMost(homeState.latest.size)
-            )
+            homeState = homeStateWithExpandedHomeVisibleCount(homeState)
             return
         }
         if (!homeState.hasMoreHomeItems) return
         viewModelScope.launch {
             val previousVisibleCount = homeState.homeVisibleCount
-            homeState = homeState.copy(isHomeAppending = true, homeAppendError = null)
+            homeState = beginHomeAppendState(homeState)
             runCatching {
                 withContext(Dispatchers.IO) {
                     repository.loadLatestCursorPage(cursor = homeState.homeCursor)
                 }
             }.onSuccess { payload ->
-                val mergedLatest = (homeState.latest + payload.items).distinctBy { it.vodId }
-                homeState = homeState.copy(
-                    latest = mergedLatest,
-                    homeVisibleCount = (previousVisibleCount + GRID_BATCH_ITEM_COUNT)
-                        .coerceAtLeast(mergedLatest.initialGridVisibleCount())
-                        .coerceAtMost(mergedLatest.size),
-                    homeCursor = payload.nextCursor,
-                    hasMoreHomeItems = payload.hasMore,
-                    isHomeAppending = false
-                )
+                homeState = homeStateWithAppendedHomePage(homeState, previousVisibleCount, payload)
             }.onFailure { error ->
-                homeState = homeState.copy(
-                    isHomeAppending = false,
-                    homeAppendError = toUserFacingMessage(error, "继续加载首页失败")
+                homeState = homeStateWithHomeAppendError(
+                    homeState,
+                    toUserFacingMessage(error, "继续加载首页失败")
                 )
             }
         }
@@ -390,18 +351,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (homeState.isCategoryAppending) {
             return
         }
-        val nextVisibleCount = homeState.categoryVisibleCount + GRID_BATCH_ITEM_COUNT
         if (homeState.categoryVisibleCount < homeState.categoryVideos.size) {
-            homeState = homeState.copy(
-                categoryVisibleCount = nextVisibleCount.coerceAtMost(homeState.categoryVideos.size)
-            )
+            homeState = homeStateWithExpandedCategoryVisibleCount(homeState)
             return
         }
         if (!homeState.hasMoreCategoryItems) return
         val category = homeState.selectedCategory ?: return
         viewModelScope.launch {
             val previousVisibleCount = homeState.categoryVisibleCount
-            homeState = homeState.copy(isCategoryAppending = true, categoryAppendError = null)
+            homeState = beginCategoryAppendState(homeState)
             runCatching {
                 withContext(Dispatchers.IO) {
                     repository.loadCategoryCursorPage(
@@ -411,20 +369,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }.onSuccess { payload ->
-                val mergedVideos = (homeState.categoryVideos + payload.items).distinctBy { it.vodId }
-                homeState = homeState.copy(
-                    categoryVideos = mergedVideos,
-                    categoryVisibleCount = (previousVisibleCount + GRID_BATCH_ITEM_COUNT)
-                        .coerceAtLeast(mergedVideos.initialGridVisibleCount())
-                        .coerceAtMost(mergedVideos.size),
-                    categoryCursor = payload.nextCursor,
-                    hasMoreCategoryItems = payload.hasMore,
-                    isCategoryAppending = false
-                )
+                homeState = homeStateWithAppendedCategoryPage(homeState, previousVisibleCount, payload)
             }.onFailure { error ->
-                homeState = homeState.copy(
-                    isCategoryAppending = false,
-                    categoryAppendError = toUserFacingMessage(error, "继续加载分类失败")
+                homeState = homeStateWithCategoryAppendError(
+                    homeState,
+                    toUserFacingMessage(error, "继续加载分类失败")
                 )
             }
         }
