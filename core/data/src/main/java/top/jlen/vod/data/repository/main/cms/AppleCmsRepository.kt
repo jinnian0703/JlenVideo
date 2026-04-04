@@ -2179,12 +2179,7 @@ class AppleCmsRepository(
     }
 
     private fun buildVodDetailUrl(item: VodItem): String =
-        item.detailUrl.ifBlank {
-            item.vodId
-                .takeIf(String::isNotBlank)
-                ?.let { normalizeUrl("/voddetail/$it/") }
-                .orEmpty()
-        }
+        top.jlen.vod.data.buildVodDetailUrl(item, baseUrl)
 
     private fun resolveUserActionVodId(item: VodItem): String =
         item.vodId
@@ -3675,52 +3670,20 @@ class AppleCmsRepository(
         return ""
     }
 
-    private fun extractVodIdFromUserUrl(pathOrUrl: String): String {
-        val normalized = resolveUrl(pathOrUrl)
-        return when {
-            normalized.contains("/voddetail/") -> extractVodId(normalized)
-            normalized.contains("/vodplay/") -> normalized
-                .substringAfter("/vodplay/")
-                .substringBefore('/')
-                .substringBefore('-')
-            else -> ""
-        }
-    }
+    private fun extractVodIdFromUserUrl(pathOrUrl: String): String =
+        top.jlen.vod.data.extractVodIdFromUserUrl(pathOrUrl, baseUrl)
 
-    private fun resolveUrl(pathOrUrl: String): String {
-        val value = pathOrUrl.trim()
-        if (value.startsWith("http://") || value.startsWith("https://")) {
-            return value
-        }
-        return normalizeUrl(value)
-    }
+    private fun resolveUrl(pathOrUrl: String): String =
+        top.jlen.vod.data.resolveUrl(baseUrl, pathOrUrl)
 
-    private fun normalizeAgainst(raw: String, base: String): String {
-        val value = raw.trim().replace("\\/", "/")
-        if (value.isBlank()) return ""
-        if (value.startsWith("http://") || value.startsWith("https://")) return value
-        if (value.startsWith("//")) return "https:$value"
-        return runCatching { URI(base).resolve(value).toString() }
-            .getOrElse { resolveUrl(value) }
-    }
+    private fun normalizeAgainst(raw: String, base: String): String =
+        top.jlen.vod.data.normalizeAgainst(raw, base, baseUrl)
 
-    private fun normalizeUrl(raw: String): String {
-        val value = raw.trim()
-        if (value.isBlank()) return ""
-        if (value.startsWith("http://") || value.startsWith("https://")) return value
-        if (value.startsWith("//")) return "https:$value"
-        return if (value.startsWith("/")) {
-            baseUrl + value
-        } else {
-            Uri.parse("$baseUrl/").buildUpon().appendEncodedPath(value).build().toString()
-        }
-    }
+    private fun normalizeUrl(raw: String): String =
+        top.jlen.vod.data.normalizeUrl(baseUrl, raw)
 
-    private fun normalizePortraitUrl(raw: String): String {
-        val value = raw.trim()
-        if (value.isBlank() || value == "deleted") return ""
-        return appendTimestamp(normalizeUrl(value))
-    }
+    private fun normalizePortraitUrl(raw: String): String =
+        top.jlen.vod.data.normalizePortraitUrl(baseUrl, raw)
 
     private fun createApi(baseUrl: String): AppleCmsApi =
         Retrofit.Builder()
