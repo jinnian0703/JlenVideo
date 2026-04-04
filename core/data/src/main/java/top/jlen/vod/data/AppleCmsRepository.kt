@@ -3326,57 +3326,6 @@ class AppleCmsRepository(
         )
     }
 
-    private fun extractCategoryPageCount(document: Document, pagination: Element?): Int {
-        val mobileCount = pagination?.selectFirst("li.active .num")
-            ?.text()
-            .orEmpty()
-            .substringAfter('/')
-            .substringBefore(' ')
-            .toIntOrNull()
-        if (mobileCount != null && mobileCount > 0) return mobileCount
-
-        val numericLinks = pagination?.select("a[href]")
-            .orEmpty()
-            .mapNotNull { anchor ->
-                anchor.text().trim().toIntOrNull()
-            }
-        val maxNumericLink = numericLinks.maxOrNull()
-        if (maxNumericLink != null && maxNumericLink > 0) return maxNumericLink
-
-        val titleCount = Regex("""第(\d+)页""")
-            .find(document.title())
-            ?.groupValues
-            ?.getOrNull(1)
-            ?.toIntOrNull()
-        return titleCount ?: 1
-    }
-
-    private fun extractCategoryTotal(document: Document): Int {
-        val scriptTotal = document.select("script")
-            .asSequence()
-            .mapNotNull { script ->
-                Regex("""ewave-total"\)\.text\((\d+)\)""")
-                    .find(script.html())
-                    ?.groupValues
-                    ?.getOrNull(1)
-                    ?.toIntOrNull()
-            }
-            .firstOrNull()
-        if (scriptTotal != null && scriptTotal > 0) return scriptTotal
-
-        val headerTotal = document.selectFirst(".vod-list h2 .small")
-            ?.text()
-            .orEmpty()
-            .let { text ->
-                Regex("""共\s*(\d+)\s*个视频""")
-                    .find(text)
-                    ?.groupValues
-                    ?.getOrNull(1)
-                    ?.toIntOrNull()
-            }
-        return headerTotal ?: 0
-    }
-
     private suspend fun fetchUserDocument(pathOrUrl: String): Document {
         val document = fetchDocument(resolveUrl(pathOrUrl))
         if (document.select(".ewave-jump-msg, .panel-body").any { it.text().contains("未登录") }) {

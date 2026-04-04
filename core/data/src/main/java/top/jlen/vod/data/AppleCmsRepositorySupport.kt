@@ -12,6 +12,8 @@ import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
+import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
 
 internal fun decodeSiteText(raw: String): String {
     val cleaned = raw.trim()
@@ -624,6 +626,57 @@ internal fun buildMergedCategoryPage(
         limit = pages.sumOf { it.limit }.takeIf { it > 0 } ?: mergedItems.size,
         hasNextPage = pages.any { it.hasNextPage }
     )
+}
+
+internal fun extractCategoryPageCount(document: Document, pagination: Element?): Int {
+    val mobileCount = pagination?.selectFirst("li.active .num")
+        ?.text()
+        .orEmpty()
+        .substringAfter('/')
+        .substringBefore(' ')
+        .toIntOrNull()
+    if (mobileCount != null && mobileCount > 0) return mobileCount
+
+    val numericLinks = pagination?.select("a[href]")
+        .orEmpty()
+        .mapNotNull { anchor ->
+            anchor.text().trim().toIntOrNull()
+        }
+    val maxNumericLink = numericLinks.maxOrNull()
+    if (maxNumericLink != null && maxNumericLink > 0) return maxNumericLink
+
+    val titleCount = Regex("""第(\d+)页""")
+        .find(document.title())
+        ?.groupValues
+        ?.getOrNull(1)
+        ?.toIntOrNull()
+    return titleCount ?: 1
+}
+
+internal fun extractCategoryTotal(document: Document): Int {
+    val scriptTotal = document.select("script")
+        .asSequence()
+        .mapNotNull { script ->
+            Regex("""ewave-total"\)\.text\((\d+)\)""")
+                .find(script.html())
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.toIntOrNull()
+        }
+        .firstOrNull()
+    if (scriptTotal != null && scriptTotal > 0) return scriptTotal
+
+    val headerTotal = document.selectFirst(".vod-list h2 .small")
+        ?.text()
+        .orEmpty()
+        .let { text ->
+            Regex("""共\s*(\d+)\s*个视频""")
+                .find(text)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.toIntOrNull()
+        }
+    return headerTotal ?: 0
 }
 
 data class HomePayload(
