@@ -166,6 +166,19 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
 
     internal fun currentSearchRequestVersion(): Long = searchRequestVersion
 
+    internal fun currentHistoryEnrichJob(): Job? = historyEnrichJob
+
+    internal fun replaceHistoryEnrichJob(value: Job?) {
+        historyEnrichJob = value
+    }
+
+    internal fun nextHistoryEnrichVersion(): Long {
+        historyEnrichVersion += 1L
+        return historyEnrichVersion
+    }
+
+    internal fun currentHistoryEnrichVersion(): Long = historyEnrichVersion
+
     init {
         searchState = searchStateWithHistory(searchState, searchHistoryStore.load())
         refreshCrashLog()
@@ -266,54 +279,12 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
     fun updateRegisterEditor(transform: (RegisterEditor) -> RegisterEditor) =
         legacyUpdateRegisterEditor(transform)
 
-    fun refreshRegisterCaptcha() {
-        val captchaUrl = accountState.registerCaptchaUrl
-        if (captchaUrl.isBlank()) {
-            loadRegisterPage(forceRefresh = true)
-            return
-        }
-
-        viewModelScope.launch {
-            accountState = beginAccountContentLoad(accountState)
-            runCatching {
-                withContext(Dispatchers.IO) { repository.loadRegisterCaptcha(captchaUrl) }
-            }.onSuccess { bytes ->
-                accountState = accountStateWithRegisterCaptcha(accountState, bytes)
-            }.onFailure { error ->
-                if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountStateWithContentError(
-                    accountState,
-                    toUserFacingMessage(error, "验证码加载失败")
-                )
-            }
-        }
-    }
+    fun refreshRegisterCaptcha() = legacyRefreshRegisterCaptcha()
 
     fun updateFindPasswordEditor(transform: (FindPasswordEditor) -> FindPasswordEditor) =
         legacyUpdateFindPasswordEditor(transform)
 
-    fun refreshFindPasswordCaptcha() {
-        val captchaUrl = accountState.findPasswordCaptchaUrl
-        if (captchaUrl.isBlank()) {
-            loadFindPasswordPage(forceRefresh = true)
-            return
-        }
-
-        viewModelScope.launch {
-            accountState = beginAccountContentLoad(accountState)
-            runCatching {
-                withContext(Dispatchers.IO) { repository.loadFindPasswordCaptcha(captchaUrl) }
-            }.onSuccess { bytes ->
-                accountState = accountStateWithFindPasswordCaptcha(accountState, bytes)
-            }.onFailure { error ->
-                if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountStateWithContentError(
-                    accountState,
-                    toUserFacingMessage(error, "验证码加载失败")
-                )
-            }
-        }
-    }
+    fun refreshFindPasswordCaptcha() = legacyRefreshFindPasswordCaptcha()
 
     fun updateProfileEditor(transform: (UserProfileEditor) -> UserProfileEditor) =
         legacyUpdateProfileEditor(transform)
@@ -396,142 +367,21 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
 
     fun logout() = legacyLogout()
 
-    private fun loadRegisterPage(forceRefresh: Boolean = false) {
-        if (accountState.isContentLoading && !forceRefresh) return
-        viewModelScope.launch {
-            accountState = beginAccountContentLoad(accountState)
-            runCatching {
-                withContext(Dispatchers.IO) { repository.loadRegisterPageForApp() }
-            }.onSuccess { page ->
-                accountState = accountStateWithRegisterPage(accountState, page)
-                if (page.requiresVerify && page.captchaUrl.isNotBlank()) {
-                    refreshRegisterCaptcha()
-                }
-            }.onFailure { error ->
-                if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountStateWithContentError(
-                    accountState,
-                    toUserFacingMessage(error, "注册页面加载失败")
-                )
-            }
-        }
-    }
+    private fun loadRegisterPage(forceRefresh: Boolean = false) = legacyLoadRegisterPage(forceRefresh)
 
-    private fun loadFindPasswordPage(forceRefresh: Boolean = false) {
-        if (accountState.isContentLoading && !forceRefresh) return
-        viewModelScope.launch {
-            accountState = beginAccountContentLoad(accountState)
-            runCatching {
-                withContext(Dispatchers.IO) { repository.loadFindPasswordPageForApp() }
-            }.onSuccess { page ->
-                accountState = accountStateWithFindPasswordPage(accountState, page)
-                if (page.requiresVerify && page.captchaUrl.isNotBlank()) {
-                    refreshFindPasswordCaptcha()
-                }
-            }.onFailure { error ->
-                if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountStateWithContentError(
-                    accountState,
-                    toUserFacingMessage(error, "找回密码页面加载失败")
-                )
-            }
-        }
-    }
+    private fun loadFindPasswordPage(forceRefresh: Boolean = false) = legacyLoadFindPasswordPage(forceRefresh)
 
-    private fun loadAccountProfile() {
-        viewModelScope.launch {
-            accountState = beginAccountContentLoad(accountState)
-            runCatching {
-                withContext(Dispatchers.IO) { repository.loadUserProfileForApp() }
-            }.onSuccess { page ->
-                accountState = accountStateWithProfilePage(accountState, page)
-            }.onFailure { error ->
-                if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountStateWithContentError(
-                    accountState,
-                    toUserFacingMessage(error, "加载资料失败")
-                )
-            }
-        }
-    }
+    private fun loadAccountProfile() = legacyLoadAccountProfile()
 
-    private fun loadFavoriteRecords(pageUrl: String? = null, append: Boolean = false) {
-        viewModelScope.launch {
-            accountState = beginAccountContentLoad(accountState)
-            runCatching {
-                withContext(Dispatchers.IO) { repository.loadFavoritePageForApp(pageUrl) }
-            }.onSuccess { page ->
-                accountState = accountStateWithFavoritePage(accountState, page, append)
-            }.onFailure { error ->
-                if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountStateWithContentError(
-                    accountState,
-                    toUserFacingMessage(error, "加载收藏失败")
-                )
-            }
-        }
-    }
+    private fun loadFavoriteRecords(pageUrl: String? = null, append: Boolean = false) =
+        legacyLoadFavoriteRecords(pageUrl, append)
 
-    private fun loadHistoryRecords(pageUrl: String? = null, append: Boolean = false) {
-        viewModelScope.launch {
-            accountState = beginAccountContentLoad(accountState)
-            runCatching {
-                withContext(Dispatchers.IO) { repository.loadHistoryPageForApp(pageUrl) }
-            }.onSuccess { page ->
-                val historyPageState = accountStateWithHistoryPage(accountState, page, append)
-                accountState = historyPageState.accountState
-                enrichHistoryRecords(historyPageState.mergedItems)
-            }.onFailure { error ->
-                if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountStateWithContentError(
-                    accountState,
-                    toUserFacingMessage(error, "加载播放记录失败")
-                )
-            }
-        }
-    }
+    private fun loadHistoryRecords(pageUrl: String? = null, append: Boolean = false) =
+        legacyLoadHistoryRecords(pageUrl, append)
 
-    private fun enrichHistoryRecords(items: List<UserCenterItem>) {
-        val targetItems = items.filter { item ->
-            item.sourceIndex >= 0 &&
-                item.sourceName.isBlank() &&
-                (item.vodId.isNotBlank() || item.playUrl.isNotBlank() || item.actionUrl.isNotBlank())
-        }
-        if (targetItems.isEmpty()) return
+    private fun enrichHistoryRecords(items: List<UserCenterItem>) = legacyEnrichHistoryRecords(items)
 
-        historyEnrichJob?.cancel()
-        val requestVersion = ++historyEnrichVersion
-        historyEnrichJob = viewModelScope.launch {
-            val enrichedItems = runCatching {
-                withContext(Dispatchers.IO) { repository.enrichHistoryItems(targetItems) }
-            }.getOrNull() ?: return@launch
-            if (requestVersion != historyEnrichVersion) return@launch
-
-            val enrichedByKey = enrichedItems.associateBy(::historyRecordKey)
-            accountState = accountStateWithEnrichedHistoryItems(accountState, enrichedByKey)
-        }
-    }
-
-    private fun loadMembership() {
-        viewModelScope.launch {
-            accountState = beginAccountContentLoad(accountState)
-            runCatching {
-                withContext(Dispatchers.IO) { repository.loadMembershipDataForApp() }
-            }.onSuccess { page ->
-                accountState = accountStateWithMembershipPage(
-                    accountState = accountState,
-                    page = page,
-                    currentSession = repository.currentSession()
-                )
-            }.onFailure { error ->
-                if (handleAccountSessionExpired(error)) return@onFailure
-                accountState = accountStateWithContentError(
-                    accountState,
-                    toUserFacingMessage(error, "加载会员信息失败")
-                )
-            }
-        }
-    }
+    private fun loadMembership() = legacyLoadMembership()
 
     private fun runAccountAction(
         block: suspend AppleCmsRepository.() -> String,
