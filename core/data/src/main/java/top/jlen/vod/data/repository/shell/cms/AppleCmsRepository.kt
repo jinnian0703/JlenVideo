@@ -7,14 +7,14 @@ class AppleCmsRepository(
     context: Context,
     cookieJar: PersistentCookieJar = PersistentCookieJar(context),
     client: OkHttpClient = createClient(cookieJar)
-) : LegacyAppleCmsRepository(context, cookieJar, client) {
+) : LegacyAppleCmsRuntimeRepository(context, cookieJar, client) {
     companion object {
         fun clearAllCaches(context: Context) {
-            LegacyAppleCmsRepository.clearAllCaches(context)
+            LegacyAppleCmsRuntimeRepository.clearAllCaches(context)
         }
 
         fun clearMemoryCaches(context: Context) {
-            LegacyAppleCmsRepository.clearMemoryCaches(context)
+            LegacyAppleCmsRuntimeRepository.clearMemoryCaches(context)
         }
     }
 }
