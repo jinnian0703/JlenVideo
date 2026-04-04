@@ -101,11 +101,6 @@ internal fun failedHistoryPlayerState(
     resolveError = message
 )
 
-internal data class HistoryResumeSelection(
-    val sourceIndex: Int,
-    val episodeIndex: Int
-)
-
 internal fun resolveHistoryVodId(item: UserCenterItem): String =
     item.vodId.ifBlank {
         Regex("""/vodplay/([^/]+?)-\d+-\d+(?:\.html)?/?(?:\?.*)?$""")

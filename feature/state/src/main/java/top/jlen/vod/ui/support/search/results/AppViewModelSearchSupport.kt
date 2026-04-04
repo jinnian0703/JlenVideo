@@ -133,7 +133,3 @@ internal fun searchStateWithAppendError(
     appendError = errorMessage
 )
 
-data class SearchResultScrollPosition(
-    val index: Int = 0,
-    val offset: Int = 0
-)
