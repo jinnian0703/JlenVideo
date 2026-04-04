@@ -431,13 +431,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateQuery(query: String) {
-        searchState = searchState.copy(query = query, error = null)
+        searchState = searchStateWithQuery(searchState, query)
     }
 
     fun searchHistory(keyword: String) {
         val normalized = keyword.trim()
         if (normalized.isBlank()) return
-        searchState = searchState.copy(query = normalized, error = null)
+        searchState = searchStateWithQuery(searchState, normalized)
     }
 
     fun clearSearchHistory() {
@@ -447,7 +447,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun search(keyword: String) {
         val normalized = keyword.trim()
-        searchState = searchState.copy(query = normalized, error = null)
+        searchState = searchStateWithQuery(searchState, normalized)
         performSearch(normalized)
     }
 
@@ -456,19 +456,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         viewModelScope.launch {
-            searchState = searchState.copy(isHotSearchLoading = true, hotSearchError = null)
+            searchState = startHotSearchLoading(searchState)
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadHotSearchGroups(forceRefresh = forceRefresh) }
             }.onSuccess { groups ->
-                searchState = searchState.copy(
-                    isHotSearchLoading = false,
-                    hotSearchGroups = groups,
-                    hotSearchError = null
-                )
+                searchState = searchStateWithHotSearchGroups(searchState, groups)
             }.onFailure { error ->
-                searchState = searchState.copy(
-                    isHotSearchLoading = false,
-                    hotSearchError = toUserFacingMessage(error, "热搜加载失败")
+                searchState = searchStateWithHotSearchError(
+                    searchState,
+                    toUserFacingMessage(error, "热搜加载失败")
                 )
             }
         }
@@ -494,12 +490,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val normalized = query.trim()
         if (normalized.isBlank()) return
         val current = searchState
-        val alreadyShowingSameQuery =
-            current.submittedQuery == normalized &&
-                (current.firstLoaded || current.isLoading || !current.error.isNullOrBlank())
+        val alreadyShowingSameQuery = shouldReuseSearchResults(current, normalized)
         if (alreadyShowingSameQuery) {
             if (current.query != normalized) {
-                searchState = current.copy(query = normalized)
+                searchState = searchStateWithQuery(current, normalized)
             }
             return
         }
@@ -511,34 +505,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (query.isBlank()) {
             searchJob?.cancel()
             searchEnrichJob?.cancel()
-            searchState = searchState.copy(
-                submittedQuery = "",
-                isLoading = false,
-                isAppending = false,
-                results = emptyList(),
-                cursor = "",
-                hasMore = false,
-                firstLoaded = false,
-                appendError = null,
-                error = "请输入影片名称"
-            )
+            searchState = blankSearchState(searchState)
             return
         }
         searchJob?.cancel()
         searchEnrichJob?.cancel()
         val requestVersion = ++searchRequestVersion
-        searchState = searchState.copy(
-            query = query,
-            submittedQuery = query,
-            isLoading = true,
-            isAppending = false,
-            cursor = "",
-            hasMore = true,
-            firstLoaded = false,
-            results = emptyList(),
-            appendError = null,
-            error = null
-        )
+        searchState = beginSearchState(searchState, query)
         searchJob = viewModelScope.launch searchLaunch@{
             try {
                 val firstPage = withContext(Dispatchers.IO) {
@@ -547,14 +520,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (requestVersion != searchRequestVersion) return@searchLaunch
 
                 searchHistoryStore.save(query)
-                searchState = searchState.copy(
-                    isLoading = false,
+                searchState = searchStateWithFirstPage(
+                    searchState = searchState,
                     history = searchHistoryStore.load(),
-                    results = firstPage.items,
-                    cursor = firstPage.nextCursor,
-                    hasMore = firstPage.hasMore,
-                    firstLoaded = true,
-                    error = null
+                    page = firstPage
                 )
 
                 if (firstPage.items.isNotEmpty()) {
@@ -563,17 +532,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             repository.enrichSearchResults(firstPage.items, limit = 8)
                         }
                         if (requestVersion != searchRequestVersion) return@searchEnrichLaunch
-                        searchState = searchState.copy(results = enrichedResults)
+                        searchState = searchStateWithEnrichedResults(searchState, enrichedResults)
                     }
                 }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
                 if (requestVersion != searchRequestVersion) return@searchLaunch
-                searchState = searchState.copy(
-                    isLoading = false,
-                    firstLoaded = true,
-                    error = toUserFacingMessage(error, "搜索失败")
+                searchState = searchStateWithError(
+                    searchState,
+                    toUserFacingMessage(error, "搜索失败")
                 )
             }
         }
@@ -591,23 +559,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         viewModelScope.launch {
-            searchState = searchState.copy(isAppending = true, appendError = null)
+            searchState = beginSearchAppend(searchState)
             runCatching {
                 withContext(Dispatchers.IO) {
                     repository.searchCursor(keyword = query, cursor = searchState.cursor)
                 }
             }.onSuccess { page ->
-                val mergedResults = (searchState.results + page.items).distinctBy { it.vodId }
-                searchState = searchState.copy(
-                    isAppending = false,
-                    results = mergedResults,
-                    cursor = page.nextCursor,
-                    hasMore = page.hasMore
-                )
+                searchState = searchStateWithAppendedPage(searchState, page)
             }.onFailure { error ->
-                searchState = searchState.copy(
-                    isAppending = false,
-                    appendError = toUserFacingMessage(error, "继续加载搜索结果失败")
+                searchState = searchStateWithAppendError(
+                    searchState,
+                    toUserFacingMessage(error, "继续加载搜索结果失败")
                 )
             }
         }
