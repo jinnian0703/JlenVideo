@@ -2901,52 +2901,6 @@ class AppleCmsRepository(
         )
     }
 
-    private fun AppleCmsResponse.toPagedVodItems(): PagedVodItems =
-        PagedVodItems(
-            items = list.distinctBy { it.vodId },
-            page = safePage,
-            pageCount = safePageCount,
-            totalItems = safeTotal,
-            limit = safeLimit,
-            hasNextPage = hasNextPage
-        )
-
-    private fun VideoApiEnvelope<VideoApiPagedRows<VodItem>>.toPagedVodItems(): PagedVodItems {
-        val payload = data ?: return PagedVodItems(
-            items = emptyList(),
-            page = 1,
-            pageCount = 1,
-            totalItems = 0,
-            limit = 0,
-            hasNextPage = false
-        )
-        val safePage = payload.page.coerceAtLeast(1)
-        val safePageCount = payload.totalPages.coerceAtLeast(safePage)
-        val items = payload.rows.distinctBy { it.vodId }
-        val safeLimit = payload.limit.coerceAtLeast(items.size)
-        val safeTotal = payload.total.coerceAtLeast(items.size)
-        return PagedVodItems(
-            items = items,
-            page = safePage,
-            pageCount = safePageCount,
-            totalItems = safeTotal,
-            limit = safeLimit,
-            hasNextPage = safePage < safePageCount
-        )
-    }
-
-    private fun VideoApiEnvelope<VideoApiPagedRows<VodItem>>.toCursorPagedVodItems(): CursorPagedVodItems {
-        val payload = data ?: return CursorPagedVodItems()
-        val items = payload.rows.distinctBy { it.vodId }
-        val nextCursor = payload.nextCursor.orEmpty().trim()
-        return CursorPagedVodItems(
-            items = items,
-            limit = payload.limit.coerceAtLeast(items.size),
-            nextCursor = nextCursor,
-            hasMore = payload.hasMore?.let { it != 0 } ?: nextCursor.isNotBlank()
-        )
-    }
-
     private fun parseUserCenterPageEnhanced(document: Document): UserCenterPage {
         val items = document.select("input[name='ids[]']")
             .mapNotNull { input ->

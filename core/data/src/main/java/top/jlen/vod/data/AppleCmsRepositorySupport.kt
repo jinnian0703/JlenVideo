@@ -493,6 +493,52 @@ internal fun parseAppCenterMembershipPlan(element: JsonElement): MembershipPlan?
     )
 }
 
+internal fun AppleCmsResponse.toPagedVodItems(): PagedVodItems =
+    PagedVodItems(
+        items = list.distinctBy { it.vodId },
+        page = safePage,
+        pageCount = safePageCount,
+        totalItems = safeTotal,
+        limit = safeLimit,
+        hasNextPage = hasNextPage
+    )
+
+internal fun VideoApiEnvelope<VideoApiPagedRows<VodItem>>.toPagedVodItems(): PagedVodItems {
+    val payload = data ?: return PagedVodItems(
+        items = emptyList(),
+        page = 1,
+        pageCount = 1,
+        totalItems = 0,
+        limit = 0,
+        hasNextPage = false
+    )
+    val safePage = payload.page.coerceAtLeast(1)
+    val safePageCount = payload.totalPages.coerceAtLeast(safePage)
+    val items = payload.rows.distinctBy { it.vodId }
+    val safeLimit = payload.limit.coerceAtLeast(items.size)
+    val safeTotal = payload.total.coerceAtLeast(items.size)
+    return PagedVodItems(
+        items = items,
+        page = safePage,
+        pageCount = safePageCount,
+        totalItems = safeTotal,
+        limit = safeLimit,
+        hasNextPage = safePage < safePageCount
+    )
+}
+
+internal fun VideoApiEnvelope<VideoApiPagedRows<VodItem>>.toCursorPagedVodItems(): CursorPagedVodItems {
+    val payload = data ?: return CursorPagedVodItems()
+    val items = payload.rows.distinctBy { it.vodId }
+    val nextCursor = payload.nextCursor.orEmpty().trim()
+    return CursorPagedVodItems(
+        items = items,
+        limit = payload.limit.coerceAtLeast(items.size),
+        nextCursor = nextCursor,
+        hasMore = payload.hasMore?.let { it != 0 } ?: nextCursor.isNotBlank()
+    )
+}
+
 data class HomePayload(
     val slides: List<VodItem>,
     val hot: List<VodItem>,
