@@ -4446,68 +4446,6 @@ class AppleCmsRepository(
         )
     }
 
-    private fun parseMembershipInfoFromUserCenter(root: JsonObject): MembershipInfo? {
-        val payload = unwrapUserCenterPayload(root)
-        val userObject = payload.firstObject("user", "member", "info", "member_info", "membership_info") ?: payload
-        val membershipObject = payload.firstObject(
-            "membership",
-            "member_info",
-            "membership_info",
-            "vip",
-            "group",
-            "current_group"
-        ) ?: userObject
-
-        val groupName = decodeSiteText(
-            payload.firstString(
-                "group_name",
-                "member_name",
-                "vip_name",
-                "current_group_name"
-            ).ifBlank {
-                membershipObject.firstString(
-                    "group_name",
-                    "member_name",
-                    "vip_name",
-                    "current_group_name",
-                    "group"
-                )
-            }.ifBlank {
-                userObject.firstString("group_name", "member_name", "vip_name", "group")
-            }
-        )
-        val points = decodeSiteText(
-            payload.firstString(
-                "user_points",
-                "points",
-                "score",
-                "integral",
-                "point_balance"
-            ).ifBlank {
-                membershipObject.firstString(
-                    "user_points",
-                    "points",
-                    "score",
-                    "integral",
-                    "point_balance"
-                )
-            }.ifBlank {
-                userObject.firstString("user_points", "points", "score", "integral")
-            }
-        )
-        val expiry = resolveMembershipExpiryText(payload, membershipObject, userObject)
-
-        if (groupName.isBlank() && points.isBlank() && expiry.isBlank()) {
-            return null
-        }
-
-        return MembershipInfo(
-            groupName = groupName,
-            points = points,
-            expiry = expiry
-        )
-    }
-
     private fun parseMembershipPlansFromHtml(document: Document): List<MembershipPlan> {
         val attributePlans = document.select(
             "[data-id][data-points][data-long], " +
