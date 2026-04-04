@@ -337,6 +337,65 @@ open class LegacyAppleCmsRuntimeRepository(
 
     internal fun runtimeNoticeCacheTtlMs(): Long = NOTICE_CACHE_TTL_MS
 
+    internal suspend fun runtimeFetchUserDocument(pathOrUrl: String): Document =
+        fetchUserDocument(pathOrUrl)
+
+    internal fun runtimeParseUserProfileFields(document: Document): List<Pair<String, String>> =
+        parseUserProfileFields(document)
+
+    internal fun runtimeParseUserProfileEditor(document: Document): UserProfileEditor =
+        parseUserProfileEditor(document)
+
+    internal fun runtimeParseUserProfileSession(document: Document): AuthSession =
+        parseUserProfileSession(document)
+
+    internal fun runtimeParseUserCenterPageEnhanced(document: Document): UserCenterPage =
+        parseUserCenterPageEnhanced(document)
+
+    internal suspend fun runtimeLoadUserProfileFromUserDetailApi(session: AuthSession): UserProfilePage =
+        loadUserProfileFromUserDetailApi(session)
+
+    internal suspend fun runtimeLoadUserProfileFromVideoMemberInfoApi(): UserProfilePage =
+        loadUserProfileFromVideoMemberInfoApi()
+
+    internal suspend fun runtimeLoadMembershipPageFromVideoMemberInfoApi(): MembershipPage =
+        loadMembershipPageFromVideoMemberInfoApi()
+
+    internal suspend fun runtimeLoadMembershipInfoFromUserDetailApi(userId: String): MembershipPage =
+        loadMembershipInfoFromUserDetailApi(userId)
+
+    internal suspend fun runtimeLoadMembershipPageFromUserCenterJson(): MembershipPage =
+        loadMembershipPageFromUserCenterJson()
+
+    internal suspend fun runtimeLoadMembershipPageFromAppCenter(): MembershipPage =
+        loadMembershipPageFromAppCenter()
+
+    internal suspend fun runtimeLoadMembershipPageFromHtml(): MembershipPage =
+        loadMembershipPageFromHtml()
+
+    internal suspend fun runtimeSubmitUserProfileToAppCenter(editor: UserProfileEditor): String =
+        submitUserProfileToAppCenter(editor)
+
+    internal suspend fun runtimeSubmitAppCenterUserProfileMutation(formBody: FormBody): String =
+        submitAppCenterUserProfileMutation(formBody)
+
+    internal suspend fun runtimeSubmitUserAction(
+        url: String,
+        referer: String,
+        formBody: FormBody
+    ): String = submitUserAction(url, referer, formBody)
+
+    internal suspend fun runtimeSubmitUserUlog(
+        siteVodId: String,
+        type: Int,
+        sid: String = "",
+        nid: String = ""
+    ): String = submitUserUlog(siteVodId, type, sid, nid)
+
+    internal fun runtimeResolveSiteLogId(item: VodItem): String = item.siteLogId
+
+    internal fun runtimeParsePlayRoute(episodePageUrl: String): PlayRoute? = parsePlayRoute(episodePageUrl)
+
     private fun clearMemoryCaches() = legacyClearMemoryCaches()
 
     private fun clearAllAppCaches() = legacyClearAllAppCaches()
@@ -1405,59 +1464,15 @@ open class LegacyAppleCmsRuntimeRepository(
         cookieJar.clear()
     }
 
-    suspend fun loadUserProfile(): UserProfilePage {
-        runCatching { loadUserProfileFromUserDetailApi(currentSession()) }
-            .getOrNull()
-            ?.let { return it }
-
-        runCatching { loadUserProfileFromVideoMemberInfoApi() }
-            .getOrNull()
-            ?.let { return it }
-
-        val profileDocument = fetchUserDocument("/index.php/user/index.html")
-        val editorDocument = fetchUserDocument("/index.php/user/info.html")
-        return UserProfilePage(
-            fields = parseUserProfileFields(profileDocument),
-            editor = parseUserProfileEditor(editorDocument),
-            session = parseUserProfileSession(profileDocument)
-        )
-    }
+    suspend fun loadUserProfile(): UserProfilePage = legacyLoadUserProfile()
 
     suspend fun loadFavoritePage(pageUrl: String? = null): UserCenterPage =
-        parseUserCenterPageEnhanced(
-            document = fetchUserDocument(pageUrl ?: "/index.php/user/favs.html")
-        )
+        legacyLoadFavoritePage(pageUrl)
 
     suspend fun loadHistoryPage(pageUrl: String? = null): UserCenterPage =
-        parseUserCenterPageEnhanced(
-            document = fetchUserDocument(pageUrl ?: "/index.php/user/plays.html")
-        )
+        legacyLoadHistoryPage(pageUrl)
 
-    suspend fun loadMembershipPage(): MembershipPage {
-        runCatching { loadMembershipPageFromVideoMemberInfoApi() }
-            .getOrNull()
-            ?.let { return it }
-
-        currentSession().userId
-            .takeIf(String::isNotBlank)
-            ?.let { userId ->
-                runCatching { loadMembershipInfoFromUserDetailApi(userId) }
-                    .getOrNull()
-                    ?.takeIf { it.info.groupName.isNotBlank() || it.info.points.isNotBlank() || it.info.expiry.isNotBlank() }
-                    ?.let { return it }
-            }
-
-        runCatching { loadMembershipPageFromUserCenterJson() }
-            .getOrNull()
-            ?.takeIf { it.info.groupName.isNotBlank() || it.info.points.isNotBlank() || it.info.expiry.isNotBlank() || it.plans.isNotEmpty() }
-            ?.let { return it }
-
-        runCatching { loadMembershipPageFromAppCenter() }
-            .getOrNull()
-            ?.let { return it }
-
-        return loadMembershipPageFromHtml()
-    }
+    suspend fun loadMembershipPage(): MembershipPage = legacyLoadMembershipPage()
 
     private suspend fun loadMembershipPageFromHtml(): MembershipPage {
         val document = fetchUserDocument("/index.php/user/upgrade.html")
@@ -1476,27 +1491,8 @@ open class LegacyAppleCmsRuntimeRepository(
         )
     }
 
-    suspend fun saveUserProfile(editor: UserProfileEditor): String {
-        runCatching { submitUserProfileToAppCenter(editor) }
-            .getOrNull()
-            ?.let { return it }
-
-        val form = FormBody.Builder()
-            .add("user_pwd", editor.currentPassword)
-            .add("user_pwd1", editor.newPassword)
-            .add("user_pwd2", editor.confirmPassword)
-            .add("user_qq", editor.qq)
-            .add("user_email", editor.email)
-            .add("user_phone", editor.phone)
-            .add("user_question", editor.question)
-            .add("user_answer", editor.answer)
-            .build()
-        return submitUserAction(
-            url = "$baseUrl/index.php/user/info",
-            referer = "$baseUrl/index.php/user/info.html",
-            formBody = form
-        )
-    }
+    suspend fun saveUserProfile(editor: UserProfileEditor): String =
+        legacySaveUserProfile(editor)
 
     private suspend fun loadUserProfileFromAppCenter(): UserProfilePage {
         val snapshot = loadAppCenterUserSnapshot()
@@ -1588,90 +1584,16 @@ open class LegacyAppleCmsRuntimeRepository(
             ?: throw IOException("浼氬憳淇℃伅涓虹┖")
     }
 
-    suspend fun sendEmailBindCode(email: String): String {
-        runCatching {
-            submitAppCenterUserProfileMutation(
-                FormBody.Builder()
-                    .add("ac", "email")
-                    .add("to", email.trim())
-                    .add("op", "send_bind_code")
-                    .add("action", "send_bind_code")
-                    .build()
-            )
-        }.getOrNull()?.let { return it }
+    suspend fun sendEmailBindCode(email: String): String = legacySendEmailBindCode(email)
 
-        val form = FormBody.Builder()
-            .add("ac", "email")
-            .add("to", email.trim())
-            .build()
-        return submitUserAction(
-            url = "$baseUrl/index.php/user/bindmsg",
-            referer = "$baseUrl/index.php/user/bind?ac=email",
-            formBody = form
-        )
-    }
+    suspend fun bindEmail(email: String, code: String): String = legacyBindEmail(email, code)
 
-    suspend fun bindEmail(email: String, code: String): String {
-        runCatching {
-            submitAppCenterUserProfileMutation(
-                FormBody.Builder()
-                    .add("ac", "email")
-                    .add("to", email.trim())
-                    .add("code", code.trim())
-                    .add("op", "bind_email")
-                    .add("action", "bind_email")
-                    .build()
-            )
-        }.getOrNull()?.let { return it }
+    suspend fun unbindEmail(): String = legacyUnbindEmail()
 
-        val form = FormBody.Builder()
-            .add("ac", "email")
-            .add("to", email.trim())
-            .add("code", code.trim())
-            .build()
-        return submitUserAction(
-            url = "$baseUrl/index.php/user/bind",
-            referer = "$baseUrl/index.php/user/bind?ac=email",
-            formBody = form
-        )
-    }
+    suspend fun addFavorite(item: VodItem): String = legacyAddFavorite(item)
 
-    suspend fun unbindEmail(): String {
-        runCatching {
-            submitAppCenterUserProfileMutation(
-                FormBody.Builder()
-                    .add("ac", "email")
-                    .add("op", "unbind_email")
-                    .add("action", "unbind_email")
-                    .build()
-            )
-        }.getOrNull()?.let { return it }
-
-        val form = FormBody.Builder()
-            .add("ac", "email")
-            .build()
-        return submitUserAction(
-            url = "$baseUrl/index.php/user/unbind",
-            referer = "$baseUrl/index.php/user/info.html",
-            formBody = form
-        )
-    }
-
-    suspend fun addFavorite(item: VodItem): String =
-        submitUserUlog(
-            siteVodId = item.siteLogId,
-            type = 2
-        )
-
-    suspend fun addPlayRecord(item: VodItem, episodePageUrl: String): String {
-        val route = parsePlayRoute(episodePageUrl)
-        return submitUserUlog(
-            siteVodId = item.siteLogId,
-            type = 4,
-            sid = route?.sid.orEmpty(),
-            nid = route?.nid.orEmpty()
-        )
-    }
+    suspend fun addPlayRecord(item: VodItem, episodePageUrl: String): String =
+        legacyAddPlayRecord(item, episodePageUrl)
 
     private suspend fun submitUserUlog(
         siteVodId: String,
@@ -1715,41 +1637,10 @@ open class LegacyAppleCmsRuntimeRepository(
             return "操作成功"
         }
     }
-    suspend fun deleteUserRecord(recordIds: List<String>, type: Int, clearAll: Boolean): String {
-        val form = FormBody.Builder()
-            .add("ids", recordIds.joinToString(","))
-            .add("type", type.toString())
-            .add("all", if (clearAll) "1" else "0")
-            .build()
-        return submitUserAction(
-            url = "$baseUrl/index.php/user/ulog_del",
-            referer = "$baseUrl/index.php/user/${if (type == 2) "favs" else "plays"}.html",
-            formBody = form
-        )
-    }
+    suspend fun deleteUserRecord(recordIds: List<String>, type: Int, clearAll: Boolean): String =
+        legacyDeleteUserRecord(recordIds, type, clearAll)
 
-    suspend fun upgradeMembership(plan: MembershipPlan): String {
-        runCatching {
-            submitAppCenterUserProfileMutation(
-                FormBody.Builder()
-                    .add("group_id", plan.groupId)
-                    .add("long", plan.duration)
-                    .add("op", "upgrade_membership")
-                    .add("action", "upgrade_membership")
-                    .build()
-            )
-        }.getOrNull()?.let { return it }
-
-        val form = FormBody.Builder()
-            .add("group_id", plan.groupId)
-            .add("long", plan.duration)
-            .build()
-        return submitUserAction(
-            url = "$baseUrl/index.php/user/upgrade",
-            referer = "$baseUrl/index.php/user/upgrade.html",
-            formBody = form
-        )
-    }
+    suspend fun upgradeMembership(plan: MembershipPlan): String = legacyUpgradeMembership(plan)
 
     suspend fun loginForApp(userName: String, password: String): AuthSession {
         val body = executeUserRequest(
