@@ -1,6 +1,5 @@
 package top.jlen.vod.ui
 
-import kotlin.math.abs
 import top.jlen.vod.data.PlaySource
 import top.jlen.vod.data.VodItem
 
@@ -66,33 +65,3 @@ internal fun updatePlayerSourceSelection(
         playbackSnapshot = PlaybackSnapshot()
     )
 }
-
-internal fun applyDetectedStream(
-    playerState: PlayerUiState,
-    streamUrl: String
-): PlayerUiState? {
-    if (streamUrl.isBlank()) return null
-    return playerState.copy(
-        resolvedUrl = streamUrl,
-        isResolving = false,
-        useWebPlayer = false,
-        resolveError = null
-    )
-}
-
-internal fun applyTakeoverFailure(
-    playerState: PlayerUiState,
-    message: String
-): PlayerUiState = playerState.copy(
-    isResolving = false,
-    useWebPlayer = false,
-    resolveError = message.ifBlank { "该线路暂不支持，请换个线路试试" }
-)
-
-internal fun hasMeaningfulPlaybackChange(
-    currentSnapshot: PlaybackSnapshot,
-    incomingSnapshot: PlaybackSnapshot
-): Boolean =
-    abs(incomingSnapshot.positionMs - currentSnapshot.positionMs) >= UiMotion.SnapshotPositionThresholdMillis ||
-        abs(incomingSnapshot.speed - currentSnapshot.speed) > 0.01f ||
-        incomingSnapshot.playWhenReady != currentSnapshot.playWhenReady
