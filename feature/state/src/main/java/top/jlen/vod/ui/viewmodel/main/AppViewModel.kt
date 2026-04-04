@@ -72,20 +72,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshAccount() {
         val session = repository.currentSession()
-        accountState = if (session.isLoggedIn) {
-            accountState.copy(
-                session = mergeAccountSession(session, accountState.session),
-                error = null
-            )
-        } else {
-            AccountUiState(
-                userName = accountState.userName,
-                session = session,
-                updateInfo = accountState.updateInfo,
-                hasCrashLog = accountState.hasCrashLog,
-                latestCrashLog = accountState.latestCrashLog
-            )
-        }
+        accountState = refreshedAccountState(accountState, session)
         if (session.isLoggedIn) {
             if (hasEnteredAccountScreen) {
                 hydrateAccountSession()
@@ -107,29 +94,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             runCatching {
                 withContext(Dispatchers.IO) { repository.loadUserProfileForApp() }
             }.onSuccess { page ->
-                accountState = accountState.copy(
-                    session = mergeAccountSession(page.session, accountState.session)
-                )
+                accountState = accountStateWithHydratedSession(accountState, page.session)
             }
         }
     }
 
     fun refreshCrashLog() {
         val latestCrashLog = CrashLogger.readLatest(getApplication())
-        accountState = accountState.copy(
-            hasCrashLog = latestCrashLog.isNotBlank(),
-            latestCrashLog = latestCrashLog
-        )
+        accountState = accountStateWithCrashLog(accountState, latestCrashLog)
     }
 
     fun clearCrashLog() {
         CrashLogger.clear(getApplication())
-        accountState = accountState.copy(
-            hasCrashLog = false,
-            latestCrashLog = "",
-            message = "已清空崩溃日志",
-            error = null
-        )
+        accountState = accountStateAfterCrashLogCleared(accountState)
     }
 
     fun checkAppUpdate() {
