@@ -156,6 +156,25 @@ internal fun normalizeLoginFailureMessage(rawMessage: String): String {
     }
 }
 
+internal fun parsePortraitUploadResult(json: JsonObject): String {
+    val code = json.firstInt("code", "status")
+    val message = json.firstString("msg", "message")
+    if (code == 401 || message.equals("login required", ignoreCase = true) || isLoginMessage(message)) {
+        throw IOException("璇峰厛鐧诲綍")
+    }
+    if (code != null && code !in setOf(1, 200)) {
+        throw IOException(message.ifBlank { "澶村儚涓婁紶澶辫触" })
+    }
+    val payload = unwrapApiPayload(json)
+    val portrait = payload?.firstString("user_portrait_with_version", "user_portrait", "portrait", "avatar")
+        .orEmpty()
+    return if (portrait.isNotBlank() || message.isBlank() || message.equals("ok", ignoreCase = true)) {
+        "澶村儚鏇存柊鎴愬姛"
+    } else {
+        message
+    }
+}
+
 internal fun decodePlayerUrl(rawUrl: String, encrypt: Int): String {
     val cleaned = rawUrl.trim().replace("\\/", "/")
     if (cleaned.isBlank()) return ""

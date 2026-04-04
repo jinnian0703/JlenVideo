@@ -106,6 +106,15 @@ internal data class HistoryResumeSelection(
     val episodeIndex: Int
 )
 
+internal fun resolveHistoryVodId(item: UserCenterItem): String =
+    item.vodId.ifBlank {
+        Regex("""/vodplay/([^/]+?)-\d+-\d+(?:\.html)?/?(?:\?.*)?$""")
+            .find(item.playUrl.ifBlank { item.actionUrl })
+            ?.groupValues
+            ?.getOrNull(1)
+            .orEmpty()
+    }
+
 internal fun resolveHistoryResumeSelection(
     item: UserCenterItem,
     sources: List<PlaySource>

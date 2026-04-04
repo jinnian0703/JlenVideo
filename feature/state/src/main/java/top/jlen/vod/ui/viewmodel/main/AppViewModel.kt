@@ -1112,13 +1112,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openHistoryRecord(item: UserCenterItem) {
-        val resolvedVodId = item.vodId.ifBlank {
-            Regex("""/vodplay/([^/]+?)-\d+-\d+(?:\.html)?/?(?:\?.*)?$""")
-                .find(item.playUrl.ifBlank { item.actionUrl })
-                ?.groupValues
-                ?.getOrNull(1)
-                .orEmpty()
-        }
+        val resolvedVodId = resolveHistoryVodId(item)
 
         if (resolvedVodId.isBlank()) {
             openHistoryRecordDirectly(item)
@@ -1162,24 +1156,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resumeHistoryRecord(item: UserCenterItem) {
-        val resolvedVodId = item.vodId.ifBlank {
-            Regex("""/vodplay/([^/]+?)-\d+-\d+(?:\.html)?/?(?:\?.*)?$""")
-                .find(item.playUrl.ifBlank { item.actionUrl })
-                ?.groupValues
-                ?.getOrNull(1)
-                .orEmpty()
-        }
+        val resolvedVodId = resolveHistoryVodId(item)
 
         if (resolvedVodId.isBlank()) {
             openHistoryRecordDirectly(item)
             return
         }
 
-        playerState = PlayerUiState(
-            title = item.title,
-            isResolving = true,
-            resolveError = null
-        )
+        playerState = resolvingHistoryPlayerState(item.title)
 
         viewModelScope.launch {
             runCatching {
