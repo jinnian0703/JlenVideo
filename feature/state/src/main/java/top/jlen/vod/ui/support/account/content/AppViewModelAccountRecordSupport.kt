@@ -1,31 +1,13 @@
 package top.jlen.vod.ui
 
-import top.jlen.vod.data.AuthSession
-import top.jlen.vod.data.MembershipPage
 import top.jlen.vod.data.UserCenterItem
 import top.jlen.vod.data.UserCenterPage
-import top.jlen.vod.data.UserProfilePage
 
 internal fun mergeAccountItems(
     current: List<UserCenterItem>,
     incoming: List<UserCenterItem>
 ): List<UserCenterItem> = (current + incoming)
     .distinctBy { item -> "${item.recordId}:${item.actionUrl}:${item.vodId}" }
-
-internal fun selectAccountSectionState(
-    accountState: AccountUiState,
-    section: AccountSection
-): AccountUiState = accountState.copy(selectedSection = section, error = null, message = null)
-
-internal fun accountStateWithProfilePage(
-    accountState: AccountUiState,
-    page: UserProfilePage
-): AccountUiState = accountState.copy(
-    isContentLoading = false,
-    profileFields = page.fields,
-    profileEditor = page.editor,
-    session = mergeAccountSession(page.session, accountState.session)
-)
 
 internal fun accountStateWithFavoritePage(
     accountState: AccountUiState,
@@ -56,23 +38,6 @@ internal fun accountStateWithHistoryPage(
             historyNextPageUrl = page.nextPageUrl
         ),
         mergedItems = mergedItems
-    )
-}
-
-internal fun accountStateWithMembershipPage(
-    accountState: AccountUiState,
-    page: MembershipPage,
-    currentSession: AuthSession
-): AccountUiState {
-    val refreshedSession = mergeAccountSession(currentSession, accountState.session)
-        .let { session -> session.copy(groupName = page.info.groupName.ifBlank { session.groupName }) }
-    return accountState.copy(
-        isContentLoading = false,
-        session = refreshedSession,
-        membershipInfo = page.info.copy(
-            groupName = page.info.groupName.ifBlank { refreshedSession.groupName }
-        ),
-        membershipPlans = page.plans
     )
 }
 
