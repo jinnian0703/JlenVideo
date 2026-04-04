@@ -21,6 +21,11 @@ import top.jlen.vod.data.VodItem
 internal fun searchStateWithQuery(searchState: SearchUiState, query: String): SearchUiState =
     searchState.copy(query = query, error = null)
 
+internal fun searchStateWithHistory(
+    searchState: SearchUiState,
+    history: List<String>
+): SearchUiState = searchState.copy(history = history)
+
 internal fun startHotSearchLoading(searchState: SearchUiState): SearchUiState =
     searchState.copy(isHotSearchLoading = true, hotSearchError = null)
 

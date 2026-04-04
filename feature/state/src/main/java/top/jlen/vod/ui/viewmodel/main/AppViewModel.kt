@@ -63,7 +63,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     init {
-        searchState = searchState.copy(history = searchHistoryStore.load())
+        searchState = searchStateWithHistory(searchState, searchHistoryStore.load())
         refreshCrashLog()
         refreshAccount()
         refreshHome()
@@ -359,7 +359,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearSearchHistory() {
         searchHistoryStore.clear()
-        searchState = searchState.copy(history = emptyList())
+        searchState = searchStateWithHistory(searchState, emptyList())
     }
 
     fun search(keyword: String) {
