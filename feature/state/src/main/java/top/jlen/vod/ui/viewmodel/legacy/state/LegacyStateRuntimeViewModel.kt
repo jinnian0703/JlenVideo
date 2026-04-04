@@ -62,6 +62,26 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
     var accountState by mutableStateOf(AccountUiState())
         private set
 
+    internal fun legacyRepository(): AppleCmsRepository = repository
+
+    internal fun currentAccountState(): AccountUiState = accountState
+
+    internal fun updateAccountState(value: AccountUiState) {
+        accountState = value
+    }
+
+    internal fun currentNoticeState(): NoticeUiState = noticeState
+
+    internal fun updateNoticeState(value: NoticeUiState) {
+        noticeState = value
+    }
+
+    internal fun hasEnteredAccountScreenFlag(): Boolean = hasEnteredAccountScreen
+
+    internal fun markAccountScreenEntered() {
+        hasEnteredAccountScreen = true
+    }
+
     init {
         searchState = searchStateWithHistory(searchState, searchHistoryStore.load())
         refreshCrashLog()
@@ -70,111 +90,23 @@ open class LegacyStateRuntimeViewModel(application: Application) : AndroidViewMo
         checkAppUpdate()
     }
 
-    fun refreshAccount() {
-        val session = repository.currentSession()
-        accountState = refreshedAccountState(accountState, session)
-        if (session.isLoggedIn) {
-            if (hasEnteredAccountScreen) {
-                hydrateAccountSession()
-                selectAccountSection(accountState.selectedSection, forceRefresh = true)
-            }
-        }
-    }
+    fun refreshAccount() = legacyRefreshAccount()
 
-    fun ensureAccountScreenReady() {
-        if (hasEnteredAccountScreen) return
-        hasEnteredAccountScreen = true
-        if (!accountState.session.isLoggedIn) return
-        hydrateAccountSession()
-        selectAccountSection(accountState.selectedSection, forceRefresh = true)
-    }
+    fun ensureAccountScreenReady() = legacyEnsureAccountScreenReady()
 
-    private fun hydrateAccountSession() {
-        viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) { repository.loadUserProfileForApp() }
-            }.onSuccess { page ->
-                accountState = accountStateWithHydratedSession(accountState, page.session)
-            }
-        }
-    }
+    private fun hydrateAccountSession() = legacyHydrateAccountSession()
 
-    fun refreshCrashLog() {
-        val latestCrashLog = CrashLogger.readLatest(getApplication())
-        accountState = accountStateWithCrashLog(accountState, latestCrashLog)
-    }
+    fun refreshCrashLog() = legacyRefreshCrashLog()
 
-    fun clearCrashLog() {
-        CrashLogger.clear(getApplication())
-        accountState = accountStateAfterCrashLogCleared(accountState)
-    }
+    fun clearCrashLog() = legacyClearCrashLog()
 
-    fun checkAppUpdate() {
-        if (accountState.isUpdateLoading) return
-        viewModelScope.launch {
-            accountState = beginUpdateCheck(accountState)
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    repository.loadLatestRelease(AppRuntimeInfo.versionName)
-                }
-            }.onSuccess { updateInfo ->
-                accountState = accountStateWithUpdateInfo(accountState, updateInfo)
-            }.onFailure {
-                accountState = accountStateWithUpdateError(accountState)
-            }
-        }
-    }
+    fun checkAppUpdate() = legacyCheckAppUpdate()
 
-    fun refreshNotices(forceRefresh: Boolean = false) {
-        if (noticeState.isLoading && !forceRefresh) return
-        val userId = accountState.session.userId
-        viewModelScope.launch {
-            noticeState = beginNoticeRefresh(noticeState)
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    repository.loadNotices(
-                        appVersion = AppRuntimeInfo.versionName,
-                        userId = userId,
-                        forceRefresh = forceRefresh
-                    )
-                }
-            }.onSuccess { notices ->
-                val unreadNoticeIds = repository.unreadActiveNoticeIds(notices)
-                noticeState = noticeStateWithLoadedNotices(
-                    noticeState = noticeState,
-                    notices = notices,
-                    unreadNoticeIds = unreadNoticeIds,
-                    pendingNotice = repository.pickPendingNotice(notices)
-                )
-            }.onFailure { error ->
-                noticeState = noticeStateWithRefreshError(
-                    noticeState = noticeState,
-                    errorMessage = toUserFacingMessage(error, "公告加载失败", serviceLabel = "公告服务")
-                )
-            }
-        }
-    }
+    fun refreshNotices(forceRefresh: Boolean = false) = legacyRefreshNotices(forceRefresh)
 
-    fun dismissNoticeDialog() {
-        val dismissedNotice = noticeState.dialogNotice
-        dismissedNotice?.let(repository::markNoticeDismissed)
-        noticeState = noticeStateAfterDialogDismiss(
-            noticeState = noticeState,
-            unreadNoticeIds = repository.unreadActiveNoticeIds(noticeState.notices)
-        )
-    }
+    fun dismissNoticeDialog() = legacyDismissNoticeDialog()
 
-    fun markNoticeOpened(noticeId: String) {
-        val normalized = noticeId.trim()
-        noticeState.notices
-            .firstOrNull { it.id == normalized }
-            ?.let(repository::markNoticeDismissed)
-        noticeState = noticeStateAfterNoticeOpened(
-            noticeState = noticeState,
-            noticeId = normalized,
-            unreadNoticeIds = repository.unreadActiveNoticeIds(noticeState.notices)
-        )
-    }
+    fun markNoticeOpened(noticeId: String) = legacyMarkNoticeOpened(noticeId)
 
     fun findNotice(noticeId: String): AppNotice? =
         noticeState.notices.firstOrNull { it.id == noticeId }
