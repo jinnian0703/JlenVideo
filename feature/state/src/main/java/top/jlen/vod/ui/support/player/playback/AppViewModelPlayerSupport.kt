@@ -12,6 +12,7 @@ import top.jlen.vod.data.CursorPagedVodItems
 import top.jlen.vod.data.HomePayload
 import top.jlen.vod.data.MembershipPage
 import top.jlen.vod.data.PlaySource
+import top.jlen.vod.data.ResolvedPlayUrl
 import top.jlen.vod.data.UserCenterPage
 import top.jlen.vod.data.UserCenterItem
 import top.jlen.vod.data.UserProfilePage
@@ -138,3 +139,110 @@ internal fun syncPlayerStateFromFullscreen(
         shouldResolveCurrentUrl = result.resolvedUrl.isBlank() && safeEpisodeIndex != previousEpisodeIndex
     )
 }
+
+internal data class RefreshedPlayerState(
+    val playerState: PlayerUiState,
+    val sourcesChanged: Boolean,
+    val episodeChanged: Boolean
+)
+
+internal fun playerStateWithRefreshedSources(
+    playerState: PlayerUiState,
+    detailItem: VodItem,
+    refreshedSources: List<PlaySource>,
+    currentSourceName: String,
+    currentEpisodeUrl: String,
+    currentEpisodeName: String
+): RefreshedPlayerState {
+    val previousSources = playerState.sources
+    val resolvedSourceIndex = when {
+        refreshedSources.isEmpty() -> 0
+        else -> {
+            val matchedByName = refreshedSources.indexOfFirst { it.name == currentSourceName }
+            when {
+                matchedByName >= 0 -> matchedByName
+                else -> playerState.selectedSourceIndex.coerceIn(0, refreshedSources.lastIndex)
+            }
+        }
+    }
+    val resolvedEpisodes = refreshedSources.getOrNull(resolvedSourceIndex)?.episodes.orEmpty()
+    val resolvedEpisodeIndex = when {
+        resolvedEpisodes.isEmpty() -> 0
+        else -> {
+            val matchedByUrl = resolvedEpisodes.indexOfFirst { it.url == currentEpisodeUrl }
+            val matchedByName = resolvedEpisodes.indexOfFirst { it.name == currentEpisodeName }
+            when {
+                matchedByUrl >= 0 -> matchedByUrl
+                matchedByName >= 0 -> matchedByName
+                else -> playerState.selectedEpisodeIndex.coerceIn(0, resolvedEpisodes.lastIndex)
+            }
+        }
+    }
+    val refreshedEpisodeUrl = resolvedEpisodes.getOrNull(resolvedEpisodeIndex)?.url.orEmpty()
+    val sourcesChanged = previousSources != refreshedSources
+    val episodeChanged = refreshedEpisodeUrl != currentEpisodeUrl
+    return RefreshedPlayerState(
+        playerState = playerState.copy(
+            title = detailItem.displayTitle,
+            item = detailItem,
+            sources = refreshedSources,
+            selectedSourceIndex = resolvedSourceIndex,
+            selectedEpisodeIndex = resolvedEpisodeIndex,
+            playbackSnapshot = if (episodeChanged) PlaybackSnapshot() else playerState.playbackSnapshot,
+            resolveError = if (refreshedSources.isEmpty()) "暂无可播放线路" else null
+        ),
+        sourcesChanged = sourcesChanged,
+        episodeChanged = episodeChanged
+    )
+}
+
+internal fun playerStateWithoutPlayableSource(playerState: PlayerUiState): PlayerUiState =
+    playerState.copy(
+        isResolving = false,
+        resolvedUrl = "",
+        useWebPlayer = false
+    )
+
+internal fun playerStateAfterSourceRefresh(playerState: PlayerUiState): PlayerUiState =
+    playerState.copy(
+        isResolving = false,
+        useWebPlayer = false,
+        resolveError = null
+    )
+
+internal fun playerStateWithoutEpisode(title: String): PlayerUiState =
+    PlayerUiState(
+        title = title,
+        isResolving = false,
+        resolvedUrl = "",
+        useWebPlayer = false,
+        resolveError = "暂无可播放地址"
+    )
+
+internal fun beginPlayerResolution(playerState: PlayerUiState): PlayerUiState =
+    playerState.copy(
+        isResolving = true,
+        resolvedUrl = "",
+        useWebPlayer = false,
+        resolveError = null
+    )
+
+internal fun playerStateWithResolvedUrl(
+    playerState: PlayerUiState,
+    resolved: ResolvedPlayUrl
+): PlayerUiState = playerState.copy(
+    isResolving = false,
+    resolvedUrl = resolved.url,
+    useWebPlayer = resolved.useWebPlayer,
+    resolveError = if (resolved.url.isBlank()) "解析播放地址失败" else null
+)
+
+internal fun playerStateWithWebFallback(
+    playerState: PlayerUiState,
+    episodePageUrl: String
+): PlayerUiState = playerState.copy(
+    isResolving = false,
+    resolvedUrl = episodePageUrl,
+    useWebPlayer = true,
+    resolveError = "该线路暂不支持，请换个线路试试"
+)

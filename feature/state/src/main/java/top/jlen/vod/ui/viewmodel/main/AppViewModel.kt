@@ -1298,61 +1298,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val refreshedSources = repository.parseSources(detailItem)
-                val previousSources = playerState.sources
-                val resolvedSourceIndex = when {
-                    refreshedSources.isEmpty() -> 0
-                    else -> {
-                        val matchedByName = refreshedSources.indexOfFirst { it.name == currentSourceName }
-                        when {
-                            matchedByName >= 0 -> matchedByName
-                            else -> playerState.selectedSourceIndex.coerceIn(0, refreshedSources.lastIndex)
-                        }
-                    }
-                }
-                val resolvedEpisodes = refreshedSources.getOrNull(resolvedSourceIndex)?.episodes.orEmpty()
-                val resolvedEpisodeIndex = when {
-                    resolvedEpisodes.isEmpty() -> 0
-                    else -> {
-                        val matchedByUrl = resolvedEpisodes.indexOfFirst { it.url == currentEpisodeUrl }
-                        val matchedByName = resolvedEpisodes.indexOfFirst { it.name == currentEpisodeName }
-                        when {
-                            matchedByUrl >= 0 -> matchedByUrl
-                            matchedByName >= 0 -> matchedByName
-                            else -> playerState.selectedEpisodeIndex.coerceIn(0, resolvedEpisodes.lastIndex)
-                        }
-                    }
-                }
-                val refreshedEpisodeUrl = resolvedEpisodes.getOrNull(resolvedEpisodeIndex)?.url.orEmpty()
-                val sourcesChanged = previousSources != refreshedSources
-                val episodeChanged = refreshedEpisodeUrl != currentEpisodeUrl
-
-                playerState = playerState.copy(
-                    title = detailItem.displayTitle,
-                    item = detailItem,
-                    sources = refreshedSources,
-                    selectedSourceIndex = resolvedSourceIndex,
-                    selectedEpisodeIndex = resolvedEpisodeIndex,
-                    playbackSnapshot = if (episodeChanged) PlaybackSnapshot() else playerState.playbackSnapshot,
-                    resolveError = if (refreshedSources.isEmpty()) "暂无可播放线路" else null
+                val refreshedState = playerStateWithRefreshedSources(
+                    playerState = playerState,
+                    detailItem = detailItem,
+                    refreshedSources = refreshedSources,
+                    currentSourceName = currentSourceName,
+                    currentEpisodeUrl = currentEpisodeUrl,
+                    currentEpisodeName = currentEpisodeName
                 )
+                playerState = refreshedState.playerState
 
                 if (refreshedSources.isEmpty()) {
-                    playerState = playerState.copy(
-                        isResolving = false,
-                        resolvedUrl = "",
-                        useWebPlayer = false
-                    )
+                    playerState = playerStateWithoutPlayableSource(playerState)
                     return@onSuccess
                 }
 
-                if (episodeChanged || playerState.resolvedUrl.isBlank()) {
+                if (refreshedState.episodeChanged || playerState.resolvedUrl.isBlank()) {
                     resolveCurrentPlayerUrl()
-                } else if (sourcesChanged) {
-                    playerState = playerState.copy(
-                        isResolving = false,
-                        useWebPlayer = false,
-                        resolveError = null
-                    )
+                } else if (refreshedState.sourcesChanged) {
+                    playerState = playerStateAfterSourceRefresh(playerState)
                 }
             }
         }
@@ -1440,40 +1404,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun resolveCurrentPlayerUrl() {
         val currentEpisode = playerState.currentEpisode ?: run {
-            playerState = playerState.copy(
-                isResolving = false,
-                resolvedUrl = "",
-                useWebPlayer = false,
-                resolveError = "暂无可播放地址"
-            )
+            playerState = playerStateWithoutEpisode(playerState.title)
             return
         }
         val episodePageUrl = currentEpisode.url
-        playerState = playerState.copy(
-            isResolving = true,
-            resolvedUrl = "",
-            useWebPlayer = false,
-            resolveError = null
-        )
+        playerState = beginPlayerResolution(playerState)
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) { repository.resolvePlayUrl(episodePageUrl) }
             }.onSuccess { resolved ->
                 if (playerState.currentEpisode?.url != episodePageUrl) return@onSuccess
-                playerState = playerState.copy(
-                    isResolving = false,
-                    resolvedUrl = resolved.url,
-                    useWebPlayer = resolved.useWebPlayer,
-                    resolveError = if (resolved.url.isBlank()) "解析播放地址失败" else null
-                )
+                playerState = playerStateWithResolvedUrl(playerState, resolved)
             }.onFailure {
                 if (playerState.currentEpisode?.url != episodePageUrl) return@onFailure
-                playerState = playerState.copy(
-                    isResolving = false,
-                    resolvedUrl = episodePageUrl,
-                    useWebPlayer = true,
-                    resolveError = "该线路暂不支持，请换个线路试试"
-                )
+                playerState = playerStateWithWebFallback(playerState, episodePageUrl)
             }
         }
     }
