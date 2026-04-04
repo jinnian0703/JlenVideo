@@ -2070,34 +2070,6 @@ class AppleCmsRepository(
         }
     }
 
-    private suspend fun collectAllUserCenterItems(
-        loader: suspend (String?) -> UserCenterPage
-    ): List<UserCenterItem> {
-        val items = mutableListOf<UserCenterItem>()
-        var nextPageToken: String? = null
-        do {
-            val page = loader(nextPageToken)
-            items += page.items
-            nextPageToken = page.nextPageUrl
-        } while (!nextPageToken.isNullOrBlank())
-        return items
-    }
-
-    private fun parseUserCenterApiPage(pageUrl: String?, prefix: String): Int {
-        val raw = pageUrl.orEmpty().trim()
-        if (raw.startsWith("$prefix:")) {
-            return raw.substringAfter(':').toIntOrNull()?.coerceAtLeast(1) ?: 1
-        }
-        return Uri.parse(raw.ifBlank { "https://localhost/" })
-            .getQueryParameter("page")
-            ?.toIntOrNull()
-            ?.coerceAtLeast(1)
-            ?: 1
-    }
-
-    private fun buildUserCenterNextPage(prefix: String, page: Int, totalPages: Int): String? =
-        if (page < totalPages) "$prefix:${page + 1}" else null
-
     private fun parseFavoritePageFromApi(json: JsonObject, page: Int): UserCenterPage {
         extractVideoApiMessage(json, "加载收藏失败")
         val data = unwrapApiPayload(json) ?: return UserCenterPage()
@@ -5079,25 +5051,6 @@ class AppleCmsRepository(
         return formatMembershipExpiry(rawValue)
     }
 
-    private fun mergeMembershipPages(base: MembershipPage, fallback: MembershipPage?): MembershipPage {
-        if (fallback == null) return base
-        return MembershipPage(
-            info = MembershipInfo(
-                groupName = base.info.groupName.ifBlank { fallback.info.groupName },
-                points = base.info.points.ifBlank { fallback.info.points },
-                expiry = base.info.expiry.ifBlank { fallback.info.expiry }
-            ),
-            plans = (base.plans + fallback.plans)
-                .filter { plan ->
-                    plan.groupId.isNotBlank() ||
-                        plan.groupName.isNotBlank() ||
-                        plan.duration.isNotBlank() ||
-                        plan.points.isNotBlank()
-                }
-                .distinctBy { "${it.groupId}:${it.groupName}:${it.duration}:${it.points}" }
-        )
-    }
-
     private fun parsePlayRoute(episodePageUrl: String): PlayRoute? {
         val normalized = resolveUrl(episodePageUrl)
         val match = Regex("""/vodplay/[^/]+?-(\d+)-(\d+)(?:\.html)?/?(?:\?.*)?$""")
@@ -5143,27 +5096,6 @@ class AppleCmsRepository(
             normalized.contains("未登录") ||
             normalized.contains("登录失效") ||
             normalized.contains("login required", ignoreCase = true)
-    }
-
-    private fun parseAppCenterMembershipPlan(element: JsonElement): MembershipPlan? {
-        val obj = element.takeIf { it.isJsonObject }?.asJsonObject ?: return null
-        val groupId = obj.firstString("group_id", "id", "gid", "groupId")
-        val groupName = decodeSiteText(obj.firstString("group_name", "name", "title", "label"))
-        val duration = decodeSiteText(
-            obj.firstString("duration", "long", "period", "days", "months", "month_label", "long_name")
-        )
-        val points = decodeSiteText(
-            obj.firstString("points", "need_points", "cost_points", "price", "score")
-        )
-        if (groupId.isBlank() && groupName.isBlank() && duration.isBlank() && points.isBlank()) {
-            return null
-        }
-        return MembershipPlan(
-            groupId = groupId,
-            groupName = groupName,
-            duration = duration,
-            points = points
-        )
     }
 
     private fun extractLabeledValues(
