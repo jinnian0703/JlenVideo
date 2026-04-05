@@ -63,6 +63,17 @@ internal fun LegacyStateRuntimeViewModelCore.legacyClearHistory() {
 
 internal fun LegacyStateRuntimeViewModelCore.legacyUpgradeMembership(plan: MembershipPlan) {
     if (plan.groupId.isBlank() || plan.duration.isBlank()) return
+    val currentPoints = currentAccountState().membershipInfo.points.trim().toIntOrNull()
+    val requiredPoints = plan.points.trim().toIntOrNull()
+    if (currentPoints != null && requiredPoints != null && currentPoints < requiredPoints) {
+        updateAccountState(
+            accountStateWithValidationError(
+                currentAccountState(),
+                "当前积分不足，无法升级该套餐"
+            )
+        )
+        return
+    }
     runtimeRunAccountAction(
         block = { upgradeMembership(plan) },
         successMessage = "会员信息已更新",

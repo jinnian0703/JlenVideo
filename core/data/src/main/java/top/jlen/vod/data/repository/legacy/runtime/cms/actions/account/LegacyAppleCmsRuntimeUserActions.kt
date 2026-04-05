@@ -227,17 +227,6 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyDeleteUserRecord(
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyUpgradeMembership(
     plan: MembershipPlan
 ): String {
-    runCatching {
-        runtimeSubmitAppCenterUserProfileMutation(
-            FormBody.Builder()
-                .add("group_id", plan.groupId)
-                .add("long", plan.duration)
-                .add("op", "upgrade_membership")
-                .add("action", "upgrade_membership")
-                .build()
-        )
-    }.getOrNull()?.let { return it }
-
     val form = FormBody.Builder()
         .add("group_id", plan.groupId)
         .add("long", plan.duration)
