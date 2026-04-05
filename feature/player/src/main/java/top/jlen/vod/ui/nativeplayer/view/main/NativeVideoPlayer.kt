@@ -850,7 +850,7 @@ fun NativeVideoPlayer(
                         .padding(top = if (fullscreenMode) 8.dp else 24.dp)
                         .widthIn(min = 124.dp, max = 184.dp),
                     shape = RoundedCornerShape(20.dp),
-                    color = Color.Black.copy(alpha = 0.68f)
+                    color = Color.Black.copy(alpha = 0.56f)
                 ) {
                     Column(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
