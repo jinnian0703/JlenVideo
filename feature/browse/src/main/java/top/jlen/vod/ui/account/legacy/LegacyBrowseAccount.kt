@@ -180,8 +180,8 @@ internal fun LegacyAccountScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+        contentPadding = PaddingValues(top = 18.dp, bottom = 28.dp)
     ) {
         item {
             Column {
@@ -198,25 +198,25 @@ internal fun LegacyAccountScreen(
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(28.dp),
                     border = BorderStroke(1.dp, UiPalette.Border)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                            .padding(22.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             if (state.session.portraitUrl.isNotBlank()) {
                                 AuthenticatedAvatar(
                                     imageUrl = state.session.portraitUrl,
                                     contentDescription = state.session.userName,
                                     modifier = Modifier
-                                        .size(64.dp)
+                                        .size(72.dp)
                                         .clip(CircleShape)
                                         .clickable(onClick = onChangePortrait),
                                     contentScale = ContentScale.Crop
@@ -224,7 +224,7 @@ internal fun LegacyAccountScreen(
                             } else {
                                 Box(
                                     modifier = Modifier
-                                        .size(64.dp)
+                                        .size(72.dp)
                                         .clip(CircleShape)
                                         .background(UiPalette.Accent.copy(alpha = 0.15f))
                                         .clickable(onClick = onChangePortrait),
@@ -272,7 +272,12 @@ internal fun LegacyAccountScreen(
                                 onClick = onRefreshSection,
                                 enabled = !state.isLoading,
                                 modifier = Modifier.weight(1f),
-                                border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                                shape = RoundedCornerShape(18.dp),
+                                border = BorderStroke(1.dp, UiPalette.BorderSoft),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = UiPalette.SurfaceSoft,
+                                    contentColor = UiPalette.Accent
+                                )
                             ) {
                                 Text("刷新")
                             }
@@ -280,6 +285,7 @@ internal fun LegacyAccountScreen(
                                 onClick = onLogout,
                                 enabled = !state.isLoading,
                                 modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(18.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = UiPalette.Accent,
                                     contentColor = UiPalette.AccentText
@@ -293,7 +299,13 @@ internal fun LegacyAccountScreen(
             }
 
             item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
+                    shape = RoundedCornerShape(24.dp),
+                    border = BorderStroke(1.dp, UiPalette.Border)
+                ) {
                 LazyRow(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(
@@ -326,6 +338,7 @@ internal fun LegacyAccountScreen(
                             )
                         )
                     }
+                }
                 }
             }
 
@@ -1210,16 +1223,24 @@ internal fun LegacyAccountProfilePaneV2(
         isLoading -> LoadingPane("资料加载中...")
         else -> Card(
             colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(28.dp),
             border = BorderStroke(1.dp, UiPalette.Border)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                    .padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
+                    shape = RoundedCornerShape(22.dp),
+                    border = BorderStroke(1.dp, UiPalette.Border)
+                ) {
+                    LazyRow(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                     items(AccountProfileTab.entries.toList()) { tab ->
                         val selected = tab == selectedTab
                         AssistChip(
@@ -1243,6 +1264,7 @@ internal fun LegacyAccountProfilePaneV2(
                             )
                         )
                     }
+                    }
                 }
 
                 when (selectedTab) {
@@ -1255,17 +1277,22 @@ internal fun LegacyAccountProfilePaneV2(
                             )
                         } else {
                             fields.forEach { (label, value) ->
-                                Column(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(18.dp))
+                                        .background(UiPalette.SurfaceSoft)
+                                        .padding(horizontal = 14.dp, vertical = 12.dp)
                                 ) {
-                                    Text(label, color = UiPalette.TextSecondary, style = MaterialTheme.typography.labelLarge)
-                                    Text(
-                                        value,
-                                        color = UiPalette.Ink,
-                                        fontWeight = FontWeight.SemiBold,
-                                        style = MaterialTheme.typography.bodyLarge
-                                    )
+                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(label, color = UiPalette.TextSecondary, style = MaterialTheme.typography.labelLarge)
+                                        Text(
+                                            value,
+                                            color = UiPalette.Ink,
+                                            fontWeight = FontWeight.SemiBold,
+                                            style = MaterialTheme.typography.bodyLarge
+                                        )
+                                    }
                                 }
                             }
                         }
