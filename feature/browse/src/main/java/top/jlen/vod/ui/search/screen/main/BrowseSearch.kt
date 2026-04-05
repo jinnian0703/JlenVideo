@@ -569,12 +569,13 @@ private fun SearchInputCard(
         trailingIcon = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                horizontalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 if (query.isNotBlank()) {
                     TextButton(
                         onClick = { onQueryChange("") },
-                        colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.TextSecondary)
+                        colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.TextSecondary),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Close,
@@ -585,7 +586,8 @@ private fun SearchInputCard(
                 }
                 TextButton(
                     onClick = onSearch,
-                    colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
+                    colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent),
+                    contentPadding = PaddingValues(start = 2.dp, top = 0.dp, end = 0.dp, bottom = 0.dp)
                 ) {
                     Text("搜索", fontWeight = FontWeight.Bold)
                 }
