@@ -153,6 +153,7 @@ internal fun LegacyAccountScreen(
     onClearHistory: () -> Unit,
     onUpgradeMembership: (MembershipPlan) -> Unit,
     onSignInMembership: () -> Unit,
+    onOpenPointLogs: () -> Unit,
     onProfileEditorChange: ((UserProfileEditor) -> UserProfileEditor) -> Unit,
     onProfileTabChange: (Boolean) -> Unit,
     onSaveProfile: () -> Unit,
@@ -380,10 +381,10 @@ internal fun LegacyAccountScreen(
                         info = state.membershipInfo,
                         plans = state.membershipPlans,
                         signInInfo = state.membershipSignInInfo,
-                        pointLogs = state.membershipPointLogs,
                         isActionLoading = state.isActionLoading,
                         onUpgrade = onUpgradeMembership,
-                        onSignIn = onSignInMembership
+                        onSignIn = onSignInMembership,
+                        onOpenPointLogs = onOpenPointLogs
                     )
                     AccountSection.About -> AboutPane(
                         currentVersion = state.updateInfo?.currentVersion?.ifBlank { AppRuntimeInfo.versionName }
@@ -1761,10 +1762,10 @@ internal fun LegacyMembershipPaneV2(
     info: top.jlen.vod.data.MembershipInfo,
     plans: List<MembershipPlan>,
     signInInfo: MembershipSignInInfo,
-    pointLogs: List<PointLogItem>,
     isActionLoading: Boolean,
     onUpgrade: (MembershipPlan) -> Unit,
-    onSignIn: () -> Unit
+    onSignIn: () -> Unit,
+    onOpenPointLogs: () -> Unit
 ) {
     when {
         isLoading && plans.isEmpty() && info.groupName.isBlank() -> LoadingPane("会员信息加载中...")
@@ -1780,10 +1781,35 @@ internal fun LegacyMembershipPaneV2(
                         .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("会员信息", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
-                    Text("当前分组：${info.groupName.ifBlank { "普通用户" }}", color = UiPalette.Ink)
-                    Text("剩余积分：${info.points.ifBlank { "--" }}", color = UiPalette.Ink)
-                    Text("到期时间：${info.expiry.ifBlank { "--" }}", color = UiPalette.Ink)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("????", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+                        TextButton(
+                            onClick = onOpenPointLogs,
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                        ) {
+                            Text(
+                                text = "????",
+                                color = UiPalette.Accent,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                                contentDescription = "??????",
+                                tint = UiPalette.Accent,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                    Text("?????${info.groupName.ifBlank { "????" }}", color = UiPalette.Ink)
+                    Text("?????${info.points.ifBlank { "--" }}", color = UiPalette.Ink)
+                    Text("?????${info.expiry.ifBlank { "--" }}", color = UiPalette.Ink)
                 }
             }
 
@@ -1915,70 +1941,122 @@ internal fun LegacyMembershipPaneV2(
                 }
             }
 
-            if (pointLogs.isNotEmpty()) {
+        }
+    }
+}
+
+@Composable
+fun AccountPointLogScreen(
+    pointLogs: List<PointLogItem>,
+    onBack: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(top = 18.dp, bottom = 28.dp)
+    ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TextButton(onClick = onBack, contentPadding = PaddingValues(0.dp)) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = "??",
+                        tint = UiPalette.Ink
+                    )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "????",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = UiPalette.Ink
+                    )
+                    Text(
+                        text = "??????????????",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = UiPalette.TextSecondary
+                    )
+                }
+            }
+        }
+
+        if (pointLogs.isEmpty()) {
+            item { EmptyPane("??????") }
+        } else {
+            items(pointLogs, key = { it.logId.ifBlank { it.time + it.typeText } }) { log ->
                 Card(
                     colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(22.dp),
                     border = BorderStroke(1.dp, UiPalette.Border)
                 ) {
-                    Column(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                            .padding(18.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "积分日志",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = UiPalette.Ink
-                        )
-                        pointLogs.forEach { log ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                                ) {
-                                    Text(
-                                        text = log.typeText.ifBlank { log.remarks.ifBlank { "积分变动" } },
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = UiPalette.Ink
-                                    )
-                                    log.remarks.takeIf(String::isNotBlank)?.let { remarks ->
-                                        Text(
-                                            text = remarks,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = UiPalette.TextSecondary,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                    Text(
-                                        text = log.timeText.ifBlank { log.time.ifBlank { "--" } },
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = UiPalette.TextMuted
-                                    )
-                                }
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(
+                                    if (log.isIncome) UiPalette.Accent.copy(alpha = 0.12f)
+                                    else UiPalette.SurfaceSoft
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (log.isIncome) "+" else "-",
+                                color = if (log.isIncome) UiPalette.Accent else UiPalette.Ink,
+                                fontWeight = FontWeight.ExtraBold,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = log.typeText.ifBlank { log.remarks.ifBlank { "????" } },
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = UiPalette.Ink
+                            )
+                            log.remarks.takeIf(String::isNotBlank)?.let { remarks ->
                                 Text(
-                                    text = log.pointsText.ifBlank {
-                                        when {
-                                            log.points.isBlank() -> "--"
-                                            log.isIncome && !log.points.startsWith("+") -> "+${log.points}"
-                                            !log.isIncome && !log.points.startsWith("-") -> "-${log.points}"
-                                            else -> log.points
-                                        }
-                                    },
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = if (log.isIncome) UiPalette.Accent else UiPalette.Ink
+                                    text = remarks,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = UiPalette.TextSecondary,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            Text(
+                                text = log.timeText.ifBlank { log.time.ifBlank { "--" } },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = UiPalette.TextMuted
+                            )
                         }
+                        Text(
+                            text = log.pointsText.ifBlank {
+                                when {
+                                    log.points.isBlank() -> "--"
+                                    log.isIncome && !log.points.startsWith("+") -> "+${log.points}"
+                                    !log.isIncome && !log.points.startsWith("-") -> "-${log.points}"
+                                    else -> log.points
+                                }
+                            },
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = if (log.isIncome) UiPalette.Accent else UiPalette.Ink
+                        )
                     }
                 }
             }

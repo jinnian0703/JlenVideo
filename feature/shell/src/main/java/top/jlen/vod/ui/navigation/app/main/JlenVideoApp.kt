@@ -332,6 +332,7 @@ fun JlenVideoApp() {
                                 onClearHistory = viewModel::clearHistory,
                                 onUpgradeMembership = viewModel::upgradeMembership,
                                 onSignInMembership = viewModel::signInMembership,
+                                onOpenPointLogs = { navController.navigate("account/points") },
                                 onProfileEditorChange = viewModel::updateProfileEditor,
                                 onProfileTabChange = viewModel::setProfileEditTab,
                                 onSaveProfile = viewModel::saveProfile,
@@ -362,6 +363,12 @@ fun JlenVideoApp() {
                                     viewModel.markNoticeOpened(noticeId)
                                     navController.navigate("announcement/${Uri.encode(noticeId)}")
                                 }
+                            )
+                        }
+                        composable("account/points") {
+                            AccountPointLogScreen(
+                                pointLogs = viewModel.accountState.membershipPointLogs,
+                                onBack = { navController.popBackStack() }
                             )
                         }
                         composable(

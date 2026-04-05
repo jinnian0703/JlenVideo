@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import top.jlen.vod.data.MembershipInfo
 import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.MembershipSignInInfo
-import top.jlen.vod.data.PointLogItem
 
 @Composable
 internal fun MembershipPaneV2(
@@ -12,19 +11,19 @@ internal fun MembershipPaneV2(
     info: MembershipInfo,
     plans: List<MembershipPlan>,
     signInInfo: MembershipSignInInfo,
-    pointLogs: List<PointLogItem>,
     isActionLoading: Boolean,
     onUpgrade: (MembershipPlan) -> Unit,
-    onSignIn: () -> Unit
+    onSignIn: () -> Unit,
+    onOpenPointLogs: () -> Unit
 ) = LegacyMembershipPaneV2(
     isLoading = isLoading,
     info = info,
     plans = plans,
     signInInfo = signInInfo,
-    pointLogs = pointLogs,
     isActionLoading = isActionLoading,
     onUpgrade = onUpgrade,
-    onSignIn = onSignIn
+    onSignIn = onSignIn,
+    onOpenPointLogs = onOpenPointLogs
 )
 
 @Composable
