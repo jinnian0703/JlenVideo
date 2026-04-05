@@ -299,15 +299,7 @@ internal fun LegacyAccountScreen(
             }
 
             item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
-                    shape = RoundedCornerShape(24.dp),
-                    border = BorderStroke(1.dp, UiPalette.Border)
-                ) {
-                LazyRow(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
+                AccountSegmentBar {
                     items(
                         items = AccountSection.entries.toList(),
                         key = { it.name },
@@ -329,16 +321,15 @@ internal fun LegacyAccountScreen(
                                 )
                             },
                             colors = AssistChipDefaults.assistChipColors(
-                                containerColor = if (selected) UiPalette.Accent else UiPalette.Surface,
+                                containerColor = if (selected) UiPalette.Accent else UiPalette.Surface.copy(alpha = 0.92f),
                                 labelColor = if (selected) UiPalette.AccentText else UiPalette.Ink
                             ),
                             border = AssistChipDefaults.assistChipBorder(
-                                borderColor = if (selected) UiPalette.Accent else UiPalette.BorderSoft,
+                                borderColor = if (selected) Color.Transparent else UiPalette.Border,
                                 enabled = true
                             )
                         )
                     }
-                }
                 }
             }
 
@@ -1198,6 +1189,19 @@ internal fun LegacyAccountFindPasswordPane(
     }
 }
 
+@Composable
+private fun AccountSegmentBar(content: LazyListScope.() -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(UiPalette.SurfaceSoft.copy(alpha = 0.9f))
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+    ) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), content = content)
+    }
+}
+
 private enum class AccountProfileTab {
     Overview,
     Edit
@@ -1232,15 +1236,7 @@ internal fun LegacyAccountProfilePaneV2(
                     .padding(22.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
-                    shape = RoundedCornerShape(22.dp),
-                    border = BorderStroke(1.dp, UiPalette.Border)
-                ) {
-                    LazyRow(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
+                AccountSegmentBar {
                     items(AccountProfileTab.entries.toList()) { tab ->
                         val selected = tab == selectedTab
                         AssistChip(
@@ -1255,15 +1251,14 @@ internal fun LegacyAccountProfilePaneV2(
                                 )
                             },
                             colors = AssistChipDefaults.assistChipColors(
-                                containerColor = if (selected) UiPalette.Accent else UiPalette.Surface,
+                                containerColor = if (selected) UiPalette.Accent else UiPalette.Surface.copy(alpha = 0.92f),
                                 labelColor = if (selected) UiPalette.AccentText else UiPalette.Ink
                             ),
                             border = AssistChipDefaults.assistChipBorder(
-                                borderColor = if (selected) UiPalette.Accent else UiPalette.BorderSoft,
+                                borderColor = if (selected) Color.Transparent else UiPalette.Border,
                                 enabled = true
                             )
                         )
-                    }
                     }
                 }
 
