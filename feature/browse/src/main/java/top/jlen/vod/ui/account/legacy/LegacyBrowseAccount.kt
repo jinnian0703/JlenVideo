@@ -688,7 +688,10 @@ internal fun LegacyAboutPane(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 OutlinedButton(
                     onClick = onCheckUpdate,
                     enabled = !isUpdateLoading,
@@ -1594,20 +1597,35 @@ internal fun LegacyAccountRecordPane(
     when {
         isLoading && items.isEmpty() -> LoadingPane("$title 加载中...")
         items.isEmpty() -> EmptyPane(emptyMessage)
-        else -> Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        else -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(24.dp),
                 border = BorderStroke(1.dp, UiPalette.Border)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(
+                                    UiPalette.Surface,
+                                    UiPalette.AccentGlow.copy(alpha = 0.22f)
+                                )
+                            )
+                        )
+                        .padding(horizontal = 18.dp, vertical = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+                        Text(
+                            text = "共 ${items.size} 条",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = UiPalette.TextMuted
+                        )
+                    }
                     TextButton(onClick = onClearAll, enabled = !isActionLoading) {
                         Text(if (isActionLoading) "处理中..." else "清空")
                     }
@@ -1641,14 +1659,14 @@ internal fun LegacyAccountRecordCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(24.dp),
         border = BorderStroke(1.dp, UiPalette.Border)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = item.title,
@@ -1658,26 +1676,46 @@ internal fun LegacyAccountRecordCard(
             )
             val subtitle = sanitizeUserFacingComposite(item.subtitle)
             if (subtitle.isNotBlank()) {
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = UiPalette.TextSecondary,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(UiPalette.SurfaceSoft)
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = UiPalette.TextSecondary,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
                     onClick = { onPrimaryAction(item) },
                     enabled = !isActionLoading && (item.vodId.isNotBlank() || item.playUrl.isNotBlank()),
-                    border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.dp, UiPalette.BorderSoft),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = UiPalette.SurfaceSoft,
+                        contentColor = UiPalette.Accent
+                    )
                 ) {
                     Text(item.actionLabel.ifBlank { "查看详情" })
                 }
-                TextButton(
+                OutlinedButton(
                     onClick = { onDelete(item.recordId) },
                     enabled = item.recordId.isNotBlank() && !isActionLoading,
-                    colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.dp, UiPalette.DangerBorder),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = UiPalette.DangerSurface,
+                        contentColor = UiPalette.DangerText
+                    )
                 ) {
                     Text("删除")
                 }

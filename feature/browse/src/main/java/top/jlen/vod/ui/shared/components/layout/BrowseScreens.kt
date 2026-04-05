@@ -182,11 +182,20 @@ private fun SearchDock(onClick: () -> Unit) {
             .fillMaxWidth()
             .clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(24.dp),
         border = BorderStroke(1.dp, UiPalette.Border)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+            modifier = Modifier
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            UiPalette.Surface,
+                            UiPalette.AccentGlow.copy(alpha = 0.14f)
+                        )
+                    )
+                )
+                .padding(horizontal = 18.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -217,14 +226,14 @@ private fun AnnouncementTickerStrip(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         border = BorderStroke(1.dp, UiPalette.Border)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
