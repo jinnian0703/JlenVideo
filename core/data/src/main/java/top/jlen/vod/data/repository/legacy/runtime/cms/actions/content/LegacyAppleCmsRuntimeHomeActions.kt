@@ -1,8 +1,6 @@
 package top.jlen.vod.data
 
 import java.io.IOException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import org.jsoup.nodes.Document
 
 internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyClearMemoryCaches() {
@@ -124,21 +122,14 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadEmergencyHome
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFreshHome(
     forceRefresh: Boolean
 ): HomePayload {
-    val (latestPage, recommendedItems) = coroutineScope {
-        val latestDeferred = async {
-            runCatching {
-                runtimeLoadLatestCursorPage(cursor = "")
-            }.getOrElse {
-                CursorPagedVodItems()
-            }
-        }
-        val recommendationsDeferred = async {
-            runCatching {
-                runtimeLoadRecommendedPreviewItems(limit = 16)
-            }.getOrDefault(emptyList())
-        }
-        latestDeferred.await() to recommendationsDeferred.await()
+    val latestPage = runCatching {
+        runtimeLoadLatestCursorPage(cursor = "")
+    }.getOrElse {
+        CursorPagedVodItems()
     }
+    val recommendedItems = runCatching {
+        runtimeLoadRecommendedPreviewItems(limit = 16)
+    }.getOrDefault(emptyList())
     val homeDocument: Document? = if (recommendedItems.isEmpty()) {
         runCatching { runtimeFetchHomeDocument() }.getOrNull()
     } else {

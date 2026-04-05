@@ -1,8 +1,5 @@
 package top.jlen.vod.data
 
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadByCategory(
     typeId: String
@@ -46,13 +43,10 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFreshAllCateg
     page: Int,
     forceRefresh: Boolean
 ): PagedVodItems {
-    val pages = coroutineScope {
-        runtimeGetBrowsableCategories(forceRefresh = forceRefresh)
-            .map { category ->
-                async { runtimeLoadCategoryPage(category.typeId, page, forceRefresh = forceRefresh) }
-            }
-            .awaitAll()
-    }
+    val pages = runtimeGetBrowsableCategories(forceRefresh = forceRefresh)
+        .map { category ->
+            runtimeLoadCategoryPage(category.typeId, page, forceRefresh = forceRefresh)
+        }
     return runtimeBuildMergedCategoryPage(pages, page).also { payload ->
         runtimeCacheCategoryPagePayload("all:$page", payload)
     }
@@ -113,17 +107,13 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyPrewarmCategoryFi
     forceRefresh: Boolean = false
 ) {
     val categories = runtimeGetBrowsableCategories(forceRefresh = forceRefresh)
-    coroutineScope {
-        categories.map { category ->
-            async {
-                runCatching {
-                    runtimeLoadCategoryPage(
-                        typeId = category.typeId,
-                        page = 1,
-                        forceRefresh = forceRefresh
-                    )
-                }
-            }
-        }.awaitAll()
+    categories.forEach { category ->
+        runCatching {
+            runtimeLoadCategoryPage(
+                typeId = category.typeId,
+                page = 1,
+                forceRefresh = forceRefresh
+            )
+        }
     }
 }
