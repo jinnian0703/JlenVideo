@@ -76,6 +76,13 @@ import top.jlen.vod.data.AppUpdateInfo
 
 private val topLevelRoutes = setOf("home", "categories", "search", "account")
 
+private val bottomBarItems = listOf(
+    Triple("home", "棣栭〉", Icons.Rounded.Home),
+    Triple("categories", "鐗囧簱", Icons.Rounded.Category),
+    Triple("search", "鎼滅储", Icons.Rounded.Search),
+    Triple("account", "鎴戠殑", Icons.Rounded.Person)
+)
+
 private val appBackground = Brush.verticalGradient(
     colors = listOf(UiPalette.HeroEnd, UiPalette.BackgroundTop, UiPalette.BackgroundBottom)
 )
@@ -105,6 +112,7 @@ fun JlenVideoApp() {
     }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val currentTopLevelRoute = normalizeTopLevelRoute(currentRoute)
     val heartbeatRoute = normalizeHeartbeatRoute(currentRoute)
     val heartbeatPlaybackKey = if (heartbeatRoute == "player") {
         listOf(
@@ -116,7 +124,7 @@ fun JlenVideoApp() {
     } else {
         heartbeatRoute
     }
-    val showBottomBar = currentRoute in topLevelRoutes
+    val showBottomBar = currentTopLevelRoute != null
     val rootContentInsets = if (currentRoute == "player") {
         WindowInsets(0, 0, 0, 0)
     } else {
@@ -144,12 +152,14 @@ fun JlenVideoApp() {
         openExternalUrl(context, targetUrl)
     }
     val navigateToTopLevel: (String) -> Unit = { route ->
-        navController.navigate(route) {
-            popUpTo(navController.graph.findStartDestination().id) {
-                saveState = true
+        if (currentTopLevelRoute != route) {
+            navController.navigate(route) {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
             }
-            launchSingleTop = true
-            restoreState = true
         }
     }
     val openSearchResults: (String) -> Unit = { query ->
@@ -201,7 +211,7 @@ fun JlenVideoApp() {
                     bottomBar = {
                         if (showBottomBar) {
                             AppBottomBar(
-                                currentRoute = currentRoute.orEmpty(),
+                                currentRoute = currentTopLevelRoute.orEmpty(),
                                 onNavigate = navigateToTopLevel
                             )
                         }
@@ -211,34 +221,10 @@ fun JlenVideoApp() {
                         navController = navController,
                         startDestination = "home",
                         modifier = Modifier.padding(innerPadding),
-                        enterTransition = {
-                            if (!shouldAnimateRouteTransition(initialState.destination.route, targetState.destination.route)) {
-                                EnterTransition.None
-                            } else {
-                                screenEnterTransition()
-                            }
-                        },
-                        exitTransition = {
-                            if (!shouldAnimateRouteTransition(initialState.destination.route, targetState.destination.route)) {
-                                ExitTransition.None
-                            } else {
-                                screenExitTransition()
-                            }
-                        },
-                        popEnterTransition = {
-                            if (!shouldAnimateRouteTransition(initialState.destination.route, targetState.destination.route)) {
-                                EnterTransition.None
-                            } else {
-                                screenPopEnterTransition()
-                            }
-                        },
-                        popExitTransition = {
-                            if (!shouldAnimateRouteTransition(initialState.destination.route, targetState.destination.route)) {
-                                ExitTransition.None
-                            } else {
-                                screenPopExitTransition()
-                            }
-                        }
+                        enterTransition = { EnterTransition.None },
+                        exitTransition = { ExitTransition.None },
+                        popEnterTransition = { EnterTransition.None },
+                        popExitTransition = { ExitTransition.None }
                     ) {
                         composable("home") {
                             HomeScreen(
@@ -431,11 +417,13 @@ fun JlenVideoApp() {
     }
 }
 
-private fun shouldAnimateRouteTransition(fromRoute: String?, toRoute: String?): Boolean {
-    if (fromRoute == toRoute) return false
-    val fromTopLevel = fromRoute in topLevelRoutes
-    val toTopLevel = toRoute in topLevelRoutes
-    return !fromTopLevel && !toTopLevel
+private fun normalizeTopLevelRoute(route: String?): String? = when {
+    route == null -> null
+    route == "home" || route.startsWith("home/") -> "home"
+    route == "categories" || route.startsWith("categories/") -> "categories"
+    route == "search" || route.startsWith("search/") -> "search"
+    route == "account" || route.startsWith("account/") -> "account"
+    else -> null
 }
 
 private fun normalizeHeartbeatRoute(route: String?): String = when {
@@ -808,7 +796,7 @@ private fun AppBottomBar(currentRoute: String, onNavigate: (String) -> Unit) {
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 0.dp
     ) {
-        items.forEach { (route, label, icon) ->
+        bottomBarItems.forEach { (route, label, icon) ->
             NavigationBarItem(
                 selected = currentRoute == route,
                 onClick = { onNavigate(route) },
