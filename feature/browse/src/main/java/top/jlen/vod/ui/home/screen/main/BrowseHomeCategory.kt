@@ -343,7 +343,7 @@ fun CategoryScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
                 Text(
                     text = "片库",
                     style = MaterialTheme.typography.headlineSmall,
@@ -371,19 +371,26 @@ fun CategoryScreen(
             }
         }
         item {
-            SectionTitle(
-                title = state.selectedCategory?.typeName ?: "分类",
-                action = null,
-                icon = {
-                    Icon(
-                        imageVector = Icons.Rounded.GridView,
-                        contentDescription = null,
-                        tint = UiPalette.Accent,
-                        modifier = Modifier.size(20.dp)
-                    )
-                },
-                onAction = {}
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.GridView,
+                    contentDescription = null,
+                    tint = UiPalette.Accent,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = state.selectedCategory?.typeName ?: "分类",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Ink
+                )
+            }
         }
         if (state.categoryFilterGroups.isNotEmpty()) {
             item {
@@ -490,3 +497,5 @@ private fun SelectableAssistChip(
         )
     )
 }
+
+
