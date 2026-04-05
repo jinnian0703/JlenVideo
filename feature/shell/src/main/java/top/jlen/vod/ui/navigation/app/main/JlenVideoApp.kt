@@ -78,10 +78,10 @@ import top.jlen.vod.data.AppUpdateInfo
 private val topLevelRoutes = setOf("home", "categories", "search", "account")
 
 private val bottomBarItems = listOf(
-    Triple("home", "棣栭〉", Icons.Rounded.Home),
-    Triple("categories", "鐗囧簱", Icons.Rounded.Category),
-    Triple("search", "鎼滅储", Icons.Rounded.Search),
-    Triple("account", "鎴戠殑", Icons.Rounded.Person)
+    Triple("home", "首页", Icons.Rounded.Home),
+    Triple("categories", "片库", Icons.Rounded.Category),
+    Triple("search", "搜索", Icons.Rounded.Search),
+    Triple("account", "我的", Icons.Rounded.Person)
 )
 
 private val appBackground = Brush.verticalGradient(
@@ -549,7 +549,6 @@ private fun AnnouncementPromptDialog(
         }
     }
 }
-
 @Composable
 private fun UpdatePromptDialog(
     updateInfo: AppUpdateInfo,
@@ -602,7 +601,7 @@ private fun UpdatePromptDialog(
                             color = UiPalette.Ink
                         )
                         Text(
-                            text = "建议更新到最新版本，获得更好的稳定性和体验。",
+                            text = "建议更新到最新版本，获得更好的稳定性和使用体验。",
                             style = MaterialTheme.typography.bodyMedium,
                             color = UiPalette.TextSecondary
                         )
@@ -794,13 +793,6 @@ private fun UpdateVersionPill(
 
 @Composable
 private fun AppBottomBar(currentRoute: String, onNavigate: (String) -> Unit) {
-    val items = listOf(
-        Triple("home", "首页", Icons.Rounded.Home),
-        Triple("categories", "片库", Icons.Rounded.Category),
-        Triple("search", "搜索", Icons.Rounded.Search),
-        Triple("account", "我的", Icons.Rounded.Person)
-    )
-
     NavigationBar(
         containerColor = Color(0xF8FFFFFF),
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -828,3 +820,4 @@ private fun AppBottomBar(currentRoute: String, onNavigate: (String) -> Unit) {
         }
     }
 }
+

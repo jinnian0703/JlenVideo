@@ -196,7 +196,7 @@ private fun SearchDock(onClick: () -> Unit) {
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = "搜影片",
+                text = "搜索片库",
                 style = MaterialTheme.typography.bodyMedium,
                 color = UiPalette.TextSecondary
             )
@@ -722,7 +722,7 @@ internal fun LoadMoreFooter(
                 color = UiPalette.Accent
             )
             Text(
-                text = "加载中",
+                text = "加载中...",
                 style = MaterialTheme.typography.bodySmall,
                 color = UiPalette.TextMuted
             )
@@ -882,11 +882,11 @@ private fun String.formatNoticeTime(): String {
 internal fun isAnnouncementListLine(text: String): Boolean =
     text.startsWith("- ") ||
         text.startsWith("* ") ||
-        text.startsWith("?") ||
+        text.startsWith("•") ||
         Regex("^\\d+[.、]\\s*.+").matches(text)
 
 internal fun String.removeAnnouncementListPrefix(): String =
-    replaceFirst(Regex("^(-|\\*|?)\\s*"), "")
+    replaceFirst(Regex("^(-|\\*|•)\\s*"), "")
         .replaceFirst(Regex("^\\d+[.、]\\s*"), "")
         .trim()
 
@@ -1119,7 +1119,7 @@ private fun compactPosterBadgeText(raw: String): String {
     }
 
     return when {
-        compactEpisodeBadge.matches(Regex("^[.。·?…-]+$")) -> ""
+        compactEpisodeBadge.matches(Regex("^[.、·•-]+$")) -> ""
         compactEpisodeBadge.isBlank() -> ""
         else -> compactEpisodeBadge
     }
@@ -1142,7 +1142,7 @@ private fun normalizePosterBadgeText(raw: String): String {
     }
 
     return when {
-        normalizedEpisodeBadge.matches(Regex("^[.。·?…-]+$")) -> ""
+        normalizedEpisodeBadge.matches(Regex("^[.、·•-]+$")) -> ""
         normalizedEpisodeBadge.isBlank() -> ""
         else -> normalizedEpisodeBadge
     }
@@ -1159,7 +1159,7 @@ private fun sanitizePosterBadge(raw: String): String {
         .trim()
 
     return when {
-        trimmedRankPrefix.matches(Regex("^[.。·?…-]+$")) -> ""
+        trimmedRankPrefix.matches(Regex("^[.、·•-]+$")) -> ""
         trimmedRankPrefix.isBlank() -> ""
         else -> trimmedRankPrefix
     }
