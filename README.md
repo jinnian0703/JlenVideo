@@ -1,41 +1,37 @@
 # JlenVideo
 
-> 面向新接手开发者的项目说明。  
-> 当前分支是 **单模块 Android 工程**，核心代码集中在 `app` 模块内。
+> 面向新接手开发者的教程型项目说明。  
+> 当前分支为 **module**，已经完成 `app / core / feature` 多模块拆分。
 
 ---
 
-## 项目简介
+## 1. 项目简介
 
 JlenVideo 是一个基于 **Kotlin + Jetpack Compose + Media3** 开发的苹果 CMS 视频客户端。
 
-当前分支的工程目标比较直接：
-
-- 提供首页、片库、搜索、详情、账号、播放器等基础能力
-- 通过苹果 CMS 站点获取内容数据
-- 支持原生播放器、全屏播放、线路切换、剧集切换、搜索历史、Cookie 持久化等功能
+当前 `module` 分支的重点不是功能实验，而是把原本集中在单模块里的代码拆成清晰的模块边界，便于继续维护、排查和扩展。
 
 当前默认站点：
 
 - `https://cms.jlen.top/`
 
-相关服务仓库：
+相关配套仓库：
 
-- 使用的 API 项目：
+- API：
   [maccms-pure-video-api](https://github.com/jinnian0703/maccms-pure-video-api)
-- 使用的管理系统：
+- 管理系统：
   [appcenter-standalone-admin](https://github.com/jinnian0703/appcenter-standalone-admin)
 
 ---
 
-## 当前版本
+## 2. 当前版本
 
 | 项目 | 值 |
 | --- | --- |
-| 应用名 | `JlenVideo` |
+| 项目名 | `JlenVideo` |
 | Application Id | `top.jlen.vod` |
-| versionName | `2.1.1.0` |
-| versionCode | `24` |
+| 当前版本 | `2.1.1.0` |
+| 当前 versionCode | `26` |
 | minSdk | `24` |
 | targetSdk | `34` |
 | compileSdk | `34` |
@@ -49,14 +45,15 @@ JlenVideo-版本号-debug.apk
 
 ---
 
-## 技术栈
+## 3. 技术栈
 
 ### Android
 
 - Kotlin
 - Jetpack Compose
-- AndroidX Navigation Compose
+- AndroidX
 - Lifecycle ViewModel
+- Navigation Compose
 - Media3 ExoPlayer
 
 ### 网络与解析
@@ -70,20 +67,19 @@ JlenVideo-版本号-debug.apk
 
 - Gradle
 - Kotlin DSL
+- 多模块工程
 
 ---
 
-## 快速开始
+## 4. 快速开始
 
-### 1. 环境准备
-
-建议本地具备：
+### 环境准备
 
 - JDK 17
 - Android Studio 或完整 Android SDK
 - Windows PowerShell
 
-### 2. 首次构建
+### 第一次构建
 
 在项目根目录执行：
 
@@ -91,27 +87,29 @@ JlenVideo-版本号-debug.apk
 .\gradlew.bat :app:assembleDebug
 ```
 
-如果构建通过，说明当前依赖、SDK 和工程结构都正常。
+如果构建通过，说明当前模块依赖与本地环境都正常。
 
-### 3. 建议先看的文件
+### 第一次建议看的文件
 
-如果你第一次接手，推荐按这个顺序读：
-
-1. [settings.gradle.kts](/F:/codex/1/settings.gradle.kts)
-2. [app/build.gradle.kts](/F:/codex/1/app/build.gradle.kts)
-3. [MainActivity.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/MainActivity.kt)
-4. [JlenVideoApp.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/JlenVideoApp.kt)
-5. [AppViewModel.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/AppViewModel.kt)
-6. [AppleCmsRepository.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt)
-7. [NativeVideoPlayer.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/NativeVideoPlayer.kt)
+```text
+settings.gradle.kts
+gradle.properties
+app/build.gradle.kts
+feature/shell/.../JlenVideoApp.kt
+feature/state/.../AppViewModel.kt
+core/data/.../AppleCmsRepository.kt
+feature/player/.../NativeVideoPlayer.kt
+```
 
 > 阅读建议  
-> 如果你只是修播放器问题，优先看 `NativeVideoPlayer.kt` 和 `FullscreenPlayerActivity.kt`。  
-> 如果你是查接口或解析问题，优先看 `AppleCmsRepository.kt`、`AppleCmsApi.kt` 和 `Models.kt`。
+> 想理解整个应用怎么串起来，先看 `feature:shell`。  
+> 想查页面状态为什么不对，先看 `feature:state`。  
+> 想查接口或解析问题，先看 `core:data`。  
+> 想查播放交互问题，先看 `feature:player`。
 
 ---
 
-## 构建方式
+## 5. 构建方式
 
 ### 常用命令
 
@@ -122,206 +120,269 @@ JlenVideo-版本号-debug.apk
 
 ### APK 输出
 
-默认输出目录：
-
 - [JlenVideo-2.1.1.0-debug.apk](/F:/codex/1/app/build/outputs/apk/debug/JlenVideo-2.1.1.0-debug.apk)
 
 ---
 
-## 项目结构详解
+## 6. 模块结构详解
 
-当前分支不是多模块结构，核心代码集中在 `app`。
+当前工程参与构建的模块如下：
 
-### 顶层目录
+```text
+app
+core:model
+core:common
+core:design
+core:data
+feature:common
+feature:browse
+feature:detail
+feature:player
+feature:shell
+feature:state
+```
 
-| 路径 | 作用 |
-| --- | --- |
-| `app/` | Android 应用主模块，绝大多数业务代码都在这里 |
-| `templates/` | 模板与辅助资源，不属于主 Android 运行代码 |
-| `core/` | 当前分支下未接入构建的实验性或历史结构目录 |
-| `feature/` | 当前分支下未接入构建的实验性或历史结构目录 |
+### `app`
 
-> 说明  
-> 以当前 `settings.gradle.kts` 为准，真正参与构建的是 `:app`。  
-> `core/` 和 `feature/` 目录当前没有被 `include()` 到 Gradle 模块里，不要误以为它们已经生效。
+`app` 是最终应用壳层，只负责：
 
----
+- Android Application / Activity 入口
+- 打包配置
+- APK 产出
 
-## `app` 模块结构
+关键文件：
 
-### 入口层
-
-| 文件 | 作用 |
-| --- | --- |
-| [MainActivity.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/MainActivity.kt) | Android Activity 入口 |
-| [JlenVideoApplication.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/JlenVideoApplication.kt) | Application 初始化入口 |
-| [CrashLogger.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/CrashLogger.kt) | 崩溃日志记录与读取 |
+- [MainActivity.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/bootstrap/activity/MainActivity.kt)
+- [JlenVideoApplication.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/bootstrap/application/JlenVideoApplication.kt)
+- [app/build.gradle.kts](/F:/codex/1/app/build.gradle.kts)
 
 什么时候看：
 
 - 应用启动异常
-- Application 初始化问题
-- 崩溃日志没有落盘
+- 版本号 / 打包 / APK 命名问题
 
-### 数据层
+### `core:model`
 
-| 文件 | 作用 |
-| --- | --- |
-| [AppleCmsApi.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/AppleCmsApi.kt) | Retrofit API 定义 |
-| [AppleCmsRepository.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt) | 数据入口、页面抓取、解析、用户中心、播放地址等主逻辑 |
-| [Models.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/Models.kt) | 数据模型定义 |
-| [PersistentCookieJar.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/PersistentCookieJar.kt) | Cookie 持久化 |
-| [SearchHistoryStore.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/SearchHistoryStore.kt) | 搜索历史持久化 |
+纯数据模型层，放视频、分类、用户中心等共享模型。
+
+关键文件：
+
+- [Models.kt](/F:/codex/1/core/model/src/main/java/top/jlen/vod/data/shared/model/Models.kt)
+
+### `core:common`
+
+通用配置和基础运行时能力。
+
+关键文件：
+
+- [AppConfig.kt](/F:/codex/1/core/common/src/main/java/top/jlen/vod/config/runtime/app/AppConfig.kt)
+- [CrashLogger.kt](/F:/codex/1/core/common/src/main/java/top/jlen/vod/logging/crash/handler/CrashLogger.kt)
+
+### `core:design`
+
+共享设计常量。
+
+关键文件：
+
+- [UiPalette.kt](/F:/codex/1/core/design/src/main/java/top/jlen/vod/ui/theme/palette/system/UiPalette.kt)
+- [UiMotion.kt](/F:/codex/1/core/design/src/main/java/top/jlen/vod/ui/motion/spec/system/UiMotion.kt)
+
+### `core:data`
+
+数据入口模块，负责：
+
+- Retrofit API
+- HTML / JSON 解析
+- Cookie 与搜索历史
+- Repository 壳层
+- legacy runtime repository / parsing
+
+关键文件：
+
+- [AppleCmsApi.kt](/F:/codex/1/core/data/src/main/java/top/jlen/vod/data/api/service/main/AppleCmsApi.kt)
+- [AppleCmsRepository.kt](/F:/codex/1/core/data/src/main/java/top/jlen/vod/data/repository/shell/cms/AppleCmsRepository.kt)
+- [AppleCmsRepositorySupport.kt](/F:/codex/1/core/data/src/main/java/top/jlen/vod/data/support/parsing/shell/cms/AppleCmsRepositorySupport.kt)
+- [LegacyAppleCmsRuntimeRepository.kt](/F:/codex/1/core/data/src/main/java/top/jlen/vod/data/repository/legacy/runtime/cms/shell/LegacyAppleCmsRuntimeRepository.kt)
+- [LegacyAppleCmsRuntimeRepositoryCore.kt](/F:/codex/1/core/data/src/main/java/top/jlen/vod/data/repository/legacy/runtime/cms/runtime/core/LegacyAppleCmsRuntimeRepositoryCore.kt)
 
 什么时候看：
 
-- 分类、详情、搜索、账号、公告、播放地址解析错误
-- 登录状态丢失
-- 搜索历史不对
+- 站点数据解析不对
+- 分类、搜索、详情、播放地址异常
+- 登录、收藏、历史、会员相关数据异常
 
-### 状态与页面层
+### `feature:common`
 
-| 文件 | 作用 |
-| --- | --- |
-| [AppViewModel.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/AppViewModel.kt) | 页面状态与业务调度中心 |
-| [JlenVideoApp.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/JlenVideoApp.kt) | Compose 应用壳和导航入口 |
-| [BrowseScreens.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/BrowseScreens.kt) | 首页、片库、搜索、账号等页面集合 |
-| [DetailPlayerScreens.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/DetailPlayerScreens.kt) | 详情页与播放页 UI |
+共享 UI 状态模型和公共组件。
 
-什么时候看：
+### `feature:browse`
 
-- 页面状态不刷新
-- 点击动作没有生效
-- 首页、分类、搜索、详情、账号页面显示不对
+首页、片库、搜索、公告、账号相关页面。
 
-### 播放器层
+关键入口：
 
-| 文件 | 作用 |
-| --- | --- |
-| [NativeVideoPlayer.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/NativeVideoPlayer.kt) | 原生播放器 UI、手势、控制层、进度条等 |
-| [FullscreenPlayerActivity.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/FullscreenPlayerActivity.kt) | 全屏播放器入口 |
-| [PlayerWebSupport.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/PlayerWebSupport.kt) | Web 回退与网页播放器辅助逻辑 |
-| [HiddenStreamResolver.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/HiddenStreamResolver.kt) | 隐藏播放流解析 |
+- [BrowseHomeCategory.kt](/F:/codex/1/feature/browse/src/main/java/top/jlen/vod/ui/home/screen/main/BrowseHomeCategory.kt)
+- [BrowseSearch.kt](/F:/codex/1/feature/browse/src/main/java/top/jlen/vod/ui/search/screen/main/BrowseSearch.kt)
+- [BrowseAnnouncements.kt](/F:/codex/1/feature/browse/src/main/java/top/jlen/vod/ui/announcements/screen/main/BrowseAnnouncements.kt)
+- [BrowseAccount.kt](/F:/codex/1/feature/browse/src/main/java/top/jlen/vod/ui/account/screen/main/BrowseAccount.kt)
 
-什么时候看：
+### `feature:detail`
 
-- 双击播放/暂停问题
-- 控件显示隐藏问题
-- 进度条拖动问题
-- 全屏播放同步问题
-- 播放地址识别异常
+详情页与内嵌播放页 UI。
 
-### 视觉与辅助层
+关键入口：
 
-| 文件 | 作用 |
-| --- | --- |
-| [UiPalette.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/UiPalette.kt) | 颜色与视觉常量 |
-| [UiMotion.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/UiMotion.kt) | 动画与交互节奏常量 |
-| [ExternalLinkHelper.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/ExternalLinkHelper.kt) | 外链打开辅助 |
+- [DetailScreen.kt](/F:/codex/1/feature/detail/src/main/java/top/jlen/vod/ui/detail/screen/main/DetailScreen.kt)
+- [PlayerScreen.kt](/F:/codex/1/feature/detail/src/main/java/top/jlen/vod/ui/player/screen/main/PlayerScreen.kt)
 
----
+### `feature:player`
 
-## 关键目录命名和理解方式
+播放器能力模块。
 
-虽然当前分支是单模块，但理解代码时仍然建议按“职责”来分层：
+关键入口：
 
-- `data`：接口、解析、持久化
-- `ui`：页面、播放器、状态调度、导航
-- `templates`：模板资源和辅助文件
+- [NativeVideoPlayer.kt](/F:/codex/1/feature/player/src/main/java/top/jlen/vod/ui/nativeplayer/view/main/NativeVideoPlayer.kt)
+- [FullscreenPlayerActivity.kt](/F:/codex/1/feature/player/src/main/java/top/jlen/vod/ui/fullscreen/activity/main/FullscreenPlayerActivity.kt)
+- [HiddenStreamResolver.kt](/F:/codex/1/feature/player/src/main/java/top/jlen/vod/ui/resolver/support/stream/HiddenStreamResolver.kt)
 
-可以把当前工程理解成：
+### `feature:shell`
 
-```text
-app
-├─ data    -> 数据入口
-├─ ui      -> 页面与播放器
-└─ entry   -> Application / Activity
-```
+应用导航壳。
+
+关键文件：
+
+- [JlenVideoApp.kt](/F:/codex/1/feature/shell/src/main/java/top/jlen/vod/ui/navigation/app/main/JlenVideoApp.kt)
+
+### `feature:state`
+
+状态调度与业务桥接层。
+
+关键文件：
+
+- [AppViewModel.kt](/F:/codex/1/feature/state/src/main/java/top/jlen/vod/ui/viewmodel/shell/AppViewModel.kt)
+- [LegacyStateRuntimeViewModel.kt](/F:/codex/1/feature/state/src/main/java/top/jlen/vod/ui/viewmodel/legacy/state/shell/LegacyStateRuntimeViewModel.kt)
+- [LegacyStateRuntimeViewModelCore.kt](/F:/codex/1/feature/state/src/main/java/top/jlen/vod/ui/viewmodel/legacy/state/runtime/core/LegacyStateRuntimeViewModelCore.kt)
 
 ---
 
-## 推荐阅读顺序
+## 7. 关键目录命名规则
 
-### 如果你要快速上手
+### `shell`
 
-1. [app/build.gradle.kts](/F:/codex/1/app/build.gradle.kts)
-2. [MainActivity.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/MainActivity.kt)
-3. [JlenVideoApp.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/JlenVideoApp.kt)
-4. [AppViewModel.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/AppViewModel.kt)
-5. [AppleCmsRepository.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt)
+薄壳入口。  
+对外提供稳定入口，尽量不放大段正文。
 
-### 如果你要改播放器
+### `runtime`
 
-1. [NativeVideoPlayer.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/NativeVideoPlayer.kt)
-2. [FullscreenPlayerActivity.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/FullscreenPlayerActivity.kt)
-3. [DetailPlayerScreens.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/ui/DetailPlayerScreens.kt)
+真正运行时实现所在层。
 
-### 如果你要改接口或站点解析
+### `core`
 
-1. [AppleCmsApi.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/AppleCmsApi.kt)
-2. [AppleCmsRepository.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/AppleCmsRepository.kt)
-3. [Models.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/data/Models.kt)
+runtime 内部的核心正文。
 
----
+### `legacy`
 
-## 维护建议
+历史实现兼容区。  
+不是废代码，而是仍在运行、但已被隔离出来的历史正文。
 
-### 新代码优先往哪里加
+### `support`
 
-- 新页面：优先放 `app/src/main/java/top/jlen/vod/ui`
-- 新接口与解析：优先放 `app/src/main/java/top/jlen/vod/data`
-- 新公共视觉常量：优先放 `UiPalette.kt` / `UiMotion.kt`
+辅助逻辑层，常见于纯解析、纯工具、纯状态构造。
 
-### 尽量不要做的事
+### `actions`
 
-- 不要把页面直接写成和数据请求强耦合
-- 不要把 HTML / JSON 解析散落到 UI 层
-- 不要把播放器细节逻辑塞回页面文件
-- 不要误把 `core/`、`feature/` 当成当前构建主入口
+按业务动作拆开的正文文件，比如首页加载、账号动作、播放器同步。
 
-### 遇到问题时怎么排查
+### `models`
 
-| 问题类型 | 优先检查 |
-| --- | --- |
-| 页面展示问题 | `BrowseScreens.kt` / `DetailPlayerScreens.kt` |
-| 状态不更新 | `AppViewModel.kt` |
-| 接口或解析问题 | `AppleCmsRepository.kt` |
-| 播放器交互问题 | `NativeVideoPlayer.kt` |
-| 登录状态问题 | `PersistentCookieJar.kt` / `AppleCmsRepository.kt` |
+内部数据模型层，避免巨型正文文件混放数据类。
 
 ---
 
-## 当前工程约定
+## 8. 关键文件作用说明
 
-- 默认站点在 [app/build.gradle.kts](/F:/codex/1/app/build.gradle.kts) 的 `BuildConfig.APPLE_CMS_BASE_URL`
+### 应用入口
+
+- [MainActivity.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/bootstrap/activity/MainActivity.kt)  
+  应用启动入口，Activity 层问题先看这里。
+
+- [JlenVideoApplication.kt](/F:/codex/1/app/src/main/java/top/jlen/vod/bootstrap/application/JlenVideoApplication.kt)  
+  Application 初始化问题先看这里。
+
+### 导航入口
+
+- [JlenVideoApp.kt](/F:/codex/1/feature/shell/src/main/java/top/jlen/vod/ui/navigation/app/main/JlenVideoApp.kt)  
+  页面导航、底部栏、主页面入口先看这里。
+
+### 状态入口
+
+- [AppViewModel.kt](/F:/codex/1/feature/state/src/main/java/top/jlen/vod/ui/viewmodel/shell/AppViewModel.kt)  
+  ViewModel 对外入口。
+
+- [LegacyStateRuntimeViewModelCore.kt](/F:/codex/1/feature/state/src/main/java/top/jlen/vod/ui/viewmodel/legacy/state/runtime/core/LegacyStateRuntimeViewModelCore.kt)  
+  真正的 legacy 状态正文核心。
+
+### 数据入口
+
+- [AppleCmsRepository.kt](/F:/codex/1/core/data/src/main/java/top/jlen/vod/data/repository/shell/cms/AppleCmsRepository.kt)  
+  Repository 对外入口。
+
+- [LegacyAppleCmsRuntimeRepositoryCore.kt](/F:/codex/1/core/data/src/main/java/top/jlen/vod/data/repository/legacy/runtime/cms/runtime/core/LegacyAppleCmsRuntimeRepositoryCore.kt)  
+  真正的 legacy repository 正文核心。
+
+### 播放器入口
+
+- [NativeVideoPlayer.kt](/F:/codex/1/feature/player/src/main/java/top/jlen/vod/ui/nativeplayer/view/main/NativeVideoPlayer.kt)  
+  手势、控制层、暂停播放、进度条等问题优先看这里。
+
+---
+
+## 9. 推荐阅读顺序
+
+推荐按下面顺序理解这个分支：
+
+1. [settings.gradle.kts](/F:/codex/1/settings.gradle.kts)
+2. [gradle.properties](/F:/codex/1/gradle.properties)
+3. [app/build.gradle.kts](/F:/codex/1/app/build.gradle.kts)
+4. [JlenVideoApp.kt](/F:/codex/1/feature/shell/src/main/java/top/jlen/vod/ui/navigation/app/main/JlenVideoApp.kt)
+5. [AppViewModel.kt](/F:/codex/1/feature/state/src/main/java/top/jlen/vod/ui/viewmodel/shell/AppViewModel.kt)
+6. [AppleCmsRepository.kt](/F:/codex/1/core/data/src/main/java/top/jlen/vod/data/repository/shell/cms/AppleCmsRepository.kt)
+7. [NativeVideoPlayer.kt](/F:/codex/1/feature/player/src/main/java/top/jlen/vod/ui/nativeplayer/view/main/NativeVideoPlayer.kt)
+
+---
+
+## 10. 维护建议
+
+- 新页面优先加到对应 `feature:*`
+- 新数据模型优先加到 `core:model`
+- 新接口和解析优先加到 `core:data`
+- 新通用状态或组件优先加到 `feature:common`
+- 不要把新逻辑再塞回 `app`
+- 不要直接在页面里写解析逻辑
+- 不要绕过 `shell` 入口直接耦合 legacy core
+
+---
+
+## 11. 当前工程约定
+
+- 默认站点配置在 [gradle.properties](/F:/codex/1/gradle.properties)
+- 当前版本为 `2.1.1.0 (26)`
 - APK 命名规则固定为：
 
 ```text
 JlenVideo-版本号-debug.apk
 ```
 
-- 小改动也会自动提交并推送
-- 发布版本默认会一起完成：
+- 小改动也自动提交并推送
+- 发布版本默认一起完成：
   1. 修改版本号
   2. 编译 APK
   3. 提交并推送源码
   4. 创建 GitHub Release
   5. 上传 APK 到 Release
-- Release 中文说明统一通过 UTF-8 文件和 `--notes-file` 发布
 
 ---
 
-## 2.1.1.0 更新说明
+## 12. 2.1.1.0 更新说明
 
 - 优化播放器逻辑
-
----
-
-## 附：模板目录说明
-
-[templates](/F:/codex/1/templates) 目录用于放模板和辅助资源，当前内容包括：
-
-- [DYXS2](/F:/codex/1/templates/DYXS2)
-- [v2.zip](/F:/codex/1/templates/v2.zip)
-
-平时排查 Android 客户端问题时，一般不需要先看这里。
