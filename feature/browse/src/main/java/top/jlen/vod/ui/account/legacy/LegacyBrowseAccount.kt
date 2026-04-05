@@ -271,10 +271,14 @@ internal fun LegacyAccountScreen(
                             }
                         }
 
+                        val showMembershipSignInAction = state.selectedSection == AccountSection.Member
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             OutlinedButton(
-                                onClick = onRefreshSection,
-                                enabled = !state.isLoading,
+                                onClick = if (showMembershipSignInAction) onSignInMembership else onRefreshSection,
+                                enabled = when {
+                                    showMembershipSignInAction -> !state.isActionLoading && !state.membershipSignInInfo.signedToday
+                                    else -> !state.isLoading
+                                },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(18.dp),
                                 border = BorderStroke(1.dp, UiPalette.BorderSoft),
@@ -283,7 +287,14 @@ internal fun LegacyAccountScreen(
                                     contentColor = UiPalette.Accent
                                 )
                             ) {
-                                Text("刷新")
+                                Text(
+                                    when {
+                                        showMembershipSignInAction && state.isActionLoading -> "处理中..."
+                                        showMembershipSignInAction && state.membershipSignInInfo.signedToday -> "今日已签"
+                                        showMembershipSignInAction -> "立即签到"
+                                        else -> "刷新"
+                                    }
+                                )
                             }
                             Button(
                                 onClick = onLogout,
@@ -1786,14 +1797,14 @@ internal fun LegacyMembershipPaneV2(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("????", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+                        Text("会员信息", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
                         TextButton(
                             onClick = onOpenPointLogs,
                             shape = RoundedCornerShape(14.dp),
                             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
                         ) {
                             Text(
-                                text = "????",
+                                text = "积分日志",
                                 color = UiPalette.Accent,
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.labelLarge
@@ -1801,15 +1812,15 @@ internal fun LegacyMembershipPaneV2(
                             Spacer(modifier = Modifier.width(2.dp))
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                                contentDescription = "??????",
+                                contentDescription = "查看积分日志",
                                 tint = UiPalette.Accent,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
                     }
-                    Text("?????${info.groupName.ifBlank { "????" }}", color = UiPalette.Ink)
-                    Text("?????${info.points.ifBlank { "--" }}", color = UiPalette.Ink)
-                    Text("?????${info.expiry.ifBlank { "--" }}", color = UiPalette.Ink)
+                    Text("当前分组：${info.groupName.ifBlank { "普通会员" }}", color = UiPalette.Ink)
+                    Text("剩余积分：${info.points.ifBlank { "--" }}", color = UiPalette.Ink)
+                    Text("到期时间：${info.expiry.ifBlank { "--" }}", color = UiPalette.Ink)
                 }
             }
 
@@ -1966,19 +1977,19 @@ fun AccountPointLogScreen(
                 TextButton(onClick = onBack, contentPadding = PaddingValues(0.dp)) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = "??",
+                        contentDescription = "返回",
                         tint = UiPalette.Ink
                     )
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = "????",
+                        text = "积分日志",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.ExtraBold,
                         color = UiPalette.Ink
                     )
                     Text(
-                        text = "??????????????",
+                        text = "查看签到、升级和积分变动记录",
                         style = MaterialTheme.typography.bodySmall,
                         color = UiPalette.TextSecondary
                     )
@@ -1987,7 +1998,7 @@ fun AccountPointLogScreen(
         }
 
         if (pointLogs.isEmpty()) {
-            item { EmptyPane("??????") }
+            item { EmptyPane("暂无积分日志") }
         } else {
             items(pointLogs, key = { it.logId.ifBlank { it.time + it.typeText } }) { log ->
                 Card(
@@ -2024,7 +2035,7 @@ fun AccountPointLogScreen(
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
-                                text = log.typeText.ifBlank { log.remarks.ifBlank { "????" } },
+                                text = log.typeText.ifBlank { log.remarks.ifBlank { "积分变动" } },
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = UiPalette.Ink
