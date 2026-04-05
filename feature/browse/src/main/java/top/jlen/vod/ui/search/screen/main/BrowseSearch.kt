@@ -111,6 +111,7 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -388,12 +389,14 @@ fun SearchResultsScreen(
     }
     LaunchedEffect(resultKey, listState) {
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .distinctUntilChanged()
             .collect { (index, offset) ->
                 onScrollPositionChange(index, offset)
             }
     }
     LaunchedEffect(listState, state.results.size, state.hasMore, state.isAppending, state.isLoading) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
+            .distinctUntilChanged()
             .collect { lastVisibleIndex ->
                 val resultsStartIndex = 3
                 val preloadThreshold = (resultsStartIndex + state.results.size - 3).coerceAtLeast(resultsStartIndex)

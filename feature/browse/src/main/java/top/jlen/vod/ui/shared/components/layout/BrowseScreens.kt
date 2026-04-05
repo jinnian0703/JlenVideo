@@ -1261,19 +1261,22 @@ internal fun AuthenticatedAvatar(
     contentScale: ContentScale = ContentScale.Crop
 ) {
     val context = LocalContext.current
+    val cookieJar = remember(context) { PersistentCookieJar(context.applicationContext) }
+    val imageClient = remember(context, cookieJar) {
+        OkHttpClient.Builder()
+            .cookieJar(cookieJar)
+            .build()
+    }
     val imageBytes by produceState<ByteArray?>(initialValue = null, context, imageUrl) {
         value = withContext(Dispatchers.IO) {
             runCatching {
-                val client = OkHttpClient.Builder()
-                    .cookieJar(PersistentCookieJar(context.applicationContext))
-                    .build()
                 val request = Request.Builder()
                     .url(imageUrl)
                     .header("Referer", AppConfig.appleCmsBaseUrl)
                     .header("Origin", AppConfig.appleCmsBaseUrl.trimEnd('/'))
                     .header("User-Agent", PLAYER_DESKTOP_UA)
                     .build()
-                client.newCall(request).execute().use { response ->
+                imageClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) return@use null
                     response.body?.bytes()
                 }

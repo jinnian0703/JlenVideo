@@ -111,6 +111,7 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -156,6 +157,7 @@ fun HomeScreen(
 
     LaunchedEffect(listState, latestRows.size, state.hasMoreLatest, state.isHomeAppending) {
         snapshotFlow { listState.maxVisiblePosterRowIndex("home_latest-") }
+            .distinctUntilChanged()
             .collect { lastVisibleRowIndex ->
                 if (
                     shouldAutoPreloadRows(
@@ -319,6 +321,7 @@ fun CategoryScreen(
 
     LaunchedEffect(listState, categoryRows.size, categoryRowKeyPrefix, state.hasMoreCategoryVideos, state.isCategoryAppending) {
         snapshotFlow { listState.maxVisiblePosterRowIndex(categoryRowKeyPrefix) }
+            .distinctUntilChanged()
             .collect { lastVisibleRowIndex ->
                 if (
                     shouldAutoPreloadRows(
