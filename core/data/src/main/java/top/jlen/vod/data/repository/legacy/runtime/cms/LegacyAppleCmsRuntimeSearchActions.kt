@@ -48,7 +48,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyPerformSearch(
     }.also { results ->
         runtimeUpdateSearchCacheEntry(
             cacheKey,
-            LegacyAppleCmsRuntimeRepository.CachedValue(
+            CachedValue(
                 value = results,
                 timestampMs = System.currentTimeMillis()
             )

@@ -50,7 +50,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadFreshDetail(
         }
         runtimeUpdateDetailCacheEntry(
             normalizedId,
-            LegacyAppleCmsRuntimeRepository.CachedValue(
+            CachedValue(
                 value = resolvedItem,
                 timestampMs = System.currentTimeMillis()
             )
@@ -65,7 +65,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadFreshDetail(
     ).also { item ->
         runtimeUpdateDetailCacheEntry(
             normalizedId,
-            LegacyAppleCmsRuntimeRepository.CachedValue(
+            CachedValue(
                 value = item,
                 timestampMs = System.currentTimeMillis()
             )
@@ -118,7 +118,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyFilterPlayablePreview
                 if (resolved != null && legacyParseSources(resolved).isNotEmpty()) {
                     runtimeUpdateDetailCacheEntry(
                         previewItem.vodId,
-                        LegacyAppleCmsRuntimeRepository.CachedValue(
+                        CachedValue(
                             value = resolved,
                             timestampMs = System.currentTimeMillis()
                         )

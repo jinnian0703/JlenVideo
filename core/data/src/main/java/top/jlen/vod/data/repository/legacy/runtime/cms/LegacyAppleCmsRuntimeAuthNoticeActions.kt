@@ -210,7 +210,7 @@ internal fun LegacyAppleCmsRuntimeRepository.legacyLoadFreshNotices(
             )
 
         updateNoticeCacheEntry(
-            LegacyAppleCmsRuntimeRepository.CachedValue(
+            CachedValue(
                 value = notices,
                 timestampMs = System.currentTimeMillis()
             )

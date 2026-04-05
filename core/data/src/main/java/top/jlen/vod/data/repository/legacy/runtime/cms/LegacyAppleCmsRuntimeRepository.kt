@@ -98,35 +98,6 @@ open class LegacyAppleCmsRuntimeRepository(
     @Volatile
     private var preferBackupApiUntilMs = 0L
 
-    private data class PortraitUploadPayload(
-        val bytes: ByteArray,
-        val fileName: String,
-        val mimeType: String
-    )
-
-    internal data class CachedValue<T>(
-        val value: T,
-        val timestampMs: Long
-    )
-
-    private data class PersistedPageCache(
-        val timestampMs: Long,
-        val payload: PagedVodItems
-    )
-
-    private data class PersistedHomeCache(
-        val timestampMs: Long,
-        val payload: HomePayload
-    )
-
-    private data class AppCenterUserSnapshot(
-        val session: AuthSession = AuthSession(),
-        val profileFields: List<Pair<String, String>> = emptyList(),
-        val profileEditor: UserProfileEditor = UserProfileEditor(),
-        val membershipInfo: MembershipInfo = MembershipInfo(),
-        val membershipPlans: List<MembershipPlan> = emptyList()
-    )
-
     internal fun runtimeClearHomeCacheEntry() {
         homeCache = null
     }
