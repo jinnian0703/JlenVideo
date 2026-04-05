@@ -48,6 +48,13 @@ internal fun accountStateRemovingFavorite(
     favoriteItems = accountState.favoriteItems.filterNot { item -> item.recordId == recordId }
 )
 
+internal fun accountStateRemovingFavoriteByVodId(
+    accountState: AccountUiState,
+    vodId: String
+): AccountUiState = accountState.copy(
+    favoriteItems = accountState.favoriteItems.filterNot { item -> item.vodId == vodId }
+)
+
 internal fun accountStateClearingFavorites(accountState: AccountUiState): AccountUiState = accountState.copy(
     favoriteItems = emptyList(),
     favoriteNextPageUrl = null

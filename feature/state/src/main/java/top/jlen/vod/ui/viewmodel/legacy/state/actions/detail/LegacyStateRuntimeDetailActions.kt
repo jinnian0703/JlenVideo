@@ -47,21 +47,22 @@ internal fun LegacyStateRuntimeViewModelCore.legacyCancelCurrentDetailFavorite()
         updateDetailState(detailStateWithActionMessage(currentDetailState(), "请先登录后再操作收藏", true))
         return
     }
-    val recordId = currentAccountState()
-        .favoriteItems
-        .firstOrNull { favorite -> favorite.vodId == item.vodId }
-        ?.recordId
-        ?.takeIf { it.isNotBlank() }
-    if (recordId == null) {
-        updateDetailState(detailStateWithFavoriteRemoveFailure(currentDetailState(), "未找到收藏记录，请稍后重试"))
+    val favoriteVodId = item.vodId.takeIf { it.isNotBlank() }
+        ?: currentAccountState()
+            .favoriteItems
+            .firstOrNull { favorite -> favorite.vodId == item.vodId }
+            ?.vodId
+            ?.takeIf { it.isNotBlank() }
+    if (favoriteVodId == null) {
+        updateDetailState(detailStateWithFavoriteRemoveFailure(currentDetailState(), "未找到可取消的收藏记录"))
         return
     }
     if (currentDetailState().isActionLoading) return
     updateDetailState(beginDetailFavoriteAction(currentDetailState()))
     runtimeRunAccountAction(
-        block = { deleteUserRecordForApp(recordIds = listOf(recordId), type = 2, clearAll = false) },
+        block = { deleteUserRecordForApp(recordIds = listOf(favoriteVodId), type = 2, clearAll = false) },
         onSuccess = {
-            updateAccountState(accountStateRemovingFavorite(currentAccountState(), recordId))
+            updateAccountState(accountStateRemovingFavoriteByVodId(currentAccountState(), favoriteVodId))
             updateDetailState(detailStateWithFavoriteRemoved(currentDetailState(), "已取消收藏"))
         }
     )
