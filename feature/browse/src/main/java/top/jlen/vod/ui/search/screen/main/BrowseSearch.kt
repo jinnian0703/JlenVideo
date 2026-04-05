@@ -43,6 +43,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.History
@@ -566,11 +567,28 @@ private fun SearchInputCard(
         ),
         placeholder = { Text("搜片名") },
         trailingIcon = {
-            TextButton(
-                onClick = onSearch,
-                colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Text("搜索", fontWeight = FontWeight.Bold)
+                if (query.isNotBlank()) {
+                    TextButton(
+                        onClick = { onQueryChange("") },
+                        colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.TextSecondary)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "清空搜索关键词",
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                TextButton(
+                    onClick = onSearch,
+                    colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
+                ) {
+                    Text("搜索", fontWeight = FontWeight.Bold)
+                }
             }
         }
     )
