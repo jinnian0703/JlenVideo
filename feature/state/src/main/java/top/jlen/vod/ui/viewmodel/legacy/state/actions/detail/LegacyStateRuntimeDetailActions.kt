@@ -40,6 +40,32 @@ internal fun LegacyStateRuntimeViewModelCore.legacyAddCurrentDetailFavorite() {
     }
 }
 
+
+internal fun LegacyStateRuntimeViewModelCore.legacyCancelCurrentDetailFavorite() {
+    val item = currentDetailState().item ?: return
+    if (!currentAccountState().session.isLoggedIn) {
+        updateDetailState(detailStateWithActionMessage(currentDetailState(), "请先登录后再操作收藏", true))
+        return
+    }
+    val recordId = currentAccountState()
+        .favoriteItems
+        .firstOrNull { favorite -> favorite.vodId == item.vodId }
+        ?.recordId
+        ?.takeIf { it.isNotBlank() }
+    if (recordId == null) {
+        updateDetailState(detailStateWithFavoriteRemoveFailure(currentDetailState(), "未找到收藏记录，请稍后重试"))
+        return
+    }
+    if (currentDetailState().isActionLoading) return
+    updateDetailState(beginDetailFavoriteAction(currentDetailState()))
+    runtimeRunAccountAction(
+        block = { deleteUserRecordForApp(recordIds = listOf(recordId), type = 2, clearAll = false) },
+        onSuccess = {
+            updateAccountState(accountStateRemovingFavorite(currentAccountState(), recordId))
+            updateDetailState(detailStateWithFavoriteRemoved(currentDetailState(), "已取消收藏"))
+        }
+    )
+}
 internal fun LegacyStateRuntimeViewModelCore.legacyDismissDetailActionMessage() {
     if (currentDetailState().actionMessage.isNullOrBlank()) return
     updateDetailState(detailStateWithoutActionMessage(currentDetailState()))

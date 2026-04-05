@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -385,6 +386,7 @@ fun JlenVideoApp() {
                             arguments = listOf(navArgument("vodId") { type = NavType.StringType })
                         ) { entry ->
                             val vodId = entry.arguments?.getString("vodId").orEmpty()
+                            var showRemoveFavoriteDialog by remember(vodId) { mutableStateOf(false) }
                             LaunchedEffect(vodId) {
                                 viewModel.loadDetail(vodId)
                             }
@@ -393,7 +395,16 @@ fun JlenVideoApp() {
                                 isLoggedIn = viewModel.accountState.session.isLoggedIn,
                                 onBack = { navController.popBackStack() },
                                 onSelectSource = viewModel::selectSource,
-                                onFavorite = viewModel::addCurrentDetailFavorite,
+                                onFavorite = {
+                                    if (
+                                        viewModel.accountState.session.isLoggedIn &&
+                                        viewModel.detailState.isFavorited
+                                    ) {
+                                        showRemoveFavoriteDialog = true
+                                    } else {
+                                        viewModel.addCurrentDetailFavorite()
+                                    }
+                                },
                                 onDismissActionMessage = viewModel::dismissDetailActionMessage,
                                 onPlay = { title, sourceIndex, episodeIndex ->
                                     viewModel.openPlayer(
@@ -406,6 +417,28 @@ fun JlenVideoApp() {
                                     navController.navigate("player")
                                 }
                             )
+                            if (showRemoveFavoriteDialog) {
+                                AlertDialog(
+                                    onDismissRequest = { showRemoveFavoriteDialog = false },
+                                    title = { Text("取消收藏") },
+                                    text = { Text("这部影片已经在收藏中，要取消收藏吗？") },
+                                    confirmButton = {
+                                        TextButton(
+                                            onClick = {
+                                                showRemoveFavoriteDialog = false
+                                                viewModel.cancelCurrentDetailFavorite()
+                                            }
+                                        ) {
+                                            Text("确认取消", color = UiPalette.Accent)
+                                        }
+                                    },
+                                    dismissButton = {
+                                        TextButton(onClick = { showRemoveFavoriteDialog = false }) {
+                                            Text("先保留")
+                                        }
+                                    }
+                                )
+                            }
                         }
                         composable("player") {
                             LaunchedEffect(viewModel.playerState.item?.vodId) {

@@ -317,6 +317,8 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
 
     fun addCurrentDetailFavorite() = legacyAddCurrentDetailFavorite()
 
+    fun cancelCurrentDetailFavorite() = legacyCancelCurrentDetailFavorite()
+
     fun dismissDetailActionMessage() = legacyDismissDetailActionMessage()
 
     fun login() = legacyLogin()
