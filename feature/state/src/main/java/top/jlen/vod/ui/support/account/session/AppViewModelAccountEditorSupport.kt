@@ -126,6 +126,7 @@ internal fun accountStateAfterEmailBound(
 internal fun accountStateAfterEmailUnbound(accountState: AccountUiState): AccountUiState =
     accountState.copy(
         isProfileEditTab = true,
+        profileFields = accountState.profileFields.filterNot { it.first == "邮箱" },
         profileEditor = accountState.profileEditor.copy(
             email = "",
             pendingEmail = "",

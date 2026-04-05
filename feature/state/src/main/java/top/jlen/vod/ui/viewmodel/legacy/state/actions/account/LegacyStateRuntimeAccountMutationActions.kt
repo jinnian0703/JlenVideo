@@ -122,7 +122,6 @@ internal fun LegacyStateRuntimeViewModelCore.legacyUnbindEmail() {
         block = { unbindEmail() },
         onSuccess = {
             updateAccountState(accountStateAfterEmailUnbound(currentAccountState()))
-            selectAccountSection(AccountSection.Profile, forceRefresh = true)
         }
     )
 }
