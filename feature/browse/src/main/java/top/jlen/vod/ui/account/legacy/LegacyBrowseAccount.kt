@@ -1242,6 +1242,22 @@ internal fun LegacyAccountProfilePaneV2(
     onUnbindEmail: () -> Unit
 ) {
     val selectedTab = if (isEditTab) AccountProfileTab.Edit else AccountProfileTab.Overview
+    val overviewFields = remember(fields, editor.email) {
+        if (editor.email.isBlank() || fields.any { it.first == "邮箱" }) {
+            fields
+        } else {
+            val expiryIndex = fields.indexOfFirst { it.first == "到期时间" }
+            if (expiryIndex >= 0) {
+                buildList {
+                    addAll(fields.take(expiryIndex + 1))
+                    add("邮箱" to editor.email)
+                    addAll(fields.drop(expiryIndex + 1))
+                }
+            } else {
+                fields + ("邮箱" to editor.email)
+            }
+        }
+    }
 
     when {
         isLoading -> LoadingPane("资料加载中...")
@@ -1271,14 +1287,14 @@ internal fun LegacyAccountProfilePaneV2(
 
                 when (selectedTab) {
                     AccountProfileTab.Overview -> {
-                        if (fields.isEmpty()) {
+                        if (overviewFields.isEmpty()) {
                             Text(
                                 text = "暂无资料",
                                 color = UiPalette.TextSecondary,
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         } else {
-                            fields.forEach { (label, value) ->
+                            overviewFields.forEach { (label, value) ->
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
