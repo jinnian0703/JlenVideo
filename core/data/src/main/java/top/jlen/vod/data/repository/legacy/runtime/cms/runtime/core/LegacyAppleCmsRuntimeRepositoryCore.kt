@@ -382,6 +382,15 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     internal suspend fun runtimeSubmitAppCenterUserProfileMutation(formBody: FormBody): String =
         submitAppCenterUserProfileMutation(formBody)
 
+    internal suspend fun runtimeRequestVideoApiJson(
+        path: String,
+        queryParameters: Map<String, String> = emptyMap(),
+        formBody: FormBody? = null
+    ): JsonObject = requestVideoApiJson(path, queryParameters, formBody)
+
+    internal fun runtimeExtractVideoApiMessage(json: JsonObject, fallbackMessage: String): String =
+        extractVideoApiMessage(json, fallbackMessage)
+
     internal suspend fun runtimeSubmitUserAction(
         url: String,
         referer: String,

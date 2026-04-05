@@ -85,6 +85,17 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacySaveUserProfile(
 
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacySendEmailBindCode(email: String): String {
     runCatching {
+        val json = runtimeRequestVideoApiJson(
+            path = "api.php/video/bindMsg",
+            formBody = FormBody.Builder()
+                .add("ac", "email")
+                .add("to", email.trim())
+                .build()
+        )
+        runtimeExtractVideoApiMessage(json, "验证码已发送")
+    }.getOrNull()?.let { return it }
+
+    runCatching {
         runtimeSubmitAppCenterUserProfileMutation(
             FormBody.Builder()
                 .add("ac", "email")
@@ -111,6 +122,18 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyBindEmail(
     code: String
 ): String {
     runCatching {
+        val json = runtimeRequestVideoApiJson(
+            path = "api.php/video/bind",
+            formBody = FormBody.Builder()
+                .add("ac", "email")
+                .add("to", email.trim())
+                .add("code", code.trim())
+                .build()
+        )
+        runtimeExtractVideoApiMessage(json, "邮箱已绑定")
+    }.getOrNull()?.let { return it }
+
+    runCatching {
         runtimeSubmitAppCenterUserProfileMutation(
             FormBody.Builder()
                 .add("ac", "email")
@@ -135,6 +158,16 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyBindEmail(
 }
 
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyUnbindEmail(): String {
+    runCatching {
+        val json = runtimeRequestVideoApiJson(
+            path = "api.php/video/unbind",
+            formBody = FormBody.Builder()
+                .add("ac", "email")
+                .build()
+        )
+        runtimeExtractVideoApiMessage(json, "邮箱已解绑")
+    }.getOrNull()?.let { return it }
+
     runCatching {
         runtimeSubmitAppCenterUserProfileMutation(
             FormBody.Builder()
