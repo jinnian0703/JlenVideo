@@ -418,24 +418,11 @@ fun JlenVideoApp() {
                                 }
                             )
                             if (showRemoveFavoriteDialog) {
-                                AlertDialog(
-                                    onDismissRequest = { showRemoveFavoriteDialog = false },
-                                    title = { Text("取消收藏") },
-                                    text = { Text("这部影片已经在收藏中，要取消收藏吗？") },
-                                    confirmButton = {
-                                        TextButton(
-                                            onClick = {
-                                                showRemoveFavoriteDialog = false
-                                                viewModel.cancelCurrentDetailFavorite()
-                                            }
-                                        ) {
-                                            Text("确认取消", color = UiPalette.Accent)
-                                        }
-                                    },
-                                    dismissButton = {
-                                        TextButton(onClick = { showRemoveFavoriteDialog = false }) {
-                                            Text("先保留")
-                                        }
+                                RemoveFavoriteConfirmDialog(
+                                    onDismiss = { showRemoveFavoriteDialog = false },
+                                    onConfirm = {
+                                        showRemoveFavoriteDialog = false
+                                        viewModel.cancelCurrentDetailFavorite()
                                     }
                                 )
                             }
@@ -475,6 +462,91 @@ private fun normalizeHeartbeatRoute(route: String?): String = when {
     route.startsWith("detail/") || route == "detail/{vodId}" -> "detail"
     route.startsWith("announcement/") || route == "announcement/{noticeId}" -> "announcement_detail"
     else -> route
+}
+
+@Composable
+private fun RemoveFavoriteConfirmDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .background(UiPalette.DangerSurface, RoundedCornerShape(999.dp))
+                            .border(1.dp, UiPalette.DangerBorder, RoundedCornerShape(999.dp))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            text = "???",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = UiPalette.DangerText
+                        )
+                    }
+                    Text(
+                        text = "????",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = UiPalette.Ink
+                    )
+                    Text(
+                        text = "??????????????????",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = UiPalette.TextSecondary
+                    )
+                }
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Text(
+                        text = "????????-?????????????????",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = UiPalette.TextPrimary
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.width(110.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = UiPalette.TextPrimary)
+                    ) {
+                        Text("???", fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier
+                            .padding(start = 10.dp)
+                            .width(122.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = UiPalette.DangerText,
+                            contentColor = UiPalette.Surface
+                        )
+                    ) {
+                        Text("????", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
