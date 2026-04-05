@@ -51,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -113,6 +114,7 @@ fun JlenVideoApp() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val currentTopLevelRoute = normalizeTopLevelRoute(currentRoute)
+    var pendingTopLevelRoute by rememberSaveable { mutableStateOf<String?>(null) }
     val heartbeatRoute = normalizeHeartbeatRoute(currentRoute)
     val heartbeatPlaybackKey = if (heartbeatRoute == "player") {
         listOf(
@@ -152,7 +154,8 @@ fun JlenVideoApp() {
         openExternalUrl(context, targetUrl)
     }
     val navigateToTopLevel: (String) -> Unit = { route ->
-        if (currentTopLevelRoute != route) {
+        if (currentTopLevelRoute != route && pendingTopLevelRoute != route) {
+            pendingTopLevelRoute = route
             navController.navigate(route) {
                 popUpTo(navController.graph.findStartDestination().id) {
                     saveState = true
@@ -160,6 +163,11 @@ fun JlenVideoApp() {
                 launchSingleTop = true
                 restoreState = true
             }
+        }
+    }
+    LaunchedEffect(currentTopLevelRoute, pendingTopLevelRoute) {
+        if (pendingTopLevelRoute != null && pendingTopLevelRoute == currentTopLevelRoute) {
+            pendingTopLevelRoute = null
         }
     }
     val openSearchResults: (String) -> Unit = { query ->
@@ -220,7 +228,9 @@ fun JlenVideoApp() {
                     NavHost(
                         navController = navController,
                         startDestination = "home",
-                        modifier = Modifier.padding(innerPadding),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
                         enterTransition = { EnterTransition.None },
                         exitTransition = { ExitTransition.None },
                         popEnterTransition = { EnterTransition.None },
