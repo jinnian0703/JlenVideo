@@ -7,6 +7,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyDeleteFavorite(recordId: Stri
     if (recordId.isBlank()) return
     runtimeRunAccountAction(
         block = { deleteUserRecordForApp(recordIds = listOf(recordId), type = 2, clearAll = false) },
+        successMessage = "已移出收藏",
         onSuccess = {
             val removedItem = currentAccountState().favoriteItems.firstOrNull { item -> item.recordId == recordId }
             updateAccountState(accountStateRemovingFavorite(currentAccountState(), recordId))
@@ -21,6 +22,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyDeleteFavorite(recordId: Stri
 internal fun LegacyStateRuntimeViewModelCore.legacyClearFavorites() {
     runtimeRunAccountAction(
         block = { deleteUserRecordForApp(recordIds = emptyList(), type = 2, clearAll = true) },
+        successMessage = "已清空收藏",
         onSuccess = {
             updateAccountState(accountStateClearingFavorites(currentAccountState()))
             if (currentDetailState().item != null) {
@@ -35,6 +37,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyDeleteHistory(recordId: Strin
     if (recordId.isBlank()) return
     runtimeRunAccountAction(
         block = { deleteUserRecordForApp(recordIds = listOf(recordId), type = 4, clearAll = false) },
+        successMessage = "已删除播放记录",
         onSuccess = {
             updateAccountState(accountStateRemovingHistory(currentAccountState(), recordId))
             selectAccountSection(AccountSection.History, forceRefresh = true)
@@ -45,6 +48,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyDeleteHistory(recordId: Strin
 internal fun LegacyStateRuntimeViewModelCore.legacyClearHistory() {
     runtimeRunAccountAction(
         block = { deleteUserRecordForApp(recordIds = emptyList(), type = 4, clearAll = true) },
+        successMessage = "已清空播放记录",
         onSuccess = {
             updateAccountState(accountStateClearingHistory(currentAccountState()))
             selectAccountSection(AccountSection.History, forceRefresh = true)
@@ -56,6 +60,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyUpgradeMembership(plan: Membe
     if (plan.groupId.isBlank() || plan.duration.isBlank()) return
     runtimeRunAccountAction(
         block = { upgradeMembership(plan) },
+        successMessage = "会员信息已更新",
         onSuccess = { selectAccountSection(AccountSection.Member, forceRefresh = true) }
     )
 }
@@ -63,6 +68,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyUpgradeMembership(plan: Membe
 internal fun LegacyStateRuntimeViewModelCore.legacySaveProfile() {
     runtimeRunAccountAction(
         block = { saveUserProfile(currentAccountState().profileEditor) },
+        successMessage = "资料已保存",
         onSuccess = {
             updateAccountState(accountStateAfterProfileSaved(currentAccountState()))
             selectAccountSection(AccountSection.Profile, forceRefresh = true)
@@ -78,6 +84,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyUploadPortrait(uri: Uri) {
     }
     runtimeRunAccountAction(
         block = { uploadPortraitOptimized(uri) },
+        successMessage = "头像已更新",
         onSuccess = {
             refreshNotices(forceRefresh = true)
             selectAccountSection(AccountSection.Profile, forceRefresh = true)
@@ -93,6 +100,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacySendEmailBindCode() {
     }
     runtimeRunAccountAction(
         block = { sendEmailBindCode(email) },
+        successMessage = "验证码已发送，请注意查收",
         onSuccess = { }
     )
 }
@@ -110,6 +118,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyBindEmail() {
     }
     runtimeRunAccountAction(
         block = { bindEmail(email, code) },
+        successMessage = "邮箱已绑定",
         onSuccess = {
             updateAccountState(accountStateAfterEmailBound(currentAccountState(), email))
             selectAccountSection(AccountSection.Profile, forceRefresh = true)
@@ -120,6 +129,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyBindEmail() {
 internal fun LegacyStateRuntimeViewModelCore.legacyUnbindEmail() {
     runtimeRunAccountAction(
         block = { unbindEmail() },
+        successMessage = "邮箱已解绑",
         onSuccess = {
             updateAccountState(accountStateAfterEmailUnbound(currentAccountState()))
         }

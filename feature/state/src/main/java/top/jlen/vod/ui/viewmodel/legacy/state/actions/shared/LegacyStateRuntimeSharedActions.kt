@@ -27,6 +27,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyReportHeartbeat(route: String
 
 internal fun LegacyStateRuntimeViewModelCore.legacyRunAccountAction(
     block: suspend AppleCmsRepository.() -> String,
+    successMessage: String? = null,
     onSuccess: () -> Unit
 ) {
     if (currentAccountState().isActionLoading) return
@@ -35,7 +36,12 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRunAccountAction(
         runCatching {
             withContext(Dispatchers.IO) { legacyRepository().block() }
         }.onSuccess { message ->
-            updateAccountState(accountStateWithActionSuccess(currentAccountState(), message))
+            updateAccountState(
+                accountStateWithActionSuccess(
+                    currentAccountState(),
+                    successMessage ?: message
+                )
+            )
             onSuccess()
         }.onFailure { error ->
             if (legacyHandleAccountSessionExpired(error)) return@onFailure
