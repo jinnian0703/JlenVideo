@@ -1571,15 +1571,16 @@ internal fun LegacyReadonlyBindingField(
     actionText: String? = null,
     onAction: (() -> Unit)? = null
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(UiPalette.Surface)
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        border = BorderStroke(1.dp, UiPalette.BorderSoft)
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(label, color = UiPalette.TextSecondary, style = MaterialTheme.typography.labelLarge)
@@ -1602,7 +1603,7 @@ internal fun LegacyReadonlyBindingField(
                 }
             }
         }
-    }
+    }    
 }
 
 @Composable
