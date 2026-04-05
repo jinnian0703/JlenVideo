@@ -573,56 +573,79 @@ internal fun AccountStatusNotice(
     onAction: (() -> Unit)? = null
 ) {
     val isError = tone == AccountNoticeTone.Error
-    val containerColor = if (isError) UiPalette.DangerSurface else UiPalette.AccentSoft.copy(alpha = 0.18f)
-    val borderColor = if (isError) UiPalette.DangerBorder else UiPalette.BorderSoft
+    val containerColor = if (isError) UiPalette.DangerSurface.copy(alpha = 0.58f) else UiPalette.AccentSoft.copy(alpha = 0.14f)
+    val borderColor = if (isError) UiPalette.DangerBorder.copy(alpha = 0.65f) else UiPalette.BorderSoft
     val iconTint = if (isError) UiPalette.DangerText else UiPalette.Accent
     val textColor = if (isError) UiPalette.DangerText else UiPalette.Ink
     val icon = if (isError) Icons.Rounded.ErrorOutline else Icons.Rounded.CheckCircle
+    val badgeText = if (isError) "提示" else "状态"
 
     Card(
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(22.dp),
         border = BorderStroke(1.dp, borderColor)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color.White.copy(alpha = if (isError) 0.7f else 0.82f)),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-            Text(
-                text = message,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyLarge,
-                color = textColor
-            )
-            if (!actionLabel.isNullOrBlank() && onAction != null) {
-                TextButton(
-                    onClick = onAction,
-                    colors = ButtonDefaults.textButtonColors(contentColor = textColor)
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = if (isError) 0.86f else 0.9f)),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Refresh,
+                        imageVector = icon,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp)
+                        tint = iconTint,
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(actionLabel, fontWeight = FontWeight.Bold)
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = badgeText,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = iconTint
+                    )
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = textColor
+                    )
+                }
+                if (!actionLabel.isNullOrBlank() && onAction != null) {
+                    OutlinedButton(
+                        onClick = onAction,
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, borderColor),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color.White.copy(alpha = 0.52f),
+                            contentColor = textColor
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(actionLabel, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+                    }
                 }
             }
         }
