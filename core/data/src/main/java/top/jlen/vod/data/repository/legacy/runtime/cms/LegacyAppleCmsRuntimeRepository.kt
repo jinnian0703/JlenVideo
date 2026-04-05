@@ -315,7 +315,47 @@ open class LegacyAppleCmsRuntimeRepository(
 
     internal fun runtimeNormalizeUrl(raw: String): String = normalizeUrl(raw)
 
+    internal fun runtimeNormalizeAgainst(raw: String, base: String): String =
+        normalizeAgainst(raw, base)
+
+    internal fun runtimePeekDetailCacheEntry(vodId: String): CachedValue<VodItem?>? =
+        detailCache[vodId]
+
+    internal fun runtimeUpdateDetailCacheEntry(vodId: String, value: CachedValue<VodItem?>) {
+        detailCache[vodId] = value
+    }
+
+    internal fun runtimeDetailCacheTtlMs(): Long = DETAIL_CACHE_TTL_MS
+
+    internal fun runtimeFindPreviewItem(vodId: String): VodItem? = findPreviewItem(vodId)
+
     internal suspend fun runtimeFetchDocument(url: String): Document = fetchDocument(url)
+
+    internal suspend fun runtimeFetchHtml(
+        url: String,
+        referer: String = "",
+        postBody: FormBody? = null
+    ): String = fetchHtml(url, postBody = postBody, referer = referer)
+
+    internal fun runtimeParseDetail(document: Document): VodItem? = parseDetail(document)
+
+    internal suspend fun runtimeRequestDetailApi(vodId: String): VodItem? =
+        requestApi { getDetail(vodId = vodId) }
+            .data
+            ?.takeIf { it.isJsonObject }
+            ?.let { json -> gson.fromJson(json, VodItem::class.java) }
+
+    internal fun runtimeExtractPlayerConfig(html: String): Pair<String, Int>? =
+        extractPlayerConfig(html)
+
+    internal fun runtimeDecodePlayerUrl(rawUrl: String, encrypt: Int): String =
+        decodePlayerUrl(rawUrl, encrypt)
+
+    internal suspend fun runtimeResolveNestedMediaUrl(
+        candidateUrl: String,
+        referer: String,
+        depth: Int
+    ): String = resolveNestedMediaUrl(candidateUrl, referer, depth)
 
     internal suspend fun runtimeSubmitPublicAction(
         url: String,
@@ -2114,204 +2154,31 @@ open class LegacyAppleCmsRuntimeRepository(
             .ifBlank { item.siteLogId }
             .ifBlank { throw IOException("未找到影片编号") }
 
-    suspend fun loadDetail(vodId: String, forceRefresh: Boolean = false): VodItem? {
-        val normalizedId = vodId.trim()
-        if (normalizedId.isBlank()) return null
-        if (!forceRefresh) {
-            detailCache[normalizedId]
-                ?.takeIf { isCacheValid(it.timestampMs, DETAIL_CACHE_TTL_MS) }
-                ?.value
-                ?.let { return it }
-        }
+    suspend fun loadDetail(vodId: String, forceRefresh: Boolean = false): VodItem? =
+        legacyLoadDetail(vodId, forceRefresh)
 
-        return if (forceRefresh) {
-            loadFreshDetail(normalizedId)
-        } else {
-            awaitSharedRequest("detail:$normalizedId") {
-                detailCache[normalizedId]
-                    ?.takeIf { isCacheValid(it.timestampMs, DETAIL_CACHE_TTL_MS) }
-                    ?.value
-                    ?: loadFreshDetail(normalizedId)
-            }
-        }
-    }
-
-    private suspend fun loadFreshDetail(normalizedId: String): VodItem? {
-        if (normalizedId.all(Char::isDigit)) {
-            val previewItem = findPreviewItem(normalizedId)
-            val apiItem = loadDetailFromApi(normalizedId)
-            val resolvedItem = when {
-                apiItem == null -> previewItem?.let { preview ->
-                    resolveDetailMismatch(preview, excludedVodId = normalizedId)
-                        ?.let { mergePreviewIntoDetail(preview, it) }
-                        ?: preview
-                }
-                previewItem != null && !detailMatchesPreview(apiItem, previewItem) ->
-                    resolveDetailMismatch(previewItem, excludedVodId = normalizedId)
-                        ?.let { mergePreviewIntoDetail(previewItem, it) }
-                        ?: previewItem
-                previewItem != null -> mergePreviewIntoDetail(previewItem, apiItem)
-                else -> apiItem
-            }
-            detailCache[normalizedId] = CachedValue(
-                value = resolvedItem,
-                timestampMs = System.currentTimeMillis()
-            )
-            resolvedItem?.let { rememberPreviewItems(listOf(it)) }
-            cleanupCachesIfNeeded()
-            return resolvedItem
-        }
-
-        return parseDetail(fetchDocument("$baseUrl/voddetail/$normalizedId/")).also { item ->
-            detailCache[normalizedId] = CachedValue(
-                value = item,
-                timestampMs = System.currentTimeMillis()
-            )
-            cleanupCachesIfNeeded()
-        }
-    }
+    private suspend fun loadFreshDetail(normalizedId: String): VodItem? =
+        legacyLoadFreshDetail(normalizedId)
 
     private suspend fun loadDetailFromApi(vodId: String): VodItem? =
-        requestApi { getDetail(vodId = vodId) }
-            .data
-            ?.takeIf { it.isJsonObject }
-            ?.let { json -> gson.fromJson(json, VodItem::class.java) }
+        legacyLoadDetailFromApi(vodId)
 
     private suspend fun resolveDetailMismatch(
         previewItem: VodItem,
         excludedVodId: String
-    ): VodItem? {
-        val targetTitle = canonicalTitle(previewItem.vodName)
-        if (targetTitle.isBlank()) return null
+    ): VodItem? = legacyResolveDetailMismatch(previewItem, excludedVodId)
 
-        val candidates = runCatching {
-            requestApi { search(keyword = previewItem.vodName, page = 1, limit = 10) }
-                .data
-                ?.rows
-                .orEmpty()
-        }.getOrDefault(emptyList())
-            .filter { candidate ->
-                candidate.vodId != excludedVodId &&
-                    canonicalTitle(candidate.vodName) == targetTitle
-            }
-            .sortedByDescending { candidate ->
-                searchCandidateScore(candidate, previewItem)
-            }
+    private suspend fun filterPlayablePreviewItems(items: List<VodItem>): List<VodItem> =
+        legacyFilterPlayablePreviewItems(items)
 
-        for (candidate in candidates.take(5)) {
-            val detail = runCatching { loadDetailFromApi(candidate.vodId) }.getOrNull() ?: continue
-            if (detailMatchesPreview(detail, previewItem)) {
-                return detail
-            }
-        }
-        return null
-    }
+    private suspend fun resolvePlayableDetailForPreview(previewItem: VodItem): VodItem? =
+        legacyResolvePlayableDetailForPreview(previewItem)
 
-    private suspend fun filterPlayablePreviewItems(items: List<VodItem>): List<VodItem> {
-        if (items.isEmpty()) return emptyList()
-        return coroutineScope {
-            items.map { previewItem ->
-                async {
-                    val resolved = runCatching {
-                        resolvePlayableDetailForPreview(previewItem)
-                    }.getOrNull()
-                    if (resolved != null && parseSources(resolved).isNotEmpty()) {
-                        detailCache[previewItem.vodId] = CachedValue(
-                            value = resolved,
-                            timestampMs = System.currentTimeMillis()
-                        )
-                        rememberPreviewItems(listOf(resolved))
-                        previewItem
-                    } else {
-                        null
-                    }
-                }
-            }.awaitAll().filterNotNull()
-        }
-    }
+    suspend fun resolvePlayUrl(playPageUrl: String): ResolvedPlayUrl =
+        legacyResolvePlayUrl(playPageUrl)
 
-    private suspend fun resolvePlayableDetailForPreview(previewItem: VodItem): VodItem? {
-        detailCache[previewItem.vodId]
-            ?.takeIf { isCacheValid(it.timestampMs, DETAIL_CACHE_TTL_MS) }
-            ?.value
-            ?.takeIf { parseSources(it).isNotEmpty() }
-            ?.let { return it }
-
-        val apiItem = loadDetailFromApi(previewItem.vodId)
-        return when {
-            apiItem == null -> resolveDetailMismatch(previewItem, excludedVodId = previewItem.vodId)
-                ?.let { mergePreviewIntoDetail(previewItem, it) }
-            !detailMatchesPreview(apiItem, previewItem) ->
-                resolveDetailMismatch(previewItem, excludedVodId = previewItem.vodId)
-                    ?.let { mergePreviewIntoDetail(previewItem, it) }
-            else -> mergePreviewIntoDetail(previewItem, apiItem)
-        }
-    }
-
-    suspend fun resolvePlayUrl(playPageUrl: String): ResolvedPlayUrl {
-        val normalizedPageUrl = resolveUrl(playPageUrl)
-        if (isDirectMediaUrl(normalizedPageUrl)) {
-            return ResolvedPlayUrl(url = normalizedPageUrl, useWebPlayer = false)
-        }
-
-        val html = fetchHtml(normalizedPageUrl, referer = "$baseUrl/")
-        val playerConfig = extractPlayerConfig(html)
-        val rawUrl = playerConfig?.first.orEmpty()
-        val encrypt = playerConfig?.second ?: 0
-        val decodedUrl = decodePlayerUrl(rawUrl, encrypt)
-        val firstResolvedUrl = normalizeAgainst(decodedUrl.ifBlank { normalizedPageUrl }, normalizedPageUrl)
-        val resolvedUrl = resolveNestedMediaUrl(
-            candidateUrl = firstResolvedUrl,
-            referer = normalizedPageUrl,
-            depth = 0
-        )
-        val useWebPlayer = !isDirectMediaUrl(resolvedUrl)
-
-        return ResolvedPlayUrl(
-            url = if (useWebPlayer) normalizedPageUrl else resolvedUrl,
-            useWebPlayer = useWebPlayer
-        )
-    }
-
-    fun parseSources(item: VodItem): List<PlaySource> {
-        val sourceNames = item.vodPlayFrom
-            .orEmpty()
-            .split("$$$")
-            .map(::sanitizeUserFacingToken)
-            .filter { it.isNotBlank() }
-
-        val groups = item.vodPlayUrl
-            .orEmpty()
-            .split("$$$")
-            .map { rawGroup ->
-                rawGroup.split("#")
-                    .mapNotNull { rawEpisode ->
-                        val pair = rawEpisode.split("$", limit = 2)
-                        val url = pair.getOrNull(1).orEmpty().trim()
-                        if (url.isBlank()) {
-                            null
-                        } else {
-                            Episode(
-                                name = pair.firstOrNull().orEmpty().ifBlank { "播放" },
-                                url = normalizeUrl(url)
-                            )
-                        }
-                    }
-            }
-            .filter { it.isNotEmpty() }
-            .map { episodes ->
-                episodes.map { episode ->
-                    episode.copy(name = sanitizeUserFacingToken(episode.name).ifBlank { "播放" })
-                }
-            }
-
-        return groups.mapIndexed { index, episodes ->
-            PlaySource(
-                name = sourceNames.getOrNull(index).orEmpty().ifBlank { "线路 ${index + 1}" },
-                episodes = episodes
-            )
-        }
-    }
+    fun parseSources(item: VodItem): List<PlaySource> =
+        legacyParseSources(item)
 
     private suspend fun loadLevelItemsFromHomePage(limit: Int): List<VodItem> {
         val document = fetchDocument("$baseUrl/")
