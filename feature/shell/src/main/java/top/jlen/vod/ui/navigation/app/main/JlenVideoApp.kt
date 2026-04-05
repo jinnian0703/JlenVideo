@@ -487,20 +487,20 @@ private fun RemoveFavoriteConfirmDialog(
                             .padding(horizontal = 10.dp, vertical = 5.dp)
                     ) {
                         Text(
-                            text = "???",
+                            text = "已收藏",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = UiPalette.DangerText
                         )
                     }
                     Text(
-                        text = "????",
+                        text = "取消收藏",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.ExtraBold,
                         color = UiPalette.Ink
                     )
                     Text(
-                        text = "??????????????????",
+                        text = "这部影片已经在收藏中，要取消收藏吗？",
                         style = MaterialTheme.typography.bodyLarge,
                         color = UiPalette.TextSecondary
                     )
@@ -510,7 +510,7 @@ private fun RemoveFavoriteConfirmDialog(
                     shape = RoundedCornerShape(20.dp)
                 ) {
                     Text(
-                        text = "????????-?????????????????",
+                        text = "取消后会从“我的-收藏”中移除，但不会影响播放记录。",
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -528,7 +528,7 @@ private fun RemoveFavoriteConfirmDialog(
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = UiPalette.TextPrimary)
                     ) {
-                        Text("???", fontWeight = FontWeight.Bold)
+                        Text("先保留", fontWeight = FontWeight.Bold)
                     }
                     Button(
                         onClick = onConfirm,
@@ -541,7 +541,7 @@ private fun RemoveFavoriteConfirmDialog(
                             contentColor = UiPalette.Surface
                         )
                     ) {
-                        Text("????", fontWeight = FontWeight.Bold)
+                        Text("确认取消", fontWeight = FontWeight.Bold)
                     }
                 }
             }
