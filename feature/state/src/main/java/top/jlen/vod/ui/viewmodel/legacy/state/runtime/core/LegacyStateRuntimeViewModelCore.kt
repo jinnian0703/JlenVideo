@@ -136,9 +136,14 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
 
     internal fun runtimeRunAccountAction(
         block: suspend AppleCmsRepository.() -> String,
+        successMessage: String? = null,
         onSuccess: () -> Unit
     ) {
-        runAccountAction(block, onSuccess)
+        legacyRunAccountAction(
+            block = block,
+            successMessage = successMessage,
+            onSuccess = onSuccess
+        )
     }
 
     internal fun runtimeHandleAccountSessionExpired(error: Throwable): Boolean =
@@ -344,7 +349,7 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
     private fun runAccountAction(
         block: suspend AppleCmsRepository.() -> String,
         onSuccess: () -> Unit
-    ) = legacyRunAccountAction(block, onSuccess)
+    ) = legacyRunAccountAction(block = block, onSuccess = onSuccess)
 
     private fun handleAccountSessionExpired(error: Throwable): Boolean =
         legacyHandleAccountSessionExpired(error)

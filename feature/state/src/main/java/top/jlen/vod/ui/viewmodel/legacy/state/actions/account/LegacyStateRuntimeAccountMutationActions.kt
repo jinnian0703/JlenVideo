@@ -1,7 +1,12 @@
 package top.jlen.vod.ui
 
 import android.net.Uri
+import android.util.Patterns
 import top.jlen.vod.data.MembershipPlan
+
+
+private fun String.isValidEmailAddress(): Boolean =
+    Patterns.EMAIL_ADDRESS.matcher(this).matches()
 
 internal fun LegacyStateRuntimeViewModelCore.legacyDeleteFavorite(recordId: String) {
     if (recordId.isBlank()) return
