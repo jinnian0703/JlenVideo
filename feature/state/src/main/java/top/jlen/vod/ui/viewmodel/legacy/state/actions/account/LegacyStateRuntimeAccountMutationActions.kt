@@ -81,6 +81,32 @@ internal fun LegacyStateRuntimeViewModelCore.legacyUpgradeMembership(plan: Membe
     )
 }
 
+internal fun LegacyStateRuntimeViewModelCore.legacySignInMembership() {
+    val signInInfo = currentAccountState().membershipSignInInfo
+    if (!signInInfo.enabled) {
+        updateAccountState(
+            accountStateWithValidationError(
+                currentAccountState(),
+                "当前站点未开启签到功能"
+            )
+        )
+        return
+    }
+    if (signInInfo.signedToday) {
+        updateAccountState(
+            accountStateWithValidationError(
+                currentAccountState(),
+                "今日已签到，请明天再来"
+            )
+        )
+        return
+    }
+    runtimeRunAccountAction(
+        block = { signInMembership() },
+        onSuccess = { selectAccountSection(AccountSection.Member, forceRefresh = true) }
+    )
+}
+
 internal fun LegacyStateRuntimeViewModelCore.legacySaveProfile() {
     runtimeRunAccountAction(
         block = { saveUserProfile(currentAccountState().profileEditor) },

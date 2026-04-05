@@ -331,6 +331,7 @@ fun JlenVideoApp() {
                                 onDeleteHistory = viewModel::deleteHistory,
                                 onClearHistory = viewModel::clearHistory,
                                 onUpgradeMembership = viewModel::upgradeMembership,
+                                onSignInMembership = viewModel::signInMembership,
                                 onProfileEditorChange = viewModel::updateProfileEditor,
                                 onProfileTabChange = viewModel::setProfileEditTab,
                                 onSaveProfile = viewModel::saveProfile,

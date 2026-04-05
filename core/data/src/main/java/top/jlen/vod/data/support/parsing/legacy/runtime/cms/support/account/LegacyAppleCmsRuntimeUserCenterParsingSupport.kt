@@ -170,7 +170,16 @@ internal fun mergeMembershipPages(base: MembershipPage, fallback: MembershipPage
                     plan.duration.isNotBlank() ||
                     plan.points.isNotBlank()
             }
-            .distinctBy { "${it.groupId}:${it.groupName}:${it.duration}:${it.points}" }
+            .distinctBy { "${it.groupId}:${it.groupName}:${it.duration}:${it.points}" },
+        signInInfo = MembershipSignInInfo(
+            enabled = base.signInInfo.enabled || fallback.signInInfo.enabled,
+            signedToday = base.signInInfo.signedToday || fallback.signInInfo.signedToday,
+            rewardPoints = base.signInInfo.rewardPoints.ifBlank { fallback.signInInfo.rewardPoints },
+            rewardMinPoints = base.signInInfo.rewardMinPoints.ifBlank { fallback.signInInfo.rewardMinPoints },
+            rewardMaxPoints = base.signInInfo.rewardMaxPoints.ifBlank { fallback.signInInfo.rewardMaxPoints },
+            signedAt = base.signInInfo.signedAt.ifBlank { fallback.signInInfo.signedAt }
+        ),
+        pointLogs = if (base.pointLogs.isNotEmpty()) base.pointLogs else fallback.pointLogs
     )
 }
 

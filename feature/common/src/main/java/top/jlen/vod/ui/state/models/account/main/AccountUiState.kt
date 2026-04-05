@@ -5,6 +5,8 @@ import top.jlen.vod.data.AuthSession
 import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.MembershipInfo
 import top.jlen.vod.data.MembershipPlan
+import top.jlen.vod.data.MembershipSignInInfo
+import top.jlen.vod.data.PointLogItem
 import top.jlen.vod.data.RegisterEditor
 import top.jlen.vod.data.UserCenterItem
 import top.jlen.vod.data.UserProfileEditor
@@ -57,6 +59,8 @@ data class AccountUiState(
     val historyNextPageUrl: String? = null,
     val membershipInfo: MembershipInfo = MembershipInfo(),
     val membershipPlans: List<MembershipPlan> = emptyList(),
+    val membershipSignInInfo: MembershipSignInInfo = MembershipSignInInfo(),
+    val membershipPointLogs: List<PointLogItem> = emptyList(),
     val updateInfo: AppUpdateInfo? = null,
     val hasCrashLog: Boolean = false,
     val latestCrashLog: String = ""

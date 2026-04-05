@@ -24,7 +24,6 @@ import top.jlen.vod.data.Episode
 import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.HotSearchGroup
 import top.jlen.vod.data.HomeSection
-import top.jlen.vod.data.MembershipInfo
 import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.PlaySource
 import top.jlen.vod.data.RegisterEditor
@@ -303,6 +302,8 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
     fun clearHistory() = legacyClearHistory()
 
     fun upgradeMembership(plan: MembershipPlan) = legacyUpgradeMembership(plan)
+
+    fun signInMembership() = legacySignInMembership()
 
     fun saveProfile() = legacySaveProfile()
 

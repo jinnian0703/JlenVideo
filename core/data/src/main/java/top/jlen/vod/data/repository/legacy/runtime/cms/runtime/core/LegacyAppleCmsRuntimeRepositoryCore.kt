@@ -1512,7 +1512,8 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         val snapshot = loadAppCenterUserSnapshot()
         return MembershipPage(
             info = snapshot.membershipInfo,
-            plans = snapshot.membershipPlans
+            plans = snapshot.membershipPlans,
+            signInInfo = snapshot.membershipSignInInfo
         )
     }
 
@@ -1529,7 +1530,8 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         val snapshot = loadVideoMemberInfoSnapshot()
         return MembershipPage(
             info = snapshot.membershipInfo,
-            plans = snapshot.membershipPlans
+            plans = snapshot.membershipPlans,
+            signInInfo = snapshot.membershipSignInInfo
         )
     }
 
@@ -1646,6 +1648,19 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         legacyDeleteUserRecord(recordIds, type, clearAll)
 
     suspend fun upgradeMembership(plan: MembershipPlan): String = legacyUpgradeMembership(plan)
+
+    suspend fun signInMembership(): String = legacySignInMembership()
+
+    private suspend fun loadPointLogsForApp(page: Int = 1, limit: Int = 20): List<PointLogItem> {
+        val json = requestVideoApiJson(
+            path = "api.php/video/pointLogs",
+            queryParameters = mapOf(
+                "page" to page.toString(),
+                "limit" to limit.toString()
+            )
+        )
+        return parsePointLogItems(json)
+    }
 
     suspend fun loginForApp(userName: String, password: String): AuthSession {
         val body = executeUserRequest(
@@ -1908,7 +1923,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             throw IOException("璇峰厛鐧诲綍")
         }
 
-        return mergeMembershipPages(
+        val merged = mergeMembershipPages(
             base = MembershipPage(info = MembershipInfo(groupName = session.groupName)),
             fallback = runCatching { loadMembershipPageFromVideoMemberInfoApi() }.getOrNull()
         ).let { merged ->
@@ -1937,6 +1952,8 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 fallback = runCatching { loadMembershipPageFromHtml() }.getOrNull()
             )
         }
+        val pointLogs = runCatching { loadPointLogsForApp() }.getOrDefault(emptyList())
+        return merged.copy(pointLogs = if (merged.pointLogs.isNotEmpty()) merged.pointLogs else pointLogs)
     }
 
     suspend fun addFavoriteForApp(item: VodItem): String {
@@ -3742,6 +3759,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             points = points,
             expiry = expiry
         )
+        val membershipSignInInfo = parseMembershipSignInInfo(root)
         val profileFields = buildProfileFields(
             userId = userId,
             userName = userName,
@@ -3775,7 +3793,8 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 answer = answer
             ),
             membershipInfo = membershipInfo,
-            membershipPlans = plans
+            membershipPlans = plans,
+            membershipSignInInfo = membershipSignInInfo
         )
     }
 

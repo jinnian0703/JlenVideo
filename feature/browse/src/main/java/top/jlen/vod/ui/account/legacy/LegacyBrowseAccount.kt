@@ -123,7 +123,9 @@ import top.jlen.vod.data.CategoryFilterGroup
 import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.HotSearchGroup
 import top.jlen.vod.data.MembershipPlan
+import top.jlen.vod.data.MembershipSignInInfo
 import top.jlen.vod.data.PersistentCookieJar
+import top.jlen.vod.data.PointLogItem
 import top.jlen.vod.data.RegisterEditor
 import top.jlen.vod.data.UserProfileEditor
 import top.jlen.vod.data.VodItem
@@ -150,6 +152,7 @@ internal fun LegacyAccountScreen(
     onDeleteHistory: (String) -> Unit,
     onClearHistory: () -> Unit,
     onUpgradeMembership: (MembershipPlan) -> Unit,
+    onSignInMembership: () -> Unit,
     onProfileEditorChange: ((UserProfileEditor) -> UserProfileEditor) -> Unit,
     onProfileTabChange: (Boolean) -> Unit,
     onSaveProfile: () -> Unit,
@@ -376,8 +379,11 @@ internal fun LegacyAccountScreen(
                         isLoading = state.isContentLoading,
                         info = state.membershipInfo,
                         plans = state.membershipPlans,
+                        signInInfo = state.membershipSignInInfo,
+                        pointLogs = state.membershipPointLogs,
                         isActionLoading = state.isActionLoading,
-                        onUpgrade = onUpgradeMembership
+                        onUpgrade = onUpgradeMembership,
+                        onSignIn = onSignInMembership
                     )
                     AccountSection.About -> AboutPane(
                         currentVersion = state.updateInfo?.currentVersion?.ifBlank { AppRuntimeInfo.versionName }
@@ -1754,8 +1760,11 @@ internal fun LegacyMembershipPaneV2(
     isLoading: Boolean,
     info: top.jlen.vod.data.MembershipInfo,
     plans: List<MembershipPlan>,
+    signInInfo: MembershipSignInInfo,
+    pointLogs: List<PointLogItem>,
     isActionLoading: Boolean,
-    onUpgrade: (MembershipPlan) -> Unit
+    onUpgrade: (MembershipPlan) -> Unit,
+    onSignIn: () -> Unit
 ) {
     when {
         isLoading && plans.isEmpty() && info.groupName.isBlank() -> LoadingPane("会员信息加载中...")
@@ -1775,6 +1784,86 @@ internal fun LegacyMembershipPaneV2(
                     Text("当前分组：${info.groupName.ifBlank { "普通用户" }}", color = UiPalette.Ink)
                     Text("剩余积分：${info.points.ifBlank { "--" }}", color = UiPalette.Ink)
                     Text("到期时间：${info.expiry.ifBlank { "--" }}", color = UiPalette.Ink)
+                }
+            }
+
+            if (signInInfo.enabled || signInInfo.signedToday) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                    shape = RoundedCornerShape(22.dp),
+                    border = BorderStroke(1.dp, UiPalette.Border)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(UiPalette.Accent.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (signInInfo.signedToday) "已签" else "签到",
+                                color = UiPalette.Accent,
+                                fontWeight = FontWeight.ExtraBold,
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = if (signInInfo.signedToday) "今日已签到" else "每日签到",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = UiPalette.Ink
+                            )
+                            val rewardHint = when {
+                                signInInfo.rewardPoints.isNotBlank() -> "今日获得 ${signInInfo.rewardPoints} 积分"
+                                signInInfo.rewardMinPoints.isNotBlank() && signInInfo.rewardMaxPoints.isNotBlank() ->
+                                    "签到可获得 ${signInInfo.rewardMinPoints} - ${signInInfo.rewardMaxPoints} 积分"
+                                signInInfo.rewardMinPoints.isNotBlank() -> "签到可获得 ${signInInfo.rewardMinPoints} 积分起"
+                                else -> "完成签到即可领取积分奖励"
+                            }
+                            Text(
+                                text = rewardHint,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = UiPalette.TextSecondary
+                            )
+                            signInInfo.signedAt.takeIf(String::isNotBlank)?.let { signedAt ->
+                                Text(
+                                    text = signedAt,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = UiPalette.TextMuted
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = onSignIn,
+                            enabled = signInInfo.enabled && !signInInfo.signedToday && !isActionLoading,
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = UiPalette.Accent,
+                                contentColor = UiPalette.AccentText,
+                                disabledContainerColor = UiPalette.SurfaceSoft,
+                                disabledContentColor = UiPalette.TextMuted
+                            )
+                        ) {
+                            Text(
+                                when {
+                                    isActionLoading -> "处理中..."
+                                    signInInfo.signedToday -> "今日已签"
+                                    else -> "立即签到"
+                                }
+                            )
+                        }
+                    }
                 }
             }
 
@@ -1820,6 +1909,74 @@ internal fun LegacyMembershipPaneV2(
                                 )
                             ) {
                                 Text(if (isActionLoading) "处理中..." else "立即升级")
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (pointLogs.isNotEmpty()) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                    shape = RoundedCornerShape(24.dp),
+                    border = BorderStroke(1.dp, UiPalette.Border)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Text(
+                            text = "积分日志",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = UiPalette.Ink
+                        )
+                        pointLogs.forEach { log ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Text(
+                                        text = log.typeText.ifBlank { log.remarks.ifBlank { "积分变动" } },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = UiPalette.Ink
+                                    )
+                                    log.remarks.takeIf(String::isNotBlank)?.let { remarks ->
+                                        Text(
+                                            text = remarks,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = UiPalette.TextSecondary,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    Text(
+                                        text = log.timeText.ifBlank { log.time.ifBlank { "--" } },
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = UiPalette.TextMuted
+                                    )
+                                }
+                                Text(
+                                    text = log.pointsText.ifBlank {
+                                        when {
+                                            log.points.isBlank() -> "--"
+                                            log.isIncome && !log.points.startsWith("+") -> "+${log.points}"
+                                            !log.isIncome && !log.points.startsWith("-") -> "-${log.points}"
+                                            else -> log.points
+                                        }
+                                    },
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = if (log.isIncome) UiPalette.Accent else UiPalette.Ink
+                                )
                             }
                         }
                     }

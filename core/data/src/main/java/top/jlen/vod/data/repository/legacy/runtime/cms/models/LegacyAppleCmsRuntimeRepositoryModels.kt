@@ -26,5 +26,6 @@ internal data class AppCenterUserSnapshot(
     val profileFields: List<Pair<String, String>> = emptyList(),
     val profileEditor: UserProfileEditor = UserProfileEditor(),
     val membershipInfo: MembershipInfo = MembershipInfo(),
-    val membershipPlans: List<MembershipPlan> = emptyList()
+    val membershipPlans: List<MembershipPlan> = emptyList(),
+    val membershipSignInInfo: MembershipSignInInfo = MembershipSignInInfo()
 )

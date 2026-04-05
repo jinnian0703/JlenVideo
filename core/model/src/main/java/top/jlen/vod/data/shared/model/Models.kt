@@ -315,6 +315,27 @@ data class MembershipInfo(
     val expiry: String = ""
 )
 
+data class MembershipSignInInfo(
+    val enabled: Boolean = false,
+    val signedToday: Boolean = false,
+    val rewardPoints: String = "",
+    val rewardMinPoints: String = "",
+    val rewardMaxPoints: String = "",
+    val signedAt: String = ""
+)
+
+data class PointLogItem(
+    val logId: String = "",
+    val type: String = "",
+    val typeText: String = "",
+    val points: String = "",
+    val pointsText: String = "",
+    val isIncome: Boolean = false,
+    val remarks: String = "",
+    val time: String = "",
+    val timeText: String = ""
+)
+
 data class MembershipPlan(
     val groupId: String = "",
     val groupName: String = "",
@@ -324,7 +345,9 @@ data class MembershipPlan(
 
 data class MembershipPage(
     val info: MembershipInfo = MembershipInfo(),
-    val plans: List<MembershipPlan> = emptyList()
+    val plans: List<MembershipPlan> = emptyList(),
+    val signInInfo: MembershipSignInInfo = MembershipSignInInfo(),
+    val pointLogs: List<PointLogItem> = emptyList()
 )
 
 data class AppUpdateInfo(

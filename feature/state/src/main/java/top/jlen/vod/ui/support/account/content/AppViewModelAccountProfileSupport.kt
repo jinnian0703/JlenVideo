@@ -27,6 +27,8 @@ internal fun accountStateWithMembershipPage(
         membershipInfo = page.info.copy(
             groupName = page.info.groupName.ifBlank { refreshedSession.groupName }
         ),
-        membershipPlans = page.plans
+        membershipPlans = page.plans,
+        membershipSignInInfo = page.signInInfo,
+        membershipPointLogs = page.pointLogs
     )
 }

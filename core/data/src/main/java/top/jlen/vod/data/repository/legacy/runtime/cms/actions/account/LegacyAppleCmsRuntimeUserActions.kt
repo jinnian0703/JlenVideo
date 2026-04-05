@@ -227,6 +227,17 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyDeleteUserRecord(
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyUpgradeMembership(
     plan: MembershipPlan
 ): String {
+    runCatching {
+        val json = runtimeRequestVideoApiJson(
+            path = "api.php/video/upgrade",
+            formBody = FormBody.Builder()
+                .add("group_id", plan.groupId)
+                .add("long", plan.duration)
+                .build()
+        )
+        runtimeExtractVideoApiMessage(json, "会员信息已更新")
+    }.getOrNull()?.let { return it }
+
     val form = FormBody.Builder()
         .add("group_id", plan.groupId)
         .add("long", plan.duration)
@@ -236,4 +247,20 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyUpgradeMembership
         referer = "${runtimeBaseUrl()}/index.php/user/upgrade.html",
         formBody = form
     )
+}
+
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacySignInMembership(): String {
+    val json = runtimeRequestVideoApiJson(
+        path = "api.php/video/signIn",
+        formBody = FormBody.Builder().build()
+    )
+    val payload = json.firstObject("data", "info") ?: json
+    val rewardPoints = payload.firstString("reward_points", "today_reward_points", "reward")
+    val currentPoints = payload.firstString("current_points", "points", "user_points")
+    return when {
+        rewardPoints.isNotBlank() && currentPoints.isNotBlank() ->
+            "签到成功，获得 $rewardPoints 积分，当前积分 $currentPoints"
+        rewardPoints.isNotBlank() -> "签到成功，获得 $rewardPoints 积分"
+        else -> runtimeExtractVideoApiMessage(json, "签到成功")
+    }
 }
