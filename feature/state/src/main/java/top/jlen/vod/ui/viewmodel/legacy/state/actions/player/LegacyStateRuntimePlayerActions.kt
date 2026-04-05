@@ -7,7 +7,7 @@ import kotlinx.coroutines.withContext
 import top.jlen.vod.data.PlaySource
 import top.jlen.vod.data.VodItem
 
-internal fun LegacyStateRuntimeViewModel.legacyRefreshPlayerSources() {
+internal fun LegacyStateRuntimeViewModelCore.legacyRefreshPlayerSources() {
     val currentItem = currentPlayerState().item ?: return
     val vodId = currentItem.vodId
     if (vodId.isBlank()) return
@@ -49,7 +49,7 @@ internal fun LegacyStateRuntimeViewModel.legacyRefreshPlayerSources() {
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyOpenPlayer(
+internal fun LegacyStateRuntimeViewModelCore.legacyOpenPlayer(
     title: String,
     item: VodItem?,
     sources: List<PlaySource>,
@@ -69,41 +69,41 @@ internal fun LegacyStateRuntimeViewModel.legacyOpenPlayer(
     legacyRecordCurrentPlayback()
 }
 
-internal fun LegacyStateRuntimeViewModel.legacySelectPlayerEpisode(index: Int) {
+internal fun LegacyStateRuntimeViewModelCore.legacySelectPlayerEpisode(index: Int) {
     val updatedState = updatePlayerEpisodeSelection(currentPlayerState(), index) ?: return
     updatePlayerState(updatedState)
     legacyResolveCurrentPlayerUrl()
     legacyRecordCurrentPlayback()
 }
 
-internal fun LegacyStateRuntimeViewModel.legacySelectPlayerSource(index: Int) {
+internal fun LegacyStateRuntimeViewModelCore.legacySelectPlayerSource(index: Int) {
     val updatedState = updatePlayerSourceSelection(currentPlayerState(), index) ?: return
     updatePlayerState(updatedState)
     legacyResolveCurrentPlayerUrl()
     legacyRecordCurrentPlayback()
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyPlayNextEpisode() {
+internal fun LegacyStateRuntimeViewModelCore.legacyPlayNextEpisode() {
     val nextIndex = currentPlayerState().selectedEpisodeIndex + 1
     if (nextIndex <= currentPlayerState().episodes.lastIndex) {
         legacySelectPlayerEpisode(nextIndex)
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyAdoptDetectedStream(streamUrl: String) {
+internal fun LegacyStateRuntimeViewModelCore.legacyAdoptDetectedStream(streamUrl: String) {
     updatePlayerState(applyDetectedStream(currentPlayerState(), streamUrl) ?: return)
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyReportTakeoverFailure(message: String) {
+internal fun LegacyStateRuntimeViewModelCore.legacyReportTakeoverFailure(message: String) {
     updatePlayerState(applyTakeoverFailure(currentPlayerState(), message))
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyUpdatePlaybackSnapshot(snapshot: PlaybackSnapshot) {
+internal fun LegacyStateRuntimeViewModelCore.legacyUpdatePlaybackSnapshot(snapshot: PlaybackSnapshot) {
     if (!hasMeaningfulPlaybackChange(currentPlayerState().playbackSnapshot, snapshot)) return
     updatePlayerState(playerStateWithPlaybackSnapshot(currentPlayerState(), snapshot))
 }
 
-internal fun LegacyStateRuntimeViewModel.legacySyncFromFullscreen(result: FullscreenPlaybackResult) {
+internal fun LegacyStateRuntimeViewModelCore.legacySyncFromFullscreen(result: FullscreenPlaybackResult) {
     val syncState = syncPlayerStateFromFullscreen(currentPlayerState(), result)
     updatePlayerState(syncState.playerState)
     if (syncState.shouldResolveCurrentUrl) {
@@ -111,7 +111,7 @@ internal fun LegacyStateRuntimeViewModel.legacySyncFromFullscreen(result: Fullsc
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyRecordCurrentPlayback() {
+internal fun LegacyStateRuntimeViewModelCore.legacyRecordCurrentPlayback() {
     val item = currentPlayerState().item ?: return
     val episodePageUrl = currentPlayerState().episodePageUrl
     if (!currentAccountState().session.isLoggedIn || episodePageUrl.isBlank()) return
@@ -127,7 +127,7 @@ internal fun LegacyStateRuntimeViewModel.legacyRecordCurrentPlayback() {
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyResolveCurrentPlayerUrl() {
+internal fun LegacyStateRuntimeViewModelCore.legacyResolveCurrentPlayerUrl() {
     val currentEpisode = currentPlayerState().currentEpisode ?: run {
         updatePlayerState(playerStateWithoutEpisode(currentPlayerState().title))
         return

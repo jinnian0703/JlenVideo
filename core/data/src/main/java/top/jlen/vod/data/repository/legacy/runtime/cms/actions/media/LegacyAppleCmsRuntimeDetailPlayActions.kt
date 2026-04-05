@@ -4,7 +4,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadDetail(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadDetail(
     vodId: String,
     forceRefresh: Boolean = false
 ): VodItem? {
@@ -29,7 +29,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadDetail(
     }
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadFreshDetail(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFreshDetail(
     normalizedId: String
 ): VodItem? {
     if (normalizedId.all(Char::isDigit)) {
@@ -74,11 +74,11 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadFreshDetail(
     }
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadDetailFromApi(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadDetailFromApi(
     vodId: String
 ): VodItem? = runtimeRequestDetailApi(vodId)
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyResolveDetailMismatch(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyResolveDetailMismatch(
     previewItem: VodItem,
     excludedVodId: String
 ): VodItem? {
@@ -105,7 +105,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyResolveDetailMismatch
     return null
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyFilterPlayablePreviewItems(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyFilterPlayablePreviewItems(
     items: List<VodItem>
 ): List<VodItem> {
     if (items.isEmpty()) return emptyList()
@@ -133,7 +133,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyFilterPlayablePreview
     }
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyResolvePlayableDetailForPreview(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyResolvePlayableDetailForPreview(
     previewItem: VodItem
 ): VodItem? {
     runtimePeekDetailCacheEntry(previewItem.vodId)
@@ -153,7 +153,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyResolvePlayableDetail
     }
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyResolvePlayUrl(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyResolvePlayUrl(
     playPageUrl: String
 ): ResolvedPlayUrl {
     val normalizedPageUrl = runtimeResolveUrl(playPageUrl)
@@ -183,7 +183,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyResolvePlayUrl(
     )
 }
 
-internal fun LegacyAppleCmsRuntimeRepository.legacyParseSources(
+internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyParseSources(
     item: VodItem
 ): List<PlaySource> {
     val sourceNames = item.vodPlayFrom

@@ -8,7 +8,7 @@ import okhttp3.FormBody
 import okhttp3.Request
 import top.jlen.vod.AppRuntimeInfo
 
-internal fun LegacyAppleCmsRuntimeRepository.legacyReportHeartbeat(
+internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyReportHeartbeat(
     route: String,
     userId: String = currentSession().userId,
     vodId: String = "",
@@ -50,7 +50,7 @@ internal fun LegacyAppleCmsRuntimeRepository.legacyReportHeartbeat(
     }
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLogin(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLogin(
     userName: String,
     password: String
 ): AuthSession {
@@ -89,7 +89,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLogin(
     }
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadNotices(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadNotices(
     appVersion: String = AppRuntimeInfo.versionName,
     userId: String = "",
     forceRefresh: Boolean = false
@@ -120,7 +120,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadNotices(
     }
 }
 
-internal fun LegacyAppleCmsRuntimeRepository.legacyPickPendingNotice(
+internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyPickPendingNotice(
     notices: List<AppNotice>
 ): AppNotice? {
     val dismissedIds = runtimeNoticePrefs()
@@ -133,7 +133,7 @@ internal fun LegacyAppleCmsRuntimeRepository.legacyPickPendingNotice(
     }
 }
 
-internal fun LegacyAppleCmsRuntimeRepository.legacyUnreadActiveNoticeIds(
+internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyUnreadActiveNoticeIds(
     notices: List<AppNotice>
 ): Set<String> {
     val dismissedIds = runtimeNoticePrefs()
@@ -149,12 +149,12 @@ internal fun LegacyAppleCmsRuntimeRepository.legacyUnreadActiveNoticeIds(
         .toSet()
 }
 
-internal fun LegacyAppleCmsRuntimeRepository.legacyMarkNoticeDismissed(notice: AppNotice) {
+internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyMarkNoticeDismissed(notice: AppNotice) {
     if (notice.alwaysShowDialog) return
     legacyMarkNoticeDismissed(notice.id)
 }
 
-internal fun LegacyAppleCmsRuntimeRepository.legacyMarkNoticeDismissed(noticeId: String) {
+internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyMarkNoticeDismissed(noticeId: String) {
     val normalized = noticeId.trim()
     if (normalized.isBlank()) return
     val currentIds = runtimeNoticePrefs()
@@ -166,7 +166,7 @@ internal fun LegacyAppleCmsRuntimeRepository.legacyMarkNoticeDismissed(noticeId:
         .apply()
 }
 
-internal fun LegacyAppleCmsRuntimeRepository.legacyLoadFreshNotices(
+internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFreshNotices(
     appVersion: String,
     userId: String
 ): List<AppNotice> {
@@ -220,7 +220,7 @@ internal fun LegacyAppleCmsRuntimeRepository.legacyLoadFreshNotices(
     }
 }
 
-internal fun LegacyAppleCmsRuntimeRepository.legacyEnsureHeartbeatDeviceId(): String {
+internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyEnsureHeartbeatDeviceId(): String {
     runtimeHeartbeatPrefs().getString(runtimeHeartbeatDeviceIdKey(), null)
         ?.takeIf(String::isNotBlank)
         ?.let { return it }
@@ -229,7 +229,7 @@ internal fun LegacyAppleCmsRuntimeRepository.legacyEnsureHeartbeatDeviceId(): St
     return generated
 }
 
-internal fun LegacyAppleCmsRuntimeRepository.legacyNormalizeLoginFailureMessage(
+internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyNormalizeLoginFailureMessage(
     rawMessage: String
 ): String {
     val message = rawMessage.trim()
@@ -240,7 +240,7 @@ internal fun LegacyAppleCmsRuntimeRepository.legacyNormalizeLoginFailureMessage(
     }
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadRegisterPage(): RegisterPage {
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadRegisterPage(): RegisterPage {
     val document = runtimeFetchDocument("${runtimeBaseUrl()}/index.php/user/reg.html")
     val channel = document.selectFirst("input[name=ac]")?.attr("value")?.trim().orEmpty()
         .ifBlank { "email" }
@@ -261,7 +261,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadRegisterPage(): R
     )
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadRegisterCaptcha(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadRegisterCaptcha(
     captchaUrl: String
 ): ByteArray {
     val request = Request.Builder()
@@ -277,7 +277,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadRegisterCaptcha(
     }
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadFindPasswordPage(): FindPasswordPage {
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFindPasswordPage(): FindPasswordPage {
     val document = runtimeFetchDocument("${runtimeBaseUrl()}/index.php/user/findpass.html")
     val requiresVerify = document.selectFirst("input[name=verify]") != null
     val captchaUrl = document.selectFirst("img[src*=/verify/], img.mac_verify_img")
@@ -291,7 +291,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadFindPasswordPage(
     )
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadFindPasswordCaptcha(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFindPasswordCaptcha(
     captchaUrl: String
 ): ByteArray {
     val request = Request.Builder()
@@ -307,7 +307,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadFindPasswordCaptc
     }
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyFindPassword(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyFindPassword(
     editor: FindPasswordEditor
 ): String {
     val form = FormBody.Builder()
@@ -325,7 +325,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyFindPassword(
     )
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacySendRegisterCode(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacySendRegisterCode(
     channel: String,
     contact: String
 ): String {
@@ -340,7 +340,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacySendRegisterCode(
     )
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyRegister(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyRegister(
     editor: RegisterEditor
 ): String {
     val form = FormBody.Builder()
@@ -359,7 +359,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyRegister(
     )
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLogout() {
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLogout() {
     val request = Request.Builder()
         .url("${runtimeBaseUrl()}/index.php/user/logout")
         .header("Referer", "${runtimeBaseUrl()}/index.php/user")

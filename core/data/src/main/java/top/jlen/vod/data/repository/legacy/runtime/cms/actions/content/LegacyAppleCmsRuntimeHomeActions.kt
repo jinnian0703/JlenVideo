@@ -5,7 +5,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import org.jsoup.nodes.Document
 
-internal fun LegacyAppleCmsRuntimeRepository.legacyClearMemoryCaches() {
+internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyClearMemoryCaches() {
     runtimeClearHomeCacheEntry()
     runtimeClearHotSearchCacheEntry()
     runtimeClearNoticeCacheEntry()
@@ -20,21 +20,21 @@ internal fun LegacyAppleCmsRuntimeRepository.legacyClearMemoryCaches() {
     runtimeResetCleanupTimestamps()
 }
 
-internal fun LegacyAppleCmsRuntimeRepository.legacyClearAllAppCaches() {
+internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyClearAllAppCaches() {
     legacyClearMemoryCaches()
     runtimeClearPersistedPageCache()
     runtimeClearPersistedHomeCache()
 }
 
-internal fun LegacyAppleCmsRuntimeRepository.legacyClearProcessMemoryCaches() {
+internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyClearProcessMemoryCaches() {
     legacyClearMemoryCaches()
 }
 
-internal fun LegacyAppleCmsRuntimeRepository.legacyClearRuntimeCaches() {
+internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyClearRuntimeCaches() {
     legacyClearAllAppCaches()
 }
 
-internal fun LegacyAppleCmsRuntimeRepository.legacyPeekHomePayload(
+internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyPeekHomePayload(
     allowStale: Boolean = false
 ): HomePayload? {
     val ttlMs = runtimeHomeCacheTtlMs(allowStale)
@@ -48,7 +48,7 @@ internal fun LegacyAppleCmsRuntimeRepository.legacyPeekHomePayload(
         ?.value
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadHome(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadHome(
     forceRefresh: Boolean = false
 ): HomePayload {
     if (!forceRefresh) {
@@ -68,7 +68,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadHome(
     }
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadEmergencyHome(): HomePayload {
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadEmergencyHome(): HomePayload {
     val cachedHome = runtimePeekHomeCacheEntry()?.value
     val latestPage = runCatching { runtimeLoadLatestCursorPage(cursor = "") }
         .getOrNull()
@@ -121,7 +121,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadEmergencyHome(): 
     }
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadFreshHome(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFreshHome(
     forceRefresh: Boolean
 ): HomePayload {
     val (latestPage, recommendedItems) = coroutineScope {

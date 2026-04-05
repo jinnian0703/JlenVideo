@@ -6,7 +6,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.jlen.vod.data.UserCenterItem
 
-internal fun LegacyStateRuntimeViewModel.legacyAddCurrentDetailFavorite() {
+internal fun LegacyStateRuntimeViewModelCore.legacyAddCurrentDetailFavorite() {
     val item = currentDetailState().item ?: return
     if (!currentAccountState().session.isLoggedIn) {
         updateDetailState(detailStateWithActionMessage(currentDetailState(), "请先登录后再收藏", true))
@@ -40,12 +40,12 @@ internal fun LegacyStateRuntimeViewModel.legacyAddCurrentDetailFavorite() {
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyDismissDetailActionMessage() {
+internal fun LegacyStateRuntimeViewModelCore.legacyDismissDetailActionMessage() {
     if (currentDetailState().actionMessage.isNullOrBlank()) return
     updateDetailState(detailStateWithoutActionMessage(currentDetailState()))
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyOpenHistoryRecord(item: UserCenterItem) {
+internal fun LegacyStateRuntimeViewModelCore.legacyOpenHistoryRecord(item: UserCenterItem) {
     val resolvedVodId = resolveHistoryVodId(item)
     if (resolvedVodId.isBlank()) {
         legacyOpenHistoryRecordDirectly(item)
@@ -83,7 +83,7 @@ internal fun LegacyStateRuntimeViewModel.legacyOpenHistoryRecord(item: UserCente
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyResumeHistoryRecord(item: UserCenterItem) {
+internal fun LegacyStateRuntimeViewModelCore.legacyResumeHistoryRecord(item: UserCenterItem) {
     val resolvedVodId = resolveHistoryVodId(item)
     if (resolvedVodId.isBlank()) {
         legacyOpenHistoryRecordDirectly(item)
@@ -115,7 +115,7 @@ internal fun LegacyStateRuntimeViewModel.legacyResumeHistoryRecord(item: UserCen
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyOpenHistoryRecordDirectly(item: UserCenterItem) {
+internal fun LegacyStateRuntimeViewModelCore.legacyOpenHistoryRecordDirectly(item: UserCenterItem) {
     val resumeUrl = item.playUrl.ifBlank { item.actionUrl }
     if (resumeUrl.isBlank()) {
         updatePlayerState(failedHistoryPlayerState(item.title, "无法恢复该条播放记录"))
@@ -131,7 +131,7 @@ internal fun LegacyStateRuntimeViewModel.legacyOpenHistoryRecordDirectly(item: U
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyLoadDetail(vodId: String) {
+internal fun LegacyStateRuntimeViewModelCore.legacyLoadDetail(vodId: String) {
     viewModelScope.launch {
         val keepCurrentContent = currentDetailState().item?.vodId == vodId
         updateDetailState(beginDetailLoad(currentDetailState(), keepCurrentContent))
@@ -155,6 +155,6 @@ internal fun LegacyStateRuntimeViewModel.legacyLoadDetail(vodId: String) {
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacySelectSource(index: Int) {
+internal fun LegacyStateRuntimeViewModelCore.legacySelectSource(index: Int) {
     updateDetailState(detailStateWithSelectedSource(currentDetailState(), index))
 }

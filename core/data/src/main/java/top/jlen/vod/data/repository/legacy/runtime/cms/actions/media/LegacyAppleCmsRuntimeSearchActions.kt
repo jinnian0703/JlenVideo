@@ -4,7 +4,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacySearch(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacySearch(
     keyword: String,
     forceRefresh: Boolean = false
 ): List<VodItem> {
@@ -30,7 +30,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacySearch(
     }
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyPerformSearch(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyPerformSearch(
     keyword: String,
     cacheKey: String
 ): List<VodItem> {
@@ -58,7 +58,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyPerformSearch(
     }
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacySearchCursor(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacySearchCursor(
     keyword: String,
     cursor: String
 ): CursorPagedVodItems {
@@ -67,7 +67,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacySearchCursor(
     return runtimeRequestSearchCursor(query, cursor).also { runtimeRememberPreviewItems(it.items) }
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyEnrichSearchResults(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyEnrichSearchResults(
     items: List<VodItem>,
     limit: Int = 8
 ): List<VodItem> {

@@ -3,7 +3,7 @@ package top.jlen.vod.data
 import java.io.IOException
 import okhttp3.FormBody
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadUserProfile(): UserProfilePage {
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadUserProfile(): UserProfilePage {
     runCatching { runtimeLoadUserProfileFromUserDetailApi(currentSession()) }
         .getOrNull()
         ?.let { return it }
@@ -21,19 +21,19 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadUserProfile(): Us
     )
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadFavoritePage(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFavoritePage(
     pageUrl: String? = null
 ): UserCenterPage = runtimeParseUserCenterPageEnhanced(
     document = runtimeFetchUserDocument(pageUrl ?: "/index.php/user/favs.html")
 )
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadHistoryPage(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadHistoryPage(
     pageUrl: String? = null
 ): UserCenterPage = runtimeParseUserCenterPageEnhanced(
     document = runtimeFetchUserDocument(pageUrl ?: "/index.php/user/plays.html")
 )
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadMembershipPage(): MembershipPage {
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadMembershipPage(): MembershipPage {
     runCatching { runtimeLoadMembershipPageFromVideoMemberInfoApi() }
         .getOrNull()
         ?.let { return it }
@@ -59,7 +59,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadMembershipPage():
     return runtimeLoadMembershipPageFromHtml()
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacySaveUserProfile(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacySaveUserProfile(
     editor: UserProfileEditor
 ): String {
     runCatching { runtimeSubmitUserProfileToAppCenter(editor) }
@@ -83,7 +83,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacySaveUserProfile(
     )
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacySendEmailBindCode(email: String): String {
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacySendEmailBindCode(email: String): String {
     runCatching {
         runtimeSubmitAppCenterUserProfileMutation(
             FormBody.Builder()
@@ -106,7 +106,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacySendEmailBindCode(ema
     )
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyBindEmail(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyBindEmail(
     email: String,
     code: String
 ): String {
@@ -134,7 +134,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyBindEmail(
     )
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyUnbindEmail(): String {
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyUnbindEmail(): String {
     runCatching {
         runtimeSubmitAppCenterUserProfileMutation(
             FormBody.Builder()
@@ -155,13 +155,13 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyUnbindEmail(): String
     )
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyAddFavorite(item: VodItem): String =
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyAddFavorite(item: VodItem): String =
     runtimeSubmitUserUlog(
         siteVodId = runtimeResolveSiteLogId(item),
         type = 2
     )
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyAddPlayRecord(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyAddPlayRecord(
     item: VodItem,
     episodePageUrl: String
 ): String {
@@ -174,7 +174,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyAddPlayRecord(
     )
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyDeleteUserRecord(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyDeleteUserRecord(
     recordIds: List<String>,
     type: Int,
     clearAll: Boolean
@@ -191,7 +191,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyDeleteUserRecord(
     )
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyUpgradeMembership(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyUpgradeMembership(
     plan: MembershipPlan
 ): String {
     runCatching {

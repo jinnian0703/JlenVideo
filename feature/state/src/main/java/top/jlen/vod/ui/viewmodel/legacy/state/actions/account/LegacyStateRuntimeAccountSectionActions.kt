@@ -4,15 +4,15 @@ import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.RegisterEditor
 import top.jlen.vod.data.UserProfileEditor
 
-internal fun LegacyStateRuntimeViewModel.legacyUpdateLoginUserName(value: String) {
+internal fun LegacyStateRuntimeViewModelCore.legacyUpdateLoginUserName(value: String) {
     updateAccountState(accountStateWithUserName(currentAccountState(), value))
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyUpdateLoginPassword(value: String) {
+internal fun LegacyStateRuntimeViewModelCore.legacyUpdateLoginPassword(value: String) {
     updateAccountState(accountStateWithPassword(currentAccountState(), value))
 }
 
-internal fun LegacyStateRuntimeViewModel.legacySetAccountAuthMode(mode: AccountAuthMode) {
+internal fun LegacyStateRuntimeViewModelCore.legacySetAccountAuthMode(mode: AccountAuthMode) {
     updateAccountState(accountStateWithAuthMode(currentAccountState(), mode))
     when (mode) {
         AccountAuthMode.Login -> Unit
@@ -22,7 +22,7 @@ internal fun LegacyStateRuntimeViewModel.legacySetAccountAuthMode(mode: AccountA
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyUpdateRegisterEditor(
+internal fun LegacyStateRuntimeViewModelCore.legacyUpdateRegisterEditor(
     transform: (RegisterEditor) -> RegisterEditor
 ) {
     updateAccountState(
@@ -33,7 +33,7 @@ internal fun LegacyStateRuntimeViewModel.legacyUpdateRegisterEditor(
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyUpdateFindPasswordEditor(
+internal fun LegacyStateRuntimeViewModelCore.legacyUpdateFindPasswordEditor(
     transform: (FindPasswordEditor) -> FindPasswordEditor
 ) {
     updateAccountState(
@@ -44,7 +44,7 @@ internal fun LegacyStateRuntimeViewModel.legacyUpdateFindPasswordEditor(
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyUpdateProfileEditor(
+internal fun LegacyStateRuntimeViewModelCore.legacyUpdateProfileEditor(
     transform: (UserProfileEditor) -> UserProfileEditor
 ) {
     updateAccountState(
@@ -55,11 +55,11 @@ internal fun LegacyStateRuntimeViewModel.legacyUpdateProfileEditor(
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacySetProfileEditTab(editMode: Boolean) {
+internal fun LegacyStateRuntimeViewModelCore.legacySetProfileEditTab(editMode: Boolean) {
     updateAccountState(accountStateWithProfileEditTab(currentAccountState(), editMode))
 }
 
-internal fun LegacyStateRuntimeViewModel.legacySelectAccountSection(
+internal fun LegacyStateRuntimeViewModelCore.legacySelectAccountSection(
     section: AccountSection,
     forceRefresh: Boolean = false
 ) {
@@ -94,16 +94,16 @@ internal fun LegacyStateRuntimeViewModel.legacySelectAccountSection(
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyRefreshSelectedAccountSection() {
+internal fun LegacyStateRuntimeViewModelCore.legacyRefreshSelectedAccountSection() {
     legacySelectAccountSection(currentAccountState().selectedSection, forceRefresh = true)
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyLoadMoreFavorites() {
+internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreFavorites() {
     if (currentAccountState().isContentLoading || currentAccountState().favoriteNextPageUrl.isNullOrBlank()) return
     runtimeLoadFavoriteRecords(pageUrl = currentAccountState().favoriteNextPageUrl, append = true)
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyLoadMoreHistory() {
+internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreHistory() {
     if (currentAccountState().isContentLoading || currentAccountState().historyNextPageUrl.isNullOrBlank()) return
     runtimeLoadHistoryRecords(pageUrl = currentAccountState().historyNextPageUrl, append = true)
 }

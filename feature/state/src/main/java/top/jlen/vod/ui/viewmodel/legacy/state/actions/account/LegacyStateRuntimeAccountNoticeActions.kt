@@ -7,7 +7,7 @@ import kotlinx.coroutines.withContext
 import top.jlen.vod.AppRuntimeInfo
 import top.jlen.vod.CrashLogger
 
-internal fun LegacyStateRuntimeViewModel.legacyRefreshAccount() {
+internal fun LegacyStateRuntimeViewModelCore.legacyRefreshAccount() {
     val session = legacyRepository().currentSession()
     updateAccountState(refreshedAccountState(currentAccountState(), session))
     if (session.isLoggedIn && hasEnteredAccountScreenFlag()) {
@@ -16,7 +16,7 @@ internal fun LegacyStateRuntimeViewModel.legacyRefreshAccount() {
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyEnsureAccountScreenReady() {
+internal fun LegacyStateRuntimeViewModelCore.legacyEnsureAccountScreenReady() {
     if (hasEnteredAccountScreenFlag()) return
     markAccountScreenEntered()
     if (!currentAccountState().session.isLoggedIn) return
@@ -24,7 +24,7 @@ internal fun LegacyStateRuntimeViewModel.legacyEnsureAccountScreenReady() {
     selectAccountSection(currentAccountState().selectedSection, forceRefresh = true)
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyHydrateAccountSession() {
+internal fun LegacyStateRuntimeViewModelCore.legacyHydrateAccountSession() {
     viewModelScope.launch {
         runCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadUserProfileForApp() }
@@ -39,17 +39,17 @@ internal fun LegacyStateRuntimeViewModel.legacyHydrateAccountSession() {
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyRefreshCrashLog() {
+internal fun LegacyStateRuntimeViewModelCore.legacyRefreshCrashLog() {
     val latestCrashLog = CrashLogger.readLatest(getApplication())
     updateAccountState(accountStateWithCrashLog(currentAccountState(), latestCrashLog))
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyClearCrashLog() {
+internal fun LegacyStateRuntimeViewModelCore.legacyClearCrashLog() {
     CrashLogger.clear(getApplication())
     updateAccountState(accountStateAfterCrashLogCleared(currentAccountState()))
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyCheckAppUpdate() {
+internal fun LegacyStateRuntimeViewModelCore.legacyCheckAppUpdate() {
     if (currentAccountState().isUpdateLoading) return
     viewModelScope.launch {
         updateAccountState(beginUpdateCheck(currentAccountState()))
@@ -65,7 +65,7 @@ internal fun LegacyStateRuntimeViewModel.legacyCheckAppUpdate() {
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyRefreshNotices(forceRefresh: Boolean = false) {
+internal fun LegacyStateRuntimeViewModelCore.legacyRefreshNotices(forceRefresh: Boolean = false) {
     if (currentNoticeState().isLoading && !forceRefresh) return
     val userId = currentAccountState().session.userId
     viewModelScope.launch {
@@ -99,7 +99,7 @@ internal fun LegacyStateRuntimeViewModel.legacyRefreshNotices(forceRefresh: Bool
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyDismissNoticeDialog() {
+internal fun LegacyStateRuntimeViewModelCore.legacyDismissNoticeDialog() {
     val dismissedNotice = currentNoticeState().dialogNotice
     dismissedNotice?.let(legacyRepository()::markNoticeDismissed)
     updateNoticeState(
@@ -110,7 +110,7 @@ internal fun LegacyStateRuntimeViewModel.legacyDismissNoticeDialog() {
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyMarkNoticeOpened(noticeId: String) {
+internal fun LegacyStateRuntimeViewModelCore.legacyMarkNoticeOpened(noticeId: String) {
     val normalized = noticeId.trim()
     currentNoticeState().notices
         .firstOrNull { it.id == normalized }

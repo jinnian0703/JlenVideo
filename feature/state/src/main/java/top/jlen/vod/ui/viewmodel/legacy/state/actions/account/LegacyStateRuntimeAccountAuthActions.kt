@@ -5,7 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-internal fun LegacyStateRuntimeViewModel.legacySendRegisterCode() {
+internal fun LegacyStateRuntimeViewModelCore.legacySendRegisterCode() {
     val editor = currentAccountState().registerEditor
     val contact = editor.contact.trim()
     if (contact.isBlank()) {
@@ -29,7 +29,7 @@ internal fun LegacyStateRuntimeViewModel.legacySendRegisterCode() {
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyRegister() {
+internal fun LegacyStateRuntimeViewModelCore.legacyRegister() {
     val editor = currentAccountState().registerEditor
     if (editor.userName.isBlank()) {
         updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入用户名"))
@@ -78,7 +78,7 @@ internal fun LegacyStateRuntimeViewModel.legacyRegister() {
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyFindPassword() {
+internal fun LegacyStateRuntimeViewModelCore.legacyFindPassword() {
     val editor = currentAccountState().findPasswordEditor
     if (editor.userName.isBlank()) {
         updateAccountState(accountStateWithValidationError(currentAccountState(), "璇疯緭鍏ョ敤鎴峰悕"))
@@ -117,7 +117,7 @@ internal fun LegacyStateRuntimeViewModel.legacyFindPassword() {
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyLogin() {
+internal fun LegacyStateRuntimeViewModelCore.legacyLogin() {
     val userName = currentAccountState().userName.trim()
     val password = currentAccountState().password
     if (userName.isBlank()) {
@@ -149,7 +149,7 @@ internal fun LegacyStateRuntimeViewModel.legacyLogin() {
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyLogout() {
+internal fun LegacyStateRuntimeViewModelCore.legacyLogout() {
     if (currentAccountState().isLoading) return
     viewModelScope.launch {
         updateAccountState(beginLogout(currentAccountState()))

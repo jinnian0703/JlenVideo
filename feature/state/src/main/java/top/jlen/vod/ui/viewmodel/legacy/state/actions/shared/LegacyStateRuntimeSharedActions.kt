@@ -6,7 +6,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.jlen.vod.data.AppleCmsRepository
 
-internal fun LegacyStateRuntimeViewModel.legacyReportHeartbeat(route: String) {
+internal fun LegacyStateRuntimeViewModelCore.legacyReportHeartbeat(route: String) {
     val normalizedRoute = route.trim().ifBlank { "home" }
     val userId = currentAccountState().session.userId
     val vodId = if (normalizedRoute == "player") resolveHeartbeatVodId(currentPlayerState()) else ""
@@ -25,7 +25,7 @@ internal fun LegacyStateRuntimeViewModel.legacyReportHeartbeat(route: String) {
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyRunAccountAction(
+internal fun LegacyStateRuntimeViewModelCore.legacyRunAccountAction(
     block: suspend AppleCmsRepository.() -> String,
     onSuccess: () -> Unit
 ) {
@@ -49,7 +49,7 @@ internal fun LegacyStateRuntimeViewModel.legacyRunAccountAction(
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyHandleAccountSessionExpired(error: Throwable): Boolean {
+internal fun LegacyStateRuntimeViewModelCore.legacyHandleAccountSessionExpired(error: Throwable): Boolean {
     val message = error.message.orEmpty()
     val isExpired = message.contains("请先登录") || message.contains("登录已失效")
     if (!isExpired) return false

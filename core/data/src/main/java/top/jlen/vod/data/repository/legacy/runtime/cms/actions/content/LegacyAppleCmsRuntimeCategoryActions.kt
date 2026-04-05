@@ -4,11 +4,11 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadByCategory(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadByCategory(
     typeId: String
 ): List<VodItem> = runtimeLoadCategoryPage(typeId = typeId, page = 1).items
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadAllCategoryPage(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadAllCategoryPage(
     page: Int,
     forceRefresh: Boolean = false
 ): PagedVodItems {
@@ -42,7 +42,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadAllCategoryPage(
     }
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadFreshAllCategoryPage(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFreshAllCategoryPage(
     page: Int,
     forceRefresh: Boolean
 ): PagedVodItems {
@@ -58,7 +58,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepository.legacyLoadFreshAllCategoryP
     }
 }
 
-internal fun LegacyAppleCmsRuntimeRepository.legacyPeekAllCategoryPage(page: Int): PagedVodItems? {
+internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyPeekAllCategoryPage(page: Int): PagedVodItems? {
     val safePage = page.coerceAtLeast(1)
     val allCacheKey = "all:$safePage"
     runtimePeekCategoryPageCacheEntry(allCacheKey)
@@ -89,7 +89,7 @@ internal fun LegacyAppleCmsRuntimeRepository.legacyPeekAllCategoryPage(page: Int
     }
 }
 
-internal fun LegacyAppleCmsRuntimeRepository.legacyPeekCategoryPage(
+internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyPeekCategoryPage(
     typeId: String,
     page: Int,
     allowStale: Boolean = false
@@ -109,7 +109,7 @@ internal fun LegacyAppleCmsRuntimeRepository.legacyPeekCategoryPage(
     return null
 }
 
-internal suspend fun LegacyAppleCmsRuntimeRepository.legacyPrewarmCategoryFirstPages(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyPrewarmCategoryFirstPages(
     forceRefresh: Boolean = false
 ) {
     val categories = runtimeGetBrowsableCategories(forceRefresh = forceRefresh)

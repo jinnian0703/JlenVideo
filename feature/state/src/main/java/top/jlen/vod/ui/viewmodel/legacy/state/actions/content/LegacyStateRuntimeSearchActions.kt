@@ -6,28 +6,28 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-internal fun LegacyStateRuntimeViewModel.legacyUpdateQuery(query: String) {
+internal fun LegacyStateRuntimeViewModelCore.legacyUpdateQuery(query: String) {
     updateSearchState(searchStateWithQuery(currentSearchState(), query))
 }
 
-internal fun LegacyStateRuntimeViewModel.legacySearchHistory(keyword: String) {
+internal fun LegacyStateRuntimeViewModelCore.legacySearchHistory(keyword: String) {
     val normalized = keyword.trim()
     if (normalized.isBlank()) return
     updateSearchState(searchStateWithQuery(currentSearchState(), normalized))
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyClearSearchHistory() {
+internal fun LegacyStateRuntimeViewModelCore.legacyClearSearchHistory() {
     searchHistoryStore().clear()
     updateSearchState(searchStateWithHistory(currentSearchState(), emptyList()))
 }
 
-internal fun LegacyStateRuntimeViewModel.legacySearch(keyword: String) {
+internal fun LegacyStateRuntimeViewModelCore.legacySearch(keyword: String) {
     val normalized = keyword.trim()
     updateSearchState(searchStateWithQuery(currentSearchState(), normalized))
     legacyPerformSearch(normalized)
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyRefreshHotSearches(forceRefresh: Boolean = false) {
+internal fun LegacyStateRuntimeViewModelCore.legacyRefreshHotSearches(forceRefresh: Boolean = false) {
     if (!forceRefresh && (currentSearchState().hotSearchGroups.isNotEmpty() || currentSearchState().isHotSearchLoading)) {
         return
     }
@@ -48,14 +48,14 @@ internal fun LegacyStateRuntimeViewModel.legacyRefreshHotSearches(forceRefresh: 
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacySearch() {
+internal fun LegacyStateRuntimeViewModelCore.legacySearch() {
     legacyPerformSearch(currentSearchState().query)
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyGetSearchResultScroll(query: String): SearchResultScrollPosition =
+internal fun LegacyStateRuntimeViewModelCore.legacyGetSearchResultScroll(query: String): SearchResultScrollPosition =
     getSearchResultScrollPosition(query.trim()) ?: SearchResultScrollPosition()
 
-internal fun LegacyStateRuntimeViewModel.legacyUpdateSearchResultScroll(query: String, index: Int, offset: Int) {
+internal fun LegacyStateRuntimeViewModelCore.legacyUpdateSearchResultScroll(query: String, index: Int, offset: Int) {
     val normalized = query.trim()
     if (normalized.isBlank()) return
     val current = getSearchResultScrollPosition(normalized)
@@ -63,7 +63,7 @@ internal fun LegacyStateRuntimeViewModel.legacyUpdateSearchResultScroll(query: S
     putSearchResultScrollPosition(normalized, SearchResultScrollPosition(index = index, offset = offset))
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyEnsureSearchResults(query: String) {
+internal fun LegacyStateRuntimeViewModelCore.legacyEnsureSearchResults(query: String) {
     val normalized = query.trim()
     if (normalized.isBlank()) return
     val current = currentSearchState()
@@ -77,7 +77,7 @@ internal fun LegacyStateRuntimeViewModel.legacyEnsureSearchResults(query: String
     legacyPerformSearch(normalized)
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyPerformSearch(keyword: String) {
+internal fun LegacyStateRuntimeViewModelCore.legacyPerformSearch(keyword: String) {
     val query = keyword.trim()
     if (query.isBlank()) {
         currentSearchJob()?.cancel()
@@ -128,7 +128,7 @@ internal fun LegacyStateRuntimeViewModel.legacyPerformSearch(keyword: String) {
     })
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyLoadMoreSearchResults() {
+internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreSearchResults() {
     val query = currentSearchState().submittedQuery.trim()
     if (
         query.isBlank() ||

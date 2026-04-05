@@ -3,7 +3,7 @@ package top.jlen.vod.ui
 import android.net.Uri
 import top.jlen.vod.data.MembershipPlan
 
-internal fun LegacyStateRuntimeViewModel.legacyDeleteFavorite(recordId: String) {
+internal fun LegacyStateRuntimeViewModelCore.legacyDeleteFavorite(recordId: String) {
     if (recordId.isBlank()) return
     runtimeRunAccountAction(
         block = { deleteUserRecordForApp(recordIds = listOf(recordId), type = 2, clearAll = false) },
@@ -18,7 +18,7 @@ internal fun LegacyStateRuntimeViewModel.legacyDeleteFavorite(recordId: String) 
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyClearFavorites() {
+internal fun LegacyStateRuntimeViewModelCore.legacyClearFavorites() {
     runtimeRunAccountAction(
         block = { deleteUserRecordForApp(recordIds = emptyList(), type = 2, clearAll = true) },
         onSuccess = {
@@ -31,7 +31,7 @@ internal fun LegacyStateRuntimeViewModel.legacyClearFavorites() {
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyDeleteHistory(recordId: String) {
+internal fun LegacyStateRuntimeViewModelCore.legacyDeleteHistory(recordId: String) {
     if (recordId.isBlank()) return
     runtimeRunAccountAction(
         block = { deleteUserRecordForApp(recordIds = listOf(recordId), type = 4, clearAll = false) },
@@ -42,7 +42,7 @@ internal fun LegacyStateRuntimeViewModel.legacyDeleteHistory(recordId: String) {
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyClearHistory() {
+internal fun LegacyStateRuntimeViewModelCore.legacyClearHistory() {
     runtimeRunAccountAction(
         block = { deleteUserRecordForApp(recordIds = emptyList(), type = 4, clearAll = true) },
         onSuccess = {
@@ -52,7 +52,7 @@ internal fun LegacyStateRuntimeViewModel.legacyClearHistory() {
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyUpgradeMembership(plan: MembershipPlan) {
+internal fun LegacyStateRuntimeViewModelCore.legacyUpgradeMembership(plan: MembershipPlan) {
     if (plan.groupId.isBlank() || plan.duration.isBlank()) return
     runtimeRunAccountAction(
         block = { upgradeMembership(plan) },
@@ -60,7 +60,7 @@ internal fun LegacyStateRuntimeViewModel.legacyUpgradeMembership(plan: Membershi
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacySaveProfile() {
+internal fun LegacyStateRuntimeViewModelCore.legacySaveProfile() {
     runtimeRunAccountAction(
         block = { saveUserProfile(currentAccountState().profileEditor) },
         onSuccess = {
@@ -71,7 +71,7 @@ internal fun LegacyStateRuntimeViewModel.legacySaveProfile() {
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyUploadPortrait(uri: Uri) {
+internal fun LegacyStateRuntimeViewModelCore.legacyUploadPortrait(uri: Uri) {
     if (!currentAccountState().session.isLoggedIn) {
         updateAccountState(accountStateWithValidationError(currentAccountState(), "璇峰厛鐧诲綍"))
         return
@@ -85,7 +85,7 @@ internal fun LegacyStateRuntimeViewModel.legacyUploadPortrait(uri: Uri) {
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacySendEmailBindCode() {
+internal fun LegacyStateRuntimeViewModelCore.legacySendEmailBindCode() {
     val email = currentAccountState().profileEditor.pendingEmail.trim()
     if (email.isBlank()) {
         updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入邮箱地址"))
@@ -97,7 +97,7 @@ internal fun LegacyStateRuntimeViewModel.legacySendEmailBindCode() {
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyBindEmail() {
+internal fun LegacyStateRuntimeViewModelCore.legacyBindEmail() {
     val email = currentAccountState().profileEditor.pendingEmail.trim()
     val code = currentAccountState().profileEditor.emailCode.trim()
     if (email.isBlank()) {
@@ -117,7 +117,7 @@ internal fun LegacyStateRuntimeViewModel.legacyBindEmail() {
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyUnbindEmail() {
+internal fun LegacyStateRuntimeViewModelCore.legacyUnbindEmail() {
     runtimeRunAccountAction(
         block = { unbindEmail() },
         onSuccess = {

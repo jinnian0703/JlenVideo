@@ -6,7 +6,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.jlen.vod.data.UserCenterItem
 
-internal fun LegacyStateRuntimeViewModel.legacyRefreshRegisterCaptcha() {
+internal fun LegacyStateRuntimeViewModelCore.legacyRefreshRegisterCaptcha() {
     val captchaUrl = currentAccountState().registerCaptchaUrl
     if (captchaUrl.isBlank()) {
         runtimeLoadRegisterPage(forceRefresh = true)
@@ -31,7 +31,7 @@ internal fun LegacyStateRuntimeViewModel.legacyRefreshRegisterCaptcha() {
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyRefreshFindPasswordCaptcha() {
+internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFindPasswordCaptcha() {
     val captchaUrl = currentAccountState().findPasswordCaptchaUrl
     if (captchaUrl.isBlank()) {
         runtimeLoadFindPasswordPage(forceRefresh = true)
@@ -56,7 +56,7 @@ internal fun LegacyStateRuntimeViewModel.legacyRefreshFindPasswordCaptcha() {
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyLoadRegisterPage(forceRefresh: Boolean = false) {
+internal fun LegacyStateRuntimeViewModelCore.legacyLoadRegisterPage(forceRefresh: Boolean = false) {
     if (currentAccountState().isContentLoading && !forceRefresh) return
     viewModelScope.launch {
         updateAccountState(beginAccountContentLoad(currentAccountState()))
@@ -79,7 +79,7 @@ internal fun LegacyStateRuntimeViewModel.legacyLoadRegisterPage(forceRefresh: Bo
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyLoadFindPasswordPage(forceRefresh: Boolean = false) {
+internal fun LegacyStateRuntimeViewModelCore.legacyLoadFindPasswordPage(forceRefresh: Boolean = false) {
     if (currentAccountState().isContentLoading && !forceRefresh) return
     viewModelScope.launch {
         updateAccountState(beginAccountContentLoad(currentAccountState()))
@@ -102,7 +102,7 @@ internal fun LegacyStateRuntimeViewModel.legacyLoadFindPasswordPage(forceRefresh
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyLoadAccountProfile() {
+internal fun LegacyStateRuntimeViewModelCore.legacyLoadAccountProfile() {
     viewModelScope.launch {
         updateAccountState(beginAccountContentLoad(currentAccountState()))
         runCatching {
@@ -121,7 +121,7 @@ internal fun LegacyStateRuntimeViewModel.legacyLoadAccountProfile() {
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyLoadFavoriteRecords(pageUrl: String? = null, append: Boolean = false) {
+internal fun LegacyStateRuntimeViewModelCore.legacyLoadFavoriteRecords(pageUrl: String? = null, append: Boolean = false) {
     viewModelScope.launch {
         updateAccountState(beginAccountContentLoad(currentAccountState()))
         runCatching {
@@ -140,7 +140,7 @@ internal fun LegacyStateRuntimeViewModel.legacyLoadFavoriteRecords(pageUrl: Stri
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyLoadHistoryRecords(pageUrl: String? = null, append: Boolean = false) {
+internal fun LegacyStateRuntimeViewModelCore.legacyLoadHistoryRecords(pageUrl: String? = null, append: Boolean = false) {
     viewModelScope.launch {
         updateAccountState(beginAccountContentLoad(currentAccountState()))
         runCatching {
@@ -161,7 +161,7 @@ internal fun LegacyStateRuntimeViewModel.legacyLoadHistoryRecords(pageUrl: Strin
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyEnrichHistoryRecords(items: List<UserCenterItem>) {
+internal fun LegacyStateRuntimeViewModelCore.legacyEnrichHistoryRecords(items: List<UserCenterItem>) {
     val targetItems = items.filter { item ->
         item.sourceIndex >= 0 &&
             item.sourceName.isBlank() &&
@@ -182,7 +182,7 @@ internal fun LegacyStateRuntimeViewModel.legacyEnrichHistoryRecords(items: List<
     })
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyLoadMembership() {
+internal fun LegacyStateRuntimeViewModelCore.legacyLoadMembership() {
     viewModelScope.launch {
         updateAccountState(beginAccountContentLoad(currentAccountState()))
         runCatching {

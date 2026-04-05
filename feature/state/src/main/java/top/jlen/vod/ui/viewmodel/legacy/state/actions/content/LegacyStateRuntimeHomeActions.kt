@@ -6,7 +6,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.jlen.vod.data.AppleCmsCategory
 
-internal fun LegacyStateRuntimeViewModel.legacyRefreshHome(forceRefresh: Boolean = false) {
+internal fun LegacyStateRuntimeViewModelCore.legacyRefreshHome(forceRefresh: Boolean = false) {
     refreshNotices(forceRefresh = forceRefresh)
     val cachedPayload = if (!forceRefresh) {
         legacyRepository().peekHomePayload(allowStale = true)
@@ -35,7 +35,7 @@ internal fun LegacyStateRuntimeViewModel.legacyRefreshHome(forceRefresh: Boolean
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyRefreshHomeAndClearCaches() {
+internal fun LegacyStateRuntimeViewModelCore.legacyRefreshHomeAndClearCaches() {
     viewModelScope.launch {
         withContext(Dispatchers.IO) { legacyRepository().clearRuntimeCaches() }
         clearSearchResultScrollPositions()
@@ -43,7 +43,7 @@ internal fun LegacyStateRuntimeViewModel.legacyRefreshHomeAndClearCaches() {
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacySelectCategory(
+internal fun LegacyStateRuntimeViewModelCore.legacySelectCategory(
     category: AppleCmsCategory,
     forceRefresh: Boolean = false
 ) {
@@ -57,7 +57,7 @@ internal fun LegacyStateRuntimeViewModel.legacySelectCategory(
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyUpdateCategoryFilter(key: String, value: String) {
+internal fun LegacyStateRuntimeViewModelCore.legacyUpdateCategoryFilter(key: String, value: String) {
     val category = currentHomeState().selectedCategory ?: return
     val normalizedKey = key.trim()
     if (normalizedKey.isBlank()) return
@@ -78,7 +78,7 @@ internal fun LegacyStateRuntimeViewModel.legacyUpdateCategoryFilter(key: String,
     )
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyLoadCategoryContent(
+internal fun LegacyStateRuntimeViewModelCore.legacyLoadCategoryContent(
     category: AppleCmsCategory,
     filters: Map<String, String>
 ) {
@@ -105,7 +105,7 @@ internal fun LegacyStateRuntimeViewModel.legacyLoadCategoryContent(
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyLoadMoreHome() {
+internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreHome() {
     if (currentHomeState().isHomeAppending) {
         return
     }
@@ -140,7 +140,7 @@ internal fun LegacyStateRuntimeViewModel.legacyLoadMoreHome() {
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyLoadMoreCategory() {
+internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreCategory() {
     if (currentHomeState().isCategoryAppending) {
         return
     }
@@ -180,7 +180,7 @@ internal fun LegacyStateRuntimeViewModel.legacyLoadMoreCategory() {
     }
 }
 
-internal fun LegacyStateRuntimeViewModel.legacyRefreshCategoryTab(forceRefresh: Boolean = false) {
+internal fun LegacyStateRuntimeViewModelCore.legacyRefreshCategoryTab(forceRefresh: Boolean = false) {
     val selectedCategory = currentHomeState().selectedCategory ?: currentHomeState().categories.firstOrNull() ?: return
     if (forceRefresh || currentHomeState().selectedCategoryFilters.isNotEmpty()) {
         legacyLoadCategoryContent(
