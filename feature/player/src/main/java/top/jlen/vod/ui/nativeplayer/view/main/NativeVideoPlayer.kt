@@ -1277,10 +1277,10 @@ private fun IconControlChip(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(Color.Black.copy(alpha = 0.28f))
+            .background(Color.Black.copy(alpha = 0.20f))
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.14f),
+                color = Color.White.copy(alpha = 0.10f),
                 shape = RoundedCornerShape(999.dp)
             )
             .width(width)
@@ -1308,10 +1308,10 @@ private fun ControlChip(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(Color.Black.copy(alpha = 0.28f))
+            .background(Color.Black.copy(alpha = 0.20f))
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.14f),
+                color = Color.White.copy(alpha = 0.10f),
                 shape = RoundedCornerShape(999.dp)
             )
             .width(width)
