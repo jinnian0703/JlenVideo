@@ -305,29 +305,16 @@ internal fun LegacyAccountScreen(
                         key = { it.name },
                         contentType = { "account_section" }
                     ) { section ->
-                        val selected = state.selectedSection == section
-                        AssistChip(
-                            onClick = { onSelectSection(section) },
-                            label = {
-                                Text(
-                                    when (section) {
-                                        AccountSection.Profile -> "资料"
-                                        AccountSection.Favorites -> "收藏"
-                                        AccountSection.History -> "记录"
-                                        AccountSection.Member -> "会员"
-                                        AccountSection.About -> "关于"
-                                    },
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                        AccountUnderlineTab(
+                            text = when (section) {
+                                AccountSection.Profile -> "资料"
+                                AccountSection.Favorites -> "收藏"
+                                AccountSection.History -> "记录"
+                                AccountSection.Member -> "会员"
+                                AccountSection.About -> "关于"
                             },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = if (selected) UiPalette.Accent else UiPalette.Surface.copy(alpha = 0.92f),
-                                labelColor = if (selected) UiPalette.AccentText else UiPalette.Ink
-                            ),
-                            border = AssistChipDefaults.assistChipBorder(
-                                borderColor = if (selected) Color.Transparent else UiPalette.Border,
-                                enabled = true
-                            )
+                            selected = state.selectedSection == section,
+                            onClick = { onSelectSection(section) }
                         )
                     }
                 }
@@ -1197,11 +1184,41 @@ private fun AccountSegmentBar(content: LazyListScope.() -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(UiPalette.SurfaceSoft.copy(alpha = 0.9f))
-            .padding(horizontal = 8.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(UiPalette.SurfaceSoft.copy(alpha = 0.72f))
+            .padding(horizontal = 10.dp, vertical = 10.dp)
     ) {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), content = content)
+    }
+}
+
+@Composable
+private fun AccountUnderlineTab(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
+            color = if (selected) UiPalette.Accent else UiPalette.TextSecondary
+        )
+        Box(
+            modifier = Modifier
+                .width(if (selected) 26.dp else 16.dp)
+                .height(3.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(if (selected) UiPalette.Accent else Color.Transparent)
+        )
     }
 }
 
@@ -1241,26 +1258,13 @@ internal fun LegacyAccountProfilePaneV2(
             ) {
                 AccountSegmentBar {
                     items(AccountProfileTab.entries.toList()) { tab ->
-                        val selected = tab == selectedTab
-                        AssistChip(
-                            onClick = { onTabChange(tab == AccountProfileTab.Edit) },
-                            label = {
-                                Text(
-                                    text = when (tab) {
-                                        AccountProfileTab.Overview -> "基本资料"
-                                        AccountProfileTab.Edit -> "修改信息"
-                                    },
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                        AccountUnderlineTab(
+                            text = when (tab) {
+                                AccountProfileTab.Overview -> "基本资料"
+                                AccountProfileTab.Edit -> "修改信息"
                             },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = if (selected) UiPalette.Accent else UiPalette.Surface.copy(alpha = 0.92f),
-                                labelColor = if (selected) UiPalette.AccentText else UiPalette.Ink
-                            ),
-                            border = AssistChipDefaults.assistChipBorder(
-                                borderColor = if (selected) Color.Transparent else UiPalette.Border,
-                                enabled = true
-                            )
+                            selected = tab == selectedTab,
+                            onClick = { onTabChange(tab == AccountProfileTab.Edit) }
                         )
                     }
                 }
