@@ -271,14 +271,10 @@ internal fun LegacyAccountScreen(
                             }
                         }
 
-                        val showMembershipSignInAction = state.selectedSection == AccountSection.Member
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             OutlinedButton(
-                                onClick = if (showMembershipSignInAction) onSignInMembership else onRefreshSection,
-                                enabled = when {
-                                    showMembershipSignInAction -> !state.isActionLoading && !state.membershipSignInInfo.signedToday
-                                    else -> !state.isLoading
-                                },
+                                onClick = onSignInMembership,
+                                enabled = !state.isActionLoading && !state.membershipSignInInfo.signedToday,
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(18.dp),
                                 border = BorderStroke(1.dp, UiPalette.BorderSoft),
@@ -289,10 +285,9 @@ internal fun LegacyAccountScreen(
                             ) {
                                 Text(
                                     when {
-                                        showMembershipSignInAction && state.isActionLoading -> "处理中..."
-                                        showMembershipSignInAction && state.membershipSignInInfo.signedToday -> "今日已签"
-                                        showMembershipSignInAction -> "立即签到"
-                                        else -> "刷新"
+                                        state.isActionLoading -> "处理中..."
+                                        state.membershipSignInInfo.signedToday -> "今日已签"
+                                        else -> "立即签到"
                                     }
                                 )
                             }
