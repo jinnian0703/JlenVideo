@@ -3,9 +3,6 @@ package top.jlen.vod
 object AppConfig {
     val appleCmsBaseUrl: String
         get() = top.jlen.vod.core.common.BuildConfig.APPLE_CMS_BASE_URL
-
-    val appleCmsFallbackBaseUrl: String
-        get() = top.jlen.vod.core.common.BuildConfig.APPLE_CMS_FALLBACK_BASE_URL
 }
 
 object AppRuntimeInfo {

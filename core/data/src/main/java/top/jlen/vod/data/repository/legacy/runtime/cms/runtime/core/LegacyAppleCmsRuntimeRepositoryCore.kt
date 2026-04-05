@@ -71,9 +71,6 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         AppleCmsCategory(typeId = "GCCCCW", typeName = "动漫", parentId = "GCCCCW")
     )
     private val baseUrl = AppConfig.appleCmsBaseUrl.trimEnd('/')
-    private val fallbackApiBaseUrl = AppConfig.appleCmsFallbackBaseUrl
-        .trimEnd('/')
-        .takeIf { it.isNotBlank() && !it.equals(baseUrl, ignoreCase = true) }
     private val gson = Gson()
     private val categoryPageCache = ConcurrentHashMap<String, CachedValue<PagedVodItems>>()
     private val detailCache = ConcurrentHashMap<String, CachedValue<VodItem?>>()
@@ -94,9 +91,6 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     @Volatile
     private var lastDiskCacheCleanupAt = 0L
     private val primaryApi: AppleCmsApi = createApi(baseUrl)
-    private val backupApi: AppleCmsApi? = fallbackApiBaseUrl?.let(::createApi)
-    @Volatile
-    private var preferBackupApiUntilMs = 0L
 
     internal fun runtimeClearHomeCacheEntry() {
         homeCache = null
@@ -138,9 +132,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         inFlightRequests.clear()
     }
 
-    internal fun runtimeResetRequestPreference() {
-        preferBackupApiUntilMs = 0L
-    }
+    internal fun runtimeResetRequestPreference() = Unit
 
     internal fun runtimeResetCleanupTimestamps() {
         lastMemoryCacheCleanupAt = 0L

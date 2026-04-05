@@ -10,7 +10,6 @@ val appApplicationId = providers.gradleProperty("APP_APPLICATION_ID").get()
 val appVersionCode = providers.gradleProperty("APP_VERSION_CODE").get().toInt()
 val appVersionName = providers.gradleProperty("APP_VERSION_NAME").get()
 val appleCmsBaseUrl = providers.gradleProperty("APPLE_CMS_BASE_URL").get()
-val appleCmsFallbackBaseUrl = providers.gradleProperty("APPLE_CMS_FALLBACK_BASE_URL").get()
 
 android {
     namespace = "top.jlen.vod"
@@ -29,7 +28,6 @@ android {
         }
 
         buildConfigField("String", "APPLE_CMS_BASE_URL", "\"$appleCmsBaseUrl\"")
-        buildConfigField("String", "APPLE_CMS_FALLBACK_BASE_URL", "\"$appleCmsFallbackBaseUrl\"")
     }
 
     buildTypes {
