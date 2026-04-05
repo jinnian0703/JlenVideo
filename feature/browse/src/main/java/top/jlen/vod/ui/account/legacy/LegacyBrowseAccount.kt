@@ -1377,16 +1377,9 @@ internal fun LegacyAccountProfilePaneV2(
                             ReadonlyBindingField(
                                 label = "邮箱",
                                 value = editor.email,
-                                actionText = "已绑定",
-                                onAction = null
+                                actionText = if (isSaving) "解绑中..." else "解绑邮箱",
+                                onAction = if (isSaving) null else onUnbindEmail
                             )
-                            OutlinedButton(
-                                onClick = onUnbindEmail,
-                                enabled = !isSaving,
-                                border = BorderStroke(1.dp, UiPalette.BorderSoft)
-                            ) {
-                                Text(if (isSaving) "解绑中..." else "解绑邮箱")
-                            }
                         }
 
                         Text(
@@ -1578,23 +1571,34 @@ internal fun LegacyReadonlyBindingField(
     actionText: String? = null,
     onAction: (() -> Unit)? = null
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(
-            onClick = { onAction?.invoke() },
-            enabled = onAction != null,
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(UiPalette.Surface)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            border = BorderStroke(1.dp, UiPalette.BorderSoft),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(label, color = UiPalette.TextSecondary, style = MaterialTheme.typography.labelLarge)
-                Text(value, color = UiPalette.Ink, style = MaterialTheme.typography.bodyLarge)
-                if (!actionText.isNullOrBlank()) {
-                    Text(actionText, color = UiPalette.Accent, style = MaterialTheme.typography.labelLarge)
+            Text(label, color = UiPalette.TextSecondary, style = MaterialTheme.typography.labelLarge)
+            Text(value, color = UiPalette.Ink, style = MaterialTheme.typography.bodyLarge)
+            if (!actionText.isNullOrBlank()) {
+                TextButton(
+                    onClick = { onAction?.invoke() },
+                    enabled = onAction != null,
+                    modifier = Modifier.align(Alignment.End),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = UiPalette.Accent
+                    )
+                ) {
+                    Text(
+                        text = actionText,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }
