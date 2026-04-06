@@ -787,11 +787,12 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         val cookies = cookieJar.snapshot()
         val userId = cookies.firstCookieValue("user_id")
         val userName = cookies.firstCookieValue("user_name")
+        val userCheck = cookies.firstCookieValue("user_check")
         val groupName = cookies.firstCookieValue("group_name")
         val portraitUrl = cookies.firstCookieValue("user_portrait")
 
         return AuthSession(
-            isLoggedIn = userId.isNotBlank() && userName.isNotBlank(),
+            isLoggedIn = userId.isNotBlank() && userName.isNotBlank() && userCheck.isNotBlank(),
             userId = userId,
             userName = decodeSiteText(userName),
             groupName = decodeSiteText(groupName),
