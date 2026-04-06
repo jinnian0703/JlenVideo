@@ -3882,6 +3882,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             points = points,
             expiry = expiry
         )
+        val membershipSignInInfo = parseMembershipSignInInfo(root)
         val profileFields = buildProfileFields(
             userId = userId,
             userName = userName,
@@ -3915,7 +3916,8 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 answer = answer
             ),
             membershipInfo = membershipInfo,
-            membershipPlans = plans
+            membershipPlans = plans,
+            membershipSignInInfo = membershipSignInInfo
         )
     }
 
