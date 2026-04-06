@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Precision
 import coil.size.Scale
@@ -22,6 +23,9 @@ fun rememberPosterRequest(
             .bitmapConfig(Bitmap.Config.RGB_565)
             .precision(Precision.INEXACT)
             .scale(Scale.FILL)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .networkCachePolicy(CachePolicy.ENABLED)
             .allowHardware(true)
             .crossfade(false)
             .diskCacheKey(data.orEmpty())

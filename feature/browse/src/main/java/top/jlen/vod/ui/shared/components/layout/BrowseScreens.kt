@@ -1,4 +1,4 @@
-package top.jlen.vod.ui
+﻿package top.jlen.vod.ui
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -181,9 +181,9 @@ private fun SearchDock(onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.96f)),
         shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, UiPalette.Border)
+        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.78f))
     ) {
         Row(
             modifier = Modifier
@@ -225,9 +225,9 @@ private fun AnnouncementTickerStrip(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.96f)),
         shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, UiPalette.Border)
+        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.78f))
     ) {
         Column(
             modifier = Modifier
@@ -582,7 +582,7 @@ internal fun AccountStatusNotice(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(26.dp),
         border = BorderStroke(1.dp, borderColor)
     ) {
         Column(
@@ -659,9 +659,9 @@ internal fun InlineEmptyStateCard(
     onAction: (() -> Unit)? = null
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.96f)),
         shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, UiPalette.Border)
+        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.78f))
     ) {
         Column(
             modifier = Modifier
@@ -1235,12 +1235,12 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick(item.vodId) },
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.dp, UiPalette.Border)
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.96f)),
+        shape = RoundedCornerShape(26.dp),
+        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.78f))
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             AsyncImage(
@@ -1265,11 +1265,18 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = item.subtitle.ifBlank { "站内资源" },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = UiPalette.TextSecondary
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(UiPalette.SurfaceSoft)
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = item.subtitle.ifBlank { "站内资源" },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = UiPalette.TextSecondary
+                    )
+                }
                 detailDescription?.let {
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
