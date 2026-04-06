@@ -494,7 +494,7 @@ internal fun LegacyAccountScreen(
                         AccountAuthMode.Register -> {
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-                                shape = RoundedCornerShape(24.dp),
+                                shape = RoundedCornerShape(28.dp),
                                 border = BorderStroke(1.dp, UiPalette.Border)
                             ) {
                                 AccountRegisterPane(
@@ -561,14 +561,14 @@ internal fun LegacyAccountScreen(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(20.dp),
-                                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                                        .padding(horizontal = 20.dp, vertical = 22.dp),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
                                     OutlinedTextField(
                                         value = state.userName,
                                         onValueChange = onUserNameChange,
                                         modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(20.dp),
+                                        shape = RoundedCornerShape(18.dp),
                                         singleLine = true,
                                         label = { Text("用户名") },
                                         placeholder = { Text("请输入站内用户名") },
@@ -578,15 +578,15 @@ internal fun LegacyAccountScreen(
                                             focusedTextColor = UiPalette.Ink,
                                             unfocusedTextColor = UiPalette.Ink,
                                             cursorColor = UiPalette.Accent,
-                                            focusedContainerColor = UiPalette.Surface,
-                                            unfocusedContainerColor = UiPalette.Surface
+                                            focusedContainerColor = UiPalette.SurfaceSoft,
+                                            unfocusedContainerColor = UiPalette.SurfaceSoft
                                         )
                                     )
                                     OutlinedTextField(
                                         value = state.password,
                                         onValueChange = onPasswordChange,
                                         modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(20.dp),
+                                        shape = RoundedCornerShape(18.dp),
                                         singleLine = true,
                                         label = { Text("密码") },
                                         placeholder = { Text("请输入密码") },
@@ -600,8 +600,8 @@ internal fun LegacyAccountScreen(
                                             focusedTextColor = UiPalette.Ink,
                                             unfocusedTextColor = UiPalette.Ink,
                                             cursorColor = UiPalette.Accent,
-                                            focusedContainerColor = UiPalette.Surface,
-                                            unfocusedContainerColor = UiPalette.Surface
+                                            focusedContainerColor = UiPalette.SurfaceSoft,
+                                            unfocusedContainerColor = UiPalette.SurfaceSoft
                                         )
                                     )
                                     Button(
