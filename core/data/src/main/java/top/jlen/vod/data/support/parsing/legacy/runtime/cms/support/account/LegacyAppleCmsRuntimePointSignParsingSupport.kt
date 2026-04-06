@@ -4,55 +4,31 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 
 internal fun parseMembershipSignInInfo(root: JsonObject): MembershipSignInInfo {
-    val payload = root.firstObject("data", "info") ?: root
-    val signIn = payload.firstObject("sign_in", "signIn", "signin") ?: return MembershipSignInInfo()
+    val payload = root.firstObject("data") ?: return MembershipSignInInfo()
+    val signIn = payload.firstObject("sign_in") ?: return MembershipSignInInfo()
     return MembershipSignInInfo(
-        enabled = signIn.firstBoolean(
-            "enabled",
-            "is_enabled",
-            "is_open",
-            "open",
-            "status",
-            "sign_in_enabled"
-        ) ?: signIn.entrySet().isNotEmpty(),
-        signedToday = signIn.firstBoolean(
-            "signed_today",
-            "is_signed_today",
-            "today_signed",
-            "is_today_signed",
-            "signed",
-            "signed_in"
-        ) ?: false,
+        enabled = signIn.firstBoolean("enabled") == true,
+        signedToday = signIn.firstBoolean("signed_today") == true,
         rewardPoints = decodeSiteText(
             signIn.firstString(
                 "reward_points",
-                "today_reward_points",
-                "today_points",
-                "today_reward"
+                "today_reward_points"
             )
         ),
         rewardMinPoints = decodeSiteText(
             signIn.firstString(
-                "min_points",
-                "reward_min_points",
-                "reward_min",
-                "min_reward_points"
+                "points_min"
             )
         ),
         rewardMaxPoints = decodeSiteText(
             signIn.firstString(
-                "max_points",
-                "reward_max_points",
-                "reward_max",
-                "max_reward_points"
+                "points_max"
             )
         ),
         signedAt = decodeSiteText(
             signIn.firstString(
                 "signed_at_text",
-                "signed_at",
-                "today_signed_at_text",
-                "today_signed_at"
+                "signed_at"
             )
         )
     )
