@@ -220,17 +220,12 @@ private fun SearchLandingContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     SearchInputCard(
                         query = state.query,
                         onQueryChange = onQueryChange,
                         onSearch = { onOpenSearchResults(state.query.trim()) }
-                    )
-                    Text(
-                        text = "回车或点右侧搜索即可进入结果页",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = UiPalette.TextMuted
                     )
                 }
             }
@@ -273,7 +268,7 @@ private fun SearchLandingContent(
                                 )
                             }
                             TextButton(onClick = onClearHistory) {
-                                Text("??")
+                                Text("清空")
                             }
                         }
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
