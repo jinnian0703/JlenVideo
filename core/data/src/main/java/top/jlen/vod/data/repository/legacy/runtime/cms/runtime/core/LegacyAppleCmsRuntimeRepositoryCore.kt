@@ -2230,7 +2230,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             .firstOrNull { section ->
                 section.selectFirst("h2")?.text()
                     ?.replace(Regex("\\s+"), "")
-                    ?.contains("鎺ㄨ崘") == true
+                    ?.contains("推荐") == true
             }
 
         return featuredSection

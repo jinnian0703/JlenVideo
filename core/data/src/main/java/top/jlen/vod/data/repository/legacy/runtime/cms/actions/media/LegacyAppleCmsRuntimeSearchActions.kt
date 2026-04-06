@@ -78,7 +78,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyEnrichSearchResul
             async {
                 val detailItem = runCatching { loadDetail(item.vodId) }.getOrNull()
                 val description = detailItem?.description
-                    ?.takeIf { it.isNotBlank() && it != "鏆傛棤绠€浠?" }
+                    ?.takeIf { it.isNotBlank() && it != "暂无简介" }
                     .orEmpty()
                 item.vodId to if (description.isNotBlank()) {
                     item.copy(

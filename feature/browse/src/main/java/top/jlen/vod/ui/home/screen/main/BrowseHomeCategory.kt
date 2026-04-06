@@ -145,7 +145,7 @@ fun HomeScreen(
     onOpenSearch: () -> Unit
 ) {
     if (state.isLoading) {
-        LoadingPane("棣栭〉鍔犺浇涓?..")
+        LoadingPane("首页加载中...")
         return
     }
 
@@ -194,7 +194,7 @@ fun HomeScreen(
         if (state.slides.isNotEmpty()) {
             item {
                 SectionTitle(
-                    title = "杞挱鎺ㄨ崘",
+                    title = "轮播推荐",
                     action = null,
                     icon = {
                         Icon(
@@ -225,7 +225,7 @@ fun HomeScreen(
         if (state.hot.isNotEmpty()) {
             item {
                 SectionTitle(
-                    title = "姝ｅ湪鐑挱",
+                    title = "正在热播",
                     action = null,
                     icon = {
                         Icon(
@@ -247,7 +247,7 @@ fun HomeScreen(
         if (state.featured.isNotEmpty()) {
             item {
                 SectionTitle(
-                    title = "鎺ㄨ崘",
+                    title = "推荐",
                     action = null,
                     icon = {
                         Icon(
@@ -270,14 +270,14 @@ fun HomeScreen(
         item {
             SectionTitle(
                 title = "最近更新",
-                action = "杩涘叆鐗囧簱",
+                action = "进入片库",
                 onAction = onOpenCategory
             )
         }
         if (state.latest.isEmpty()) {
             item {
                 InlineEmptyStateCard(
-                    message = "鏆傛棤鍐呭",
+                    message = "暂无内容",
                     actionLabel = "\u5237\u65b0",
                     onAction = onRefresh
                 )
@@ -425,8 +425,8 @@ fun CategoryScreen(
                     onRetry = onRetryCategory
                 )
             } ?: when {
-                state.isCategoryLoading -> LoadingPane("鍒嗙被鍔犺浇涓?..")
-                state.categoryVideos.isEmpty() -> InlineEmptyStateCard("鏆傛棤鍐呭")
+                state.isCategoryLoading -> LoadingPane("分类加载中...")
+                state.categoryVideos.isEmpty() -> InlineEmptyStateCard("暂无内容")
                 else -> Spacer(modifier = Modifier.height(0.dp))
             }
         }

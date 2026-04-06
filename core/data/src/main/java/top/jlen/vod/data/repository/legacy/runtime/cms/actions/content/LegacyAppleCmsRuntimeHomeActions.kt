@@ -149,7 +149,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFreshHome(
     runtimeRememberPreviewItems(latest + featured + selectedCategoryPage?.items.orEmpty())
 
     if (latest.isEmpty() && featured.isEmpty() && categories.isEmpty()) {
-        throw IOException("棣栭〉鍐呭瑙ｆ瀽澶辫触")
+        throw IOException("首页内容解析失败")
     }
     return HomePayload(
         slides = emptyList(),
