@@ -2,6 +2,10 @@ package top.jlen.vod.ui
 
 import android.net.Uri
 import android.util.Patterns
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import top.jlen.vod.data.MembershipPlan
 
 
@@ -82,8 +86,59 @@ internal fun LegacyStateRuntimeViewModelCore.legacyUpgradeMembership(plan: Membe
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacySignInMembership() {
-    val signInInfo = currentAccountState().membershipSignInInfo
-    if (!signInInfo.enabled) {
+    val cachedSignInInfo = currentAccountState().membershipSignInInfo
+    val shouldRefreshMembershipFirst =
+        currentAccountState().selectedSection != AccountSection.Member ||
+            (!cachedSignInInfo.enabled &&
+                !cachedSignInInfo.signedToday &&
+                cachedSignInInfo.rewardPoints.isBlank() &&
+                cachedSignInInfo.rewardMinPoints.isBlank() &&
+                cachedSignInInfo.rewardMaxPoints.isBlank())
+
+    if (shouldRefreshMembershipFirst) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { legacyRepository().loadMembershipDataForApp() }
+            }.onSuccess { page ->
+                updateAccountState(
+                    accountStateWithMembershipPage(
+                        accountState = currentAccountState(),
+                        page = page,
+                        currentSession = legacyRepository().currentSession()
+                    )
+                )
+            }
+
+            val refreshedSignInInfo = currentAccountState().membershipSignInInfo
+            when {
+                !refreshedSignInInfo.enabled -> {
+                    updateAccountState(
+                        accountStateWithValidationError(
+                            currentAccountState(),
+                            "当前站点未开启签到功能"
+                        )
+                    )
+                }
+                refreshedSignInInfo.signedToday -> {
+                    updateAccountState(
+                        accountStateWithValidationError(
+                            currentAccountState(),
+                            "今日已签到，请明天再来"
+                        )
+                    )
+                }
+                else -> {
+                    runtimeRunAccountAction(
+                        block = { signInMembership() },
+                        onSuccess = { selectAccountSection(AccountSection.Member, forceRefresh = true) }
+                    )
+                }
+            }
+        }
+        return
+    }
+
+    if (!cachedSignInInfo.enabled) {
         updateAccountState(
             accountStateWithValidationError(
                 currentAccountState(),
@@ -92,7 +147,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacySignInMembership() {
         )
         return
     }
-    if (signInInfo.signedToday) {
+    if (cachedSignInInfo.signedToday) {
         updateAccountState(
             accountStateWithValidationError(
                 currentAccountState(),
