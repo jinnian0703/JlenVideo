@@ -1,4 +1,4 @@
-package top.jlen.vod.ui
+﻿package top.jlen.vod.ui
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -194,71 +194,111 @@ private fun SearchLandingContent(
         contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
     ) {
         item {
-            Text(
-                text = "搜索",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.ExtraBold,
-                color = UiPalette.Ink
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "搜索",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Ink
+                )
+                Text(
+                        text = "搜片名、主角或别名，常搜和热榜都在下面。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = UiPalette.TextMuted
+                )
+            }
         }
         item {
-            SearchInputCard(
-                query = state.query,
-                onQueryChange = onQueryChange,
-                onSearch = { onOpenSearchResults(state.query.trim()) }
-            )
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.86f)
+                ),
+                shape = RoundedCornerShape(28.dp),
+                border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.75f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    SearchInputCard(
+                        query = state.query,
+                        onQueryChange = onQueryChange,
+                        onSearch = { onOpenSearchResults(state.query.trim()) }
+                    )
+                    Text(
+                        text = "回车或点右侧搜索即可进入结果页",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = UiPalette.TextMuted
+                    )
+                }
+            }
         }
         if (state.history.isNotEmpty()) {
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = UiPalette.Surface.copy(alpha = 0.92f)
+                    ),
+                    shape = RoundedCornerShape(26.dp),
+                    border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.7f))
                 ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.History,
-                            contentDescription = null,
-                            tint = UiPalette.TextSecondary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = "搜索记录",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = UiPalette.Ink
-                        )
-                    }
-                    TextButton(onClick = onClearHistory) {
-                        Text("清空")
-                    }
-                }
-            }
-            item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(
-                        items = state.history,
-                        key = { it },
-                        contentType = { "history" }
-                    ) { keyword ->
-                        AssistChip(
-                            onClick = {
-                                onSearchHistory(keyword)
-                                onOpenSearchResults(keyword)
-                            },
-                            label = { Text(keyword) },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = UiPalette.Surface,
-                                labelColor = UiPalette.Ink
-                            ),
-                            border = AssistChipDefaults.assistChipBorder(
-                                borderColor = UiPalette.BorderSoft,
-                                enabled = true
-                            )
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.History,
+                                    contentDescription = null,
+                                    tint = UiPalette.TextSecondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = "搜索记录",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = UiPalette.Ink
+                                )
+                            }
+                            TextButton(onClick = onClearHistory) {
+                                Text("??")
+                            }
+                        }
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            items(
+                                items = state.history,
+                                key = { it },
+                                contentType = { "history" }
+                            ) { keyword ->
+                                AssistChip(
+                                    onClick = {
+                                        onSearchHistory(keyword)
+                                        onOpenSearchResults(keyword)
+                                    },
+                                    label = { Text(keyword) },
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        containerColor = Color.White,
+                                        labelColor = UiPalette.Ink
+                                    ),
+                                    border = AssistChipDefaults.assistChipBorder(
+                                        borderColor = UiPalette.BorderSoft,
+                                        enabled = true
+                                    )
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -280,7 +320,7 @@ private fun SearchLandingContent(
         }
         item {
             when {
-                state.isHotSearchLoading && state.hotSearchGroups.isEmpty() -> LoadingPane("热搜加载中..")
+                state.isHotSearchLoading && state.hotSearchGroups.isEmpty() -> LoadingPane("热搜加载中...")
                 !state.hotSearchError.isNullOrBlank() && state.hotSearchGroups.isEmpty() ->
                     ErrorBanner(message = state.hotSearchError.orEmpty(), onRetry = onLoadHotSearches)
                 state.hotSearchGroups.isEmpty() -> EmptyPane("暂无热搜")
@@ -299,74 +339,6 @@ private fun SearchLandingContent(
         }
     }
 }
-
-/*
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SearchResultsScreen(
-    state: SearchUiState,
-    onBack: () -> Unit,
-    onQueryChange: (String) -> Unit,
-    onSearch: () -> Unit,
-    onOpenDetail: (String) -> Unit
-) {
-    val listState = rememberSaveable(state.submittedQuery, saver = LazyListState.Saver) {
-        LazyListState()
-    }
-    LazyColumn(
-        state = listState,
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
-    ) {
-        item {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                CircleActionButton(icon = Icons.AutoMirrored.Rounded.ArrowBack, onClick = onBack)
-                Text(
-                    text = "搜索结果",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = UiPalette.Ink
-                )
-            }
-        }
-        item {
-            SearchInputCard(
-                query = state.query,
-                onQueryChange = onQueryChange,
-                onSearch = onSearch
-            )
-        }
-        item {
-            Text(
-                text = if (state.submittedQuery.isBlank()) "输入片名开始搜索" else "“${state.submittedQuery}” 的结果",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = UiPalette.Ink
-            )
-        }
-        when {
-            state.isLoading -> item { LoadingPane("搜索中..") }
-            !state.error.isNullOrBlank() && state.results.isEmpty() ->
-                item { ErrorBanner(message = state.error, onRetry = onSearch) }
-            state.results.isEmpty() ->
-                item { EmptyPane(if (state.submittedQuery.isBlank()) "输入片名搜索" else "暂无结果") }
-            else -> items(
-                items = state.results,
-                key = { it.stableKey() },
-                contentType = { "search_result" }
-            ) { item ->
-                ListCard(item = item, onClick = onOpenDetail)
-            }
-        }
-    }
-}
-*/
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -450,7 +422,7 @@ fun SearchResultsScreen(
             )
         }
         when {
-            state.isLoading -> item { LoadingPane("搜索中..") }
+            state.isLoading -> item { LoadingPane("搜索中...") }
             !state.error.isNullOrBlank() && state.submittedQuery.isBlank() && state.results.isEmpty() ->
                 item { SearchEmptyState(query = "", message = state.error.orEmpty()) }
             !state.error.isNullOrBlank() && state.results.isEmpty() ->
@@ -486,11 +458,11 @@ private fun SearchEmptyState(
     val title = when {
         message != null && query.isBlank() -> message
         query.isBlank() -> "输入片名开始搜索"
-        else -> "没找到“$query”"
+        else -> "没有找到“$query”"
     }
     val description = when {
-        query.isBlank() -> "也可以试试主演、导演或别名"
-        else -> "换个关键词再试试，片名、主演、别名都可以"
+        query.isBlank() -> "也可以试试主角、导演或别名"
+        else -> "换个关键词再试试，片名、主角和别名都可以"
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -546,54 +518,71 @@ private fun SearchInputCard(
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit
 ) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        singleLine = true,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = UiPalette.Accent,
-            unfocusedBorderColor = UiPalette.BorderSoft,
-            focusedTextColor = UiPalette.Ink,
-            unfocusedTextColor = UiPalette.Ink,
-            cursorColor = UiPalette.Accent,
-            focusedTrailingIconColor = UiPalette.Accent,
-            unfocusedTrailingIconColor = UiPalette.TextSecondary,
-            focusedContainerColor = UiPalette.Surface,
-            unfocusedContainerColor = UiPalette.Surface,
-            focusedPlaceholderColor = UiPalette.TextMuted,
-            unfocusedPlaceholderColor = UiPalette.TextMuted
-        ),
-        placeholder = { Text("搜片名") },
-        trailingIcon = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-                if (query.isNotBlank()) {
-                    TextButton(
-                        onClick = { onQueryChange("") },
-                        colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.TextSecondary),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(22.dp),
+        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.78f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Search,
+                contentDescription = null,
+                tint = UiPalette.TextMuted,
+                modifier = Modifier.size(20.dp)
+            )
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                shape = RoundedCornerShape(18.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedTextColor = UiPalette.Ink,
+                    unfocusedTextColor = UiPalette.Ink,
+                    cursorColor = UiPalette.Accent,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedPlaceholderColor = UiPalette.TextMuted,
+                    unfocusedPlaceholderColor = UiPalette.TextMuted
+                ),
+                placeholder = { Text("搜片名") },
+                trailingIcon = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = "清空搜索关键词",
-                            modifier = Modifier.size(18.dp)
-                        )
+                        if (query.isNotBlank()) {
+                            TextButton(
+                                onClick = { onQueryChange("") },
+                                colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.TextSecondary),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Close,
+                                    contentDescription = "清空搜索关键词",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        TextButton(
+                            onClick = onSearch,
+                            colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent),
+                            contentPadding = PaddingValues(start = 2.dp, top = 0.dp, end = 0.dp, bottom = 0.dp)
+                        ) {
+                            Text("搜索", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
-                TextButton(
-                    onClick = onSearch,
-                    colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent),
-                    contentPadding = PaddingValues(start = 2.dp, top = 0.dp, end = 0.dp, bottom = 0.dp)
-                ) {
-                    Text("搜索", fontWeight = FontWeight.Bold)
-                }
-            }
+            )
         }
-    )
+    }
 }
 
 @Composable
@@ -602,47 +591,92 @@ private fun HotSearchBoard(
     onPickKeyword: (String) -> Unit
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.dp, UiPalette.Border)
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.96f)),
+        shape = RoundedCornerShape(28.dp),
+        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.75f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = group.platform,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.ExtraBold,
-                color = UiPalette.Ink
-            )
-            group.items.forEach { item ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(UiPalette.AccentSoft.copy(alpha = 0.16f))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = group.platform,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = UiPalette.Accent
+                    )
+                }
+                Text(
+                    text = "大家都在搜",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = UiPalette.TextMuted
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            group.items.forEachIndexed { index, item ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(16.dp))
                         .clickable { onPickKeyword(item.keyword) }
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                        .padding(horizontal = 6.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = item.rank.toString().padStart(2, '0'),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (item.rank <= 3) UiPalette.Accent else UiPalette.TextSecondary
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (item.rank <= 3) UiPalette.AccentSoft.copy(alpha = 0.2f)
+                                else UiPalette.SurfaceSoft.copy(alpha = 0.9f)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = item.rank.toString().padStart(2, '0'),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = if (item.rank <= 3) UiPalette.Accent else UiPalette.TextSecondary
+                        )
+                    }
                     Text(
                         text = item.keyword,
                         style = MaterialTheme.typography.bodyLarge,
                         color = UiPalette.Ink,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                        contentDescription = null,
+                        tint = UiPalette.TextMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                if (index != group.items.lastIndex) {
+                    Spacer(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(UiPalette.BorderSoft.copy(alpha = 0.5f))
                     )
                 }
             }
         }
     }
 }
+
