@@ -14,6 +14,7 @@ internal fun toUserFacingMessage(
 ): String {
     val host = serviceLabel?.trim()?.takeIf(String::isNotBlank) ?: "内容服务"
     val rawMessage = error.message.orEmpty().trim()
+    val normalizedRawMessage = normalizeKnownUiMessage(rawMessage)
 
     return when {
         error is UnknownHostException || rawMessage.contains("Unable to resolve host", ignoreCase = true) ->
@@ -31,9 +32,11 @@ internal fun toUserFacingMessage(
             "无法连接到 $host，请稍后重试"
 
         error is SSLException || rawMessage.contains("ssl", ignoreCase = true) ->
-            "与 $host 的安全连接失败，请稍后重试"
+            "$host 的安全连接失败，请稍后重试"
 
-        rawMessage.any { it in '\u4e00'..'\u9fff' } -> rawMessage
+        normalizedRawMessage.isNotBlank() &&
+            normalizedRawMessage.any { it in '\u4e00'..'\u9fff' } &&
+            !looksLikeMojibake(normalizedRawMessage) -> normalizedRawMessage
 
         fallback.isNotBlank() -> "$fallback，请稍后重试"
 
@@ -42,7 +45,7 @@ internal fun toUserFacingMessage(
 }
 
 internal fun normalizeFavoriteActionMessage(rawMessage: String): String {
-    val message = rawMessage.trim()
+    val message = normalizeKnownUiMessage(rawMessage.trim())
     if (message.isBlank()) return "已加入收藏"
     return when {
         isDuplicateFavoriteMessage(message) -> "已在收藏中"
@@ -52,7 +55,7 @@ internal fun normalizeFavoriteActionMessage(rawMessage: String): String {
 }
 
 internal fun isDuplicateFavoriteMessage(rawMessage: String): Boolean {
-    val message = rawMessage.trim()
+    val message = normalizeKnownUiMessage(rawMessage.trim())
     if (message.isBlank()) return false
     return message.contains("已收藏") ||
         message.contains("已经收藏") ||
@@ -63,3 +66,21 @@ internal fun isDuplicateFavoriteMessage(rawMessage: String): Boolean {
 internal fun historyRecordKey(item: UserCenterItem): String =
     listOf(item.recordId, item.actionUrl, item.playUrl, item.title)
         .joinToString("|")
+
+private fun normalizeKnownUiMessage(message: String): String =
+    message
+        .replace("璇峰厛鐧诲綍", "请先登录")
+        .replace("鐧诲綍鎴愬姛", "登录成功")
+        .replace("宸查€€鍑虹櫥褰", "已退出登录")
+        .replace("鐧诲綍宸插け鏁堬紝璇烽噸鏂扮櫥褰", "登录已失效，请重新登录")
+        .replace("鍐呭鏈嶅姟", "内容服务")
+        .trim()
+
+private fun looksLikeMojibake(message: String): Boolean {
+    val suspiciousTokens = listOf(
+        "鐧", "璇", "鍔", "浼", "绉", "澶", "鏆", "宸", "鍒", "褰",
+        "缁", "鍦", "骞", "鍛", "閫", "鎿", "鏌", "濂", "鍨", "鏁",
+        "瑙", "璁", "鏈", "绱", "鏃", "鎴", "鍙"
+    )
+    return suspiciousTokens.any(message::contains)
+}

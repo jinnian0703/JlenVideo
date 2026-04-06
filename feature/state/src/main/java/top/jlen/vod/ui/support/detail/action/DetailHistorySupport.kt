@@ -52,10 +52,10 @@ internal fun resolveHistoryResumeSelection(
 internal fun buildHistoryFallbackSources(item: UserCenterItem, resumeUrl: String): List<PlaySource> =
     listOf(
         PlaySource(
-            name = item.sourceName.ifBlank { "缁х画瑙傜湅" },
+            name = item.sourceName.ifBlank { "继续观看" },
             episodes = listOf(
                 Episode(
-                    name = item.subtitle.substringBefore("|").trim().ifBlank { "缁х画瑙傜湅" },
+                    name = item.subtitle.substringBefore("|").trim().ifBlank { "继续观看" },
                     url = resumeUrl
                 )
             )

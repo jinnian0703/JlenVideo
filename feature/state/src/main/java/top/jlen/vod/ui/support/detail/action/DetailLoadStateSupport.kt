@@ -13,7 +13,7 @@ internal fun beginDetailLoad(
 }
 
 internal fun missingDetailState(): DetailUiState =
-    DetailUiState(isLoading = false, error = "閺堫亝澹橀崚鏉垮閻楀洩顕涢幆?")
+    DetailUiState(isLoading = false, error = "详情不存在或已失效")
 
 internal fun loadedDetailState(
     item: VodItem,

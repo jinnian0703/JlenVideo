@@ -188,6 +188,12 @@ data class VodItem(
 fun sanitizeUserFacingToken(value: String?): String =
     value.orEmpty()
         .trim()
+        .replace("绫诲瀷", "类型")
+        .replace("鍦板尯", "地区")
+        .replace("骞翠唤", "年份")
+        .replace("璇█", "语言")
+        .replace("鐘舵€", "状态")
+        .replace("鐗堟湰", "版本")
         .takeUnless {
             it.isBlank() ||
                 it.equals("null", ignoreCase = true) ||

@@ -81,31 +81,31 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRegister() {
 internal fun LegacyStateRuntimeViewModelCore.legacyFindPassword() {
     val editor = currentAccountState().findPasswordEditor
     if (editor.userName.isBlank()) {
-        updateAccountState(accountStateWithValidationError(currentAccountState(), "璇疯緭鍏ョ敤鎴峰悕"))
+        updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入用户名"))
         return
     }
     if (editor.question.isBlank()) {
-        updateAccountState(accountStateWithValidationError(currentAccountState(), "璇疯緭鍏ュ瘑淇濋棶棰?"))
+        updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入密保问题"))
         return
     }
     if (editor.answer.isBlank()) {
-        updateAccountState(accountStateWithValidationError(currentAccountState(), "璇疯緭鍏ュ瘑淇濈瓟妗?"))
+        updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入密保答案"))
         return
     }
     if (editor.password.isBlank()) {
-        updateAccountState(accountStateWithValidationError(currentAccountState(), "璇疯緭鍏ユ柊瀵嗙爜"))
+        updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入新密码"))
         return
     }
     if (editor.confirmPassword.isBlank()) {
-        updateAccountState(accountStateWithValidationError(currentAccountState(), "璇风‘璁ゆ柊瀵嗙爜"))
+        updateAccountState(accountStateWithValidationError(currentAccountState(), "请确认新密码"))
         return
     }
     if (editor.password != editor.confirmPassword) {
-        updateAccountState(accountStateWithValidationError(currentAccountState(), "涓ゆ杈撳叆鐨勫瘑鐮佷笉涓€鑷?"))
+        updateAccountState(accountStateWithValidationError(currentAccountState(), "两次输入的新密码不一致"))
         return
     }
     if (currentAccountState().findPasswordRequiresVerify && editor.verify.isBlank()) {
-        updateAccountState(accountStateWithValidationError(currentAccountState(), "璇疯緭鍏ュ浘鐗囬獙璇佺爜"))
+        updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入图片验证码"))
         return
     }
 

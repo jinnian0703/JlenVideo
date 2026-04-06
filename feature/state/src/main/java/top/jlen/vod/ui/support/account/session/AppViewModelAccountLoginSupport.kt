@@ -13,7 +13,7 @@ internal fun loggedInAccountState(
     session = session,
     password = "",
     error = null,
-    message = "鐧诲綍鎴愬姛"
+    message = "登录成功"
 )
 
 internal fun accountStateWithLoginError(
@@ -39,7 +39,7 @@ internal fun accountStateWithLogoutError(
 internal fun loggedOutAccountState(accountState: AccountUiState): AccountUiState = AccountUiState(
     userName = accountState.userName,
     session = AuthSession(),
-    message = "宸查€€鍑虹櫥褰?",
+    message = "已退出登录",
     updateInfo = accountState.updateInfo,
     hasCrashLog = accountState.hasCrashLog,
     latestCrashLog = accountState.latestCrashLog
@@ -48,7 +48,7 @@ internal fun loggedOutAccountState(accountState: AccountUiState): AccountUiState
 internal fun expiredAccountState(accountState: AccountUiState): AccountUiState = AccountUiState(
     userName = accountState.userName,
     authMode = AccountAuthMode.Login,
-    message = "鐧诲綍宸插け鏁堬紝璇烽噸鏂扮櫥褰?",
+    message = "登录已失效，请重新登录",
     updateInfo = accountState.updateInfo,
     hasCrashLog = accountState.hasCrashLog,
     latestCrashLog = accountState.latestCrashLog

@@ -8,7 +8,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.jlen.vod.data.MembershipPlan
 
-
 private fun String.isValidEmailAddress(): Boolean =
     Patterns.EMAIL_ADDRESS.matcher(this).matches()
 
@@ -176,7 +175,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacySaveProfile() {
 
 internal fun LegacyStateRuntimeViewModelCore.legacyUploadPortrait(uri: Uri) {
     if (!currentAccountState().session.isLoggedIn) {
-        updateAccountState(accountStateWithValidationError(currentAccountState(), "璇峰厛鐧诲綍"))
+        updateAccountState(accountStateWithValidationError(currentAccountState(), "请先登录"))
         return
     }
     runtimeRunAccountAction(
@@ -195,6 +194,10 @@ internal fun LegacyStateRuntimeViewModelCore.legacySendEmailBindCode() {
         updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入邮箱地址"))
         return
     }
+    if (!email.isValidEmailAddress()) {
+        updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入正确的邮箱地址"))
+        return
+    }
     runtimeRunAccountAction(
         block = { sendEmailBindCode(email) },
         successMessage = "验证码已发送，请注意查收",
@@ -207,6 +210,10 @@ internal fun LegacyStateRuntimeViewModelCore.legacyBindEmail() {
     val code = currentAccountState().profileEditor.emailCode.trim()
     if (email.isBlank()) {
         updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入邮箱地址"))
+        return
+    }
+    if (!email.isValidEmailAddress()) {
+        updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入正确的邮箱地址"))
         return
     }
     if (code.isBlank()) {

@@ -42,7 +42,7 @@ internal fun normalizeLoginFailureMessage(rawMessage: String): String {
     val message = rawMessage.trim()
     return when {
         message.isBlank() -> ""
-        message.contains("鑾峰彇鐢ㄦ埛淇℃伅澶辫触") -> "鐢ㄦ埛鍚嶄笉瀛樺湪鎴栧瘑鐮侀敊璇?"
+        message.contains("获取用户信息失败") -> "用户名不存在或密码错误"
         else -> message
     }
 }
@@ -51,16 +51,16 @@ internal fun parsePortraitUploadResult(json: JsonObject): String {
     val code = json.firstInt("code", "status")
     val message = json.firstString("msg", "message")
     if (code == 401 || message.equals("login required", ignoreCase = true) || isLoginMessage(message)) {
-        throw IOException("璇峰厛鐧诲綍")
+        throw IOException("请先登录")
     }
     if (code != null && code !in setOf(1, 200)) {
-        throw IOException(message.ifBlank { "澶村儚涓婁紶澶辫触" })
+        throw IOException(message.ifBlank { "头像上传失败" })
     }
     val payload = unwrapApiPayload(json)
     val portrait = payload?.firstString("user_portrait_with_version", "user_portrait", "portrait", "avatar")
         .orEmpty()
     return if (portrait.isNotBlank() || message.isBlank() || message.equals("ok", ignoreCase = true)) {
-        "澶村儚鏇存柊鎴愬姛"
+        "头像已更新"
     } else {
         message
     }

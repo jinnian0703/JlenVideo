@@ -21,7 +21,7 @@ internal fun applyTakeoverFailure(
 ): PlayerUiState = playerState.copy(
     isResolving = false,
     useWebPlayer = false,
-    resolveError = message.ifBlank { "璇ョ嚎璺殏涓嶆敮鎸侊紝璇锋崲涓嚎璺瘯璇?" }
+    resolveError = message.ifBlank { "当前线路暂不支持，请切换其他线路试试" }
 )
 
 internal fun hasMeaningfulPlaybackChange(
