@@ -47,9 +47,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,6 +65,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -89,7 +92,20 @@ private val appBackground = Brush.verticalGradient(
     colors = listOf(UiPalette.HeroEnd, UiPalette.BackgroundTop, UiPalette.BackgroundBottom)
 )
 
-private val appColors = lightColorScheme(
+private val lightAppColors = lightColorScheme(
+    primary = UiPalette.Accent,
+    onPrimary = UiPalette.AccentText,
+    secondary = UiPalette.AccentSoft,
+    onSecondary = UiPalette.AccentText,
+    background = UiPalette.BackgroundTop,
+    onBackground = UiPalette.TextPrimary,
+    surface = UiPalette.Surface,
+    onSurface = UiPalette.TextPrimary,
+    surfaceVariant = UiPalette.SurfaceStrong,
+    onSurfaceVariant = UiPalette.TextSecondary
+)
+
+private val darkAppColors = darkColorScheme(
     primary = UiPalette.Accent,
     onPrimary = UiPalette.AccentText,
     secondary = UiPalette.AccentSoft,
@@ -104,6 +120,10 @@ private val appColors = lightColorScheme(
 
 @Composable
 fun JlenVideoApp() {
+    val isDarkTheme = isSystemInDarkTheme()
+    SideEffect {
+        UiPalette.syncWithSystem(isDarkTheme)
+    }
     val viewModel: AppViewModel = viewModel()
     val navController = rememberNavController()
     val context = LocalContext.current
@@ -188,7 +208,7 @@ fun JlenVideoApp() {
         }
     }
 
-    MaterialTheme(colorScheme = appColors) {
+    MaterialTheme(colorScheme = if (isDarkTheme) darkAppColors else lightAppColors) {
         Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
             Box(modifier = Modifier.fillMaxSize().background(appBackground)) {
                 if (noticeDialog != null) {
