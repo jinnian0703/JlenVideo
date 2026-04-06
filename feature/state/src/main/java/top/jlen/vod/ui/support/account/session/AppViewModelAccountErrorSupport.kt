@@ -74,6 +74,8 @@ private fun normalizeKnownUiMessage(message: String): String =
         .replace("宸查€€鍑虹櫥褰", "已退出登录")
         .replace("鐧诲綍宸插け鏁堬紝璇烽噸鏂扮櫥褰", "登录已失效，请重新登录")
         .replace("鍐呭鏈嶅姟", "内容服务")
+        .replace("ac不能为空", "当前站点签到接口配置异常，请联系管理员")
+        .replace("ac值只能是email,phone", "当前站点签到接口配置异常，请联系管理员")
         .trim()
 
 private fun looksLikeMojibake(message: String): Boolean {
