@@ -194,19 +194,12 @@ private fun SearchLandingContent(
         contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "搜索",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = UiPalette.Ink
-                )
-                Text(
-                        text = "搜片名、主角或别名，常搜和热榜都在下面。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = UiPalette.TextMuted
-                )
-            }
+            Text(
+                text = "搜索",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = UiPalette.Ink
+            )
         }
         item {
             Card(
