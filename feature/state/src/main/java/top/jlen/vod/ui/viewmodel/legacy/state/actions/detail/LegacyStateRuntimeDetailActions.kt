@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.jlen.vod.data.UserCenterItem
+import top.jlen.vod.data.VodItem
 
 internal fun LegacyStateRuntimeViewModelCore.legacyAddCurrentDetailFavorite() {
     val item = currentDetailState().item ?: return
@@ -47,7 +48,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyCancelCurrentDetailFavorite()
         updateDetailState(detailStateWithActionMessage(currentDetailState(), "请先登录后再操作收藏", true))
         return
     }
-    val favoriteVodId = item.vodId.takeIf { it.isNotBlank() }
+    val favoriteVodId = resolveCancelableFavoriteVodId(item).takeIf { it.isNotBlank() }
         ?: currentAccountState()
             .favoriteItems
             .firstOrNull { favorite -> favorite.vodId == item.vodId }
@@ -67,6 +68,31 @@ internal fun LegacyStateRuntimeViewModelCore.legacyCancelCurrentDetailFavorite()
         }
     )
 }
+
+private fun resolveCancelableFavoriteVodId(item: VodItem): String {
+    val directVodId = item.vodId.trim()
+    if (directVodId.isNotBlank()) return directVodId
+
+    val siteVodId = item.siteVodId.trim()
+    if (siteVodId.isNotBlank()) return siteVodId
+
+    val detailUrl = item.detailUrl.trim()
+    if (detailUrl.isBlank()) return ""
+
+    return Regex("""/voddetail/([^/]+)/?""")
+        .find(detailUrl)
+        ?.groupValues
+        ?.getOrNull(1)
+        .orEmpty()
+        .ifBlank {
+            Regex("""/vodplay/([^/-]+)""")
+                .find(detailUrl)
+                ?.groupValues
+                ?.getOrNull(1)
+                .orEmpty()
+        }
+}
+
 internal fun LegacyStateRuntimeViewModelCore.legacyDismissDetailActionMessage() {
     if (currentDetailState().actionMessage.isNullOrBlank()) return
     updateDetailState(detailStateWithoutActionMessage(currentDetailState()))
