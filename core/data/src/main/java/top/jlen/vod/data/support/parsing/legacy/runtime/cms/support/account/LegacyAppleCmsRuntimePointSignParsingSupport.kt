@@ -5,32 +5,49 @@ import com.google.gson.JsonObject
 
 internal fun parseMembershipSignInInfo(root: JsonObject): MembershipSignInInfo {
     val payload = root.firstObject("data") ?: return MembershipSignInInfo()
-    val signIn = payload.firstObject("sign_in") ?: return MembershipSignInInfo()
+    val signIn = payload.firstObject("sign_in")
+    val user = payload.firstObject("user")
+    val enabledValue = signIn?.firstInt("enabled")
+        ?: payload.firstInt("sign_status")
+        ?: user?.firstInt("sign_status")
+    val signedTodayValue = signIn?.firstInt("signed_today")
+        ?: payload.firstInt("signed_today")
+        ?: user?.firstInt("signed_today")
+    val rewardMin = decodeSiteText(
+        signIn?.firstString("points_min").orEmpty().ifBlank {
+            payload.firstString("sign_points_min").ifBlank {
+                user?.firstString("sign_points_min").orEmpty()
+            }
+        }
+    )
+    val rewardMax = decodeSiteText(
+        signIn?.firstString("points_max").orEmpty().ifBlank {
+            payload.firstString("sign_points_max").ifBlank {
+                user?.firstString("sign_points_max").orEmpty()
+            }
+        }
+    )
+    val rewardPoints = decodeSiteText(
+        signIn?.firstString("reward_points", "today_reward_points").orEmpty().ifBlank {
+            payload.firstString("today_reward_points").ifBlank {
+                user?.firstString("today_reward_points").orEmpty()
+            }
+        }
+    )
+    val signedAt = decodeSiteText(
+        signIn?.firstString("signed_at_text", "signed_at").orEmpty().ifBlank {
+            payload.firstString("signed_at_text", "signed_at").ifBlank {
+                user?.firstString("signed_at_text", "signed_at").orEmpty()
+            }
+        }
+    )
     return MembershipSignInInfo(
-        enabled = signIn.firstBoolean("enabled") == true,
-        signedToday = signIn.firstBoolean("signed_today") == true,
-        rewardPoints = decodeSiteText(
-            signIn.firstString(
-                "reward_points",
-                "today_reward_points"
-            )
-        ),
-        rewardMinPoints = decodeSiteText(
-            signIn.firstString(
-                "points_min"
-            )
-        ),
-        rewardMaxPoints = decodeSiteText(
-            signIn.firstString(
-                "points_max"
-            )
-        ),
-        signedAt = decodeSiteText(
-            signIn.firstString(
-                "signed_at_text",
-                "signed_at"
-            )
-        )
+        enabled = enabledValue == 1,
+        signedToday = signedTodayValue == 1,
+        rewardPoints = rewardPoints,
+        rewardMinPoints = rewardMin,
+        rewardMaxPoints = rewardMax,
+        signedAt = signedAt
     )
 }
 
