@@ -367,19 +367,6 @@ fun CategoryScreen(
                         .padding(horizontal = 16.dp, vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(
-                            items = state.categories,
-                            key = { it.typeId.ifBlank { it.typeName } },
-                            contentType = { "category" }
-                        ) { category ->
-                            SelectableAssistChip(
-                                text = category.typeName,
-                                selected = category.typeId == state.selectedCategory?.typeId,
-                                onClick = { onSelectCategory(category) }
-                            )
-                        }
-                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -399,17 +386,23 @@ fun CategoryScreen(
                             )
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                text = state.selectedCategory?.typeName ?: "分类",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = UiPalette.Ink
-                            )
-                            Text(
-                                text = "按分类、地区、年份和语言筛选内容",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = UiPalette.TextMuted
+                        Text(
+                            text = state.selectedCategory?.typeName ?: "分类",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = UiPalette.Ink
+                        )
+                    }
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(
+                            items = state.categories,
+                            key = { it.typeId.ifBlank { it.typeName } },
+                            contentType = { "category" }
+                        ) { category ->
+                            SelectableAssistChip(
+                                text = category.typeName,
+                                selected = category.typeId == state.selectedCategory?.typeId,
+                                onClick = { onSelectCategory(category) }
                             )
                         }
                     }
