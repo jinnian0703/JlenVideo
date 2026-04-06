@@ -1,4 +1,4 @@
-package top.jlen.vod.ui
+﻿package top.jlen.vod.ui
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -145,7 +145,7 @@ fun HomeScreen(
     onOpenSearch: () -> Unit
 ) {
     if (state.isLoading) {
-        LoadingPane("首页加载中...")
+        LoadingPane("棣栭〉鍔犺浇涓?..")
         return
     }
 
@@ -194,7 +194,7 @@ fun HomeScreen(
         if (state.slides.isNotEmpty()) {
             item {
                 SectionTitle(
-                    title = "轮播推荐",
+                    title = "杞挱鎺ㄨ崘",
                     action = null,
                     icon = {
                         Icon(
@@ -225,7 +225,7 @@ fun HomeScreen(
         if (state.hot.isNotEmpty()) {
             item {
                 SectionTitle(
-                    title = "正在热播",
+                    title = "姝ｅ湪鐑挱",
                     action = null,
                     icon = {
                         Icon(
@@ -247,7 +247,7 @@ fun HomeScreen(
         if (state.featured.isNotEmpty()) {
             item {
                 SectionTitle(
-                    title = "推荐",
+                    title = "鎺ㄨ崘",
                     action = null,
                     icon = {
                         Icon(
@@ -270,14 +270,14 @@ fun HomeScreen(
         item {
             SectionTitle(
                 title = "最近更新",
-                action = "进入片库",
+                action = "杩涘叆鐗囧簱",
                 onAction = onOpenCategory
             )
         }
         if (state.latest.isEmpty()) {
             item {
                 InlineEmptyStateCard(
-                    message = "暂无内容",
+                    message = "鏆傛棤鍐呭",
                     actionLabel = "\u5237\u65b0",
                     onAction = onRefresh
                 )
@@ -353,43 +353,67 @@ fun CategoryScreen(
             }
         }
         item {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(
-                    items = state.categories,
-                    key = { it.typeId.ifBlank { it.typeName } },
-                    contentType = { "category" }
-                ) { category ->
-                    SelectableAssistChip(
-                        text = category.typeName,
-                        selected = category.typeId == state.selectedCategory?.typeId,
-                        onClick = { onSelectCategory(category) }
-                    )
-                }
-            }
-        }
-        item {
-            Row(
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 16.dp),
+                colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                shape = RoundedCornerShape(28.dp),
+                border = BorderStroke(1.dp, UiPalette.Border)
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.GridView,
-                    contentDescription = null,
-                    tint = UiPalette.Accent,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = state.selectedCategory?.typeName ?: "分类",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = UiPalette.Ink
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(
+                            items = state.categories,
+                            key = { it.typeId.ifBlank { it.typeName } },
+                            contentType = { "category" }
+                        ) { category ->
+                            SelectableAssistChip(
+                                text = category.typeName,
+                                selected = category.typeId == state.selectedCategory?.typeId,
+                                onClick = { onSelectCategory(category) }
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(UiPalette.Accent.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.GridView,
+                                contentDescription = null,
+                                tint = UiPalette.Accent,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = state.selectedCategory?.typeName ?: "分类",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = UiPalette.Ink
+                            )
+                            Text(
+                                text = "按分类、地区、年份和语言筛选内容",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = UiPalette.TextMuted
+                            )
+                        }
+                    }
+                }
             }
         }
         if (state.categoryFilterGroups.isNotEmpty()) {
@@ -408,8 +432,8 @@ fun CategoryScreen(
                     onRetry = onRetryCategory
                 )
             } ?: when {
-                state.isCategoryLoading -> LoadingPane("分类加载中...")
-                state.categoryVideos.isEmpty() -> InlineEmptyStateCard("暂无内容")
+                state.isCategoryLoading -> LoadingPane("鍒嗙被鍔犺浇涓?..")
+                state.categoryVideos.isEmpty() -> InlineEmptyStateCard("鏆傛棤鍐呭")
                 else -> Spacer(modifier = Modifier.height(0.dp))
             }
         }
@@ -439,38 +463,47 @@ private fun CategoryFilterPanel(
     selectedFilters: Map<String, String>,
     onSelectFilter: (String, String) -> Unit
 ) {
-    Column(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        shape = RoundedCornerShape(28.dp),
+        border = BorderStroke(1.dp, UiPalette.Border)
     ) {
-        groups.forEach { group ->
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = group.label,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = UiPalette.Ink
-                )
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item(key = "${group.key}_all") {
-                        SelectableAssistChip(
-                            text = "全部",
-                            selected = selectedFilters[group.key].isNullOrBlank(),
-                            onClick = { onSelectFilter(group.key, "") }
-                        )
-                    }
-                    items(
-                        items = group.options,
-                        key = { option -> "${group.key}_$option" },
-                        contentType = { "category_filter_option" }
-                    ) { option ->
-                        SelectableAssistChip(
-                            text = option,
-                            selected = selectedFilters[group.key] == option,
-                            onClick = { onSelectFilter(group.key, option) }
-                        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            groups.forEach { group ->
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = group.label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = UiPalette.TextSecondary
+                    )
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item(key = "${group.key}_all") {
+                            SelectableAssistChip(
+                                text = "全部",
+                                selected = selectedFilters[group.key].isNullOrBlank(),
+                                onClick = { onSelectFilter(group.key, "") }
+                            )
+                        }
+                        items(
+                            items = group.options,
+                            key = { option -> "${group.key}_$option" },
+                            contentType = { "category_filter_option" }
+                        ) { option ->
+                            SelectableAssistChip(
+                                text = option,
+                                selected = selectedFilters[group.key] == option,
+                                onClick = { onSelectFilter(group.key, option) }
+                            )
+                        }
                     }
                 }
             }
@@ -486,15 +519,23 @@ private fun SelectableAssistChip(
 ) {
     AssistChip(
         onClick = onClick,
-        label = { Text(text, fontWeight = FontWeight.SemiBold) },
+        shape = RoundedCornerShape(14.dp),
+        label = {
+            Text(
+                text,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelLarge
+            )
+        },
         colors = AssistChipDefaults.assistChipColors(
-            containerColor = if (selected) UiPalette.Ink else UiPalette.Surface,
+            containerColor = if (selected) UiPalette.Ink else UiPalette.SurfaceSoft,
             labelColor = if (selected) UiPalette.Surface else UiPalette.Ink
         ),
         border = AssistChipDefaults.assistChipBorder(
-            borderColor = if (selected) UiPalette.Ink else UiPalette.BorderSoft,
+            borderColor = if (selected) UiPalette.Ink else UiPalette.Border,
             enabled = true
-        )
+        ),
+        modifier = Modifier.height(40.dp)
     )
 }
 
