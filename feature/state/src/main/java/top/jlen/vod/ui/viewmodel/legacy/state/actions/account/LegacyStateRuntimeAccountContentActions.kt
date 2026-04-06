@@ -206,3 +206,22 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadMembership() {
         }
     }
 }
+
+internal fun LegacyStateRuntimeViewModelCore.legacyRefreshMembershipSignInStatus() {
+    if (!currentAccountState().session.isLoggedIn) return
+    viewModelScope.launch {
+        runCatching {
+            withContext(Dispatchers.IO) { legacyRepository().loadMembershipDataForApp() }
+        }.onSuccess { page ->
+            updateAccountState(
+                accountStateWithMembershipPage(
+                    accountState = currentAccountState(),
+                    page = page,
+                    currentSession = legacyRepository().currentSession()
+                )
+            )
+        }.onFailure { error ->
+            runtimeHandleAccountSessionExpired(error)
+        }
+    }
+}

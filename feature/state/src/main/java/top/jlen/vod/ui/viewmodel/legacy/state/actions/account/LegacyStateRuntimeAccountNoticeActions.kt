@@ -21,6 +21,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyEnsureAccountScreenReady() {
     markAccountScreenEntered()
     if (!currentAccountState().session.isLoggedIn) return
     legacyHydrateAccountSession()
+    legacyRefreshMembershipSignInStatus()
     selectAccountSection(currentAccountState().selectedSection, forceRefresh = true)
 }
 
