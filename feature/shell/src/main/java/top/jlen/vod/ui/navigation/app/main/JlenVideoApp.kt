@@ -426,14 +426,17 @@ fun JlenVideoApp() {
                         ) { entry ->
                             val vodId = entry.arguments?.getString("vodId").orEmpty()
                             var showRemoveFavoriteDialog by remember(vodId) { mutableStateOf(false) }
+                            var hasAutoResumedPlayback by rememberSaveable(vodId) { mutableStateOf(false) }
                             LaunchedEffect(vodId) {
                                 viewModel.loadDetail(vodId)
                             }
                             LaunchedEffect(
+                                hasAutoResumedPlayback,
                                 viewModel.detailState.item?.vodId,
                                 viewModel.detailState.sources,
                                 viewModel.detailState.pendingResumePlayback
                             ) {
+                                if (hasAutoResumedPlayback) return@LaunchedEffect
                                 val pendingResume = viewModel.detailState.pendingResumePlayback ?: return@LaunchedEffect
                                 val item = viewModel.detailState.item ?: return@LaunchedEffect
                                 val sources = viewModel.detailState.sources
@@ -461,6 +464,7 @@ fun JlenVideoApp() {
                                     episodeIndex = restoredEpisodeIndex,
                                     snapshot = restoredSnapshot
                                 )
+                                hasAutoResumedPlayback = true
                                 viewModel.consumePendingDetailResume()
                                 navController.navigate("player")
                             }
