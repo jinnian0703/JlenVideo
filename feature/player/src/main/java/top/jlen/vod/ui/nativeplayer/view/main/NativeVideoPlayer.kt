@@ -184,7 +184,8 @@ fun NativeVideoPlayer(
     fun currentSnapshot(): PlaybackSnapshot = PlaybackSnapshot(
         positionMs = player?.currentPosition?.coerceAtLeast(0L) ?: 0L,
         speed = player?.playbackParameters?.speed ?: speed,
-        playWhenReady = player?.playWhenReady == true
+        playWhenReady = player?.playWhenReady == true,
+        durationMs = player?.duration?.coerceAtLeast(0L) ?: 0L
     )
 
     fun dispatchSnapshot(force: Boolean = false): PlaybackSnapshot {

@@ -66,3 +66,6 @@ internal fun detailStateWithSelectedSource(
     detailState: DetailUiState,
     index: Int
 ): DetailUiState = detailState.copy(selectedSourceIndex = index)
+
+internal fun detailStateWithoutPendingResume(detailState: DetailUiState): DetailUiState =
+    detailState.copy(pendingResumePlayback = null)

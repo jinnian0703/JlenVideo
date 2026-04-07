@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.jlen.vod.data.PlaybackResumeRecord
 import top.jlen.vod.data.UserCenterItem
 import top.jlen.vod.data.VodItem
 
@@ -194,11 +195,20 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadDetail(vodId: String) {
             if (item == null) {
                 updateDetailState(missingDetailState())
             } else {
+                val sources = legacyRepository().parseSources(item)
+                val resumeRecord = resolvePlaybackResumeRecord(item)
+                val selectedSourceIndex = when {
+                    sources.isEmpty() -> 0
+                    resumeRecord != null -> resumeRecord.sourceIndex.coerceIn(0, sources.lastIndex)
+                    else -> 0
+                }
                 updateDetailState(
                     loadedDetailState(
                         item = item,
-                        sources = legacyRepository().parseSources(item),
-                        isFavorited = currentAccountState().favoriteItems.any { favorite -> favorite.vodId == item.vodId }
+                        sources = sources,
+                        isFavorited = currentAccountState().favoriteItems.any { favorite -> favorite.vodId == item.vodId },
+                        selectedSourceIndex = selectedSourceIndex,
+                        pendingResumePlayback = resumeRecord
                     )
                 )
             }
@@ -210,4 +220,15 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadDetail(vodId: String) {
 
 internal fun LegacyStateRuntimeViewModelCore.legacySelectSource(index: Int) {
     updateDetailState(detailStateWithSelectedSource(currentDetailState(), index))
+}
+
+private fun LegacyStateRuntimeViewModelCore.resolvePlaybackResumeRecord(item: VodItem): PlaybackResumeRecord? {
+    val resolvedVodId = sequenceOf(
+        item.vodId.trim(),
+        item.siteVodId.trim(),
+        Regex("""/voddetail/([^/]+)/?""").find(item.detailUrl)?.groupValues?.getOrNull(1).orEmpty(),
+        Regex("""/vodplay/([^/-]+)""").find(item.detailUrl)?.groupValues?.getOrNull(1).orEmpty()
+    ).firstOrNull { it.isNotBlank() } ?: return null
+
+    return legacyRepository().loadPlaybackResumeForApp(resolvedVodId)
 }

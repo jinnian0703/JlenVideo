@@ -24,7 +24,8 @@ internal fun buildPlayerState(
     item: VodItem?,
     sources: List<PlaySource>,
     sourceIndex: Int,
-    episodeIndex: Int
+    episodeIndex: Int,
+    playbackSnapshot: PlaybackSnapshot = PlaybackSnapshot()
 ): PlayerUiState {
     val safeSourceIndex = sourceIndex.coerceIn(0, (sources.size - 1).coerceAtLeast(0))
     val safeEpisodes = sources.getOrNull(safeSourceIndex)?.episodes.orEmpty()
@@ -34,7 +35,7 @@ internal fun buildPlayerState(
         sources = sources,
         selectedSourceIndex = safeSourceIndex,
         selectedEpisodeIndex = episodeIndex.coerceIn(0, (safeEpisodes.size - 1).coerceAtLeast(0)),
-        playbackSnapshot = PlaybackSnapshot()
+        playbackSnapshot = playbackSnapshot
     )
 }
 

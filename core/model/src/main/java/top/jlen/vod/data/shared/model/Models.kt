@@ -356,6 +356,20 @@ data class MembershipPage(
     val pointLogs: List<PointLogItem> = emptyList()
 )
 
+data class PlaybackResumeRecord(
+    val vodId: String = "",
+    val sourceIndex: Int = 0,
+    val episodeIndex: Int = 0,
+    val positionMs: Long = 0L,
+    val speed: Float = 1f,
+    val updatedAt: Long = 0L
+)
+
+data class HotSearchCacheSnapshot(
+    val groups: List<HotSearchGroup> = emptyList(),
+    val cachedAt: Long = 0L
+)
+
 data class AppUpdateInfo(
     val currentVersion: String = "",
     val latestVersion: String = "",

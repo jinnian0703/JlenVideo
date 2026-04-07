@@ -99,6 +99,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.imageLoader
 import coil.request.ImageRequest
 import coil.size.Precision
 import coil.size.Scale
@@ -150,11 +151,25 @@ fun HomeScreen(
         return
     }
 
+    val context = LocalContext.current
     val listState = rememberSaveable(saver = LazyListState.Saver) {
         LazyListState()
     }
     val hotRows = remember(state.hot) { state.hot.chunked(POSTER_GRID_COLUMNS) }
     val latestRows = remember(state.visibleLatest) { state.visibleLatest.chunked(POSTER_GRID_COLUMNS) }
+
+    LaunchedEffect(
+        state.featured.map(VodItem::stableKey),
+        state.visibleLatest.take(9).map(VodItem::stableKey)
+    ) {
+        val imageLoader = context.imageLoader
+        state.featured.take(4).forEach { item ->
+            imageLoader.enqueue(buildPosterRequest(context, item.vodPic, 720, 432))
+        }
+        state.visibleLatest.take(9).forEach { item ->
+            imageLoader.enqueue(buildPosterRequest(context, item.vodPic, 360, 520))
+        }
+    }
 
     LaunchedEffect(listState, latestRows.size, state.hasMoreLatest, state.isHomeAppending) {
         snapshotFlow { listState.maxVisiblePosterRowIndex("home_latest-") }

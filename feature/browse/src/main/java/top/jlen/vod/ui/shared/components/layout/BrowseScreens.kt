@@ -35,6 +35,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -431,18 +436,7 @@ private fun PosterImage(
     ) {
         when (painter.state) {
             is AsyncImagePainter.State.Loading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(UiPalette.SurfaceStrong),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        color = UiPalette.Accent,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+                PosterSkeletonPlaceholder(title = title)
             }
 
             is AsyncImagePainter.State.Error,
@@ -473,6 +467,46 @@ private fun PosterImage(
                 contentScale = contentScale
             )
         }
+    }
+}
+
+@Composable
+private fun PosterSkeletonPlaceholder(title: String) {
+    val shimmer = rememberInfiniteTransition(label = "posterSkeleton")
+    val shift by shimmer.animateFloat(
+        initialValue = -1f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1150, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "posterSkeletonShift"
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        UiPalette.SurfaceStrong,
+                        UiPalette.SurfaceSoft,
+                        UiPalette.SurfaceStrong
+                    ),
+                    start = androidx.compose.ui.geometry.Offset.Zero,
+                    end = androidx.compose.ui.geometry.Offset(620f * (shift + 1.2f), 620f * (shift + 1.2f))
+                )
+            )
+            .padding(12.dp),
+        contentAlignment = Alignment.BottomStart
+    ) {
+        Text(
+            text = title.ifBlank { "加载中" },
+            color = UiPalette.TextMuted,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

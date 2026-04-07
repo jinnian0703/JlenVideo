@@ -64,6 +64,8 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     private val homeCachePrefs = appContext.getSharedPreferences("home_cache_store", Context.MODE_PRIVATE)
     private val noticePrefs = appContext.getSharedPreferences("app_notice_store", Context.MODE_PRIVATE)
     private val heartbeatPrefs = appContext.getSharedPreferences("app_heartbeat_store", Context.MODE_PRIVATE)
+    private val hotSearchCacheStore = HotSearchCacheStore(appContext)
+    private val playbackResumeStore = PlaybackResumeStore(appContext)
     private val defaultCategories = listOf(
         AppleCmsCategory(typeId = "GCCCCG", typeName = "电影", parentId = "GCCCCG"),
         AppleCmsCategory(typeId = "GCCCCT", typeName = "连续剧", parentId = "GCCCCT"),
@@ -98,6 +100,17 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     internal fun runtimeClearHotSearchCacheEntry() {
         hotSearchCache = null
+    }
+
+    internal fun runtimeLoadPlaybackResume(vodId: String): PlaybackResumeRecord? =
+        playbackResumeStore.load(vodId)
+
+    internal fun runtimeSavePlaybackResume(record: PlaybackResumeRecord) {
+        playbackResumeStore.save(record)
+    }
+
+    internal fun runtimeRemovePlaybackResume(vodId: String) {
+        playbackResumeStore.remove(vodId)
     }
 
     internal fun runtimeClearNoticeCacheEntry() {
@@ -700,8 +713,21 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 ?.takeIf { isCacheValid(it.timestampMs, HOT_SEARCH_CACHE_TTL_MS) }
                 ?.value
                 ?.let { return it }
+
+            hotSearchCacheStore.load()
+                ?.takeIf { isCacheValid(it.cachedAt, HOT_SEARCH_CACHE_TTL_MS) }
+                ?.groups
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { cachedGroups ->
+                    hotSearchCache = CachedValue(
+                        value = cachedGroups,
+                        timestampMs = System.currentTimeMillis()
+                    )
+                    return cachedGroups
+                }
         }
 
+        val staleGroups = hotSearchCacheStore.load()?.groups.orEmpty()
         return if (forceRefresh) {
             loadFreshHotSearchGroups()
         } else {
@@ -709,7 +735,10 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 hotSearchCache
                     ?.takeIf { isCacheValid(it.timestampMs, HOT_SEARCH_CACHE_TTL_MS) }
                     ?.value
-                    ?: loadFreshHotSearchGroups()
+                    ?: runCatching { loadFreshHotSearchGroups() }
+                        .getOrElse { error ->
+                            staleGroups.takeIf { it.isNotEmpty() } ?: throw error
+                        }
             }
         }
     }
@@ -741,6 +770,12 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         hotSearchCache = CachedValue(
             value = groups,
             timestampMs = System.currentTimeMillis()
+        )
+        hotSearchCacheStore.save(
+            HotSearchCacheSnapshot(
+                groups = groups,
+                cachedAt = System.currentTimeMillis()
+            )
         )
         cleanupCachesIfNeeded()
         return groups
@@ -1955,6 +1990,17 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         }
         val pointLogs = runCatching { loadPointLogsForApp() }.getOrDefault(emptyList())
         return merged.copy(pointLogs = if (merged.pointLogs.isNotEmpty()) merged.pointLogs else pointLogs)
+    }
+
+    fun loadPlaybackResumeForApp(vodId: String): PlaybackResumeRecord? =
+        playbackResumeStore.load(vodId)
+
+    fun savePlaybackResumeForApp(record: PlaybackResumeRecord) {
+        playbackResumeStore.save(record)
+    }
+
+    fun removePlaybackResumeForApp(vodId: String) {
+        playbackResumeStore.remove(vodId)
     }
 
     suspend fun addFavoriteForApp(item: VodItem): String {
@@ -4407,7 +4453,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         private const val DETAIL_CACHE_TTL_MS = 60_000L
         private const val HISTORY_SOURCE_CACHE_TTL_MS = 600_000L
         private const val PREVIEW_ITEM_CACHE_TTL_MS = 600_000L
-        private const val HOT_SEARCH_CACHE_TTL_MS = 300_000L
+        private const val HOT_SEARCH_CACHE_TTL_MS = 1_800_000L
         private const val MEMORY_CACHE_CLEANUP_INTERVAL_MS = 60_000L
         private const val DISK_CACHE_CLEANUP_INTERVAL_MS = 300_000L
         private const val API_FAILOVER_COOLDOWN_MS = 300_000L

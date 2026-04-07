@@ -429,6 +429,41 @@ fun JlenVideoApp() {
                             LaunchedEffect(vodId) {
                                 viewModel.loadDetail(vodId)
                             }
+                            LaunchedEffect(
+                                viewModel.detailState.item?.vodId,
+                                viewModel.detailState.sources,
+                                viewModel.detailState.pendingResumePlayback
+                            ) {
+                                val pendingResume = viewModel.detailState.pendingResumePlayback ?: return@LaunchedEffect
+                                val item = viewModel.detailState.item ?: return@LaunchedEffect
+                                val sources = viewModel.detailState.sources
+                                if (sources.isEmpty()) return@LaunchedEffect
+
+                                val restoredSourceIndex = pendingResume.sourceIndex.coerceIn(0, sources.lastIndex)
+                                val restoredEpisodes = sources[restoredSourceIndex].episodes
+                                if (restoredEpisodes.isEmpty()) {
+                                    viewModel.consumePendingDetailResume()
+                                    return@LaunchedEffect
+                                }
+                                val restoredEpisodeIndex =
+                                    pendingResume.episodeIndex.coerceIn(0, restoredEpisodes.lastIndex)
+                                val restoredSnapshot = PlaybackSnapshot(
+                                    positionMs = pendingResume.positionMs.coerceAtLeast(0L),
+                                    speed = pendingResume.speed.coerceIn(0.5f, 3f),
+                                    playWhenReady = true
+                                )
+
+                                viewModel.openPlayer(
+                                    title = item.displayTitle,
+                                    item = item,
+                                    sources = sources,
+                                    sourceIndex = restoredSourceIndex,
+                                    episodeIndex = restoredEpisodeIndex,
+                                    snapshot = restoredSnapshot
+                                )
+                                viewModel.consumePendingDetailResume()
+                                navController.navigate("player")
+                            }
                             DetailScreen(
                                 state = viewModel.detailState,
                                 isLoggedIn = viewModel.accountState.session.isLoggedIn,

@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.jlen.vod.data.PlaybackResumeRecord
 import top.jlen.vod.data.PlaySource
 import top.jlen.vod.data.VodItem
 
@@ -54,7 +55,8 @@ internal fun LegacyStateRuntimeViewModelCore.legacyOpenPlayer(
     item: VodItem?,
     sources: List<PlaySource>,
     sourceIndex: Int,
-    episodeIndex: Int
+    episodeIndex: Int,
+    snapshot: PlaybackSnapshot = PlaybackSnapshot()
 ) {
     updatePlayerState(
         buildPlayerState(
@@ -62,9 +64,11 @@ internal fun LegacyStateRuntimeViewModelCore.legacyOpenPlayer(
             item = item,
             sources = sources,
             sourceIndex = sourceIndex,
-            episodeIndex = episodeIndex
+            episodeIndex = episodeIndex,
+            playbackSnapshot = snapshot
         )
     )
+    persistCurrentPlaybackResume()
     legacyResolveCurrentPlayerUrl()
     legacyRecordCurrentPlayback()
 }
@@ -72,6 +76,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyOpenPlayer(
 internal fun LegacyStateRuntimeViewModelCore.legacySelectPlayerEpisode(index: Int) {
     val updatedState = updatePlayerEpisodeSelection(currentPlayerState(), index) ?: return
     updatePlayerState(updatedState)
+    persistCurrentPlaybackResume()
     legacyResolveCurrentPlayerUrl()
     legacyRecordCurrentPlayback()
 }
@@ -79,6 +84,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacySelectPlayerEpisode(index: In
 internal fun LegacyStateRuntimeViewModelCore.legacySelectPlayerSource(index: Int) {
     val updatedState = updatePlayerSourceSelection(currentPlayerState(), index) ?: return
     updatePlayerState(updatedState)
+    persistCurrentPlaybackResume()
     legacyResolveCurrentPlayerUrl()
     legacyRecordCurrentPlayback()
 }
@@ -101,11 +107,13 @@ internal fun LegacyStateRuntimeViewModelCore.legacyReportTakeoverFailure(message
 internal fun LegacyStateRuntimeViewModelCore.legacyUpdatePlaybackSnapshot(snapshot: PlaybackSnapshot) {
     if (!hasMeaningfulPlaybackChange(currentPlayerState().playbackSnapshot, snapshot)) return
     updatePlayerState(playerStateWithPlaybackSnapshot(currentPlayerState(), snapshot))
+    persistCurrentPlaybackResume()
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacySyncFromFullscreen(result: FullscreenPlaybackResult) {
     val syncState = syncPlayerStateFromFullscreen(currentPlayerState(), result)
     updatePlayerState(syncState.playerState)
+    persistCurrentPlaybackResume()
     if (syncState.shouldResolveCurrentUrl) {
         legacyResolveCurrentPlayerUrl()
     }
@@ -114,6 +122,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacySyncFromFullscreen(result: Fu
 internal fun LegacyStateRuntimeViewModelCore.legacyRecordCurrentPlayback() {
     val item = currentPlayerState().item ?: return
     val episodePageUrl = currentPlayerState().episodePageUrl
+    persistCurrentPlaybackResume()
     if (!currentAccountState().session.isLoggedIn || episodePageUrl.isBlank()) return
 
     viewModelScope.launch {
@@ -125,6 +134,58 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRecordCurrentPlayback() {
             }
         }
     }
+}
+
+private fun LegacyStateRuntimeViewModelCore.persistCurrentPlaybackResume() {
+    val playerState = currentPlayerState()
+    val item = playerState.item ?: return
+    val resolvedVodId = resolvePlaybackResumeVodId(item, playerState.episodePageUrl)
+    if (resolvedVodId.isBlank()) return
+
+    val normalizedSnapshot = normalizePlaybackResumeSnapshot(playerState.playbackSnapshot)
+    val record = PlaybackResumeRecord(
+        vodId = resolvedVodId,
+        sourceIndex = playerState.selectedSourceIndex,
+        episodeIndex = playerState.selectedEpisodeIndex,
+        positionMs = normalizedSnapshot.positionMs,
+        speed = normalizedSnapshot.speed,
+        updatedAt = System.currentTimeMillis()
+    )
+
+    viewModelScope.launch(Dispatchers.IO) {
+        legacyRepository().savePlaybackResumeForApp(record)
+    }
+}
+
+private fun resolvePlaybackResumeVodId(item: VodItem, episodePageUrl: String): String =
+    item.vodId.trim()
+        .ifBlank { item.siteVodId.trim() }
+        .ifBlank {
+            Regex("""/vodplay/([^/-]+)""")
+                .find(episodePageUrl)
+                ?.groupValues
+                ?.getOrNull(1)
+                .orEmpty()
+        }
+        .ifBlank {
+            Regex("""/voddetail/([^/.]+)""")
+                .find(item.detailUrl)
+                ?.groupValues
+                ?.getOrNull(1)
+                .orEmpty()
+        }
+
+private fun normalizePlaybackResumeSnapshot(snapshot: PlaybackSnapshot): PlaybackSnapshot {
+    val durationMs = snapshot.durationMs.coerceAtLeast(0L)
+    val normalizedPosition = snapshot.positionMs
+        .coerceAtLeast(0L)
+        .let { position ->
+            if (durationMs > 60_000L && position >= durationMs - 10_000L) 0L else position
+        }
+    return snapshot.copy(
+        positionMs = normalizedPosition,
+        speed = snapshot.speed.coerceIn(0.5f, 3f)
+    )
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyResolveCurrentPlayerUrl() {

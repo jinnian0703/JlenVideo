@@ -1,5 +1,6 @@
 package top.jlen.vod.ui
 
+import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -17,19 +18,26 @@ fun rememberPosterRequest(
 ): ImageRequest {
     val context = LocalContext.current
     return remember(context, data, width, height) {
-        ImageRequest.Builder(context)
-            .data(data.orEmpty())
-            .size(width, height)
-            .bitmapConfig(Bitmap.Config.RGB_565)
-            .precision(Precision.INEXACT)
-            .scale(Scale.FILL)
-            .memoryCachePolicy(CachePolicy.ENABLED)
-            .diskCachePolicy(CachePolicy.ENABLED)
-            .networkCachePolicy(CachePolicy.ENABLED)
-            .allowHardware(true)
-            .crossfade(false)
-            .diskCacheKey(data.orEmpty())
-            .memoryCacheKey("${data.orEmpty()}@$width@$height")
-            .build()
+        buildPosterRequest(context, data, width, height)
     }
 }
+
+fun buildPosterRequest(
+    context: Context,
+    data: String?,
+    width: Int,
+    height: Int
+): ImageRequest = ImageRequest.Builder(context)
+    .data(data.orEmpty())
+    .size(width, height)
+    .bitmapConfig(Bitmap.Config.RGB_565)
+    .precision(Precision.INEXACT)
+    .scale(Scale.FILL)
+    .memoryCachePolicy(CachePolicy.ENABLED)
+    .diskCachePolicy(CachePolicy.ENABLED)
+    .networkCachePolicy(CachePolicy.ENABLED)
+    .allowHardware(true)
+    .crossfade(false)
+    .diskCacheKey(data.orEmpty())
+    .memoryCacheKey("${data.orEmpty()}@$width@$height")
+    .build()

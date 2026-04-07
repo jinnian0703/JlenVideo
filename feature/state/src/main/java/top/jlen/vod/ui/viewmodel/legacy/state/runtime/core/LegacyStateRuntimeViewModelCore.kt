@@ -363,6 +363,10 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
 
     fun loadDetail(vodId: String) = legacyLoadDetail(vodId)
 
+    fun consumePendingDetailResume() {
+        updateDetailState(detailStateWithoutPendingResume(currentDetailState()))
+    }
+
     fun refreshPlayerSources() = legacyRefreshPlayerSources()
 
     fun selectSource(index: Int) = legacySelectSource(index)
@@ -372,8 +376,9 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
         item: VodItem?,
         sources: List<PlaySource>,
         sourceIndex: Int,
-        episodeIndex: Int
-    ) = legacyOpenPlayer(title, item, sources, sourceIndex, episodeIndex)
+        episodeIndex: Int,
+        snapshot: PlaybackSnapshot = PlaybackSnapshot()
+    ) = legacyOpenPlayer(title, item, sources, sourceIndex, episodeIndex, snapshot)
 
     fun selectPlayerEpisode(index: Int) = legacySelectPlayerEpisode(index)
 

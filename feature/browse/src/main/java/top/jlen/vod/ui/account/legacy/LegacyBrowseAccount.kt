@@ -393,6 +393,7 @@ internal fun LegacyAccountScreen(
                         plans = state.membershipPlans,
                         signInInfo = state.membershipSignInInfo,
                         isActionLoading = state.isActionLoading,
+                        message = state.message,
                         onUpgrade = onUpgradeMembership,
                         onSignIn = onSignInMembership,
                         onOpenPointLogs = onOpenPointLogs

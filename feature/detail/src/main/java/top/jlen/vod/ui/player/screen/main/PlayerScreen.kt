@@ -102,6 +102,11 @@ fun PlayerScreen(
     var fullscreenTransitionLabel by remember {
         mutableStateOf("")
     }
+    var transitionFeedback by remember(state.title) { mutableStateOf<String?>(null) }
+    var previousEpisodeName by remember(state.title) { mutableStateOf(state.episodeName) }
+    var previousSourceName by remember(state.title) { mutableStateOf(state.sourceName) }
+    var previousSpeed by remember(state.title) { mutableStateOf(state.playbackSnapshot.speed) }
+    var hasStartedFeedbackTracking by remember(state.title) { mutableStateOf(false) }
 
     fun setFullscreen(fullscreen: Boolean, snapshot: PlaybackSnapshot? = null, isLandscapeVideo: Boolean? = null) {
         snapshot?.let(onPlaybackSnapshotChange)
@@ -123,6 +128,36 @@ fun PlayerScreen(
             }
         } else {
             fullscreenTransitionLabel = ""
+        }
+    }
+
+    LaunchedEffect(state.episodeName, state.sourceName, state.playbackSnapshot.speed) {
+        if (!hasStartedFeedbackTracking) {
+            previousEpisodeName = state.episodeName
+            previousSourceName = state.sourceName
+            previousSpeed = state.playbackSnapshot.speed
+            hasStartedFeedbackTracking = true
+            return@LaunchedEffect
+        }
+
+        val nextFeedback = when {
+            state.sourceName.isNotBlank() && state.sourceName != previousSourceName -> "线路：${state.sourceName}"
+            state.episodeName.isNotBlank() && state.episodeName != previousEpisodeName -> "已切换到 ${state.episodeName}"
+            kotlin.math.abs(state.playbackSnapshot.speed - previousSpeed) > 0.01f ->
+                String.format(java.util.Locale.US, "%.1fx", state.playbackSnapshot.speed)
+            else -> null
+        }
+
+        previousEpisodeName = state.episodeName
+        previousSourceName = state.sourceName
+        previousSpeed = state.playbackSnapshot.speed
+
+        if (nextFeedback != null) {
+            transitionFeedback = nextFeedback
+            delay(750)
+            if (transitionFeedback == nextFeedback) {
+                transitionFeedback = null
+            }
         }
     }
 
@@ -348,6 +383,33 @@ fun PlayerScreen(
                 )
             }
         }
+
+        transitionFeedback?.let { feedback ->
+            PlayerTransitionFeedbackChip(
+                text = feedback,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = if (isFullscreen) 28.dp else 18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlayerTransitionFeedbackChip(text: String, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.94f)),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, UiPalette.Border)
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            style = MaterialTheme.typography.titleSmall,
+            color = UiPalette.Ink,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 

@@ -5,41 +5,20 @@ import com.google.gson.JsonObject
 
 internal fun parseMembershipSignInInfo(root: JsonObject): MembershipSignInInfo {
     val payload = root.firstObject("data") ?: return MembershipSignInInfo()
-    val signIn = payload.firstObject("sign_in")
-    val user = payload.firstObject("user")
-    val enabledValue = signIn?.firstInt("enabled")
-        ?: payload.firstInt("sign_status")
-        ?: user?.firstInt("sign_status")
-    val signedTodayValue = signIn?.firstInt("signed_today")
-        ?: payload.firstInt("signed_today")
-        ?: user?.firstInt("signed_today")
+    val signIn = payload.firstObject("sign_in") ?: return MembershipSignInInfo()
+    val enabledValue = signIn.firstInt("enabled")
+    val signedTodayValue = signIn.firstInt("signed_today")
     val rewardMin = decodeSiteText(
-        signIn?.firstString("points_min").orEmpty().ifBlank {
-            payload.firstString("sign_points_min").ifBlank {
-                user?.firstString("sign_points_min").orEmpty()
-            }
-        }
+        signIn.firstString("points_min")
     )
     val rewardMax = decodeSiteText(
-        signIn?.firstString("points_max").orEmpty().ifBlank {
-            payload.firstString("sign_points_max").ifBlank {
-                user?.firstString("sign_points_max").orEmpty()
-            }
-        }
+        signIn.firstString("points_max")
     )
     val rewardPoints = decodeSiteText(
-        signIn?.firstString("reward_points", "today_reward_points").orEmpty().ifBlank {
-            payload.firstString("today_reward_points").ifBlank {
-                user?.firstString("today_reward_points").orEmpty()
-            }
-        }
+        signIn.firstString("reward_points", "today_reward_points")
     )
     val signedAt = decodeSiteText(
-        signIn?.firstString("signed_at_text", "signed_at").orEmpty().ifBlank {
-            payload.firstString("signed_at_text", "signed_at").ifBlank {
-                user?.firstString("signed_at_text", "signed_at").orEmpty()
-            }
-        }
+        signIn.firstString("signed_at_text", "signed_at")
     )
     return MembershipSignInInfo(
         enabled = enabledValue == 1,
