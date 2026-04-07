@@ -134,7 +134,7 @@ private fun MembershipSummaryRow(label: String, value: String) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = UiPalette.TextMuted
+            color = UiPalette.TextSecondary
         )
         Text(
             text = value,

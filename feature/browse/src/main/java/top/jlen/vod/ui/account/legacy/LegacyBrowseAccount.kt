@@ -284,8 +284,8 @@ internal fun LegacyAccountScreen(
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     containerColor = UiPalette.SurfaceSoft,
                                     contentColor = UiPalette.Accent,
-                                    disabledContainerColor = UiPalette.SurfaceSoft,
-                                    disabledContentColor = UiPalette.TextSecondary
+                                    disabledContainerColor = UiPalette.SurfaceStrong,
+                                    disabledContentColor = UiPalette.Ink
                                 )
                             ) {
                                 Text(
@@ -1666,7 +1666,7 @@ internal fun LegacyAccountRecordPane(
                         Text(
                             text = "共 ${items.size} 条",
                             style = MaterialTheme.typography.bodySmall,
-                            color = UiPalette.TextMuted
+                            color = UiPalette.TextSecondary
                         )
                     }
                     TextButton(onClick = onClearAll, enabled = !isActionLoading) {
@@ -1723,13 +1723,13 @@ internal fun LegacyAccountRecordCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(UiPalette.SurfaceSoft)
+                        .background(UiPalette.SurfaceStrong)
                         .padding(horizontal = 12.dp, vertical = 10.dp)
                 ) {
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = UiPalette.TextSecondary,
+                        color = UiPalette.TextPrimary,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
