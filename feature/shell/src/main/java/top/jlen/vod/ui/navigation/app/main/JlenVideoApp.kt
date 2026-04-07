@@ -128,6 +128,8 @@ fun JlenVideoApp() {
     SideEffect {
         UiPalette.syncWithSystem(isDarkTheme)
         activity?.window?.let { window ->
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
             val controller = WindowCompat.getInsetsController(window, window.decorView)
             controller.isAppearanceLightStatusBars = !isDarkTheme
             controller.isAppearanceLightNavigationBars = !isDarkTheme
@@ -157,11 +159,7 @@ fun JlenVideoApp() {
         heartbeatRoute
     }
     val showBottomBar = currentTopLevelRoute != null
-    val rootContentInsets = if (currentRoute == "player") {
-        WindowInsets(0, 0, 0, 0)
-    } else {
-        WindowInsets.safeDrawing
-    }
+    val rootContentInsets = WindowInsets(0, 0, 0, 0)
     val updateInfo = viewModel.accountState.updateInfo
     val noticeDialog = viewModel.noticeState.dialogNotice
     var dismissedUpdateVersion by rememberSaveable { mutableStateOf("") }
