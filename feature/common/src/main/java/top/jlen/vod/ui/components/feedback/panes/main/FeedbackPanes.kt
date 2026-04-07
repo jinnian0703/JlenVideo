@@ -1,5 +1,6 @@
 package top.jlen.vod.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -15,7 +16,9 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun LoadingPane(message: String) {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(UiPalette.BackgroundBottom),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -29,7 +32,9 @@ fun LoadingPane(message: String) {
 @Composable
 fun EmptyPane(message: String) {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(UiPalette.BackgroundBottom),
         contentAlignment = Alignment.Center
     ) {
         Text(message, color = UiPalette.TextMuted)
