@@ -1666,7 +1666,7 @@ internal fun LegacyAccountRecordPane(
                             title,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.ExtraBold,
-                            color = UiPalette.Surface
+                            color = UiPalette.Ink
                         )
                         Text(
                             text = "共 ${items.size} 条",
