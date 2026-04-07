@@ -1662,7 +1662,12 @@ internal fun LegacyAccountRecordPane(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = UiPalette.Surface
+                        )
                         Text(
                             text = "共 ${items.size} 条",
                             style = MaterialTheme.typography.bodySmall,

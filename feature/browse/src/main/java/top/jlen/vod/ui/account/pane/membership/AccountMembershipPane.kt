@@ -98,7 +98,8 @@ private fun MembershipSummaryCard(
                 Text(
                     text = "会员信息",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Surface
                 )
                 TextButton(
                     onClick = onOpenPointLogs,
