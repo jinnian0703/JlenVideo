@@ -11,6 +11,7 @@ import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -73,10 +74,77 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.delay
 import top.jlen.vod.data.Episode
 import top.jlen.vod.data.VodItem
+
+@Composable
+private fun DetailPosterImage(
+    data: String?,
+    title: String,
+    width: Int,
+    height: Int,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop
+) {
+    SubcomposeAsyncImage(
+        model = rememberPosterRequest(
+            data = data,
+            width = width,
+            height = height
+        ),
+        contentDescription = title,
+        modifier = modifier,
+        contentScale = contentScale
+    ) {
+        when (painter.state) {
+            is AsyncImagePainter.State.Loading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(UiPalette.SurfaceStrong),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = UiPalette.Accent,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            is AsyncImagePainter.State.Error,
+            is AsyncImagePainter.State.Empty -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(UiPalette.SurfaceStrong)
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = title.ifBlank { "暂无海报" },
+                        color = UiPalette.Ink,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            else -> Image(
+                painter = painter,
+                contentDescription = title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = contentScale
+            )
+        }
+    }
+}
 
 
 @Composable
@@ -118,13 +186,11 @@ internal fun DetailHero(item: VodItem, onBack: () -> Unit, darkMode: Boolean = i
             .fillMaxWidth()
             .height(392.dp)
     ) {
-        AsyncImage(
-            model = rememberPosterRequest(
-                data = item.vodPic,
-                width = 1280,
-                height = 720
-            ),
-            contentDescription = item.displayTitle,
+        DetailPosterImage(
+            data = item.vodPic,
+            title = item.displayTitle,
+            width = 1280,
+            height = 720,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
         )
@@ -153,13 +219,11 @@ internal fun DetailHero(item: VodItem, onBack: () -> Unit, darkMode: Boolean = i
                 if (darkMode) UiPalette.Border.copy(alpha = 0.82f) else Color.White.copy(alpha = 0.7f)
             )
         ) {
-            AsyncImage(
-                model = rememberPosterRequest(
-                    data = item.vodPic,
-                    width = 516,
-                    height = 732
-                ),
-                contentDescription = item.displayTitle,
+            DetailPosterImage(
+                data = item.vodPic,
+                title = item.displayTitle,
+                width = 516,
+                height = 732,
                 modifier = Modifier
                     .width(172.dp)
                     .height(244.dp)

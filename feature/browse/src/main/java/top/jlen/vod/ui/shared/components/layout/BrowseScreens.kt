@@ -99,6 +99,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import coil.size.Precision
 import coil.size.Scale
@@ -408,6 +410,72 @@ internal fun CircleActionButton(icon: ImageVector, onClick: () -> Unit) {
     }
 }
 
+@Composable
+private fun PosterImage(
+    data: String?,
+    title: String,
+    width: Int,
+    height: Int,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop
+) {
+    SubcomposeAsyncImage(
+        model = rememberPosterRequest(
+            data = data,
+            width = width,
+            height = height
+        ),
+        contentDescription = title,
+        modifier = modifier,
+        contentScale = contentScale,
+    ) {
+        when (painter.state) {
+            is AsyncImagePainter.State.Loading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(UiPalette.SurfaceStrong),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = UiPalette.Accent,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            is AsyncImagePainter.State.Error,
+            is AsyncImagePainter.State.Empty -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(UiPalette.SurfaceStrong)
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = title.ifBlank { "暂无海报" },
+                        color = UiPalette.Ink,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            else -> Image(
+                painter = painter,
+                contentDescription = title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = contentScale
+            )
+        }
+    }
+}
+
 
 @Composable
 fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
@@ -421,13 +489,11 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface)
     ) {
         Box {
-            AsyncImage(
-                model = rememberPosterRequest(
-                    data = item.vodPic,
-                    width = 720,
-                    height = 432
-                ),
-                contentDescription = item.displayTitle,
+            PosterImage(
+                data = item.vodPic,
+                title = item.displayTitle,
+                width = 720,
+                height = 432,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(188.dp),
@@ -798,13 +864,11 @@ private fun CompactPosterCard(
 
     Column(modifier = modifier.clickable { onClick(item.vodId) }) {
         Box {
-            AsyncImage(
-                model = rememberPosterRequest(
-                    data = item.vodPic,
-                    width = 360,
-                    height = 540
-                ),
-                contentDescription = item.displayTitle,
+            PosterImage(
+                data = item.vodPic,
+                title = item.displayTitle,
+                width = 360,
+                height = 540,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(154.dp)
@@ -1245,13 +1309,11 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
             modifier = Modifier.padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            AsyncImage(
-                model = rememberPosterRequest(
-                    data = item.vodPic,
-                    width = 312,
-                    height = 414
-                ),
-                contentDescription = item.displayTitle,
+            PosterImage(
+                data = item.vodPic,
+                title = item.displayTitle,
+                width = 312,
+                height = 414,
                 modifier = Modifier
                     .size(width = 104.dp, height = 138.dp)
                     .clip(RoundedCornerShape(16.dp)),
