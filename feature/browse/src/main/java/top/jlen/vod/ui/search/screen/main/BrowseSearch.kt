@@ -189,6 +189,7 @@ private fun SearchLandingContent(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
+            .background(UiPalette.BackgroundBottom)
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
@@ -277,7 +278,7 @@ private fun SearchLandingContent(
                                     },
                                     label = { Text(keyword) },
                                     colors = AssistChipDefaults.assistChipColors(
-                                        containerColor = Color.White,
+                                        containerColor = UiPalette.SurfaceSoft,
                                         labelColor = UiPalette.Ink
                                     ),
                                     border = AssistChipDefaults.assistChipBorder(
@@ -376,6 +377,7 @@ fun SearchResultsScreen(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
+            .background(UiPalette.BackgroundBottom)
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
@@ -507,7 +509,7 @@ private fun SearchInputCard(
     onSearch: () -> Unit
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
         shape = RoundedCornerShape(22.dp),
         border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.78f))
     ) {

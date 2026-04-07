@@ -927,7 +927,7 @@ private fun UpdateVersionPill(
 @Composable
 private fun AppBottomBar(currentRoute: String, onNavigate: (String) -> Unit) {
     NavigationBar(
-        containerColor = Color(0xF8FFFFFF),
+        containerColor = UiPalette.Surface.copy(alpha = 0.96f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 0.dp
     ) {
