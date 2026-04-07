@@ -281,7 +281,9 @@ internal fun LegacyAccountScreen(
                                 border = BorderStroke(1.dp, UiPalette.BorderSoft),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     containerColor = UiPalette.SurfaceSoft,
-                                    contentColor = UiPalette.Accent
+                                    contentColor = UiPalette.Accent,
+                                    disabledContainerColor = UiPalette.SurfaceSoft,
+                                    disabledContentColor = UiPalette.TextSecondary
                                 )
                             ) {
                                 Text(
