@@ -817,8 +817,8 @@ private fun CompactPosterCard(
                         .align(Alignment.BottomStart)
                         .padding(8.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xB825252B))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .background(Color(0xDE111419))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
                 )
             }
         }
@@ -845,8 +845,9 @@ private fun PosterBadgeText(
 
     Text(
         text = text,
-        color = UiPalette.Surface,
-        style = MaterialTheme.typography.labelSmall,
+        color = Color.White,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.ExtraBold,
         maxLines = 1,
         overflow = if (isVisibleInWindow) TextOverflow.Clip else TextOverflow.Ellipsis,
         modifier = modifier

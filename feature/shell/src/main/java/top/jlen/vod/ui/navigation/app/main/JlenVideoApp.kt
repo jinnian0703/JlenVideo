@@ -1,5 +1,7 @@
 package top.jlen.vod.ui
 
+import android.app.Activity
+import android.content.ContextWrapper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.EnterTransition
@@ -66,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -121,8 +124,14 @@ private val darkAppColors = darkColorScheme(
 @Composable
 fun JlenVideoApp() {
     val isDarkTheme = isSystemInDarkTheme()
+    val activity = LocalContext.current.findActivity()
     SideEffect {
         UiPalette.syncWithSystem(isDarkTheme)
+        activity?.window?.let { window ->
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
+            controller.isAppearanceLightStatusBars = !isDarkTheme
+            controller.isAppearanceLightNavigationBars = !isDarkTheme
+        }
     }
     val viewModel: AppViewModel = viewModel()
     val navController = rememberNavController()
@@ -473,6 +482,12 @@ fun JlenVideoApp() {
             }
         }
     }
+}
+
+private tailrec fun android.content.Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 private fun normalizeTopLevelRoute(route: String?): String? = when {
