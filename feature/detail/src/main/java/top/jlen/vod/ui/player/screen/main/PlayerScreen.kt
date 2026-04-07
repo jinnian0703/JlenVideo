@@ -1,4 +1,4 @@
-package top.jlen.vod.ui
+﻿package top.jlen.vod.ui
 
 import android.app.Activity
 import android.content.Context
@@ -49,6 +49,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -87,6 +88,7 @@ fun PlayerScreen(
     onPlayNext: () -> Unit,
     onPlaybackSnapshotChange: (PlaybackSnapshot) -> Unit
 ) {
+    val isDarkTheme = isSystemInDarkTheme()
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val playUrl = state.playUrl
@@ -235,7 +237,7 @@ fun PlayerScreen(
                     DetailTopBar(
                         title = state.title.ifBlank { "播放器" },
                         onBack = onBack,
-                        darkMode = false
+                        darkMode = isDarkTheme
                     )
                     when {
                         state.isResolving && !isFullscreen -> ResolveLoadingSurface(

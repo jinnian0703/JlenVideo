@@ -49,6 +49,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -88,6 +89,7 @@ fun DetailScreen(
     onDismissActionMessage: () -> Unit,
     onPlay: (String, Int, Int) -> Unit
 ) {
+    val isDarkTheme = isSystemInDarkTheme()
     val errorMessage = state.error
     val detailItem = state.item
     when {
@@ -105,12 +107,14 @@ fun DetailScreen(
                 }
             }
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(UiPalette.BackgroundBottom),
                 state = detailListState,
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
-                item { DetailHero(item = item, onBack = onBack) }
+                item { DetailHero(item = item, onBack = onBack, darkMode = isDarkTheme) }
                 item {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         Text(

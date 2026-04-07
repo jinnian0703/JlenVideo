@@ -49,6 +49,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -111,7 +112,7 @@ internal fun SourceRow(
 }
 
 @Composable
-internal fun DetailHero(item: VodItem, onBack: () -> Unit) {
+internal fun DetailHero(item: VodItem, onBack: () -> Unit, darkMode: Boolean = isSystemInDarkTheme()) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -133,8 +134,8 @@ internal fun DetailHero(item: VodItem, onBack: () -> Unit) {
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color.White.copy(alpha = 0.28f),
-                            Color.White.copy(alpha = 0.55f),
+                            if (darkMode) Color.Black.copy(alpha = 0.24f) else Color.White.copy(alpha = 0.28f),
+                            if (darkMode) Color.Black.copy(alpha = 0.62f) else Color.White.copy(alpha = 0.55f),
                             UiPalette.BackgroundTop
                         )
                     )
@@ -146,8 +147,11 @@ internal fun DetailHero(item: VodItem, onBack: () -> Unit) {
                 .align(Alignment.Center)
                 .padding(top = 30.dp),
             shape = RoundedCornerShape(22.dp),
-            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f))
+            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = if (darkMode) 0.94f else 1f)),
+            border = BorderStroke(
+                1.dp,
+                if (darkMode) UiPalette.Border.copy(alpha = 0.82f) else Color.White.copy(alpha = 0.7f)
+            )
         ) {
             AsyncImage(
                 model = rememberPosterRequest(
@@ -466,7 +470,7 @@ private fun openExternal(context: Context, url: String) {
 
 @Composable
 fun DetailTopBar(title: String, onBack: () -> Unit, darkMode: Boolean = false) {
-    val background = if (darkMode) Color(0x66000000) else Color.White.copy(alpha = 0.82f)
+    val background = if (darkMode) Color(0x66101419) else Color.White.copy(alpha = 0.82f)
     val contentColor = if (darkMode) Color.White else UiPalette.Ink
     val showTitle = title.isNotBlank()
     Row(
