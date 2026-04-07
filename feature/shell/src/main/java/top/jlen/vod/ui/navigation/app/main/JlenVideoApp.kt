@@ -91,36 +91,6 @@ private val bottomBarItems = listOf(
     Triple("account", "我的", Icons.Rounded.Person)
 )
 
-private val appBackground = Brush.verticalGradient(
-    colors = listOf(UiPalette.HeroEnd, UiPalette.BackgroundTop, UiPalette.BackgroundBottom)
-)
-
-private val lightAppColors = lightColorScheme(
-    primary = UiPalette.Accent,
-    onPrimary = UiPalette.AccentText,
-    secondary = UiPalette.AccentSoft,
-    onSecondary = UiPalette.AccentText,
-    background = UiPalette.BackgroundTop,
-    onBackground = UiPalette.TextPrimary,
-    surface = UiPalette.Surface,
-    onSurface = UiPalette.TextPrimary,
-    surfaceVariant = UiPalette.SurfaceStrong,
-    onSurfaceVariant = UiPalette.TextSecondary
-)
-
-private val darkAppColors = darkColorScheme(
-    primary = UiPalette.Accent,
-    onPrimary = UiPalette.AccentText,
-    secondary = UiPalette.AccentSoft,
-    onSecondary = UiPalette.AccentText,
-    background = UiPalette.BackgroundTop,
-    onBackground = UiPalette.TextPrimary,
-    surface = UiPalette.Surface,
-    onSurface = UiPalette.TextPrimary,
-    surfaceVariant = UiPalette.SurfaceStrong,
-    onSurfaceVariant = UiPalette.TextSecondary
-)
-
 @Composable
 fun JlenVideoApp() {
     val isDarkTheme = isSystemInDarkTheme()
@@ -133,6 +103,40 @@ fun JlenVideoApp() {
             val controller = WindowCompat.getInsetsController(window, window.decorView)
             controller.isAppearanceLightStatusBars = !isDarkTheme
             controller.isAppearanceLightNavigationBars = !isDarkTheme
+        }
+    }
+    val appBackground = remember(isDarkTheme) {
+        Brush.verticalGradient(
+            colors = listOf(UiPalette.HeroEnd, UiPalette.BackgroundTop, UiPalette.BackgroundBottom)
+        )
+    }
+    val appColors = remember(isDarkTheme) {
+        if (isDarkTheme) {
+            darkColorScheme(
+                primary = UiPalette.Accent,
+                onPrimary = UiPalette.AccentText,
+                secondary = UiPalette.AccentSoft,
+                onSecondary = UiPalette.AccentText,
+                background = UiPalette.BackgroundTop,
+                onBackground = UiPalette.TextPrimary,
+                surface = UiPalette.Surface,
+                onSurface = UiPalette.TextPrimary,
+                surfaceVariant = UiPalette.SurfaceStrong,
+                onSurfaceVariant = UiPalette.TextSecondary
+            )
+        } else {
+            lightColorScheme(
+                primary = UiPalette.Accent,
+                onPrimary = UiPalette.AccentText,
+                secondary = UiPalette.AccentSoft,
+                onSecondary = UiPalette.AccentText,
+                background = UiPalette.BackgroundTop,
+                onBackground = UiPalette.TextPrimary,
+                surface = UiPalette.Surface,
+                onSurface = UiPalette.TextPrimary,
+                surfaceVariant = UiPalette.SurfaceStrong,
+                onSurfaceVariant = UiPalette.TextSecondary
+            )
         }
     }
     val viewModel: AppViewModel = viewModel()
@@ -215,7 +219,7 @@ fun JlenVideoApp() {
         }
     }
 
-    MaterialTheme(colorScheme = if (isDarkTheme) darkAppColors else lightAppColors) {
+    MaterialTheme(colorScheme = appColors) {
         Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
             Box(modifier = Modifier.fillMaxSize().background(appBackground)) {
                 if (noticeDialog != null) {
