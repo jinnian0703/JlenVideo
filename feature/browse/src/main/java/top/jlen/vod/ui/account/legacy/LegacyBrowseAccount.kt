@@ -184,8 +184,8 @@ internal fun LegacyAccountScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .statusBarsPadding()
             .background(UiPalette.BackgroundBottom)
+            .statusBarsPadding()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
         contentPadding = PaddingValues(top = 18.dp, bottom = 28.dp)

@@ -177,8 +177,8 @@ fun HomeScreen(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
-            .statusBarsPadding()
-            .background(UiPalette.BackgroundBottom),
+            .background(UiPalette.BackgroundBottom)
+            .statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
@@ -344,8 +344,8 @@ fun CategoryScreen(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
-            .statusBarsPadding()
-            .background(UiPalette.BackgroundBottom),
+            .background(UiPalette.BackgroundBottom)
+            .statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {

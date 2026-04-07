@@ -140,7 +140,7 @@ internal fun HomeTopBlock(
     onOpenAnnouncementDetail: (String) -> Unit,
     onOpenSearch: () -> Unit
 ) {
-    Column(modifier = Modifier.statusBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,

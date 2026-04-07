@@ -190,8 +190,8 @@ private fun SearchLandingContent(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .statusBarsPadding()
             .background(UiPalette.BackgroundBottom)
+            .statusBarsPadding()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
@@ -379,8 +379,8 @@ fun SearchResultsScreen(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
-            .statusBarsPadding()
             .background(UiPalette.BackgroundBottom)
+            .statusBarsPadding()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
