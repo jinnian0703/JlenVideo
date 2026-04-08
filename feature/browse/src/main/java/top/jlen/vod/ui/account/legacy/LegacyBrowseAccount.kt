@@ -1724,7 +1724,10 @@ internal fun LegacyAccountRecordCard(
                 color = UiPalette.Ink
             )
             val subtitle = sanitizeUserFacingComposite(item.subtitle)
-            val watchedEpisodeLabel = buildHistoryWatchedEpisodeLabel(item)
+            val watchedEpisodeLabel = buildHistoryWatchedEpisodeLabel(
+                item = item,
+                subtitle = subtitle
+            )
             val recordSummary = listOfNotNull(
                 watchedEpisodeLabel.takeIf { it.isNotBlank() },
                 subtitle.takeIf { it.isNotBlank() }
@@ -1778,12 +1781,17 @@ internal fun LegacyAccountRecordCard(
     }
 }
 
-private fun buildHistoryWatchedEpisodeLabel(item: top.jlen.vod.data.UserCenterItem): String {
+private fun buildHistoryWatchedEpisodeLabel(
+    item: top.jlen.vod.data.UserCenterItem,
+    subtitle: String = ""
+): String {
     val episodeLabel = item.episodeIndex
         .takeIf { it >= 0 }
         ?.let { "观看至第${it + 1}集" }
         .orEmpty()
-    val sourceLabel = item.sourceName.trim().takeIf { it.isNotBlank() }.orEmpty()
+    val sourceLabel = item.sourceName.trim()
+        .takeIf { it.isNotBlank() && !subtitle.contains(it, ignoreCase = true) }
+        .orEmpty()
     return when {
         episodeLabel.isNotBlank() && sourceLabel.isNotBlank() -> "$episodeLabel · $sourceLabel"
         episodeLabel.isNotBlank() -> episodeLabel

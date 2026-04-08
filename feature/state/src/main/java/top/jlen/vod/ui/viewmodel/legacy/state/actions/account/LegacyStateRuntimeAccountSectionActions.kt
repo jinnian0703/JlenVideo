@@ -81,6 +81,8 @@ internal fun LegacyStateRuntimeViewModelCore.legacySelectAccountSection(
         AccountSection.History -> {
             if (forceRefresh || currentAccountState().historyItems.isEmpty()) {
                 runtimeLoadHistoryRecords()
+            } else {
+                legacyEnrichHistoryRecords(currentAccountState().historyItems)
             }
         }
 

@@ -163,8 +163,11 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadHistoryRecords(pageUrl: S
 
 internal fun LegacyStateRuntimeViewModelCore.legacyEnrichHistoryRecords(items: List<UserCenterItem>) {
     val targetItems = items.filter { item ->
-        item.sourceIndex >= 0 &&
-            item.sourceName.isBlank() &&
+        (
+            item.sourceName.isBlank() ||
+                item.sourceIndex < 0 ||
+                item.episodeIndex < 0
+            ) &&
             (item.vodId.isNotBlank() || item.playUrl.isNotBlank() || item.actionUrl.isNotBlank())
     }
     if (targetItems.isEmpty()) return
