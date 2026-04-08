@@ -196,7 +196,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadDetail(vodId: String) {
                 updateDetailState(missingDetailState())
             } else {
                 val sources = legacyRepository().parseSources(item)
-                val resumeRecord = resolvePlaybackResumeRecord(item)
+                val resumeRecord = resolvePlaybackResumeRecord(item, vodId)
                 val selectedSourceIndex = when {
                     sources.isEmpty() -> 0
                     resumeRecord != null -> resumeRecord.sourceIndex.coerceIn(0, sources.lastIndex)
@@ -222,13 +222,19 @@ internal fun LegacyStateRuntimeViewModelCore.legacySelectSource(index: Int) {
     updateDetailState(detailStateWithSelectedSource(currentDetailState(), index))
 }
 
-private fun LegacyStateRuntimeViewModelCore.resolvePlaybackResumeRecord(item: VodItem): PlaybackResumeRecord? {
-    val resolvedVodId = sequenceOf(
+private fun LegacyStateRuntimeViewModelCore.resolvePlaybackResumeRecord(
+    item: VodItem,
+    requestedVodId: String
+): PlaybackResumeRecord? {
+    val candidateIds = linkedSetOf(
+        requestedVodId.trim(),
         item.vodId.trim(),
         item.siteVodId.trim(),
-        Regex("""/voddetail/([^/]+)/?""").find(item.detailUrl)?.groupValues?.getOrNull(1).orEmpty(),
-        Regex("""/vodplay/([^/-]+)""").find(item.detailUrl)?.groupValues?.getOrNull(1).orEmpty()
-    ).firstOrNull { it.isNotBlank() } ?: return null
+        Regex("""/voddetail/([^/.]+)""").find(item.detailUrl)?.groupValues?.getOrNull(1).orEmpty(),
+        Regex("""/vodplay/([^/-?.]+)""").find(item.detailUrl)?.groupValues?.getOrNull(1).orEmpty()
+    ).filter(String::isNotBlank)
 
-    return legacyRepository().loadPlaybackResumeForApp(resolvedVodId)
+    return candidateIds.firstNotNullOfOrNull { candidate ->
+        legacyRepository().loadPlaybackResumeForApp(candidate)
+    }
 }
