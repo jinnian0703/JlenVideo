@@ -130,11 +130,18 @@ fun DetailScreen(
                             color = UiPalette.TextSecondary
                         )
                         Spacer(modifier = Modifier.height(18.dp))
+                        val pendingResume = state.pendingResumePlayback
+                        val primaryEpisodeIndex = pendingResume
+                            ?.episodeIndex
+                            ?.takeIf { it >= 0 }
+                            ?.coerceAtMost((source?.episodes?.lastIndex ?: 0).coerceAtLeast(0))
+                            ?: 0
+                        val primaryActionLabel = if (pendingResume != null) "缁х画瑙傜湅" else "绔嬪嵆鎾斁"
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Button(
                                 onClick = {
                                     if (source != null) {
-                                        onPlay(item.displayTitle, state.selectedSourceIndex, 0)
+                                        onPlay(item.displayTitle, state.selectedSourceIndex, primaryEpisodeIndex)
                                     }
                                 },
                                 enabled = source != null,
