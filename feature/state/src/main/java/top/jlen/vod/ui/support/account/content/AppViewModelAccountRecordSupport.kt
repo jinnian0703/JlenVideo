@@ -84,7 +84,7 @@ internal fun accountStateWithUpdatedHistoryResume(
 
     return accountState.copy(
         historyItems = accountState.historyItems.map { item ->
-            val itemVodId = item.vodId.trim()
+            val itemVodId = resolveHistoryItemVodId(item)
             if (itemVodId == normalizedVodId) {
                 item.copy(
                     sourceIndex = sourceIndex,
@@ -97,3 +97,20 @@ internal fun accountStateWithUpdatedHistoryResume(
         }
     )
 }
+
+private fun resolveHistoryItemVodId(item: UserCenterItem): String =
+    item.vodId.trim()
+        .ifBlank {
+            Regex("""/vodplay/([^/-?.]+)""")
+                .find(item.playUrl.ifBlank { item.actionUrl })
+                ?.groupValues
+                ?.getOrNull(1)
+                .orEmpty()
+        }
+        .ifBlank {
+            Regex("""/voddetail/([^/.?]+)""")
+                .find(item.actionUrl)
+                ?.groupValues
+                ?.getOrNull(1)
+                .orEmpty()
+        }
