@@ -22,7 +22,9 @@ internal fun accountStateWithEnrichedHistoryItems(
             item.copy(
                 vodId = enriched.vodId.ifBlank { item.vodId },
                 subtitle = enriched.subtitle.ifBlank { item.subtitle },
-                sourceName = enriched.sourceName.ifBlank { item.sourceName }
+                sourceName = enriched.sourceName.ifBlank { item.sourceName },
+                sourceIndex = if (enriched.sourceIndex >= 0) enriched.sourceIndex else item.sourceIndex,
+                episodeIndex = if (enriched.episodeIndex >= 0) enriched.episodeIndex else item.episodeIndex
             )
         } ?: item
     }

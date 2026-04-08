@@ -2743,10 +2743,16 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         if (items.isEmpty()) return items
 
         val normalizedItems = items.map { item ->
+            val resolvedVodId = item.vodId.ifBlank {
+                extractVodIdFromUserUrl(item.playUrl.ifBlank { item.actionUrl })
+            }
+            val localResume = resolvedVodId
+                .takeIf(String::isNotBlank)
+                ?.let(::loadPlaybackResumeForApp)
             item.copy(
-                vodId = item.vodId.ifBlank {
-                    extractVodIdFromUserUrl(item.playUrl.ifBlank { item.actionUrl })
-                }
+                vodId = resolvedVodId,
+                sourceIndex = localResume?.sourceIndex ?: item.sourceIndex,
+                episodeIndex = localResume?.episodeIndex ?: item.episodeIndex
             )
         }
 

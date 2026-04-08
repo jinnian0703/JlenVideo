@@ -1725,7 +1725,17 @@ internal fun LegacyAccountRecordCard(
             )
             val subtitle = sanitizeUserFacingComposite(item.subtitle)
             val watchedEpisodeLabel = buildHistoryWatchedEpisodeLabel(item)
-            if (subtitle.isNotBlank() || watchedEpisodeLabel.isNotBlank()) {
+            if (watchedEpisodeLabel.isNotBlank()) {
+                Text(
+                    text = watchedEpisodeLabel,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = UiPalette.Accent,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (subtitle.isNotBlank()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1733,27 +1743,13 @@ internal fun LegacyAccountRecordCard(
                         .background(UiPalette.SurfaceStrong)
                         .padding(horizontal = 12.dp, vertical = 10.dp)
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (watchedEpisodeLabel.isNotBlank()) {
-                            Text(
-                                text = watchedEpisodeLabel,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = UiPalette.Accent,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        if (subtitle.isNotBlank()) {
-                            Text(
-                                text = subtitle,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = UiPalette.TextPrimary,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = UiPalette.TextPrimary,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
