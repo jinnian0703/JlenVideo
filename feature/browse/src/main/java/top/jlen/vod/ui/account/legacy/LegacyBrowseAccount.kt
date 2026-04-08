@@ -1725,17 +1725,11 @@ internal fun LegacyAccountRecordCard(
             )
             val subtitle = sanitizeUserFacingComposite(item.subtitle)
             val watchedEpisodeLabel = buildHistoryWatchedEpisodeLabel(item)
-            if (watchedEpisodeLabel.isNotBlank()) {
-                Text(
-                    text = watchedEpisodeLabel,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = UiPalette.Accent,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            if (subtitle.isNotBlank()) {
+            val recordSummary = listOfNotNull(
+                watchedEpisodeLabel.takeIf { it.isNotBlank() },
+                subtitle.takeIf { it.isNotBlank() }
+            ).joinToString(" | ")
+            if (recordSummary.isNotBlank()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1744,7 +1738,7 @@ internal fun LegacyAccountRecordCard(
                         .padding(horizontal = 12.dp, vertical = 10.dp)
                 ) {
                     Text(
-                        text = subtitle,
+                        text = recordSummary,
                         style = MaterialTheme.typography.bodySmall,
                         color = UiPalette.TextPrimary,
                         maxLines = 3,
