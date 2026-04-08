@@ -1724,7 +1724,8 @@ internal fun LegacyAccountRecordCard(
                 color = UiPalette.Ink
             )
             val subtitle = sanitizeUserFacingComposite(item.subtitle)
-            if (subtitle.isNotBlank()) {
+            val watchedEpisodeLabel = buildHistoryWatchedEpisodeLabel(item)
+            if (subtitle.isNotBlank() || watchedEpisodeLabel.isNotBlank()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1732,13 +1733,27 @@ internal fun LegacyAccountRecordCard(
                         .background(UiPalette.SurfaceStrong)
                         .padding(horizontal = 12.dp, vertical = 10.dp)
                 ) {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = UiPalette.TextPrimary,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (watchedEpisodeLabel.isNotBlank()) {
+                            Text(
+                                text = watchedEpisodeLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = UiPalette.Accent,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (subtitle.isNotBlank()) {
+                            Text(
+                                text = subtitle,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = UiPalette.TextPrimary,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1770,6 +1785,20 @@ internal fun LegacyAccountRecordCard(
                 }
             }
         }
+    }
+}
+
+private fun buildHistoryWatchedEpisodeLabel(item: top.jlen.vod.data.UserCenterItem): String {
+    val episodeLabel = item.episodeIndex
+        .takeIf { it >= 0 }
+        ?.let { "观看至第${it + 1}集" }
+        .orEmpty()
+    val sourceLabel = item.sourceName.trim().takeIf { it.isNotBlank() }.orEmpty()
+    return when {
+        episodeLabel.isNotBlank() && sourceLabel.isNotBlank() -> "$episodeLabel · $sourceLabel"
+        episodeLabel.isNotBlank() -> episodeLabel
+        sourceLabel.isNotBlank() -> sourceLabel
+        else -> ""
     }
 }
 
