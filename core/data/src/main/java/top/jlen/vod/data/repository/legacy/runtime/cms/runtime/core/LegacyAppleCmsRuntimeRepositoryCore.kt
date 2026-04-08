@@ -470,24 +470,29 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             level.trim().takeIf { it.isNotBlank() }?.let { put("level", it) }
         }
         val page = runCatching {
+            loadLegacySearchSuggestions(
+                keyword = normalizedKeyword,
+                limit = limit.coerceAtLeast(1)
+            )
+        }.recoverCatching {
             val json = requestVideoApiJson(
                 path = "api.php/video/suggest",
                 queryParameters = queryParameters
             )
             parseSearchSuggestionPage(json)
         }.getOrElse {
-            loadLegacySearchSuggestions(
-                keyword = normalizedKeyword,
-                limit = limit.coerceAtLeast(1)
-            )
+            SearchSuggestionPage(keyword = normalizedKeyword, limit = limit)
         }.let { resolvedPage ->
             if (resolvedPage.items.isNotEmpty()) {
                 resolvedPage
             } else {
-                loadLegacySearchSuggestions(
-                    keyword = normalizedKeyword,
-                    limit = limit.coerceAtLeast(1)
-                )
+                runCatching {
+                    val json = requestVideoApiJson(
+                        path = "api.php/video/suggest",
+                        queryParameters = queryParameters
+                    )
+                    parseSearchSuggestionPage(json)
+                }.getOrElse { resolvedPage }
             }
         }
         return page.copy(

@@ -632,38 +632,22 @@ private fun SearchSuggestionRow(
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 6.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (item.poster.isNotBlank()) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(item.poster)
-                    .crossfade(true)
-                    .precision(Precision.INEXACT)
-                    .scale(Scale.FILL)
-                    .build(),
-                contentDescription = item.title,
-                modifier = Modifier
-                    .size(width = 34.dp, height = 46.dp)
-                    .clip(RoundedCornerShape(10.dp)),
-                contentScale = ContentScale.Crop
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(UiPalette.SurfaceSoft),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Search,
+                contentDescription = null,
+                tint = UiPalette.TextMuted,
+                modifier = Modifier.size(14.dp)
             )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(width = 34.dp, height = 46.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(UiPalette.SurfaceSoft),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Search,
-                    contentDescription = null,
-                    tint = UiPalette.TextMuted,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
         }
         Column(
             modifier = Modifier.weight(1f),

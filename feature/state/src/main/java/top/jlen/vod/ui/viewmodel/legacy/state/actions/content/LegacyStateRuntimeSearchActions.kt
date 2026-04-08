@@ -176,10 +176,10 @@ private fun LegacyStateRuntimeViewModelCore.legacyRefreshSearchSuggestions(keywo
     val requestVersion = nextSearchSuggestRequestVersion()
     replaceSearchSuggestJob(viewModelScope.launch suggestLaunch@{
         try {
-            delay(220)
+            delay(120)
             updateSearchState(beginSearchSuggestionLoading(currentSearchState(), normalized))
             val suggestions = withContext(Dispatchers.IO) {
-                legacyRepository().loadSearchSuggestions(keyword = normalized, limit = 8).items
+                legacyRepository().loadSearchSuggestions(keyword = normalized, limit = 6).items
             }
             if (requestVersion != currentSearchSuggestRequestVersion()) return@suggestLaunch
             if (currentSearchState().query.trim() != normalized) return@suggestLaunch
