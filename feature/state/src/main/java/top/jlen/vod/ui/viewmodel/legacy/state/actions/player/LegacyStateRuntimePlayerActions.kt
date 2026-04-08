@@ -155,6 +155,15 @@ private fun LegacyStateRuntimeViewModelCore.persistCurrentPlaybackResume() {
     viewModelScope.launch(Dispatchers.IO) {
         legacyRepository().savePlaybackResumeForApp(record)
     }
+    updateAccountState(
+        accountStateWithUpdatedHistoryResume(
+            accountState = currentAccountState(),
+            vodId = resolvedVodId,
+            sourceIndex = playerState.selectedSourceIndex,
+            episodeIndex = playerState.selectedEpisodeIndex,
+            sourceName = playerState.currentSource?.name.orEmpty()
+        )
+    )
 }
 
 private fun resolvePlaybackResumeVodId(item: VodItem, episodePageUrl: String): String =

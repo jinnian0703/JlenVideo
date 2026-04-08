@@ -71,3 +71,29 @@ internal fun accountStateClearingHistory(accountState: AccountUiState): AccountU
     historyItems = emptyList(),
     historyNextPageUrl = null
 )
+
+internal fun accountStateWithUpdatedHistoryResume(
+    accountState: AccountUiState,
+    vodId: String,
+    sourceIndex: Int,
+    episodeIndex: Int,
+    sourceName: String
+): AccountUiState {
+    val normalizedVodId = vodId.trim()
+    if (normalizedVodId.isBlank()) return accountState
+
+    return accountState.copy(
+        historyItems = accountState.historyItems.map { item ->
+            val itemVodId = item.vodId.trim()
+            if (itemVodId == normalizedVodId) {
+                item.copy(
+                    sourceIndex = sourceIndex,
+                    episodeIndex = episodeIndex,
+                    sourceName = sourceName.ifBlank { item.sourceName }
+                )
+            } else {
+                item
+            }
+        }
+    )
+}
