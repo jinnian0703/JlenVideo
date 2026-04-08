@@ -588,6 +588,7 @@ private fun SearchInputCard(
                 )
             }
             if (suggestions.isNotEmpty()) {
+                val visibleSuggestions = suggestions.take(5)
                 Spacer(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -597,20 +598,20 @@ private fun SearchInputCard(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    suggestions.forEachIndexed { index, suggestion ->
+                    visibleSuggestions.forEachIndexed { index, suggestion ->
                         SearchSuggestionRow(
                             item = suggestion,
                             onClick = { onPickSuggestion(suggestion.title.ifBlank { suggestion.highlight }) }
                         )
-                        if (index != suggestions.lastIndex) {
+                        if (index != visibleSuggestions.lastIndex) {
                             Spacer(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(1.dp)
-                                    .background(UiPalette.BorderSoft.copy(alpha = 0.35f))
+                                    .background(UiPalette.BorderSoft.copy(alpha = 0.28f))
                             )
                         }
                     }
@@ -628,10 +629,10 @@ private fun SearchSuggestionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = 6.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (item.poster.isNotBlank()) {
@@ -644,15 +645,15 @@ private fun SearchSuggestionRow(
                     .build(),
                 contentDescription = item.title,
                 modifier = Modifier
-                    .size(width = 42.dp, height = 56.dp)
-                    .clip(RoundedCornerShape(12.dp)),
+                    .size(width = 34.dp, height = 46.dp)
+                    .clip(RoundedCornerShape(10.dp)),
                 contentScale = ContentScale.Crop
             )
         } else {
             Box(
                 modifier = Modifier
-                    .size(width = 42.dp, height = 56.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .size(width = 34.dp, height = 46.dp)
+                    .clip(RoundedCornerShape(10.dp))
                     .background(UiPalette.SurfaceSoft),
                 contentAlignment = Alignment.Center
             ) {
@@ -660,17 +661,17 @@ private fun SearchSuggestionRow(
                     imageVector = Icons.Rounded.Search,
                     contentDescription = null,
                     tint = UiPalette.TextMuted,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Text(
                 text = buildSuggestionAnnotatedTitle(item),
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
                 color = UiPalette.Ink,
                 maxLines = 1,
@@ -681,7 +682,7 @@ private fun SearchSuggestionRow(
                 ?.let { meta ->
                     Text(
                         text = meta,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = UiPalette.TextSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -692,7 +693,7 @@ private fun SearchSuggestionRow(
             imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
             contentDescription = null,
             tint = UiPalette.TextMuted,
-            modifier = Modifier.size(16.dp)
+            modifier = Modifier.size(14.dp)
         )
     }
 }
