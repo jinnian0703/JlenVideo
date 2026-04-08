@@ -469,11 +469,27 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             typeId.trim().takeIf { it.isNotBlank() }?.let { put("type_id", it) }
             level.trim().takeIf { it.isNotBlank() }?.let { put("level", it) }
         }
-        val json = requestVideoApiJson(
-            path = "api.php/video/suggest",
-            queryParameters = queryParameters
-        )
-        val page = parseSearchSuggestionPage(json)
+        val page = runCatching {
+            val json = requestVideoApiJson(
+                path = "api.php/video/suggest",
+                queryParameters = queryParameters
+            )
+            parseSearchSuggestionPage(json)
+        }.getOrElse {
+            loadLegacySearchSuggestions(
+                keyword = normalizedKeyword,
+                limit = limit.coerceAtLeast(1)
+            )
+        }.let { resolvedPage ->
+            if (resolvedPage.items.isNotEmpty()) {
+                resolvedPage
+            } else {
+                loadLegacySearchSuggestions(
+                    keyword = normalizedKeyword,
+                    limit = limit.coerceAtLeast(1)
+                )
+            }
+        }
         return page.copy(
             keyword = page.keyword.ifBlank { normalizedKeyword },
             limit = page.limit.takeIf { it > 0 } ?: limit,
@@ -481,6 +497,32 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 item.copy(poster = normalizeUrl(item.poster))
             }
         )
+    }
+
+    private fun loadLegacySearchSuggestions(
+        keyword: String,
+        limit: Int
+    ): SearchSuggestionPage {
+        val url = Uri.parse("$baseUrl/index.php/ajax/suggest")
+            .buildUpon()
+            .appendQueryParameter("mid", "1")
+            .appendQueryParameter("wd", keyword)
+            .appendQueryParameter("limit", limit.toString())
+            .build()
+            .toString()
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json")
+            .get()
+            .build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw IOException("HTTP ${response.code}")
+            }
+            val json = JsonParser.parseString(body).asJsonObject
+            return parseSearchSuggestionPage(json)
+        }
     }
 
     internal suspend fun runtimeFetchSearchDocument(keyword: String): Document =
