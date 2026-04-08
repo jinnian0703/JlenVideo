@@ -128,6 +128,7 @@ import top.jlen.vod.data.HotSearchGroup
 import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.PersistentCookieJar
 import top.jlen.vod.data.RegisterEditor
+import top.jlen.vod.data.SearchSuggestionItem
 import top.jlen.vod.data.UserProfileEditor
 import top.jlen.vod.data.VodItem
 import top.jlen.vod.data.sanitizeUserFacingComposite
@@ -221,7 +222,12 @@ private fun SearchLandingContent(
                     SearchInputCard(
                         query = state.query,
                         onQueryChange = onQueryChange,
-                        onSearch = { onOpenSearchResults(state.query.trim()) }
+                        onSearch = { onOpenSearchResults(state.query.trim()) },
+                        suggestions = if (state.suggestSubmittedQuery == state.query.trim()) state.suggestions else emptyList(),
+                        onPickSuggestion = { keyword ->
+                            onSearchHistory(keyword)
+                            onOpenSearchResults(keyword)
+                        }
                     )
                 }
             }
@@ -342,6 +348,7 @@ fun SearchResultsScreen(
     onBack: () -> Unit,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
+    onPickSuggestion: (String) -> Unit,
     onLoadMore: () -> Unit,
     onOpenDetail: (String) -> Unit
 ) {
@@ -403,7 +410,9 @@ fun SearchResultsScreen(
             SearchInputCard(
                 query = state.query,
                 onQueryChange = onQueryChange,
-                onSearch = onSearch
+                onSearch = onSearch,
+                suggestions = if (state.suggestSubmittedQuery == state.query.trim()) state.suggestions else emptyList(),
+                onPickSuggestion = onPickSuggestion
             )
         }
         item {
@@ -509,71 +518,226 @@ private fun SearchEmptyState(
 private fun SearchInputCard(
     query: String,
     onQueryChange: (String) -> Unit,
-    onSearch: () -> Unit
+    onSearch: () -> Unit,
+    suggestions: List<SearchSuggestionItem> = emptyList(),
+    onPickSuggestion: (String) -> Unit = {}
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
         shape = RoundedCornerShape(22.dp),
         border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.78f))
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Search,
-                contentDescription = null,
-                tint = UiPalette.TextMuted,
-                modifier = Modifier.size(20.dp)
-            )
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                shape = RoundedCornerShape(18.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = UiPalette.Ink,
-                    unfocusedTextColor = UiPalette.Ink,
-                    cursorColor = UiPalette.Accent,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedPlaceholderColor = UiPalette.TextMuted,
-                    unfocusedPlaceholderColor = UiPalette.TextMuted
-                ),
-                placeholder = { Text("搜片名") },
-                trailingIcon = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(0.dp)
-                    ) {
-                        if (query.isNotBlank()) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Search,
+                    contentDescription = null,
+                    tint = UiPalette.TextMuted,
+                    modifier = Modifier.size(20.dp)
+                )
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    shape = RoundedCornerShape(18.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedTextColor = UiPalette.Ink,
+                        unfocusedTextColor = UiPalette.Ink,
+                        cursorColor = UiPalette.Accent,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedPlaceholderColor = UiPalette.TextMuted,
+                        unfocusedPlaceholderColor = UiPalette.TextMuted
+                    ),
+                    placeholder = { Text("搜片名") },
+                    trailingIcon = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(0.dp)
+                        ) {
+                            if (query.isNotBlank()) {
+                                TextButton(
+                                    onClick = { onQueryChange("") },
+                                    colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.TextSecondary),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Close,
+                                        contentDescription = "清空搜索关键词",
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
                             TextButton(
-                                onClick = { onQueryChange("") },
-                                colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.TextSecondary),
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                                onClick = onSearch,
+                                colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent),
+                                contentPadding = PaddingValues(start = 2.dp, top = 0.dp, end = 0.dp, bottom = 0.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Close,
-                                    contentDescription = "清空搜索关键词",
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                Text("搜索", fontWeight = FontWeight.Bold)
                             }
                         }
-                        TextButton(
-                            onClick = onSearch,
-                            colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent),
-                            contentPadding = PaddingValues(start = 2.dp, top = 0.dp, end = 0.dp, bottom = 0.dp)
-                        ) {
-                            Text("搜索", fontWeight = FontWeight.Bold)
+                    }
+                )
+            }
+            if (suggestions.isNotEmpty()) {
+                Spacer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(UiPalette.BorderSoft.copy(alpha = 0.55f))
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    suggestions.forEachIndexed { index, suggestion ->
+                        SearchSuggestionRow(
+                            item = suggestion,
+                            onClick = { onPickSuggestion(suggestion.title.ifBlank { suggestion.highlight }) }
+                        )
+                        if (index != suggestions.lastIndex) {
+                            Spacer(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(UiPalette.BorderSoft.copy(alpha = 0.35f))
+                            )
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchSuggestionRow(
+    item: SearchSuggestionItem,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (item.poster.isNotBlank()) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(item.poster)
+                    .crossfade(true)
+                    .precision(Precision.INEXACT)
+                    .scale(Scale.FILL)
+                    .build(),
+                contentDescription = item.title,
+                modifier = Modifier
+                    .size(width = 42.dp, height = 56.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop
             )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(width = 42.dp, height = 56.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(UiPalette.SurfaceSoft),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Search,
+                    contentDescription = null,
+                    tint = UiPalette.TextMuted,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = buildSuggestionAnnotatedTitle(item),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                color = UiPalette.Ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            buildSuggestionMeta(item)
+                .takeIf { it.isNotBlank() }
+                ?.let { meta ->
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = UiPalette.TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+            contentDescription = null,
+            tint = UiPalette.TextMuted,
+            modifier = Modifier.size(16.dp)
+        )
+    }
+}
+
+private fun buildSuggestionMeta(item: SearchSuggestionItem): String =
+    listOf(
+        item.subTitle.takeIf { it.isNotBlank() },
+        item.remarks.takeIf { it.isNotBlank() },
+        listOf(item.typeParentName, item.typeName)
+            .filter { it.isNotBlank() }
+            .distinct()
+            .joinToString(" / ")
+            .takeIf { it.isNotBlank() }
+    ).filterNotNull()
+        .distinct()
+        .joinToString(" · ")
+
+private fun buildSuggestionAnnotatedTitle(item: SearchSuggestionItem): AnnotatedString {
+    val raw = item.highlight.ifBlank { item.title }
+    if (!raw.contains("<em>", ignoreCase = true)) {
+        return AnnotatedString(raw.replace(Regex("<[^>]+>"), ""))
+    }
+    val regex = Regex("(?i)<em>(.*?)</em>")
+    val plain = raw.replace(Regex("<[^>]+>"), "")
+    val matches = regex.findAll(raw).toList()
+    if (matches.isEmpty()) return AnnotatedString(plain)
+
+    val highlightedSegments = matches.map { it.groupValues.getOrNull(1).orEmpty() }.filter { it.isNotBlank() }
+    if (highlightedSegments.isEmpty()) return AnnotatedString(plain)
+
+    return buildAnnotatedString {
+        var cursor = 0
+        highlightedSegments.forEach { segment ->
+            val start = plain.indexOf(segment, startIndex = cursor)
+            if (start < 0) return@forEach
+            if (start > cursor) {
+                append(plain.substring(cursor, start))
+            }
+            withStyle(SpanStyle(color = UiPalette.Accent, fontWeight = FontWeight.ExtraBold)) {
+                append(segment)
+            }
+            cursor = start + segment.length
+        }
+        if (cursor < plain.length) {
+            append(plain.substring(cursor))
         }
     }
 }

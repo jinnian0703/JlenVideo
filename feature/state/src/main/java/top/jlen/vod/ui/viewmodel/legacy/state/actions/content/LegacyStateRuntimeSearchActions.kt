@@ -3,17 +3,24 @@ package top.jlen.vod.ui
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 internal fun LegacyStateRuntimeViewModelCore.legacyUpdateQuery(query: String) {
     updateSearchState(searchStateWithQuery(currentSearchState(), query))
+    legacyRefreshSearchSuggestions(query)
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacySearchHistory(keyword: String) {
     val normalized = keyword.trim()
     if (normalized.isBlank()) return
-    updateSearchState(searchStateWithQuery(currentSearchState(), normalized))
+    currentSearchSuggestJob()?.cancel()
+    updateSearchState(
+        clearSearchSuggestions(
+            searchStateWithQuery(currentSearchState(), normalized)
+        )
+    )
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyClearSearchHistory() {
@@ -79,6 +86,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyEnsureSearchResults(query: St
 
 internal fun LegacyStateRuntimeViewModelCore.legacyPerformSearch(keyword: String) {
     val query = keyword.trim()
+    currentSearchSuggestJob()?.cancel()
     if (query.isBlank()) {
         currentSearchJob()?.cancel()
         currentSearchEnrichJob()?.cancel()
@@ -156,4 +164,37 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreSearchResults() {
             )
         }
     }
+}
+
+private fun LegacyStateRuntimeViewModelCore.legacyRefreshSearchSuggestions(keyword: String) {
+    val normalized = keyword.trim()
+    currentSearchSuggestJob()?.cancel()
+    if (normalized.isBlank()) {
+        updateSearchState(clearSearchSuggestions(currentSearchState()))
+        return
+    }
+    val requestVersion = nextSearchSuggestRequestVersion()
+    replaceSearchSuggestJob(viewModelScope.launch suggestLaunch@{
+        try {
+            delay(220)
+            updateSearchState(beginSearchSuggestionLoading(currentSearchState(), normalized))
+            val suggestions = withContext(Dispatchers.IO) {
+                legacyRepository().loadSearchSuggestions(keyword = normalized, limit = 8).items
+            }
+            if (requestVersion != currentSearchSuggestRequestVersion()) return@suggestLaunch
+            if (currentSearchState().query.trim() != normalized) return@suggestLaunch
+            updateSearchState(searchStateWithSuggestions(currentSearchState(), normalized, suggestions))
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            if (requestVersion != currentSearchSuggestRequestVersion()) return@suggestLaunch
+            updateSearchState(
+                searchStateWithSuggestionError(
+                    currentSearchState(),
+                    normalized,
+                    toUserFacingMessage(error, "搜索联想加载失败")
+                )
+            )
+        }
+    })
 }

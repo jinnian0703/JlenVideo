@@ -38,9 +38,11 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
     private val searchResultScrollPositions = mutableMapOf<String, SearchResultScrollPosition>()
     private var hasEnteredAccountScreen = false
     private var searchJob: Job? = null
+    private var searchSuggestJob: Job? = null
     private var searchEnrichJob: Job? = null
     private var historyEnrichJob: Job? = null
     private var searchRequestVersion: Long = 0L
+    private var searchSuggestRequestVersion: Long = 0L
     private var historyEnrichVersion: Long = 0L
 
     var homeState by mutableStateOf(HomeUiState())
@@ -169,12 +171,25 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
         searchEnrichJob = value
     }
 
+    internal fun currentSearchSuggestJob(): Job? = searchSuggestJob
+
+    internal fun replaceSearchSuggestJob(value: Job?) {
+        searchSuggestJob = value
+    }
+
     internal fun nextSearchRequestVersion(): Long {
         searchRequestVersion += 1L
         return searchRequestVersion
     }
 
     internal fun currentSearchRequestVersion(): Long = searchRequestVersion
+
+    internal fun nextSearchSuggestRequestVersion(): Long {
+        searchSuggestRequestVersion += 1L
+        return searchSuggestRequestVersion
+    }
+
+    internal fun currentSearchSuggestRequestVersion(): Long = searchSuggestRequestVersion
 
     internal fun currentHistoryEnrichJob(): Job? = historyEnrichJob
 

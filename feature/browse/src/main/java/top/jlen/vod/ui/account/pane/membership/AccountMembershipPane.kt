@@ -1,9 +1,9 @@
 package top.jlen.vod.ui
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ShowChart
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -36,13 +38,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import kotlin.math.abs
 import kotlinx.coroutines.delay
 import top.jlen.vod.data.MembershipInfo
 import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.MembershipSignInInfo
+import top.jlen.vod.data.PointLogItem
+import top.jlen.vod.data.PointTrendPoint
 
 @Composable
 internal fun MembershipPaneV2(
@@ -50,6 +64,7 @@ internal fun MembershipPaneV2(
     info: MembershipInfo,
     plans: List<MembershipPlan>,
     signInInfo: MembershipSignInInfo,
+    pointLogs: List<PointLogItem>,
     isActionLoading: Boolean,
     message: String? = null,
     onUpgrade: (MembershipPlan) -> Unit,
@@ -62,10 +77,11 @@ internal fun MembershipPaneV2(
     }
 
     val signInSuccessMessage = message
-        ?.takeIf { it.contains("签到成功") || it.contains("获得") && it.contains("积分") }
+        ?.takeIf { it.contains("签到成功") || (it.contains("获得") && it.contains("积分")) }
         ?.trim()
         .orEmpty()
     val shouldHighlightPoints = signInSuccessMessage.isNotBlank() || signInInfo.rewardPoints.isNotBlank()
+    val trendPoints = remember(pointLogs) { buildPointTrendPoints(pointLogs, days = 30) }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (signInSuccessMessage.isNotBlank()) {
@@ -84,6 +100,8 @@ internal fun MembershipPaneV2(
             isActionLoading = isActionLoading,
             onSignIn = onSignIn
         )
+
+        MembershipTrendCard(points = trendPoints)
 
         if (plans.isEmpty()) {
             EmptyPane("暂无可升级套餐")
@@ -223,7 +241,7 @@ private fun MembershipSummaryCard(
 private fun MembershipSummaryRow(
     label: String,
     value: String,
-    valueColor: androidx.compose.ui.graphics.Color = UiPalette.Ink,
+    valueColor: Color = UiPalette.Ink,
     highlight: Boolean = false
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -328,6 +346,160 @@ private fun MembershipSignInCard(
     }
 }
 
+@Composable
+private fun MembershipTrendCard(points: List<PointTrendPoint>) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        shape = RoundedCornerShape(22.dp),
+        border = BorderStroke(1.dp, UiPalette.Border)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(UiPalette.Accent.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ShowChart,
+                        contentDescription = null,
+                        tint = UiPalette.Accent,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "近30天积分趋势",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = UiPalette.Ink
+                    )
+                    Text(
+                        text = "按最近 30 天积分净变化统计",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = UiPalette.TextSecondary
+                    )
+                }
+            }
+
+            if (points.isEmpty() || points.all { it.delta == 0 }) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(UiPalette.SurfaceSoft)
+                        .padding(horizontal = 14.dp, vertical = 18.dp)
+                ) {
+                    Text(
+                        text = "近30天暂无积分变动",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = UiPalette.TextMuted
+                    )
+                }
+            } else {
+                val totalDelta = points.sumOf { it.delta }
+                val activeDays = points.count { it.delta != 0 }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TrendStatChip(
+                        label = "净变化",
+                        value = if (totalDelta > 0) "+$totalDelta" else totalDelta.toString()
+                    )
+                    TrendStatChip(label = "活跃天数", value = "$activeDays 天")
+                }
+                PointTrendChart(points = points)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrendStatChip(label: String, value: String) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(UiPalette.SurfaceSoft)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = UiPalette.TextMuted
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = UiPalette.Ink
+            )
+        }
+    }
+}
+
+@Composable
+private fun PointTrendChart(points: List<PointTrendPoint>) {
+    val maxAbsDelta = points.maxOf { abs(it.delta) }.coerceAtLeast(1)
+    val startLabel = points.firstOrNull()?.label.orEmpty()
+    val middleLabel = points.getOrNull(points.lastIndex / 2)?.label.orEmpty()
+    val endLabel = points.lastOrNull()?.label.orEmpty()
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(132.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(UiPalette.SurfaceSoft)
+        ) {
+            val baseline = size.height * 0.58f
+            val gap = size.width / points.size.coerceAtLeast(1)
+            val barWidth = (gap * 0.52f).coerceAtLeast(4f)
+
+            drawLine(
+                color = UiPalette.BorderSoft.copy(alpha = 0.8f),
+                start = Offset(0f, baseline),
+                end = Offset(size.width, baseline),
+                strokeWidth = 2f
+            )
+
+            points.forEachIndexed { index, point ->
+                val ratio = point.delta.toFloat() / maxAbsDelta.toFloat()
+                val barHeight = (size.height * 0.34f * abs(ratio)).coerceAtLeast(4f)
+                val left = index * gap + (gap - barWidth) / 2f
+                val top = if (point.delta >= 0) baseline - barHeight else baseline
+                val color = if (point.delta >= 0) UiPalette.Accent else UiPalette.TextMuted
+                drawRoundRect(
+                    color = color.copy(alpha = 0.9f),
+                    topLeft = Offset(left, top),
+                    size = Size(barWidth, barHeight),
+                    cornerRadius = CornerRadius(8f, 8f)
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(startLabel, style = MaterialTheme.typography.labelSmall, color = UiPalette.TextMuted)
+            Text(middleLabel, style = MaterialTheme.typography.labelSmall, color = UiPalette.TextMuted)
+            Text(endLabel, style = MaterialTheme.typography.labelSmall, color = UiPalette.TextMuted)
+        }
+    }
+}
+
 private fun membershipRewardHint(signInInfo: MembershipSignInInfo): String =
     when {
         signInInfo.signedToday && signInInfo.rewardPoints.isNotBlank() ->
@@ -400,6 +572,61 @@ private fun MembershipPlanCard(
             }
         }
     }
+}
+
+private fun buildPointTrendPoints(
+    pointLogs: List<PointLogItem>,
+    days: Int
+): List<PointTrendPoint> {
+    if (days <= 0) return emptyList()
+    val today = LocalDate.now()
+    val startDate = today.minusDays((days - 1).toLong())
+    val pointsByDate = pointLogs.fold(linkedMapOf<LocalDate, Int>()) { acc, log ->
+        val date = parsePointLogDate(log)
+        val delta = parsePointLogDelta(log)
+        if (date != null && !date.isBefore(startDate) && !date.isAfter(today) && delta != null) {
+            acc[date] = (acc[date] ?: 0) + delta
+        }
+        acc
+    }
+    val labelFormatter = DateTimeFormatter.ofPattern("MM-dd")
+    return (0 until days).map { offset ->
+        val date = startDate.plusDays(offset.toLong())
+        PointTrendPoint(
+            date = date.toString(),
+            delta = pointsByDate[date] ?: 0,
+            label = date.format(labelFormatter)
+        )
+    }
+}
+
+private fun parsePointLogDate(log: PointLogItem): LocalDate? {
+    val candidates = listOf(log.timeText, log.time)
+    val dateRegex = Regex("""\d{4}-\d{2}-\d{2}""")
+    candidates.forEach { raw ->
+        val text = raw.trim()
+        if (text.isBlank()) return@forEach
+        dateRegex.find(text)?.value?.let { value ->
+            return runCatching { LocalDate.parse(value) }.getOrNull()
+        }
+        text.toLongOrNull()?.let { epoch ->
+            val millis = if (text.length <= 10) epoch * 1000 else epoch
+            return runCatching {
+                Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+            }.getOrNull()
+        }
+    }
+    return null
+}
+
+private fun parsePointLogDelta(log: PointLogItem): Int? {
+    val raw = (log.pointsText.ifBlank { log.points })
+        .replace("积分", "")
+        .replace(" ", "")
+        .trim()
+    val numeric = Regex("""[-+]?\d+""").find(raw)?.value?.toIntOrNull()
+        ?: return null
+    return if (log.isIncome) abs(numeric) else -abs(numeric)
 }
 
 @Composable

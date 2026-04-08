@@ -332,6 +332,10 @@ fun JlenVideoApp() {
                                         openSearchResults(normalized)
                                     }
                                 },
+                                onPickSuggestion = { keyword ->
+                                    viewModel.searchHistory(keyword)
+                                    openSearchResults(keyword)
+                                },
                                 onLoadMore = viewModel::loadMoreSearchResults,
                                 onOpenDetail = { navController.navigate("detail/$it") }
                             )

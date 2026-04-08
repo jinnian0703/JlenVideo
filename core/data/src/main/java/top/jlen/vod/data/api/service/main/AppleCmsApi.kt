@@ -44,6 +44,11 @@ interface AppleCmsApi {
         @QueryMap options: Map<String, String>
     ): VideoApiEnvelope<VideoApiPagedRows<VodItem>>
 
+    @GET("api.php/video/suggest")
+    suspend fun suggest(
+        @QueryMap options: Map<String, String>
+    ): VideoApiEnvelope<JsonElement>
+
     @GET("api.php/video/detail")
     suspend fun getDetail(
         @Query("vod_id") vodId: String

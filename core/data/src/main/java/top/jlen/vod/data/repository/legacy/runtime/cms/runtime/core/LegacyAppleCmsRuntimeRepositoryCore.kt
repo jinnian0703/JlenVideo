@@ -452,6 +452,37 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         )
     }.toCursorPagedVodItems()
 
+    suspend fun loadSearchSuggestions(
+        keyword: String,
+        limit: Int = 8,
+        typeId: String = "",
+        level: String = ""
+    ): SearchSuggestionPage {
+        val normalizedKeyword = keyword.trim()
+        if (normalizedKeyword.isBlank()) {
+            return SearchSuggestionPage(keyword = normalizedKeyword, limit = limit)
+        }
+        val queryParameters = linkedMapOf(
+            "q" to normalizedKeyword,
+            "limit" to limit.coerceAtLeast(1).toString()
+        ).apply {
+            typeId.trim().takeIf { it.isNotBlank() }?.let { put("type_id", it) }
+            level.trim().takeIf { it.isNotBlank() }?.let { put("level", it) }
+        }
+        val json = requestVideoApiJson(
+            path = "api.php/video/suggest",
+            queryParameters = queryParameters
+        )
+        val page = parseSearchSuggestionPage(json)
+        return page.copy(
+            keyword = page.keyword.ifBlank { normalizedKeyword },
+            limit = page.limit.takeIf { it > 0 } ?: limit,
+            items = page.items.map { item ->
+                item.copy(poster = normalizeUrl(item.poster))
+            }
+        )
+    }
+
     internal suspend fun runtimeFetchSearchDocument(keyword: String): Document =
         fetchDocument("${runtimeBaseUrl()}/vodsearch/-------------/?wd=${Uri.encode(keyword)}")
 

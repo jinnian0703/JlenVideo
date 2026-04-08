@@ -342,6 +342,12 @@ data class PointLogItem(
     val timeText: String = ""
 )
 
+data class PointTrendPoint(
+    val date: String = "",
+    val delta: Int = 0,
+    val label: String = ""
+)
+
 data class MembershipPlan(
     val groupId: String = "",
     val groupName: String = "",
@@ -354,6 +360,25 @@ data class MembershipPage(
     val plans: List<MembershipPlan> = emptyList(),
     val signInInfo: MembershipSignInInfo = MembershipSignInInfo(),
     val pointLogs: List<PointLogItem> = emptyList()
+)
+
+data class SearchSuggestionItem(
+    val vodId: String = "",
+    val title: String = "",
+    val subTitle: String = "",
+    val poster: String = "",
+    val remarks: String = "",
+    val typeId: String = "",
+    val typeName: String = "",
+    val typeParentName: String = "",
+    val highlight: String = ""
+)
+
+data class SearchSuggestionPage(
+    val engine: String = "",
+    val keyword: String = "",
+    val limit: Int = 0,
+    val items: List<SearchSuggestionItem> = emptyList()
 )
 
 data class PlaybackResumeRecord(

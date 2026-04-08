@@ -17,25 +17,33 @@ internal fun beginSearchState(
     query = query,
     submittedQuery = query,
     isLoading = true,
+    isSuggestLoading = false,
     isAppending = false,
+    suggestions = emptyList(),
+    suggestSubmittedQuery = "",
     cursor = "",
     hasMore = true,
     firstLoaded = false,
     results = emptyList(),
     appendError = null,
-    error = null
+    error = null,
+    suggestError = null
 )
 
 internal fun blankSearchState(searchState: SearchUiState): SearchUiState = searchState.copy(
     submittedQuery = "",
     isLoading = false,
+    isSuggestLoading = false,
     isAppending = false,
+    suggestions = emptyList(),
+    suggestSubmittedQuery = "",
     results = emptyList(),
     cursor = "",
     hasMore = false,
     firstLoaded = false,
     appendError = null,
-    error = "请输入影片名称"
+    error = "请输入影片名称",
+    suggestError = null
 )
 
 internal fun searchStateWithFirstPage(
