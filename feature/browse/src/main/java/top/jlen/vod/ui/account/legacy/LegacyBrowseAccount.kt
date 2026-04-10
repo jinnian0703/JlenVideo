@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -325,11 +326,7 @@ internal fun LegacyAccountScreen(
 
             item {
                 AccountSegmentBar {
-                    items(
-                        items = visibleSections,
-                        key = { it.name },
-                        contentType = { "account_section" }
-                    ) { section ->
+                    visibleSections.forEach { section ->
                         AccountUnderlineTab(
                             text = when (section) {
                                 AccountSection.Profile -> "资料"
@@ -339,7 +336,8 @@ internal fun LegacyAccountScreen(
                                 AccountSection.Favorites -> "追剧"
                             },
                             selected = state.selectedSection == section,
-                            onClick = { onSelectSection(section) }
+                            onClick = { onSelectSection(section) },
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
@@ -1255,7 +1253,7 @@ internal fun LegacyAccountFindPasswordPane(
 }
 
 @Composable
-private fun AccountSegmentBar(content: LazyListScope.() -> Unit) {
+private fun AccountSegmentBar(content: @Composable RowScope.() -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1263,7 +1261,11 @@ private fun AccountSegmentBar(content: LazyListScope.() -> Unit) {
             .background(UiPalette.SurfaceSoft.copy(alpha = 0.72f))
             .padding(horizontal = 10.dp, vertical = 10.dp)
     ) {
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), content = content)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            content = content
+        )
     }
 }
 
@@ -1271,10 +1273,11 @@ private fun AccountSegmentBar(content: LazyListScope.() -> Unit) {
 private fun AccountUnderlineTab(
     text: String,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 6.dp, vertical = 4.dp),
@@ -1348,14 +1351,15 @@ internal fun LegacyAccountProfilePaneV2(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 AccountSegmentBar {
-                    items(AccountProfileTab.entries.toList()) { tab ->
+                    AccountProfileTab.entries.forEach { tab ->
                         AccountUnderlineTab(
                             text = when (tab) {
                                 AccountProfileTab.Overview -> "基本资料"
                                 AccountProfileTab.Edit -> "修改信息"
                             },
                             selected = tab == selectedTab,
-                            onClick = { onTabChange(tab == AccountProfileTab.Edit) }
+                            onClick = { onTabChange(tab == AccountProfileTab.Edit) },
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
