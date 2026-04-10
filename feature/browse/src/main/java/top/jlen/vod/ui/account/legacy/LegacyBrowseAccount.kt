@@ -181,6 +181,15 @@ internal fun LegacyAccountScreen(
     } else {
         AccountNoticeTone.Info
     }
+    val visibleSections = remember {
+        AccountSection.entries.filterNot { it == AccountSection.Favorites }
+    }
+
+    LaunchedEffect(showLoggedInContent, state.selectedSection) {
+        if (showLoggedInContent && state.selectedSection == AccountSection.Favorites) {
+            onSelectSection(AccountSection.Profile)
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -317,17 +326,17 @@ internal fun LegacyAccountScreen(
             item {
                 AccountSegmentBar {
                     items(
-                        items = AccountSection.entries.toList(),
+                        items = visibleSections,
                         key = { it.name },
                         contentType = { "account_section" }
                     ) { section ->
                         AccountUnderlineTab(
                             text = when (section) {
                                 AccountSection.Profile -> "资料"
-                                AccountSection.Favorites -> "收藏"
                                 AccountSection.History -> "记录"
                                 AccountSection.Member -> "会员"
                                 AccountSection.About -> "关于"
+                                AccountSection.Favorites -> "追剧"
                             },
                             selected = state.selectedSection == section,
                             onClick = { onSelectSection(section) }
@@ -362,19 +371,10 @@ internal fun LegacyAccountScreen(
                         onBindEmail = onBindEmail,
                         onUnbindEmail = onUnbindEmail
                     )
-                    AccountSection.Favorites -> AccountRecordPane(
-                        title = "我的收藏",
-                        emptyMessage = "你还没有收藏任何内容",
-                        isLoading = state.isContentLoading,
-                        items = state.favoriteItems,
-                        hasMore = !state.favoriteNextPageUrl.isNullOrBlank(),
-                        isActionLoading = state.isActionLoading,
-                        onLoadMore = onLoadMoreFavorites,
-                        onPrimaryAction = { item ->
-                            if (item.vodId.isNotBlank()) onOpenDetail(item.vodId)
-                        },
-                        onDeleteItem = onDeleteFavorite,
-                        onClearAll = onClearFavorites
+                    AccountSection.Favorites -> EmptyPane(
+                        message = "追剧入口已移到底栏",
+                        description = "想追的影片请在详情页加入追剧，然后到底栏“追剧”里查看更新和续播",
+                        style = FeedbackPaneStyle.Card
                     )
                     AccountSection.History -> AccountRecordPane(
                         title = "播放记录",

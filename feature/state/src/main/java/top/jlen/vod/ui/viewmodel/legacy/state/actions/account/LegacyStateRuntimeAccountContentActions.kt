@@ -133,7 +133,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadFavoriteRecords(pageUrl: 
             updateAccountState(
                 accountStateWithContentError(
                     currentAccountState(),
-                    toUserFacingMessage(error, "加载收藏失败")
+                    toUserFacingMessage(error, "加载追剧列表失败")
                 )
             )
         }

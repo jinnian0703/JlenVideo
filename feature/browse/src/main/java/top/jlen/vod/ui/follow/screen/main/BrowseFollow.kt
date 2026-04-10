@@ -73,7 +73,7 @@ fun FollowScreen(
                         color = UiPalette.Ink
                     )
                     Text(
-                        text = "聚合已收藏的连载内容，更新和续播都在这里",
+                        text = "聚合已加入追剧的连载内容，更新和续播都在这里",
                         style = MaterialTheme.typography.bodyMedium,
                         color = UiPalette.TextSecondary
                     )
@@ -96,7 +96,7 @@ fun FollowScreen(
             !state.isLoggedIn -> item {
                 EmptyPane(
                     message = "登录后可查看追剧列表",
-                    description = "已收藏的连载内容会自动汇总到这里",
+                    description = "已加入追剧的连载内容会自动汇总到这里",
                     actionLabel = "去登录",
                     onAction = onOpenAccount,
                     style = FeedbackPaneStyle.Card
@@ -114,7 +114,7 @@ fun FollowScreen(
             state.items.isEmpty() -> item {
                 EmptyPane(
                     message = "暂无追剧内容",
-                    description = "先收藏想追的影片，后续更新会自动显示在这里",
+                    description = "先把想追的影片加入追剧，后续更新会自动显示在这里",
                     actionLabel = "去片库",
                     onAction = onOpenLibrary,
                     style = FeedbackPaneStyle.Card
@@ -301,7 +301,7 @@ private fun FollowUpCard(
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = if (item.sourceName.isNotBlank()) item.sourceName else "已收藏",
+                            text = if (item.sourceName.isNotBlank()) item.sourceName else "已追剧",
                             style = MaterialTheme.typography.labelMedium,
                             color = UiPalette.TextMuted
                         )

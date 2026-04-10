@@ -308,8 +308,8 @@ private fun buildFollowWatchedEpisodeLabel(
         episodeLabel.isNotBlank() && sourceLabel.isNotBlank() -> "$episodeLabel · $sourceLabel"
         episodeLabel.isNotBlank() -> episodeLabel
         hasResumeTime -> "已记录本地续播"
-        hasHistory -> "已收藏，尚无本地续播时间"
-        else -> "已收藏，尚无观看记录"
+        hasHistory -> "已加入追剧，尚无本地续播时间"
+        else -> "已加入追剧，尚无观看记录"
     }
 }
 
@@ -319,8 +319,8 @@ private fun buildFollowWatchTimeText(
 ): String = when {
     lastWatchedAtMillis != null && lastWatchedAtMillis > 0L ->
         followDisplayTimeFormatter.format(Date(lastWatchedAtMillis))
-    hasHistory -> "已收藏，尚无本地续播时间"
-    else -> "已收藏，尚无观看记录"
+    hasHistory -> "已加入追剧，尚无本地续播时间"
+    else -> "已加入追剧，尚无观看记录"
 }
 
 private data class ParsedLatestEpisode(

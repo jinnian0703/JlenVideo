@@ -11,11 +11,11 @@ import top.jlen.vod.data.VodItem
 internal fun LegacyStateRuntimeViewModelCore.legacyAddCurrentDetailFavorite() {
     val item = currentDetailState().item ?: return
     if (!currentAccountState().session.isLoggedIn) {
-        updateDetailState(detailStateWithActionMessage(currentDetailState(), "请先登录后再收藏", true))
+        updateDetailState(detailStateWithActionMessage(currentDetailState(), "请先登录后再加入追剧", true))
         return
     }
     if (currentDetailState().isFavorited) {
-        updateDetailState(detailStateWithActionMessage(currentDetailState(), "已在收藏中", false))
+        updateDetailState(detailStateWithActionMessage(currentDetailState(), "已在追剧中", false))
         return
     }
     if (currentDetailState().isActionLoading) return
@@ -35,7 +35,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyAddCurrentDetailFavorite() {
             updateDetailState(
                 detailStateWithFavoriteFailure(
                     detailState = currentDetailState(),
-                    message = if (isDuplicate) "已在收藏中" else toUserFacingMessage(error, "收藏失败"),
+                    message = if (isDuplicate) "已在追剧中" else toUserFacingMessage(error, "加入追剧失败"),
                     isDuplicate = isDuplicate
                 )
             )
@@ -47,7 +47,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyAddCurrentDetailFavorite() {
 internal fun LegacyStateRuntimeViewModelCore.legacyCancelCurrentDetailFavorite() {
     val item = currentDetailState().item ?: return
     if (!currentAccountState().session.isLoggedIn) {
-        updateDetailState(detailStateWithActionMessage(currentDetailState(), "请先登录后再操作收藏", true))
+        updateDetailState(detailStateWithActionMessage(currentDetailState(), "请先登录后再管理追剧", true))
         return
     }
     val favoriteVodId = resolveCancelableFavoriteVodId(item).takeIf { it.isNotBlank() }
@@ -57,7 +57,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyCancelCurrentDetailFavorite()
             ?.vodId
             ?.takeIf { it.isNotBlank() }
     if (favoriteVodId == null) {
-        updateDetailState(detailStateWithFavoriteRemoveFailure(currentDetailState(), "未找到可取消的收藏记录"))
+        updateDetailState(detailStateWithFavoriteRemoveFailure(currentDetailState(), "未找到可取消的追剧记录"))
         return
     }
     if (currentDetailState().isActionLoading) return
@@ -66,7 +66,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyCancelCurrentDetailFavorite()
         block = { deleteUserRecordForApp(recordIds = listOf(favoriteVodId), type = 2, clearAll = false) },
         onSuccess = {
             updateAccountState(accountStateRemovingFavoriteByVodId(currentAccountState(), favoriteVodId))
-            updateDetailState(detailStateWithFavoriteRemoved(currentDetailState(), "已取消收藏"))
+            updateDetailState(detailStateWithFavoriteRemoved(currentDetailState(), "已取消追剧"))
             legacyRebuildFollowContent()
         }
     )

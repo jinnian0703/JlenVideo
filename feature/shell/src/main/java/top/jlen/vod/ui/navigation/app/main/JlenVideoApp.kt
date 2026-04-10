@@ -558,20 +558,20 @@ private fun RemoveFavoriteConfirmDialog(
                             .padding(horizontal = 10.dp, vertical = 5.dp)
                     ) {
                         Text(
-                            text = "已收藏",
+                            text = "已追剧",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = UiPalette.DangerText
                         )
                     }
                     Text(
-                        text = "取消收藏",
+                        text = "取消追剧",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.ExtraBold,
                         color = UiPalette.Ink
                     )
                     Text(
-                        text = "当前影片已加入收藏，确认将其移出收藏列表吗？",
+                        text = "当前影片已加入追剧，确认将其从追剧列表中移除吗？",
                         style = MaterialTheme.typography.bodyLarge,
                         color = UiPalette.TextSecondary
                     )
@@ -581,7 +581,7 @@ private fun RemoveFavoriteConfirmDialog(
                     shape = RoundedCornerShape(20.dp)
                 ) {
                     Text(
-                        text = "执行后，该影片将从“我的-收藏”中移除，播放记录不会受到影响。",
+                        text = "执行后，该影片将从“追剧”中移除，播放记录不会受到影响。",
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -612,7 +612,7 @@ private fun RemoveFavoriteConfirmDialog(
                             contentColor = UiPalette.Surface
                         )
                     ) {
-                        Text("确认取消", fontWeight = FontWeight.Bold)
+                        Text("确认移除", fontWeight = FontWeight.Bold)
                     }
                 }
             }

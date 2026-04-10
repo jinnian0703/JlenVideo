@@ -181,10 +181,10 @@ fun DetailScreen(
                                 )
                             ) {
                                 Text(
-                                    if (!isLoggedIn) "登录后收藏"
-                                    else if (state.isActionLoading) "收藏中..."
-                                    else if (state.isFavorited) "已收藏"
-                                    else "收藏"
+                                    if (!isLoggedIn) "登录后追剧"
+                                    else if (state.isActionLoading) "处理中..."
+                                    else if (state.isFavorited) "已追剧"
+                                    else "追剧"
                                 )
                             }
                         }

@@ -46,11 +46,11 @@ internal fun toUserFacingMessage(
 
 internal fun normalizeFavoriteActionMessage(rawMessage: String): String {
     val message = normalizeKnownUiMessage(rawMessage.trim())
-    if (message.isBlank()) return "已加入收藏"
+    if (message.isBlank()) return "已加入追剧"
     return when {
-        isDuplicateFavoriteMessage(message) -> "已在收藏中"
-        message.contains("成功") || message.contains("获取成功") || message.contains("操作成功") -> "已加入收藏"
-        else -> "已加入收藏"
+        isDuplicateFavoriteMessage(message) -> "已在追剧中"
+        message.contains("成功") || message.contains("获取成功") || message.contains("操作成功") -> "已加入追剧"
+        else -> "已加入追剧"
     }
 }
 
@@ -58,7 +58,9 @@ internal fun isDuplicateFavoriteMessage(rawMessage: String): Boolean {
     val message = normalizeKnownUiMessage(rawMessage.trim())
     if (message.isBlank()) return false
     return message.contains("已收藏") ||
+        message.contains("已追剧") ||
         message.contains("已经收藏") ||
+        message.contains("已经追剧") ||
         message.contains("已存在") ||
         message.contains("重复")
 }
