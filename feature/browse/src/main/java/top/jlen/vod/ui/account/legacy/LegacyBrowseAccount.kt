@@ -18,6 +18,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -1392,103 +1393,129 @@ internal fun LegacyAccountProfilePaneV2(
                     }
 
                     AccountProfileTab.Edit -> {
-                        Text(
-                            text = "资料修改",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = UiPalette.Ink
-                        )
-                        ProfileEditorField(
-                            label = "QQ号码",
-                            value = editor.qq,
-                            onValueChange = { value -> onEditorChange { it.copy(qq = value) } }
-                        )
-                        ProfileEditorField(
-                            label = "找回问题",
-                            value = editor.question,
-                            onValueChange = { value -> onEditorChange { it.copy(question = value) } }
-                        )
-                        ProfileEditorField(
-                            label = "找回答案",
-                            value = editor.answer,
-                            onValueChange = { value -> onEditorChange { it.copy(answer = value) } }
-                        )
-
-                        val hasBoundEmail = editor.email.contains("@") && editor.email.contains(".")
-                        if (!hasBoundEmail) {
-                            ProfileEditorField(
-                                label = "邮箱",
-                                value = editor.pendingEmail,
-                                onValueChange = { value -> onEditorChange { it.copy(pendingEmail = value) } }
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "资料修改",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = UiPalette.Ink
                             )
-                            ProfileEditorField(
-                                label = "邮箱验证码",
-                                value = editor.emailCode,
-                                onValueChange = { value -> onEditorChange { it.copy(emailCode = value) } }
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                OutlinedButton(
-                                    onClick = onSendEmailCode,
-                                    enabled = !isSaving,
-                                    modifier = Modifier.weight(1f),
-                                    border = BorderStroke(1.dp, UiPalette.BorderSoft)
-                                ) {
-                                    Text("发送验证码")
-                                }
-                                Button(
-                                    onClick = onBindEmail,
-                                    enabled = !isSaving,
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(18.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = UiPalette.Accent,
-                                        contentColor = UiPalette.AccentText
-                                    )
-                                ) {
-                                    Text(if (isSaving) "绑定中..." else "确认绑定")
-                                }
-                            }
-                        } else {
-                            ReadonlyBindingField(
-                                label = "邮箱",
-                                value = editor.email,
-                                actionText = if (isSaving) "解绑中..." else "解绑邮箱",
-                                onAction = if (isSaving) null else onUnbindEmail
+                            Text(
+                                text = "按分组管理找回信息、邮箱绑定和密码设置",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = UiPalette.TextSecondary
                             )
                         }
 
-                        Text(
-                            text = "修改密码",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = UiPalette.Ink
-                        )
-                        Text(
-                            text = "只在修改密码时填写原密码；不改密码就留空。",
-                            color = UiPalette.TextSecondary,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        ProfileEditorField(
-                            label = "原密码",
-                            value = editor.currentPassword,
-                            onValueChange = { value -> onEditorChange { it.copy(currentPassword = value) } },
-                            password = true
-                        )
-                        ProfileEditorField(
-                            label = "新密码",
-                            value = editor.newPassword,
-                            onValueChange = { value -> onEditorChange { it.copy(newPassword = value) } },
-                            password = true
-                        )
-                        ProfileEditorField(
-                            label = "确认新密码",
-                            value = editor.confirmPassword,
-                            onValueChange = { value -> onEditorChange { it.copy(confirmPassword = value) } },
-                            password = true
-                        )
+                        AccountEditSectionCard(title = "资料补充") {
+                            ProfileEditorField(
+                                label = "QQ号码",
+                                value = editor.qq,
+                                onValueChange = { value -> onEditorChange { it.copy(qq = value) } }
+                            )
+                            ProfileEditorField(
+                                label = "找回问题",
+                                value = editor.question,
+                                onValueChange = { value -> onEditorChange { it.copy(question = value) } }
+                            )
+                            ProfileEditorField(
+                                label = "找回答案",
+                                value = editor.answer,
+                                onValueChange = { value -> onEditorChange { it.copy(answer = value) } }
+                            )
+                        }
+
+                        val hasBoundEmail = editor.email.contains("@") && editor.email.contains(".")
+                        if (!hasBoundEmail) {
+                            AccountEditSectionCard(
+                                title = "邮箱绑定",
+                                description = "绑定后可用于找回账号和接收验证码"
+                            ) {
+                                ProfileEditorField(
+                                    label = "邮箱",
+                                    value = editor.pendingEmail,
+                                    onValueChange = { value -> onEditorChange { it.copy(pendingEmail = value) } }
+                                )
+                                ProfileEditorField(
+                                    label = "邮箱验证码",
+                                    value = editor.emailCode,
+                                    onValueChange = { value -> onEditorChange { it.copy(emailCode = value) } }
+                                )
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = onSendEmailCode,
+                                        enabled = !isSaving,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(46.dp),
+                                        shape = RoundedCornerShape(18.dp),
+                                        border = BorderStroke(1.dp, UiPalette.BorderSoft),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            containerColor = UiPalette.Surface,
+                                            contentColor = UiPalette.Accent
+                                        )
+                                    ) {
+                                        Text("发送验证码", fontWeight = FontWeight.Bold)
+                                    }
+                                    Button(
+                                        onClick = onBindEmail,
+                                        enabled = !isSaving,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(46.dp),
+                                        shape = RoundedCornerShape(18.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = UiPalette.Accent,
+                                            contentColor = UiPalette.AccentText
+                                        )
+                                    ) {
+                                        Text(if (isSaving) "绑定中..." else "确认绑定", fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        } else {
+                            AccountEditSectionCard(
+                                title = "邮箱绑定",
+                                description = "当前账号邮箱已绑定，可按需解绑后重新绑定"
+                            ) {
+                                ReadonlyBindingField(
+                                    label = "邮箱",
+                                    value = editor.email,
+                                    actionText = if (isSaving) "解绑中..." else "解绑邮箱",
+                                    onAction = if (isSaving) null else onUnbindEmail
+                                )
+                            }
+                        }
+
+                        AccountEditSectionCard(
+                            title = "修改密码",
+                            description = "只在修改密码时填写原密码；不改密码就留空。"
+                        ) {
+                            ProfileEditorField(
+                                label = "原密码",
+                                value = editor.currentPassword,
+                                onValueChange = { value -> onEditorChange { it.copy(currentPassword = value) } },
+                                password = true
+                            )
+                            ProfileEditorField(
+                                label = "新密码",
+                                value = editor.newPassword,
+                                onValueChange = { value -> onEditorChange { it.copy(newPassword = value) } },
+                                password = true
+                            )
+                            ProfileEditorField(
+                                label = "确认新密码",
+                                value = editor.confirmPassword,
+                                onValueChange = { value -> onEditorChange { it.copy(confirmPassword = value) } },
+                                password = true
+                            )
+                        }
                         Button(
                             onClick = onSave,
                             enabled = !isSaving,
+                            modifier = Modifier.padding(top = 4.dp),
                             shape = RoundedCornerShape(18.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = UiPalette.Accent,
@@ -1500,6 +1527,45 @@ internal fun LegacyAccountProfilePaneV2(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AccountEditSectionCard(
+    title: String,
+    description: String = "",
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.92f)),
+        shape = RoundedCornerShape(22.dp),
+        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.8f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Ink
+                )
+                description
+                    .takeIf { it.isNotBlank() }
+                    ?.let { summary ->
+                        Text(
+                            text = summary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = UiPalette.TextSecondary
+                        )
+                    }
+            }
+            content()
         }
     }
 }
@@ -1652,9 +1718,9 @@ internal fun LegacyReadonlyBindingField(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
-        border = BorderStroke(1.dp, UiPalette.Border)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.78f))
     ) {
         Column(
             modifier = Modifier
@@ -1662,27 +1728,42 @@ internal fun LegacyReadonlyBindingField(
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(label, color = UiPalette.TextSecondary, style = MaterialTheme.typography.labelLarge)
-            Text(value, color = UiPalette.Ink, style = MaterialTheme.typography.bodyLarge)
-            if (!actionText.isNullOrBlank()) {
-                TextButton(
-                    onClick = { onAction?.invoke() },
-                    enabled = onAction != null,
-                    modifier = Modifier.align(Alignment.End),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = UiPalette.Accent
-                    )
-                ) {
-                    Text(
-                        text = actionText,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(label, color = UiPalette.TextSecondary, style = MaterialTheme.typography.labelLarge)
+                if (!actionText.isNullOrBlank()) {
+                    OutlinedButton(
+                        onClick = { onAction?.invoke() },
+                        enabled = onAction != null,
+                        shape = RoundedCornerShape(999.dp),
+                        border = BorderStroke(1.dp, UiPalette.Accent.copy(alpha = 0.22f)),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = UiPalette.Accent.copy(alpha = 0.06f),
+                            contentColor = UiPalette.Accent
+                        )
+                    ) {
+                        Text(
+                            text = actionText,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
+            Text(value, color = UiPalette.Ink, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            if (!actionText.isNullOrBlank()) {
+                Text(
+                    text = "解绑后可重新绑定新的邮箱地址",
+                    color = UiPalette.TextMuted,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         }
-    }    
+    }
 }
 
 @Composable
