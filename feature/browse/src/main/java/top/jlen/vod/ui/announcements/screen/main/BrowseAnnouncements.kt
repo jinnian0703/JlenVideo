@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -140,9 +141,10 @@ fun AnnouncementListScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
+            .statusBarsPadding()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
+        contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
     ) {
         item {
             Row(
@@ -209,9 +211,10 @@ fun AnnouncementDetailScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
+                    .statusBarsPadding()
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
+                contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
             ) {
                 item {
                     Row(
@@ -240,9 +243,10 @@ fun AnnouncementDetailScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
+                    .statusBarsPadding()
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
+                contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
             ) {
                 item {
                     Row(
