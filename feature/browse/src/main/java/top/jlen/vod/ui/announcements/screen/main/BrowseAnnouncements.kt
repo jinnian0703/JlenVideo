@@ -141,6 +141,7 @@ fun AnnouncementListScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
+            .background(UiPalette.BackgroundBottom)
             .statusBarsPadding()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -213,6 +214,7 @@ fun AnnouncementDetailScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
+                    .background(UiPalette.BackgroundBottom)
                     .statusBarsPadding()
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -245,6 +247,7 @@ fun AnnouncementDetailScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
+                    .background(UiPalette.BackgroundBottom)
                     .statusBarsPadding()
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
