@@ -13,6 +13,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -647,86 +648,131 @@ internal fun LegacyAboutPane(
     onOpenRelease: () -> Unit,
     onDownloadUpdate: () -> Unit
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, UiPalette.Border)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(1.dp, UiPalette.Border)
         ) {
-            Text(
-                text = "关于",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.ExtraBold,
-                color = UiPalette.Ink
-            )
-            Text(
-                text = buildString {
-                    append("当前版本：")
-                    append(currentVersion)
-                    if (latestVersion.isNotBlank()) {
-                        append("  ·  最新版本：")
-                        append(latestVersion)
-                    }
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = UiPalette.TextSecondary
-            )
-            Text(
-                text = when {
-                    isUpdateLoading -> "检查中"
-                    hasUpdate -> "发现新版本"
-                    latestVersion.isNotBlank() -> "已是最新版本"
-                    else -> "检查更新"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = UiPalette.Ink
-            )
-            if (notes.isNotBlank()) {
-                Text(
-                    text = notes,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = UiPalette.TextSecondary,
-                    maxLines = 8,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                OutlinedButton(
-                    onClick = onCheckUpdate,
-                    enabled = !isUpdateLoading,
-                    modifier = Modifier.weight(1f),
-                    border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                Text(
+                    text = "关于",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Ink
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(UiPalette.SurfaceSoft)
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
                 ) {
-                    Text(if (isUpdateLoading) "检查中..." else "检查更新")
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "版本信息",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = UiPalette.TextSecondary
+                        )
+                        Text(
+                            text = buildString {
+                                append("当前版本：")
+                                append(currentVersion)
+                                if (latestVersion.isNotBlank()) {
+                                    append("\n最新版本：")
+                                    append(latestVersion)
+                                }
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = UiPalette.Ink
+                        )
+                        Text(
+                            text = when {
+                                isUpdateLoading -> "正在检查更新"
+                                hasUpdate -> "发现新版本，可直接前往下载"
+                                latestVersion.isNotBlank() -> "当前已经是最新版本"
+                                else -> "可手动检查 GitHub Releases"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = UiPalette.TextSecondary
+                        )
+                    }
                 }
-                Button(
-                    onClick = if (hasUpdate) onDownloadUpdate else onOpenRelease,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = UiPalette.Accent,
-                        contentColor = UiPalette.AccentText
-                    )
+                if (notes.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(UiPalette.SurfaceSoft)
+                            .padding(horizontal = 14.dp, vertical = 12.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "更新说明",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = UiPalette.TextSecondary
+                            )
+                            Text(
+                                text = notes,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = UiPalette.Ink,
+                                maxLines = 8,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(if (hasUpdate) "前往下载" else "查看发布")
+                    OutlinedButton(
+                        onClick = onCheckUpdate,
+                        enabled = !isUpdateLoading,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
+                        border = BorderStroke(1.dp, UiPalette.BorderSoft),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text(if (isUpdateLoading) "检查中..." else "检查更新")
+                    }
+                    Button(
+                        onClick = if (hasUpdate) onDownloadUpdate else onOpenRelease,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = UiPalette.Accent,
+                            contentColor = UiPalette.AccentText
+                        )
+                    ) {
+                        Text(if (hasUpdate) "前往下载" else "查看发布")
+                    }
                 }
             }
-            if (hasCrashLog) {
-                CrashLogCard(
-                    logText = crashLogText,
-                    onRefresh = onRefreshCrashLog,
-                    onClear = onClearCrashLog
-                )
-            } else {
+        }
+        if (hasCrashLog) {
+            CrashLogCard(
+                logText = crashLogText,
+                onRefresh = onRefreshCrashLog,
+                onClear = onClearCrashLog
+            )
+        } else {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                shape = RoundedCornerShape(22.dp),
+                border = BorderStroke(1.dp, UiPalette.Border)
+            ) {
                 Text(
                     text = "暂无崩溃日志",
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = UiPalette.TextSecondary
                 )
@@ -744,9 +790,9 @@ internal fun LegacyCrashLogCard(
     val context = LocalContext.current
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, UiPalette.BorderSoft)
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        shape = RoundedCornerShape(22.dp),
+        border = BorderStroke(1.dp, UiPalette.Border)
     ) {
         Column(
             modifier = Modifier
@@ -770,8 +816,11 @@ internal fun LegacyCrashLogCard(
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(
                     onClick = onRefresh,
-                    modifier = Modifier.weight(1f),
-                    border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(42.dp),
+                    border = BorderStroke(1.dp, UiPalette.BorderSoft),
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Text("刷新日志")
                 }
@@ -782,16 +831,22 @@ internal fun LegacyCrashLogCard(
                         Toast.makeText(context, "崩溃日志已复制", Toast.LENGTH_SHORT).show()
                     },
                     enabled = logText.isNotBlank(),
-                    modifier = Modifier.weight(1f),
-                    border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(42.dp),
+                    border = BorderStroke(1.dp, UiPalette.BorderSoft),
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Text("复制日志")
                 }
                 OutlinedButton(
                     onClick = onClear,
                     enabled = logText.isNotBlank(),
-                    modifier = Modifier.weight(1f),
-                    border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(42.dp),
+                    border = BorderStroke(1.dp, UiPalette.BorderSoft),
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Text("清空日志")
                 }
@@ -1460,7 +1515,11 @@ internal fun LegacyAccountProfilePane(
 ) {
     when {
         isLoading -> LoadingPane("资料加载中...")
-        fields.isEmpty() -> EmptyPane("暂无资料")
+        fields.isEmpty() -> EmptyPane(
+            message = "暂无资料",
+            description = "当前账号资料还没有可展示的信息",
+            style = FeedbackPaneStyle.Card
+        )
         else -> Card(
             colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
             shape = RoundedCornerShape(24.dp),
@@ -1578,8 +1637,8 @@ internal fun LegacyProfileEditorField(
             focusedTextColor = UiPalette.Ink,
             unfocusedTextColor = UiPalette.Ink,
             cursorColor = UiPalette.Accent,
-            focusedContainerColor = UiPalette.Surface,
-            unfocusedContainerColor = UiPalette.Surface
+            focusedContainerColor = UiPalette.SurfaceSoft,
+            unfocusedContainerColor = UiPalette.SurfaceSoft
         )
     )
 }
@@ -1594,8 +1653,8 @@ internal fun LegacyReadonlyBindingField(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        border = BorderStroke(1.dp, UiPalette.BorderSoft)
+        colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
+        border = BorderStroke(1.dp, UiPalette.Border)
     ) {
         Column(
             modifier = Modifier
@@ -1610,7 +1669,7 @@ internal fun LegacyReadonlyBindingField(
                     onClick = { onAction?.invoke() },
                     enabled = onAction != null,
                     modifier = Modifier.align(Alignment.End),
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = UiPalette.Accent
                     )
@@ -1640,13 +1699,17 @@ internal fun LegacyAccountRecordPane(
     onClearAll: () -> Unit
 ) {
     when {
-        isLoading && items.isEmpty() -> LoadingPane("$title 加载中...")
-        items.isEmpty() -> EmptyPane(emptyMessage)
+        isLoading && items.isEmpty() -> LoadingPane("$title 加载中...", style = FeedbackPaneStyle.Card)
+        items.isEmpty() -> EmptyPane(
+            message = emptyMessage,
+            description = "这里会展示你最近关注和操作过的内容",
+            style = FeedbackPaneStyle.Card
+        )
         else -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
                 shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, UiPalette.Border)
+                border = BorderStroke(1.dp, UiPalette.BorderSoft)
             ) {
                 Row(
                     modifier = Modifier
@@ -1655,7 +1718,8 @@ internal fun LegacyAccountRecordPane(
                             Brush.horizontalGradient(
                                 listOf(
                                     UiPalette.Surface,
-                                    UiPalette.AccentGlow.copy(alpha = 0.22f)
+                                    UiPalette.SurfaceStrong,
+                                    UiPalette.AccentGlow.copy(alpha = 0.18f)
                                 )
                             )
                         )
@@ -1710,7 +1774,7 @@ internal fun LegacyAccountRecordCard(
     Card(
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
         shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, UiPalette.Border)
+        border = BorderStroke(1.dp, UiPalette.BorderSoft)
     ) {
         Column(
             modifier = Modifier
@@ -1738,7 +1802,8 @@ internal fun LegacyAccountRecordCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(UiPalette.SurfaceStrong)
+                        .background(UiPalette.SurfaceSoft)
+                        .border(BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.7f)), RoundedCornerShape(16.dp))
                         .padding(horizontal = 12.dp, vertical = 10.dp)
                 ) {
                     Text(
@@ -1751,15 +1816,18 @@ internal fun LegacyAccountRecordCard(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(
+                Button(
                     onClick = { onPrimaryAction(item) },
                     enabled = !isActionLoading && (item.vodId.isNotBlank() || item.playUrl.isNotBlank()),
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp),
                     shape = RoundedCornerShape(18.dp),
-                    border = BorderStroke(1.dp, UiPalette.BorderSoft),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = UiPalette.SurfaceSoft,
-                        contentColor = UiPalette.Accent
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = UiPalette.Accent,
+                        contentColor = UiPalette.AccentText,
+                        disabledContainerColor = UiPalette.SurfaceStrong,
+                        disabledContentColor = UiPalette.TextMuted
                     )
                 ) {
                     Text(item.actionLabel.ifBlank { "查看详情" })
@@ -1767,7 +1835,9 @@ internal fun LegacyAccountRecordCard(
                 OutlinedButton(
                     onClick = { onDelete(item.recordId) },
                     enabled = item.recordId.isNotBlank() && !isActionLoading,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp),
                     shape = RoundedCornerShape(18.dp),
                     border = BorderStroke(1.dp, UiPalette.DangerBorder),
                     colors = ButtonDefaults.outlinedButtonColors(
@@ -1939,7 +2009,11 @@ internal fun LegacyMembershipPaneV2(
             }
 
             if (plans.isEmpty()) {
-                EmptyPane("暂无套餐")
+                EmptyPane(
+                    message = "暂无套餐",
+                    description = "当前没有可展示的会员方案",
+                    style = FeedbackPaneStyle.Card
+                )
             } else {
                 plans.forEach { plan ->
                     Card(
@@ -2032,7 +2106,13 @@ fun AccountPointLogScreen(
         }
 
         if (pointLogs.isEmpty()) {
-            item { EmptyPane("暂无积分日志") }
+            item {
+                EmptyPane(
+                    message = "暂无积分日志",
+                    description = "签到、升级和积分变动记录会显示在这里",
+                    style = FeedbackPaneStyle.Card
+                )
+            }
         } else {
             items(pointLogs, key = { it.logId.ifBlank { it.time + it.typeText } }) { log ->
                 Card(
@@ -2139,7 +2219,11 @@ internal fun LegacyMembershipPane(
             }
 
             if (plans.isEmpty()) {
-                EmptyPane("暂无套餐")
+                EmptyPane(
+                    message = "暂无套餐",
+                    description = "当前没有可展示的会员方案",
+                    style = FeedbackPaneStyle.Card
+                )
             } else {
                 plans.forEach { plan ->
                     Card(

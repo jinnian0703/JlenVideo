@@ -176,7 +176,9 @@ fun AnnouncementListScreen(
             item { ErrorBanner(message = state.error.orEmpty(), onRetry = onRefresh) }
         }
         when {
-            state.isLoading && state.notices.isEmpty() -> item { LoadingPane("公告加载中...") }
+            state.isLoading && state.notices.isEmpty() -> item {
+                LoadingPane("公告加载中...", style = FeedbackPaneStyle.Card)
+            }
             state.notices.isEmpty() -> item {
                 InlineEmptyStateCard(
                     message = "暂无公告",

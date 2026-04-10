@@ -317,10 +317,17 @@ private fun SearchLandingContent(
         }
         item {
             when {
-                state.isHotSearchLoading && state.hotSearchGroups.isEmpty() -> LoadingPane("热搜加载中...")
+                state.isHotSearchLoading && state.hotSearchGroups.isEmpty() ->
+                    LoadingPane("热搜加载中...", style = FeedbackPaneStyle.Card)
                 !state.hotSearchError.isNullOrBlank() && state.hotSearchGroups.isEmpty() ->
                     ErrorBanner(message = state.hotSearchError.orEmpty(), onRetry = onLoadHotSearches)
-                state.hotSearchGroups.isEmpty() -> EmptyPane("暂无热搜")
+                state.hotSearchGroups.isEmpty() -> EmptyPane(
+                    message = "暂无热搜",
+                    description = "稍后刷新看看，或者直接搜索想看的影片",
+                    actionLabel = "刷新",
+                    onAction = onLoadHotSearches,
+                    style = FeedbackPaneStyle.Card
+                )
                 else -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     state.hotSearchGroups.forEach { group ->
                         HotSearchBoard(
@@ -424,7 +431,7 @@ fun SearchResultsScreen(
             )
         }
         when {
-            state.isLoading -> item { LoadingPane("搜索中...") }
+            state.isLoading -> item { LoadingPane("搜索中...", style = FeedbackPaneStyle.Card) }
             !state.error.isNullOrBlank() && state.submittedQuery.isBlank() && state.results.isEmpty() ->
                 item { SearchEmptyState(query = "", message = state.error.orEmpty()) }
             !state.error.isNullOrBlank() && state.results.isEmpty() ->
@@ -466,51 +473,12 @@ private fun SearchEmptyState(
         query.isBlank() -> "也可以试试主角、导演或别名"
         else -> "换个关键词再试试，片名、主角和别名都可以"
     }
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.72f)),
-        shape = RoundedCornerShape(28.dp),
-        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.7f))
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 22.dp, vertical = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(UiPalette.AccentSoft.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Search,
-                    contentDescription = null,
-                    tint = UiPalette.Accent,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = UiPalette.Ink
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = UiPalette.TextMuted
-                )
-            }
-        }
-    }
+    EmptyPane(
+        message = title,
+        description = description,
+        icon = Icons.Rounded.Search,
+        style = FeedbackPaneStyle.Card
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -524,14 +492,14 @@ private fun SearchInputCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.78f))
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 4.dp),
+                    .padding(horizontal = 12.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
@@ -545,7 +513,7 @@ private fun SearchInputCard(
                     onValueChange = onQueryChange,
                     modifier = Modifier.weight(1f),
                     singleLine = true,
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color.Transparent,
                         unfocusedBorderColor = Color.Transparent,
@@ -588,7 +556,7 @@ private fun SearchInputCard(
                 )
             }
             if (suggestions.isNotEmpty()) {
-                val visibleSuggestions = suggestions.take(5)
+                val visibleSuggestions = suggestions.take(4)
                 Spacer(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -598,8 +566,8 @@ private fun SearchInputCard(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(1.dp)
                 ) {
                     visibleSuggestions.forEachIndexed { index, suggestion ->
                         SearchSuggestionRow(
@@ -631,14 +599,14 @@ private fun SearchSuggestionRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 6.dp),
+            .padding(horizontal = 6.dp, vertical = 5.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(28.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .size(24.dp)
+                .clip(RoundedCornerShape(8.dp))
                 .background(UiPalette.SurfaceSoft),
             contentAlignment = Alignment.Center
         ) {
@@ -646,16 +614,16 @@ private fun SearchSuggestionRow(
                 imageVector = Icons.Rounded.Search,
                 contentDescription = null,
                 tint = UiPalette.TextMuted,
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(12.dp)
             )
         }
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            verticalArrangement = Arrangement.spacedBy(1.dp)
         ) {
             Text(
                 text = buildSuggestionAnnotatedTitle(item),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Bold,
                 color = UiPalette.Ink,
                 maxLines = 1,
@@ -666,7 +634,7 @@ private fun SearchSuggestionRow(
                 ?.let { meta ->
                     Text(
                         text = meta,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelSmall,
                         color = UiPalette.TextSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -677,7 +645,7 @@ private fun SearchSuggestionRow(
             imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
             contentDescription = null,
             tint = UiPalette.TextMuted,
-            modifier = Modifier.size(14.dp)
+            modifier = Modifier.size(12.dp)
         )
     }
 }

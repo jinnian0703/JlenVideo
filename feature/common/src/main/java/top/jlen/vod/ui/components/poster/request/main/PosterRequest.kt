@@ -14,11 +14,12 @@ import coil.size.Scale
 fun rememberPosterRequest(
     data: String?,
     width: Int,
-    height: Int
+    height: Int,
+    retryToken: Int = 0
 ): ImageRequest {
     val context = LocalContext.current
-    return remember(context, data, width, height) {
-        buildPosterRequest(context, data, width, height)
+    return remember(context, data, width, height, retryToken) {
+        buildPosterRequest(context, data, width, height, retryToken)
     }
 }
 
@@ -26,7 +27,8 @@ fun buildPosterRequest(
     context: Context,
     data: String?,
     width: Int,
-    height: Int
+    height: Int,
+    retryToken: Int = 0
 ): ImageRequest = ImageRequest.Builder(context)
     .data(data.orEmpty())
     .size(width, height)
@@ -39,5 +41,5 @@ fun buildPosterRequest(
     .allowHardware(true)
     .crossfade(false)
     .diskCacheKey(data.orEmpty())
-    .memoryCacheKey("${data.orEmpty()}@$width@$height")
+    .memoryCacheKey("${data.orEmpty()}@$width@$height#$retryToken")
     .build()

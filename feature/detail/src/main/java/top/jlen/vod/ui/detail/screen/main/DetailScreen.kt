@@ -95,7 +95,10 @@ fun DetailScreen(
     when {
         state.isLoading -> LoadingPane("正在加载详情...")
         !errorMessage.isNullOrBlank() -> ErrorBanner(message = errorMessage, onRetry = onBack, actionLabel = "返回")
-        detailItem == null -> EmptyPane("没有找到影片详情")
+        detailItem == null -> EmptyPane(
+            message = "没有找到影片详情",
+            description = "这条资源可能已下架，或者当前站点未返回详情数据"
+        )
         else -> {
             val item = detailItem
             val source = state.selectedSource
@@ -136,7 +139,7 @@ fun DetailScreen(
                             ?.takeIf { it >= 0 }
                             ?.coerceAtMost((source?.episodes?.lastIndex ?: 0).coerceAtLeast(0))
                             ?: 0
-                        val primaryActionLabel = if (pendingResume != null) "缁х画瑙傜湅" else "绔嬪嵆鎾斁"
+                        val primaryActionLabel = if (pendingResume != null) "继续观看" else "立即播放"
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Button(
                                 onClick = {
@@ -145,16 +148,18 @@ fun DetailScreen(
                                     }
                                 },
                                 enabled = source != null,
+                                modifier = Modifier.height(52.dp),
                                 shape = RoundedCornerShape(20.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = UiPalette.Accent,
                                     contentColor = UiPalette.AccentText
                                 )
                             ) {
-                                Text("立即播放", fontWeight = FontWeight.ExtraBold)
+                                Text(primaryActionLabel, fontWeight = FontWeight.ExtraBold)
                             }
                             OutlinedButton(
                                 onClick = onBack,
+                                modifier = Modifier.height(52.dp),
                                 shape = RoundedCornerShape(20.dp),
                                 border = BorderStroke(1.dp, UiPalette.BorderSoft),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = UiPalette.Ink)
@@ -164,6 +169,7 @@ fun DetailScreen(
                             OutlinedButton(
                                 onClick = onFavorite,
                                 enabled = !state.isActionLoading,
+                                modifier = Modifier.height(52.dp),
                                 shape = RoundedCornerShape(20.dp),
                                 border = BorderStroke(
                                     1.dp,

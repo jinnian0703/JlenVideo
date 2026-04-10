@@ -137,6 +137,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLogin() {
             }
         }.onSuccess { session ->
             updateAccountState(loggedInAccountState(currentAccountState(), session))
+            updateFollowState(FollowUiState(isLoggedIn = true))
             selectAccountSection(AccountSection.Profile, forceRefresh = true)
         }.onFailure { error ->
             updateAccountState(
@@ -157,6 +158,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLogout() {
             withContext(Dispatchers.IO) { legacyRepository().logoutForApp() }
         }.onSuccess {
             updateAccountState(loggedOutAccountState(currentAccountState()))
+            updateFollowState(FollowUiState(isLoggedIn = false))
             refreshNotices(forceRefresh = true)
         }.onFailure { error ->
             if (runtimeHandleAccountSessionExpired(error)) return@onFailure

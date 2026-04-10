@@ -95,90 +95,14 @@ private fun DetailPosterImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop
 ) {
-    SubcomposeAsyncImage(
-        model = rememberPosterRequest(
-            data = data,
-            width = width,
-            height = height
-        ),
-        contentDescription = title,
+    RetryablePosterImage(
+        data = data,
+        title = title,
+        width = width,
+        height = height,
         modifier = modifier,
         contentScale = contentScale
-    ) {
-        when (painter.state) {
-            is AsyncImagePainter.State.Loading -> {
-                DetailPosterSkeletonPlaceholder(title = title)
-            }
-
-            is AsyncImagePainter.State.Error,
-            is AsyncImagePainter.State.Empty -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(UiPalette.SurfaceStrong)
-                        .padding(12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = title.ifBlank { "暂无海报" },
-                        color = UiPalette.Ink,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 4,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            else -> Image(
-                painter = painter,
-                contentDescription = title,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = contentScale
-            )
-        }
-    }
-}
-
-@Composable
-private fun DetailPosterSkeletonPlaceholder(title: String) {
-    val shimmer = rememberInfiniteTransition(label = "detailPosterSkeleton")
-    val shift by shimmer.animateFloat(
-        initialValue = -1f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1150, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "detailPosterSkeletonShift"
     )
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        UiPalette.SurfaceStrong,
-                        UiPalette.SurfaceSoft,
-                        UiPalette.SurfaceStrong
-                    ),
-                    start = androidx.compose.ui.geometry.Offset.Zero,
-                    end = androidx.compose.ui.geometry.Offset(620f * (shift + 1.2f), 620f * (shift + 1.2f))
-                )
-            )
-            .padding(12.dp),
-        contentAlignment = Alignment.BottomStart
-    ) {
-        Text(
-            text = title.ifBlank { "加载中" },
-            color = UiPalette.TextMuted,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
 }
 
 

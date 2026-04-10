@@ -19,6 +19,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyDeleteFavorite(recordId: Stri
         onSuccess = {
             val removedItem = currentAccountState().favoriteItems.firstOrNull { item -> item.recordId == recordId }
             updateAccountState(accountStateRemovingFavorite(currentAccountState(), recordId))
+            legacyRebuildFollowContent()
             if (removedItem?.vodId == currentDetailState().item?.vodId) {
                 updateDetailState(detailStateWithoutFavorite(currentDetailState()))
             }
@@ -33,6 +34,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyClearFavorites() {
         successMessage = "已清空收藏",
         onSuccess = {
             updateAccountState(accountStateClearingFavorites(currentAccountState()))
+            legacyRebuildFollowContent()
             if (currentDetailState().item != null) {
                 updateDetailState(detailStateWithoutFavorite(currentDetailState()))
             }
@@ -48,6 +50,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyDeleteHistory(recordId: Strin
         successMessage = "已删除播放记录",
         onSuccess = {
             updateAccountState(accountStateRemovingHistory(currentAccountState(), recordId))
+            legacyRebuildFollowContent()
             selectAccountSection(AccountSection.History, forceRefresh = true)
         }
     )
@@ -59,6 +62,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyClearHistory() {
         successMessage = "已清空播放记录",
         onSuccess = {
             updateAccountState(accountStateClearingHistory(currentAccountState()))
+            legacyRebuildFollowContent()
             selectAccountSection(AccountSection.History, forceRefresh = true)
         }
     )

@@ -155,7 +155,7 @@ internal fun HomeTopBlock(
         ) {
             Column {
                 Text(
-                    text = "Featured Library",
+                    text = "精选片库",
                     style = MaterialTheme.typography.labelLarge,
                     color = UiPalette.TextSecondary
                 )
@@ -424,90 +424,14 @@ private fun PosterImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop
 ) {
-    SubcomposeAsyncImage(
-        model = rememberPosterRequest(
-            data = data,
-            width = width,
-            height = height
-        ),
-        contentDescription = title,
+    RetryablePosterImage(
+        data = data,
+        title = title,
+        width = width,
+        height = height,
         modifier = modifier,
-        contentScale = contentScale,
-    ) {
-        when (painter.state) {
-            is AsyncImagePainter.State.Loading -> {
-                PosterSkeletonPlaceholder(title = title)
-            }
-
-            is AsyncImagePainter.State.Error,
-            is AsyncImagePainter.State.Empty -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(UiPalette.SurfaceStrong)
-                        .padding(12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = title.ifBlank { "暂无海报" },
-                        color = UiPalette.Ink,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 4,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            else -> Image(
-                painter = painter,
-                contentDescription = title,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = contentScale
-            )
-        }
-    }
-}
-
-@Composable
-private fun PosterSkeletonPlaceholder(title: String) {
-    val shimmer = rememberInfiniteTransition(label = "posterSkeleton")
-    val shift by shimmer.animateFloat(
-        initialValue = -1f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1150, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "posterSkeletonShift"
+        contentScale = contentScale
     )
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        UiPalette.SurfaceStrong,
-                        UiPalette.SurfaceSoft,
-                        UiPalette.SurfaceStrong
-                    ),
-                    start = androidx.compose.ui.geometry.Offset.Zero,
-                    end = androidx.compose.ui.geometry.Offset(620f * (shift + 1.2f), 620f * (shift + 1.2f))
-                )
-            )
-            .padding(12.dp),
-        contentAlignment = Alignment.BottomStart
-    ) {
-        Text(
-            text = title.ifBlank { "加载中" },
-            color = UiPalette.TextMuted,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
 }
 
 
@@ -759,57 +683,12 @@ internal fun InlineEmptyStateCard(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.96f)),
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.78f))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(UiPalette.AccentSoft.copy(alpha = 0.22f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Info,
-                        contentDescription = null,
-                        tint = UiPalette.Accent,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = UiPalette.Ink
-                )
-            }
-            if (!actionLabel.isNullOrBlank() && onAction != null) {
-                TextButton(
-                    onClick = onAction,
-                    colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(actionLabel, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
+    EmptyPane(
+        message = message,
+        actionLabel = actionLabel,
+        onAction = onAction,
+        style = FeedbackPaneStyle.Card
+    )
 }
 
 @Composable
@@ -1330,18 +1209,23 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                 it != item.subtitle &&
                 it != item.badgeText
         }
+    val compactMeta = item.subtitle.ifBlank { "站内资源" }
+    val scoreLabel = item.cleanScore
+        .takeUnless { it == "暂无评分" }
+        ?.let { "评分 $it" }
+        ?: item.badgeText.ifBlank { "查看详情" }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick(item.vodId) },
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.96f)),
-        shape = RoundedCornerShape(26.dp),
+        shape = RoundedCornerShape(24.dp),
         border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.78f))
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             PosterImage(
                 data = item.vodPic,
@@ -1349,41 +1233,66 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                 width = 312,
                 height = 414,
                 modifier = Modifier
-                    .size(width = 104.dp, height = 138.dp)
-                    .clip(RoundedCornerShape(16.dp)),
+                    .size(width = 94.dp, height = 128.dp)
+                    .clip(RoundedCornerShape(14.dp)),
                 contentScale = ContentScale.Crop
             )
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Text(
                     text = item.displayTitle,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.ExtraBold,
                     color = UiPalette.Ink,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(UiPalette.SurfaceSoft)
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Text(
-                        text = item.subtitle.ifBlank { "站内资源" },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = UiPalette.TextSecondary
-                    )
-                }
+                Text(
+                    text = compactMeta,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = UiPalette.TextSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
                 detailDescription?.let {
-                    Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = it,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = UiPalette.TextMuted,
-                        maxLines = 4,
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(UiPalette.SurfaceSoft)
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            text = scoreLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = UiPalette.TextSecondary
+                        )
+                    }
+                    TextButton(
+                        onClick = { onClick(item.vodId) },
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
+                    ) {
+                        Text(
+                            text = "查看详情",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }

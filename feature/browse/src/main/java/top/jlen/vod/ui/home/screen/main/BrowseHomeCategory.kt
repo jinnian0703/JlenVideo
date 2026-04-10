@@ -447,7 +447,7 @@ fun CategoryScreen(
                     onRetry = onRetryCategory
                 )
             } ?: when {
-                state.isCategoryLoading -> LoadingPane("分类加载中...")
+                state.isCategoryLoading -> LoadingPane("分类加载中...", style = FeedbackPaneStyle.Card)
                 state.categoryVideos.isEmpty() -> InlineEmptyStateCard("暂无内容")
                 else -> Spacer(modifier = Modifier.height(0.dp))
             }

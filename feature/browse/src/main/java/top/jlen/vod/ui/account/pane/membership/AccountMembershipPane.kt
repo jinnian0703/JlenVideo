@@ -104,7 +104,11 @@ internal fun MembershipPaneV2(
         MembershipTrendCard(points = trendPoints)
 
         if (plans.isEmpty()) {
-            EmptyPane("暂无可升级套餐")
+            EmptyPane(
+                message = "暂无可升级套餐",
+                description = "当前站点暂未提供可购买的会员方案",
+                style = FeedbackPaneStyle.Card
+            )
         } else {
             plans.forEach { plan ->
                 MembershipPlanCard(
@@ -244,19 +248,27 @@ private fun MembershipSummaryRow(
     valueColor: Color = UiPalette.Ink,
     highlight: Boolean = false
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = UiPalette.TextSecondary
-        )
-        Text(
-            text = value,
-            modifier = Modifier.scale(if (highlight) 1.04f else 1f),
-            style = MaterialTheme.typography.bodyLarge,
-            color = valueColor,
-            fontWeight = FontWeight.SemiBold
-        )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(UiPalette.SurfaceSoft)
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = UiPalette.TextSecondary
+            )
+            Text(
+                text = value,
+                modifier = Modifier.scale(if (highlight) 1.04f else 1f),
+                style = MaterialTheme.typography.bodyLarge,
+                color = valueColor,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
     }
 }
 
@@ -331,6 +343,7 @@ private fun MembershipSignInCard(
                 Button(
                     onClick = onSignIn,
                     enabled = signInInfo.enabled && !isActionLoading,
+                    modifier = Modifier.height(42.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = UiPalette.Accent,
@@ -562,6 +575,7 @@ private fun MembershipPlanCard(
             Button(
                 onClick = { onUpgrade(plan) },
                 enabled = !isActionLoading,
+                modifier = Modifier.height(42.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = UiPalette.Accent,

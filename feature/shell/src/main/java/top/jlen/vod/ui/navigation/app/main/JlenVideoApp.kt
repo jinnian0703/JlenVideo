@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
@@ -82,11 +83,12 @@ import kotlinx.coroutines.delay
 import top.jlen.vod.data.AppNotice
 import top.jlen.vod.data.AppUpdateInfo
 
-private val topLevelRoutes = setOf("home", "categories", "search", "account")
+private val topLevelRoutes = setOf("home", "categories", "follow", "search", "account")
 
 private val bottomBarItems = listOf(
     Triple("home", "首页", Icons.Rounded.Home),
     Triple("categories", "片库", Icons.Rounded.Category),
+    Triple("follow", "追剧", Icons.Rounded.Bookmark),
     Triple("search", "搜索", Icons.Rounded.Search),
     Triple("account", "我的", Icons.Rounded.Person)
 )
@@ -305,6 +307,25 @@ fun JlenVideoApp() {
                                 onLoadHotSearches = viewModel::refreshHotSearches
                             )
                         }
+                        composable("follow") {
+                            LaunchedEffect(Unit) {
+                                viewModel.refreshFollowContent()
+                            }
+                            LaunchedEffect(
+                                viewModel.accountState.session.isLoggedIn,
+                                viewModel.accountState.favoriteItems,
+                                viewModel.accountState.historyItems
+                            ) {
+                                viewModel.rebuildFollowContent()
+                            }
+                            FollowScreen(
+                                state = viewModel.followState,
+                                onRefresh = { viewModel.refreshFollowContent(forceRefresh = true) },
+                                onOpenDetail = { navController.navigate("detail/$it") },
+                                onOpenAccount = { navigateToTopLevel("account") },
+                                onOpenLibrary = { navigateToTopLevel("categories") }
+                            )
+                        }
                         composable(
                             route = "search/results/{query}",
                             arguments = listOf(navArgument("query") { type = NavType.StringType })
@@ -500,6 +521,7 @@ private fun normalizeTopLevelRoute(route: String?): String? = when {
     route == null -> null
     route == "home" || route.startsWith("home/") -> "home"
     route == "categories" || route.startsWith("categories/") -> "categories"
+    route == "follow" || route.startsWith("follow/") -> "follow"
     route == "search" || route.startsWith("search/") -> "search"
     route == "account" || route.startsWith("account/") -> "account"
     else -> null

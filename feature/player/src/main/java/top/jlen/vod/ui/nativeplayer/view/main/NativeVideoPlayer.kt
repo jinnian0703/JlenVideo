@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -249,7 +250,8 @@ fun NativeVideoPlayer(
         gestureProgress = safeValue
         gestureFeedback = PlayerGestureFeedback(
             title = "亮度",
-            detail = "${(safeValue * 100).toInt()}%"
+            detail = "${(safeValue * 100).toInt()}%",
+            progress = safeValue
         )
     }
 
@@ -258,10 +260,12 @@ fun NativeVideoPlayer(
         val maxVolume = safeManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
         val target = (value.coerceIn(0f, 1f) * maxVolume).toInt().coerceIn(0, maxVolume)
         safeManager.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
-        gestureProgress = (target.toFloat() / maxVolume.toFloat()).coerceIn(0f, 1f)
+        val progress = (target.toFloat() / maxVolume.toFloat()).coerceIn(0f, 1f)
+        gestureProgress = progress
         gestureFeedback = PlayerGestureFeedback(
             title = "音量",
-            detail = "${((target.toFloat() / maxVolume) * 100).toInt()}%"
+            detail = "${((target.toFloat() / maxVolume) * 100).toInt()}%",
+            progress = progress
         )
     }
 
@@ -389,6 +393,7 @@ fun NativeVideoPlayer(
         onDispose {
             pendingSingleTapJob?.cancel()
             unlockHintAutoHideJob?.cancel()
+            dispatchSnapshot(force = true)
             player?.release()
         }
     }
@@ -776,7 +781,8 @@ fun NativeVideoPlayer(
                                         }
                                         gestureFeedback = PlayerGestureFeedback(
                                             title = formatMillis(preview),
-                                            detail = formatSignedDuration(preview - gestureStartPositionMs)
+                                            detail = formatSignedDuration(preview - gestureStartPositionMs),
+                                            progress = gestureProgress
                                         )
                                     }
 
@@ -848,38 +854,78 @@ fun NativeVideoPlayer(
                 Surface(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = if (fullscreenMode) 8.dp else 24.dp)
-                        .widthIn(min = 124.dp, max = 184.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color.Black.copy(alpha = 0.56f)
+                        .padding(top = if (fullscreenMode) 14.dp else 28.dp)
+                        .widthIn(min = 150.dp, max = 224.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color.Transparent
                 ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    Row(
+                        modifier = Modifier
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Black.copy(alpha = 0.62f),
+                                        Color.Black.copy(alpha = 0.48f)
+                                    )
+                                ),
+                                RoundedCornerShape(24.dp)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = Color.White.copy(alpha = 0.08f),
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = feedback.title,
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
-                        feedback.detail?.takeIf(String::isNotBlank)?.let { detail ->
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White.copy(alpha = 0.10f)),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
-                                text = detail,
-                                color = Color.White.copy(alpha = 0.88f),
-                                style = MaterialTheme.typography.bodySmall,
+                                text = feedbackBadge(feedback),
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.ExtraBold,
                                 textAlign = TextAlign.Center
                             )
                         }
-                        gestureProgress?.let { progress ->
-                            LinearProgressIndicator(
-                                progress = { progress.coerceIn(0f, 1f) },
-                                modifier = Modifier.fillMaxWidth(),
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Text(
+                                text = feedback.title,
                                 color = Color.White,
-                                trackColor = Color.White.copy(alpha = 0.18f)
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
+                            feedback.detail?.takeIf(String::isNotBlank)?.let { detail ->
+                                Text(
+                                    text = detail,
+                                    color = Color.White.copy(alpha = 0.78f),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            feedback.progress?.let { progress ->
+                                LinearProgressIndicator(
+                                    progress = { progress.coerceIn(0f, 1f) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(3.dp)
+                                        .clip(RoundedCornerShape(999.dp)),
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    trackColor = Color.White.copy(alpha = 0.16f)
+                                )
+                            }
                         }
                     }
                 }
@@ -1419,6 +1465,21 @@ private data class PlayerGestureFeedback(
     val detail: String? = null,
     val progress: Float? = null
 )
+
+private fun feedbackBadge(feedback: PlayerGestureFeedback): String {
+    val title = feedback.title
+    val detail = feedback.detail.orEmpty()
+    return when {
+        title == "亮度" -> "亮"
+        title == "音量" -> "音"
+        detail.contains("长按加速") -> "速"
+        detail.contains("已切换线路") -> "线"
+        detail.contains("已切换选集") -> "集"
+        detail.startsWith("+") || detail.startsWith("-") -> "拖"
+        title.contains("x") -> "速"
+        else -> "播"
+    }
+}
 
 private enum class PlayerGestureMode {
     None,

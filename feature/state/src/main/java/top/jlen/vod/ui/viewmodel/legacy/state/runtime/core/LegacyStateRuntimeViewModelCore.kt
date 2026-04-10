@@ -63,6 +63,9 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
     var accountState by mutableStateOf(AccountUiState())
         private set
 
+    var followState by mutableStateOf(FollowUiState())
+        private set
+
     internal fun legacyRepository(): AppleCmsRepository = repository
 
     internal fun currentAccountState(): AccountUiState = accountState
@@ -99,6 +102,12 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
 
     internal fun updatePlayerState(value: PlayerUiState) {
         playerState = value
+    }
+
+    internal fun currentFollowState(): FollowUiState = followState
+
+    internal fun updateFollowState(value: FollowUiState) {
+        followState = value
     }
 
     internal fun hasEnteredAccountScreenFlag(): Boolean = hasEnteredAccountScreen
@@ -383,6 +392,10 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
     }
 
     fun refreshPlayerSources() = legacyRefreshPlayerSources()
+
+    fun refreshFollowContent(forceRefresh: Boolean = false) = legacyRefreshFollowContent(forceRefresh)
+
+    fun rebuildFollowContent() = legacyRebuildFollowContent()
 
     fun selectSource(index: Int) = legacySelectSource(index)
 

@@ -102,20 +102,32 @@ fun PlayerScreen(
     var fullscreenTransitionLabel by remember {
         mutableStateOf("")
     }
-    var transitionFeedback by remember(state.title) { mutableStateOf<String?>(null) }
+    var transitionFeedback by remember(state.title) { mutableStateOf<PlayerTransitionFeedback?>(null) }
     var previousEpisodeName by remember(state.title) { mutableStateOf(state.episodeName) }
     var previousSourceName by remember(state.title) { mutableStateOf(state.sourceName) }
-    var previousSpeed by remember(state.title) { mutableStateOf(state.playbackSnapshot.speed) }
     var hasStartedFeedbackTracking by remember(state.title) { mutableStateOf(false) }
+    var latestSnapshot by remember(state.title, state.episodeName, state.sourceName) {
+        mutableStateOf(state.playbackSnapshot)
+    }
+
+    fun handleSnapshotChange(snapshot: PlaybackSnapshot) {
+        latestSnapshot = snapshot
+        onPlaybackSnapshotChange(snapshot)
+    }
 
     fun setFullscreen(fullscreen: Boolean, snapshot: PlaybackSnapshot? = null, isLandscapeVideo: Boolean? = null) {
-        snapshot?.let(onPlaybackSnapshotChange)
+        snapshot?.let(::handleSnapshotChange)
         detectedLandscapeVideo = isLandscapeVideo ?: detectedLandscapeVideo
         isFullscreen = fullscreen
     }
 
+    fun closePlayerScreen() {
+        handleSnapshotChange(latestSnapshot)
+        onBack()
+    }
+
     BackHandler(enabled = isFullscreen) {
-        isFullscreen = false
+        setFullscreen(false, latestSnapshot, detectedLandscapeVideo)
     }
 
     LaunchedEffect(isFullscreen, state.selectedEpisodeIndex, state.episodeName, state.sourceName) {
@@ -135,26 +147,30 @@ fun PlayerScreen(
         if (!hasStartedFeedbackTracking) {
             previousEpisodeName = state.episodeName
             previousSourceName = state.sourceName
-            previousSpeed = state.playbackSnapshot.speed
             hasStartedFeedbackTracking = true
             return@LaunchedEffect
         }
 
         val nextFeedback = when {
-            state.sourceName.isNotBlank() && state.sourceName != previousSourceName -> "线路：${state.sourceName}"
-            state.episodeName.isNotBlank() && state.episodeName != previousEpisodeName -> "已切换到 ${state.episodeName}"
-            kotlin.math.abs(state.playbackSnapshot.speed - previousSpeed) > 0.01f ->
-                String.format(java.util.Locale.US, "%.1fx", state.playbackSnapshot.speed)
+            state.sourceName.isNotBlank() && state.sourceName != previousSourceName -> PlayerTransitionFeedback(
+                badge = "线",
+                title = state.sourceName,
+                detail = "已切换线路"
+            )
+            state.episodeName.isNotBlank() && state.episodeName != previousEpisodeName -> PlayerTransitionFeedback(
+                badge = "集",
+                title = state.episodeName,
+                detail = "已切换选集"
+            )
             else -> null
         }
 
         previousEpisodeName = state.episodeName
         previousSourceName = state.sourceName
-        previousSpeed = state.playbackSnapshot.speed
 
         if (nextFeedback != null) {
             transitionFeedback = nextFeedback
-            delay(750)
+            delay(650)
             if (transitionFeedback == nextFeedback) {
                 transitionFeedback = null
             }
@@ -194,8 +210,8 @@ fun PlayerScreen(
                     window.attributes = attributes
                 }
                 controller.show(WindowInsetsCompat.Type.systemBars())
-                controller.isAppearanceLightStatusBars = true
-                controller.isAppearanceLightNavigationBars = true
+                controller.isAppearanceLightStatusBars = !isDarkTheme
+                controller.isAppearanceLightNavigationBars = !isDarkTheme
                 activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
             onDispose {
@@ -208,8 +224,8 @@ fun PlayerScreen(
                         window.attributes = attributes
                     }
                     controller.show(WindowInsetsCompat.Type.systemBars())
-                    controller.isAppearanceLightStatusBars = true
-                    controller.isAppearanceLightNavigationBars = true
+                    controller.isAppearanceLightStatusBars = !isDarkTheme
+                    controller.isAppearanceLightNavigationBars = !isDarkTheme
                     activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                 }
             }
@@ -237,14 +253,14 @@ fun PlayerScreen(
                 fullscreenMode = fullscreen,
                 onVideoOrientationDetected = { detectedLandscapeVideo = it },
                 initialSnapshot = state.playbackSnapshot,
-                onPlaybackSnapshotChanged = onPlaybackSnapshotChange,
+                onPlaybackSnapshotChanged = ::handleSnapshotChange,
                 onPlaybackEnded = {
                     if (state.hasNextEpisode) {
                         onPlayNext()
                     }
                 },
                 onClose = if (fullscreen) {
-                    { isFullscreen = false }
+                    { setFullscreen(false, latestSnapshot, detectedLandscapeVideo) }
                 } else {
                     null
                 }
@@ -271,7 +287,7 @@ fun PlayerScreen(
                 Column {
                     DetailTopBar(
                         title = state.title.ifBlank { "播放器" },
-                        onBack = onBack,
+                        onBack = ::closePlayerScreen,
                         darkMode = isDarkTheme
                     )
                     when {
@@ -281,7 +297,10 @@ fun PlayerScreen(
                         state.useWebPlayer && !isFullscreen -> ResolveUnavailableSurface()
                         directPlayable && !isFullscreen -> playerContent(false)
                         directPlayable -> Spacer(modifier = Modifier.height(0.dp))
-                        else -> EmptyPane("暂无可播放地址")
+                        else -> EmptyPane(
+                            message = "暂无可播放地址",
+                            description = "可以尝试切换线路，或者稍后再回来看看"
+                        )
                     }
                 }
             }
@@ -386,32 +405,66 @@ fun PlayerScreen(
 
         transitionFeedback?.let { feedback ->
             PlayerTransitionFeedbackChip(
-                text = feedback,
+                feedback = feedback,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = if (isFullscreen) 28.dp else 18.dp)
+                    .padding(top = if (isFullscreen) 30.dp else 18.dp)
             )
         }
     }
 }
 
 @Composable
-private fun PlayerTransitionFeedbackChip(text: String, modifier: Modifier = Modifier) {
+private fun PlayerTransitionFeedbackChip(feedback: PlayerTransitionFeedback, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.94f)),
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, UiPalette.Border)
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.92f)),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.82f))
     ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            style = MaterialTheme.typography.titleSmall,
-            color = UiPalette.Ink,
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(UiPalette.Accent.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = feedback.badge,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = UiPalette.Accent,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = feedback.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = UiPalette.Ink,
+                    fontWeight = FontWeight.Bold
+                )
+                feedback.detail?.takeIf(String::isNotBlank)?.let { detail ->
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = UiPalette.TextSecondary
+                    )
+                }
+            }
+        }
     }
 }
+
+private data class PlayerTransitionFeedback(
+    val badge: String,
+    val title: String,
+    val detail: String? = null
+)
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this

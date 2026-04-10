@@ -26,6 +26,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyAddCurrentDetailFavorite() {
         }.onSuccess { message ->
             val normalizedMessage = normalizeFavoriteActionMessage(message)
             updateDetailState(detailStateWithFavoriteSuccess(currentDetailState(), normalizedMessage))
+            legacyRefreshFollowContent(forceRefresh = true)
             if (currentAccountState().selectedSection == AccountSection.Favorites) {
                 selectAccountSection(AccountSection.Favorites, forceRefresh = true)
             }
@@ -66,6 +67,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyCancelCurrentDetailFavorite()
         onSuccess = {
             updateAccountState(accountStateRemovingFavoriteByVodId(currentAccountState(), favoriteVodId))
             updateDetailState(detailStateWithFavoriteRemoved(currentDetailState(), "已取消收藏"))
+            legacyRebuildFollowContent()
         }
     )
 }
