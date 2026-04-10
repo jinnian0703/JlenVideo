@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -30,12 +31,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
@@ -48,7 +51,10 @@ fun RetryablePosterImage(
     height: Int,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
-    retryLabel: String = "重试"
+    retryLabel: String = "重试",
+    showFallbackTitle: Boolean = true,
+    compactFallback: Boolean = false,
+    fallbackBottomInset: Dp = 0.dp
 ) {
     var retryToken by remember(data, title, width, height) { mutableIntStateOf(0) }
 
@@ -73,7 +79,10 @@ fun RetryablePosterImage(
                 PosterRetryFallback(
                     title = title,
                     retryLabel = retryLabel,
-                    onRetry = { retryToken += 1 }
+                    onRetry = { retryToken += 1 },
+                    showTitle = showFallbackTitle,
+                    compact = compactFallback,
+                    bottomInset = fallbackBottomInset
                 )
             }
 
@@ -91,7 +100,10 @@ fun RetryablePosterImage(
 private fun PosterRetryFallback(
     title: String,
     retryLabel: String,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    showTitle: Boolean,
+    compact: Boolean,
+    bottomInset: Dp
 ) {
     Box(
         modifier = Modifier
@@ -104,19 +116,24 @@ private fun PosterRetryFallback(
                     )
                 )
             )
-            .padding(12.dp),
+            .padding(
+                start = if (compact) 10.dp else 12.dp,
+                top = if (compact) 10.dp else 12.dp,
+                end = if (compact) 10.dp else 12.dp,
+                bottom = (if (compact) 10.dp else 12.dp) + bottomInset
+            ),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(if (compact) 38.dp else 42.dp)
                     .background(
                         color = UiPalette.Accent.copy(alpha = 0.12f),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(if (compact) 14.dp else 16.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -124,38 +141,49 @@ private fun PosterRetryFallback(
                     imageVector = Icons.Rounded.Refresh,
                     contentDescription = null,
                     tint = UiPalette.Accent,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(if (compact) 18.dp else 20.dp)
                 )
             }
-            Text(
-                text = title.ifBlank { "暂无海报" },
-                color = UiPalette.Ink,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis
-            )
+
+            if (showTitle) {
+                Text(
+                    text = title.ifBlank { "暂无海报" },
+                    color = UiPalette.Ink,
+                    style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    maxLines = if (compact) 2 else 4,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
             OutlinedButton(
                 onClick = onRetry,
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(if (compact) 14.dp else 16.dp),
                 border = BorderStroke(1.dp, UiPalette.BorderSoft),
                 colors = ButtonDefaults.outlinedButtonColors(
                     containerColor = Color.Transparent,
                     contentColor = UiPalette.Accent
-                )
+                ),
+                contentPadding = if (compact) {
+                    PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+                } else {
+                    ButtonDefaults.ContentPadding
+                }
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Refresh,
                     contentDescription = null,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(if (compact) 13.dp else 14.dp)
                 )
-                Text(
-                    text = retryLabel,
-                    modifier = Modifier.padding(start = 4.dp),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
+                if (!compact) {
+                    Text(
+                        text = retryLabel,
+                        modifier = Modifier.padding(start = 4.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
@@ -183,8 +211,8 @@ private fun PosterSkeletonPlaceholder(title: String) {
                         UiPalette.SurfaceSoft,
                         UiPalette.SurfaceStrong
                     ),
-                    start = androidx.compose.ui.geometry.Offset.Zero,
-                    end = androidx.compose.ui.geometry.Offset(620f * (shift + 1.2f), 620f * (shift + 1.2f))
+                    start = Offset.Zero,
+                    end = Offset(620f * (shift + 1.2f), 620f * (shift + 1.2f))
                 )
             )
             .padding(12.dp),

@@ -102,6 +102,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
@@ -422,7 +423,10 @@ private fun PosterImage(
     width: Int,
     height: Int,
     modifier: Modifier = Modifier,
-    contentScale: ContentScale = ContentScale.Crop
+    contentScale: ContentScale = ContentScale.Crop,
+    showFallbackTitle: Boolean = true,
+    compactFallback: Boolean = false,
+    fallbackBottomInset: Dp = 0.dp
 ) {
     RetryablePosterImage(
         data = data,
@@ -430,7 +434,10 @@ private fun PosterImage(
         width = width,
         height = height,
         modifier = modifier,
-        contentScale = contentScale
+        contentScale = contentScale,
+        showFallbackTitle = showFallbackTitle,
+        compactFallback = compactFallback,
+        fallbackBottomInset = fallbackBottomInset
     )
 }
 
@@ -786,7 +793,10 @@ private fun CompactPosterCard(
                     .fillMaxWidth()
                     .height(154.dp)
                     .clip(RoundedCornerShape(18.dp)),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                showFallbackTitle = false,
+                compactFallback = true,
+                fallbackBottomInset = 34.dp
             )
             if (badgeText.isNotBlank()) {
                 PosterBadgeText(
