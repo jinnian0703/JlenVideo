@@ -1434,12 +1434,15 @@ internal fun LegacyAccountProfilePaneV2(
                                 ProfileEditorField(
                                     label = "邮箱",
                                     value = editor.pendingEmail,
-                                    onValueChange = { value -> onEditorChange { it.copy(pendingEmail = value) } }
+                                    onValueChange = { value -> onEditorChange { it.copy(pendingEmail = value) } },
+                                    keyboardType = KeyboardType.Email,
+                                    imeAction = androidx.compose.ui.text.input.ImeAction.Next
                                 )
                                 ProfileEditorField(
                                     label = "邮箱验证码",
                                     value = editor.emailCode,
-                                    onValueChange = { value -> onEditorChange { it.copy(emailCode = value) } }
+                                    onValueChange = { value -> onEditorChange { it.copy(emailCode = value) } },
+                                    keyboardType = KeyboardType.Ascii
                                 )
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -1684,8 +1687,12 @@ internal fun LegacyProfileEditorField(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
-    password: Boolean = false
+    password: Boolean = false,
+    keyboardType: KeyboardType? = null,
+    imeAction: androidx.compose.ui.text.input.ImeAction = androidx.compose.ui.text.input.ImeAction.Done
 ) {
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val resolvedKeyboardType = keyboardType ?: if (password) KeyboardType.Password else KeyboardType.Text
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -1695,7 +1702,14 @@ internal fun LegacyProfileEditorField(
         label = { Text(label) },
         visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-            keyboardType = if (password) KeyboardType.Password else KeyboardType.Text
+            keyboardType = resolvedKeyboardType,
+            imeAction = imeAction,
+            capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.None,
+            autoCorrect = resolvedKeyboardType == KeyboardType.Text && !password
+        ),
+        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+            onNext = { focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Down) },
+            onDone = { focusManager.clearFocus() }
         ),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = UiPalette.Accent,
