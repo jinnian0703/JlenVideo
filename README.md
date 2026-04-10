@@ -30,8 +30,8 @@ JlenVideo 是一个基于 **Kotlin + Jetpack Compose + Media3** 开发的苹果 
 | --- | --- |
 | 项目名 | `JlenVideo` |
 | Application Id | `top.jlen.vod` |
-| 当前版本 | `2.1.1.0` |
-| 当前 versionCode | `26` |
+| 当前版本 | `2.1.1.3` |
+| 当前 versionCode | `29` |
 | minSdk | `24` |
 | targetSdk | `34` |
 | compileSdk | `34` |
@@ -120,7 +120,7 @@ feature/player/.../NativeVideoPlayer.kt
 
 ### APK 输出
 
-- [JlenVideo-2.1.1.0-debug.apk](/F:/codex/1/app/build/outputs/apk/debug/JlenVideo-2.1.1.0-debug.apk)
+- [JlenVideo-2.1.1.3-debug.apk](/F:/codex/1/app/build/outputs/apk/debug/JlenVideo-2.1.1.3-debug.apk)
 
 ---
 
@@ -366,7 +366,7 @@ runtime 内部的核心正文。
 ## 11. 当前工程约定
 
 - 默认站点配置在 [gradle.properties](/F:/codex/1/gradle.properties)
-- 当前版本为 `2.1.1.0 (26)`
+- 当前版本为 `2.1.1.3 (29)`
 - APK 命名规则固定为：
 
 ```text
@@ -383,6 +383,11 @@ JlenVideo-版本号-debug.apk
 
 ---
 
-## 12. 2.1.1.0 更新说明
+## 12. 2.1.1.3 更新说明
 
-- 优化播放器逻辑
+- 优化搜索联想请求与面板展示，减少等待感并兼容旧接口兜底
+- 修复沉浸式页面顶部安全区，公告页与详情页头部显示更稳定
+- 新增底栏一级入口“追剧”，聚合已加入追剧内容的更新与续播状态
+- 统一空状态、错误提示和海报失败态的轻量反馈样式
+- “我的”页移除旧收藏入口，详情页收藏操作统一改为“追剧”
+- 修复追剧相关提示文案与错误提示的旧“收藏”残留
