@@ -72,11 +72,6 @@ fun FollowScreen(
                         fontWeight = FontWeight.ExtraBold,
                         color = UiPalette.Ink
                     )
-                    Text(
-                        text = "聚合已加入追剧的连载内容，更新和续播都在这里",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = UiPalette.TextSecondary
-                    )
                 }
                 CircleActionButton(icon = Icons.Rounded.Refresh, onClick = onRefresh)
             }

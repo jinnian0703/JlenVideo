@@ -1210,10 +1210,6 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                 it != item.badgeText
         }
     val compactMeta = item.subtitle.ifBlank { "站内资源" }
-    val scoreLabel = item.cleanScore
-        .takeUnless { it == "暂无评分" }
-        ?.let { "评分 $it" }
-        ?: item.badgeText.ifBlank { "查看详情" }
 
     Card(
         modifier = Modifier
@@ -1267,21 +1263,9 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(UiPalette.SurfaceSoft)
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
-                        Text(
-                            text = scoreLabel,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = UiPalette.TextSecondary
-                        )
-                    }
                     TextButton(
                         onClick = { onClick(item.vodId) },
                         contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
