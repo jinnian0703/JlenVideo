@@ -19,9 +19,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.ShowChart
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -384,7 +384,7 @@ private fun MembershipTrendCard(points: List<PointTrendPoint>) {
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.ShowChart,
+                        imageVector = Icons.AutoMirrored.Rounded.ShowChart,
                         contentDescription = null,
                         tint = UiPalette.Accent,
                         modifier = Modifier.size(18.dp)

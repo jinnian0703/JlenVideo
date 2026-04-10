@@ -375,15 +375,11 @@ fun JlenVideoApp() {
                                 onSelectSection = viewModel::selectAccountSection,
                                 onRefreshSection = viewModel::refreshSelectedAccountSection,
                                 onChangePortrait = { portraitPicker.launch("image/*") },
-                                onOpenDetail = { navController.navigate("detail/$it") },
                                 onOpenHistoryRecord = { item ->
                                     viewModel.resumeHistoryRecord(item)
                                     navController.navigate("player")
                                 },
-                                onLoadMoreFavorites = viewModel::loadMoreFavorites,
                                 onLoadMoreHistory = viewModel::loadMoreHistory,
-                                onDeleteFavorite = viewModel::deleteFavorite,
-                                onClearFavorites = viewModel::clearFavorites,
                                 onDeleteHistory = viewModel::deleteHistory,
                                 onClearHistory = viewModel::clearHistory,
                                 onUpgradeMembership = viewModel::upgradeMembership,

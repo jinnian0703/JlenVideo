@@ -146,12 +146,8 @@ internal fun LegacyAccountScreen(
     onSelectSection: (AccountSection) -> Unit,
     onRefreshSection: () -> Unit,
     onChangePortrait: () -> Unit,
-    onOpenDetail: (String) -> Unit,
     onOpenHistoryRecord: (top.jlen.vod.data.UserCenterItem) -> Unit,
-    onLoadMoreFavorites: () -> Unit,
     onLoadMoreHistory: () -> Unit,
-    onDeleteFavorite: (String) -> Unit,
-    onClearFavorites: () -> Unit,
     onDeleteHistory: (String) -> Unit,
     onClearHistory: () -> Unit,
     onUpgradeMembership: (MembershipPlan) -> Unit,
@@ -198,7 +194,7 @@ internal fun LegacyAccountScreen(
             .background(UiPalette.BackgroundBottom)
             .statusBarsPadding()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 18.dp, bottom = 28.dp)
     ) {
         item {
@@ -222,8 +218,8 @@ internal fun LegacyAccountScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(22.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -1259,7 +1255,7 @@ private fun AccountSegmentBar(content: @Composable RowScope.() -> Unit) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(22.dp))
             .background(UiPalette.SurfaceSoft.copy(alpha = 0.72f))
-            .padding(horizontal = 10.dp, vertical = 10.dp)
+            .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
