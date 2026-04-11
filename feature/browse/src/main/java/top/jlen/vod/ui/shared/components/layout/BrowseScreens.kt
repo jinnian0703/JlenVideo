@@ -425,7 +425,7 @@ private fun PosterImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
     showFallbackTitle: Boolean = true,
-    compactFallback: Boolean = false,
+    fallbackStyle: PosterFallbackStyle = PosterFallbackStyle.Default,
     fallbackBottomInset: Dp = 0.dp
 ) {
     RetryablePosterImage(
@@ -436,7 +436,7 @@ private fun PosterImage(
         modifier = modifier,
         contentScale = contentScale,
         showFallbackTitle = showFallbackTitle,
-        compactFallback = compactFallback,
+        fallbackStyle = fallbackStyle,
         fallbackBottomInset = fallbackBottomInset
     )
 }
@@ -794,9 +794,9 @@ private fun CompactPosterCard(
                     .height(154.dp)
                     .clip(RoundedCornerShape(18.dp)),
                 contentScale = ContentScale.Crop,
-                showFallbackTitle = false,
-                compactFallback = true,
-                fallbackBottomInset = 34.dp
+                showFallbackTitle = true,
+                fallbackStyle = PosterFallbackStyle.CompactTitle,
+                fallbackBottomInset = 30.dp
             )
             if (badgeText.isNotBlank()) {
                 PosterBadgeText(

@@ -43,6 +43,11 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
 
+enum class PosterFallbackStyle {
+    Default,
+    CompactTitle
+}
+
 @Composable
 fun RetryablePosterImage(
     data: String?,
@@ -53,7 +58,7 @@ fun RetryablePosterImage(
     contentScale: ContentScale = ContentScale.Crop,
     retryLabel: String = "重试",
     showFallbackTitle: Boolean = true,
-    compactFallback: Boolean = false,
+    fallbackStyle: PosterFallbackStyle = PosterFallbackStyle.Default,
     fallbackBottomInset: Dp = 0.dp
 ) {
     var retryToken by remember(data, title, width, height) { mutableIntStateOf(0) }
@@ -70,21 +75,16 @@ fun RetryablePosterImage(
         contentScale = contentScale
     ) {
         when (painter.state) {
-            is AsyncImagePainter.State.Loading -> {
-                PosterSkeletonPlaceholder(title = title)
-            }
-
+            is AsyncImagePainter.State.Loading -> PosterSkeletonPlaceholder(title = title)
             is AsyncImagePainter.State.Error,
-            is AsyncImagePainter.State.Empty -> {
-                PosterRetryFallback(
-                    title = title,
-                    retryLabel = retryLabel,
-                    onRetry = { retryToken += 1 },
-                    showTitle = showFallbackTitle,
-                    compact = compactFallback,
-                    bottomInset = fallbackBottomInset
-                )
-            }
+            is AsyncImagePainter.State.Empty -> PosterRetryFallback(
+                title = title,
+                retryLabel = retryLabel,
+                onRetry = { retryToken += 1 },
+                showTitle = showFallbackTitle,
+                style = fallbackStyle,
+                bottomInset = fallbackBottomInset
+            )
 
             else -> Image(
                 painter = painter,
@@ -102,7 +102,7 @@ private fun PosterRetryFallback(
     retryLabel: String,
     onRetry: () -> Unit,
     showTitle: Boolean,
-    compact: Boolean,
+    style: PosterFallbackStyle,
     bottomInset: Dp
 ) {
     Box(
@@ -111,80 +111,138 @@ private fun PosterRetryFallback(
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        UiPalette.SurfaceStrong,
-                        UiPalette.SurfaceSoft
+                        UiPalette.SurfaceStrong.copy(alpha = 0.96f),
+                        UiPalette.SurfaceSoft.copy(alpha = 0.92f)
                     )
                 )
             )
-            .padding(
-                start = if (compact) 10.dp else 12.dp,
-                top = if (compact) 10.dp else 12.dp,
-                end = if (compact) 10.dp else 12.dp,
-                bottom = (if (compact) 10.dp else 12.dp) + bottomInset
-            ),
+            .padding(horizontal = 12.dp, vertical = 12.dp + bottomInset / 2),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(if (compact) 38.dp else 42.dp)
-                    .background(
-                        color = UiPalette.Accent.copy(alpha = 0.12f),
-                        shape = RoundedCornerShape(if (compact) 14.dp else 16.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Refresh,
-                    contentDescription = null,
-                    tint = UiPalette.Accent,
-                    modifier = Modifier.size(if (compact) 18.dp else 20.dp)
-                )
-            }
+        when (style) {
+            PosterFallbackStyle.Default -> DefaultPosterRetryFallback(
+                title = title,
+                retryLabel = retryLabel,
+                onRetry = onRetry,
+                showTitle = showTitle
+            )
 
-            if (showTitle) {
-                Text(
-                    text = title.ifBlank { "暂无海报" },
-                    color = UiPalette.Ink,
-                    style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = if (compact) 2 else 4,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            PosterFallbackStyle.CompactTitle -> CompactTitlePosterRetryFallback(
+                title = title,
+                retryLabel = retryLabel,
+                onRetry = onRetry,
+                showTitle = showTitle
+            )
+        }
+    }
+}
 
-            OutlinedButton(
-                onClick = onRetry,
-                shape = RoundedCornerShape(if (compact) 14.dp else 16.dp),
-                border = BorderStroke(1.dp, UiPalette.BorderSoft),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = UiPalette.Accent
+@Composable
+private fun DefaultPosterRetryFallback(
+    title: String,
+    retryLabel: String,
+    onRetry: () -> Unit,
+    showTitle: Boolean
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .background(
+                    color = UiPalette.Accent.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(16.dp)
                 ),
-                contentPadding = if (compact) {
-                    PaddingValues(horizontal = 10.dp, vertical = 0.dp)
-                } else {
-                    ButtonDefaults.ContentPadding
-                }
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.size(if (compact) 13.dp else 14.dp)
-                )
-                if (!compact) {
-                    Text(
-                        text = retryLabel,
-                        modifier = Modifier.padding(start = 4.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Refresh,
+                contentDescription = null,
+                tint = UiPalette.Accent,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        if (showTitle) {
+            Text(
+                text = title.ifBlank { "暂无海报" },
+                color = UiPalette.Ink,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        OutlinedButton(
+            onClick = onRetry,
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, UiPalette.BorderSoft),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = Color.Transparent,
+                contentColor = UiPalette.Accent
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Refresh,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = retryLabel,
+                modifier = Modifier.padding(start = 4.dp),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompactTitlePosterRetryFallback(
+    title: String,
+    retryLabel: String,
+    onRetry: () -> Unit,
+    showTitle: Boolean
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        OutlinedButton(
+            onClick = onRetry,
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, UiPalette.Accent.copy(alpha = 0.24f)),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = UiPalette.Surface.copy(alpha = 0.76f),
+                contentColor = UiPalette.Accent
+            ),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Refresh,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = retryLabel,
+                modifier = Modifier.padding(start = 4.dp),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        if (showTitle) {
+            Text(
+                text = title.ifBlank { "暂无海报" },
+                color = UiPalette.TextSecondary,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
