@@ -236,7 +236,11 @@ fun HomeScreen(
                         key = { it.stableKey() },
                         contentType = { "slide" }
                     ) { item ->
-                        FeaturedCard(item = item, onClick = onOpenDetail)
+                        FeaturedCard(
+                            item = item,
+                            onClick = onOpenDetail,
+                            modifier = Modifier.width(318.dp)
+                        )
                     }
                 }
             }

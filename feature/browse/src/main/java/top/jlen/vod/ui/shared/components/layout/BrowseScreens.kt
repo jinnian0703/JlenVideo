@@ -84,6 +84,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -118,6 +119,7 @@ import org.jsoup.parser.Parser
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.absoluteValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -443,17 +445,20 @@ private fun PosterImage(
 
 
 @Composable
-fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
+fun FeaturedCard(
+    item: VodItem,
+    onClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
     val badgeText = compactPosterBadgeText(item.badgeText)
     val subtitle = item.subtitle.ifBlank { "精选推荐" }
 
     Card(
-        modifier = Modifier
-            .width(312.dp)
+        modifier = modifier
             .clickable { onClick(item.vodId) },
-        shape = RoundedCornerShape(26.dp),
+        shape = RoundedCornerShape(30.dp),
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.72f))
+        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.62f))
     ) {
         Box {
             PosterImage(
@@ -463,7 +468,7 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
                 height = 432,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(188.dp),
+                    .height(196.dp),
                 contentScale = ContentScale.Crop
             )
             Box(
@@ -471,7 +476,25 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
                     .matchParentSize()
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color(0x78000000), Color(0xD6000000))
+                            colors = listOf(
+                                Color.Transparent,
+                                Color(0x24000000),
+                                Color(0x92000000),
+                                Color(0xEE000000)
+                            )
+                        )
+                    )
+            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.14f),
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.10f)
+                            )
                         )
                     )
             )
@@ -482,33 +505,62 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
-                        .padding(14.dp)
+                        .padding(16.dp)
                         .clip(RoundedCornerShape(999.dp))
-                        .background(UiPalette.Accent.copy(alpha = 0.9f))
-                        .padding(horizontal = 9.dp, vertical = 4.dp)
+                        .background(UiPalette.Accent.copy(alpha = 0.86f))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
                 )
             }
-            Column(
+            Row(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    .fillMaxWidth()
+                    .padding(start = 18.dp, end = 16.dp, bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.Bottom
             ) {
-                Text(
-                    text = item.displayTitle,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = UiPalette.Surface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.78f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White.copy(alpha = 0.76f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = item.displayTitle,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = UiPalette.Surface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(UiPalette.Surface.copy(alpha = 0.14f))
+                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "查看详情",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = UiPalette.Surface
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                        contentDescription = null,
+                        tint = UiPalette.Surface,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         }
     }
@@ -565,36 +617,51 @@ internal fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            pageSpacing = 12.dp,
+            contentPadding = PaddingValues(horizontal = 18.dp),
+            pageSpacing = 10.dp,
             userScrollEnabled = actualCount > 1,
             key = { page -> loopItems[page].vodId.ifBlank { "featured_$page" } + "_$page" }
         ) { page ->
+            val pageOffset = (
+                (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+            ).absoluteValue.coerceIn(0f, 1f)
+            val scale = 1f - (pageOffset * 0.05f)
+            val alpha = 1f - (pageOffset * 0.18f)
             FeaturedCard(
                 item = loopItems[page],
-                onClick = onOpenDetail
+                onClick = onOpenDetail,
+                modifier = Modifier
+                    .width(318.dp)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        this.alpha = alpha
+                    }
             )
         }
 
         if (actualCount > 1) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 repeat(actualCount) { index ->
                     Box(
                         modifier = Modifier
-                            .padding(horizontal = 4.dp)
-                            .size(if (index == currentIndex) 16.dp else 7.dp, 7.dp)
-                            .clip(CircleShape)
+                            .padding(horizontal = 3.dp)
+                            .size(if (index == currentIndex) 20.dp else 6.dp, 6.dp)
+                            .clip(RoundedCornerShape(999.dp))
                             .background(
                                 if (index == settledIndex || index == currentIndex) UiPalette.Accent
-                                else UiPalette.BorderSoft
+                                else UiPalette.BorderSoft.copy(alpha = 0.72f)
                             )
                     )
                 }
