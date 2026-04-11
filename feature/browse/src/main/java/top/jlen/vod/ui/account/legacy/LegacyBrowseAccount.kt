@@ -224,14 +224,14 @@ internal fun LegacyAccountScreen(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             if (state.session.portraitUrl.isNotBlank()) {
                                 AuthenticatedAvatar(
                                     imageUrl = state.session.portraitUrl,
                                     contentDescription = state.session.userName,
                                     modifier = Modifier
-                                        .size(72.dp)
+                                        .size(74.dp)
                                         .clip(CircleShape)
                                         .clickable(onClick = onChangePortrait),
                                     contentScale = ContentScale.Crop
@@ -239,7 +239,7 @@ internal fun LegacyAccountScreen(
                             } else {
                                 Box(
                                     modifier = Modifier
-                                        .size(72.dp)
+                                        .size(74.dp)
                                         .clip(CircleShape)
                                         .background(UiPalette.Accent.copy(alpha = 0.15f))
                                         .clickable(onClick = onChangePortrait),
@@ -260,7 +260,10 @@ internal fun LegacyAccountScreen(
                                 }
                             }
 
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
                                 Text(
                                     text = state.session.userName,
                                     style = MaterialTheme.typography.titleLarge,
@@ -290,10 +293,10 @@ internal fun LegacyAccountScreen(
                                 shape = RoundedCornerShape(18.dp),
                                 border = BorderStroke(1.dp, UiPalette.BorderSoft),
                                 colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = UiPalette.SurfaceSoft,
+                                    containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.72f),
                                     contentColor = UiPalette.Accent,
                                     disabledContainerColor = UiPalette.SurfaceStrong,
-                                    disabledContentColor = UiPalette.Ink
+                                    disabledContentColor = UiPalette.TextPrimary
                                 )
                             ) {
                                 Text(

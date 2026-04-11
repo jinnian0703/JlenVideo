@@ -543,42 +543,35 @@ internal fun DetailActionNotice(
     message: String,
     isError: Boolean
 ) {
-    val containerColor = if (isError) UiPalette.DangerSurface else UiPalette.AccentSoft.copy(alpha = 0.18f)
-    val borderColor = if (isError) UiPalette.DangerBorder else UiPalette.BorderSoft
+    val containerColor = if (isError) UiPalette.DangerSurface.copy(alpha = 0.42f) else UiPalette.AccentSoft.copy(alpha = 0.1f)
+    val borderColor = if (isError) UiPalette.DangerBorder.copy(alpha = 0.5f) else UiPalette.BorderSoft.copy(alpha = 0.72f)
     val iconTint = if (isError) UiPalette.DangerText else UiPalette.Accent
     val textColor = if (isError) UiPalette.DangerText else UiPalette.Ink
     val icon = if (isError) Icons.Rounded.ErrorOutline else Icons.Rounded.CheckCircle
 
     Card(
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, borderColor)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White.copy(alpha = if (isError) 0.7f else 0.82f)),
-                contentAlignment = Alignment.Center
-            ) {
-                androidx.compose.material3.Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
+            androidx.compose.material3.Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(16.dp)
+            )
             Text(
                 text = message,
                 modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
                 color = textColor
             )
         }

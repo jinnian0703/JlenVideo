@@ -425,9 +425,9 @@ fun SearchResultsScreen(
         item {
             Text(
                 text = if (state.submittedQuery.isBlank()) "输入片名开始搜索" else "\"${state.submittedQuery}\" 的结果",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = UiPalette.Ink
+                color = UiPalette.TextPrimary
             )
         }
         when {
@@ -566,9 +566,16 @@ private fun SearchInputCard(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(1.dp)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    Text(
+                        text = "猜你想搜",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = UiPalette.TextSecondary,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
                     visibleSuggestions.forEachIndexed { index, suggestion ->
                         SearchSuggestionRow(
                             item = suggestion,
@@ -599,15 +606,15 @@ private fun SearchSuggestionRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 5.dp),
+            .padding(horizontal = 6.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(24.dp)
+                .size(22.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(UiPalette.SurfaceSoft),
+                .background(UiPalette.SurfaceSoft.copy(alpha = 0.78f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -623,7 +630,7 @@ private fun SearchSuggestionRow(
         ) {
             Text(
                 text = buildSuggestionAnnotatedTitle(item),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 color = UiPalette.Ink,
                 maxLines = 1,
@@ -635,7 +642,7 @@ private fun SearchSuggestionRow(
                     Text(
                         text = meta,
                         style = MaterialTheme.typography.labelSmall,
-                        color = UiPalette.TextSecondary,
+                        color = UiPalette.TextMuted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -729,8 +736,8 @@ private fun HotSearchBoard(
                     )
                 }
                 Text(
-                    text = "大家都在搜",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = "实时热度",
+                    style = MaterialTheme.typography.labelMedium,
                     color = UiPalette.TextMuted
                 )
             }
@@ -741,7 +748,7 @@ private fun HotSearchBoard(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .clickable { onPickKeyword(item.keyword) }
-                        .padding(horizontal = 6.dp, vertical = 8.dp),
+                        .padding(horizontal = 6.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -764,7 +771,8 @@ private fun HotSearchBoard(
                     }
                     Text(
                         text = item.keyword,
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
                         color = UiPalette.Ink,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

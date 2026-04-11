@@ -445,13 +445,15 @@ private fun PosterImage(
 @Composable
 fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
     val badgeText = compactPosterBadgeText(item.badgeText)
+    val subtitle = item.subtitle.ifBlank { "精选推荐" }
 
     Card(
         modifier = Modifier
             .width(312.dp)
             .clickable { onClick(item.vodId) },
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface)
+        shape = RoundedCornerShape(26.dp),
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.72f))
     ) {
         Box {
             PosterImage(
@@ -469,7 +471,7 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
                     .matchParentSize()
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color(0xA0000000), Color(0xCC000000))
+                            colors = listOf(Color.Transparent, Color(0x78000000), Color(0xD6000000))
                         )
                     )
             )
@@ -477,24 +479,33 @@ fun FeaturedCard(item: VodItem, onClick: (String) -> Unit) {
                 Text(
                     text = badgeText,
                     color = UiPalette.Surface,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .padding(14.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(UiPalette.Accent.copy(alpha = 0.92f))
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(UiPalette.Accent.copy(alpha = 0.9f))
+                        .padding(horizontal = 9.dp, vertical = 4.dp)
                 )
             }
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(16.dp)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = item.displayTitle,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.ExtraBold,
                     color = UiPalette.Surface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.78f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -579,7 +590,7 @@ internal fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String
                     Box(
                         modifier = Modifier
                             .padding(horizontal = 4.dp)
-                            .size(if (index == currentIndex) 18.dp else 8.dp, 8.dp)
+                            .size(if (index == currentIndex) 16.dp else 7.dp, 7.dp)
                             .clip(CircleShape)
                             .background(
                                 if (index == settledIndex || index == currentIndex) UiPalette.Accent
@@ -605,8 +616,8 @@ internal fun AccountStatusNotice(
     onAction: (() -> Unit)? = null
 ) {
     val isError = tone == AccountNoticeTone.Error
-    val containerColor = if (isError) UiPalette.DangerSurface.copy(alpha = 0.58f) else UiPalette.AccentSoft.copy(alpha = 0.14f)
-    val borderColor = if (isError) UiPalette.DangerBorder.copy(alpha = 0.65f) else UiPalette.BorderSoft
+    val containerColor = if (isError) UiPalette.DangerSurface.copy(alpha = 0.42f) else UiPalette.AccentSoft.copy(alpha = 0.1f)
+    val borderColor = if (isError) UiPalette.DangerBorder.copy(alpha = 0.45f) else UiPalette.BorderSoft.copy(alpha = 0.72f)
     val iconTint = if (isError) UiPalette.DangerText else UiPalette.Accent
     val textColor = if (isError) UiPalette.DangerText else UiPalette.Ink
     val icon = if (isError) Icons.Rounded.ErrorOutline else Icons.Rounded.CheckCircle
@@ -614,7 +625,7 @@ internal fun AccountStatusNotice(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        shape = RoundedCornerShape(26.dp),
+        shape = RoundedCornerShape(24.dp),
         border = BorderStroke(1.dp, borderColor)
     ) {
         Column(
@@ -628,23 +639,15 @@ internal fun AccountStatusNotice(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White.copy(alpha = if (isError) 0.86f else 0.9f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = iconTint,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(18.dp)
+                )
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     Text(
                         text = badgeText,
@@ -655,18 +658,18 @@ internal fun AccountStatusNotice(
                     Text(
                         text = message,
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Medium,
                         color = textColor
                     )
                 }
                 if (!actionLabel.isNullOrBlank() && onAction != null) {
                     OutlinedButton(
                         onClick = onAction,
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(999.dp),
                         border = BorderStroke(1.dp, borderColor),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color.White.copy(alpha = 0.52f),
+                            containerColor = Color.Transparent,
                             contentColor = textColor
                         )
                     ) {
@@ -804,21 +807,31 @@ private fun CompactPosterCard(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(8.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(999.dp))
                         .background(Color(0xDE111419))
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                        .padding(horizontal = 9.dp, vertical = 4.dp)
                 )
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = item.displayTitle,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Bold,
             color = UiPalette.Ink,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
+        item.subtitle.takeIf { it.isNotBlank() }?.let { subtitle ->
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = UiPalette.TextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -1245,11 +1258,11 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
             )
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(7.dp)
             ) {
                 Text(
                     text = item.displayTitle,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.ExtraBold,
                     color = UiPalette.Ink,
                     maxLines = 2,
@@ -1257,9 +1270,9 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                 )
                 Text(
                     text = compactMeta,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = UiPalette.TextSecondary,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 detailDescription?.let {
@@ -1267,15 +1280,31 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                         text = it,
                         style = MaterialTheme.typography.bodySmall,
                         color = UiPalette.TextMuted,
-                        maxLines = 3,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    item.badgeText.takeIf { it.isNotBlank() }?.let { badge ->
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(UiPalette.SurfaceSoft)
+                                .padding(horizontal = 9.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = badge,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = UiPalette.TextSecondary,
+                                maxLines = 1
+                            )
+                        }
+                    } ?: Spacer(modifier = Modifier.width(1.dp))
                     TextButton(
                         onClick = { onClick(item.vodId) },
                         contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
@@ -1283,7 +1312,7 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                     ) {
                         Text(
                             text = "查看详情",
-                            style = MaterialTheme.typography.labelLarge,
+                            style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold
                         )
                     }

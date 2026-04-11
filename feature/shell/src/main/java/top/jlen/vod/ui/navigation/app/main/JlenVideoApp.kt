@@ -478,7 +478,7 @@ fun JlenVideoApp() {
                                 }
                             )
                             if (showRemoveFavoriteDialog) {
-                                RemoveFavoriteConfirmDialog(
+                                FollowRemoveConfirmDialog(
                                     onDismiss = { showRemoveFavoriteDialog = false },
                                     onConfirm = {
                                         showRemoveFavoriteDialog = false
@@ -531,6 +531,7 @@ private fun normalizeHeartbeatRoute(route: String?): String = when {
     else -> route
 }
 
+@Suppress("unused")
 @Composable
 private fun RemoveFavoriteConfirmDialog(
     onDismiss: () -> Unit,
@@ -602,6 +603,90 @@ private fun RemoveFavoriteConfirmDialog(
                         modifier = Modifier
                             .padding(start = 10.dp)
                             .width(122.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = UiPalette.DangerText,
+                            contentColor = UiPalette.Surface
+                        )
+                    ) {
+                        Text("确认移除", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FollowRemoveConfirmDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(26.dp),
+            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .background(UiPalette.DangerSurface.copy(alpha = 0.68f), RoundedCornerShape(999.dp))
+                        .border(1.dp, UiPalette.DangerBorder.copy(alpha = 0.5f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = "已追剧",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = UiPalette.DangerText
+                    )
+                }
+                Text(
+                    text = "取消追剧",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Ink
+                )
+                Text(
+                    text = "确认把这部影片从追剧列表中移除吗？",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = UiPalette.TextSecondary
+                )
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.76f)),
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    Text(
+                        text = "移除后不会影响播放记录和续播进度。",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 13.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = UiPalette.TextPrimary
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.width(110.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.36f),
+                            contentColor = UiPalette.TextPrimary
+                        )
+                    ) {
+                        Text("先保留", fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier.width(122.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = UiPalette.DangerText,

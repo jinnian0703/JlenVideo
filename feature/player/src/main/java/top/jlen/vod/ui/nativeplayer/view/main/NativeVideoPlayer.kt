@@ -855,8 +855,8 @@ fun NativeVideoPlayer(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = if (fullscreenMode) 14.dp else 28.dp)
-                        .widthIn(min = 150.dp, max = 224.dp),
-                    shape = RoundedCornerShape(24.dp),
+                        .widthIn(min = 142.dp, max = 214.dp),
+                    shape = RoundedCornerShape(22.dp),
                     color = Color.Transparent
                 ) {
                     Row(
@@ -864,53 +864,53 @@ fun NativeVideoPlayer(
                             .background(
                                 Brush.verticalGradient(
                                     colors = listOf(
-                                        Color.Black.copy(alpha = 0.62f),
-                                        Color.Black.copy(alpha = 0.48f)
+                                        Color.Black.copy(alpha = 0.52f),
+                                        Color.Black.copy(alpha = 0.4f)
                                     )
                                 ),
-                                RoundedCornerShape(24.dp)
+                                RoundedCornerShape(22.dp)
                             )
                             .border(
                                 width = 1.dp,
-                                color = Color.White.copy(alpha = 0.08f),
-                                shape = RoundedCornerShape(24.dp)
+                                color = Color.White.copy(alpha = 0.06f),
+                                shape = RoundedCornerShape(22.dp)
                             )
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            .padding(horizontal = 11.dp, vertical = 9.dp),
+                        horizontalArrangement = Arrangement.spacedBy(9.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color.White.copy(alpha = 0.10f)),
+                                .size(30.dp)
+                                .clip(RoundedCornerShape(11.dp))
+                                .background(Color.White.copy(alpha = 0.09f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = feedbackBadge(feedback),
                                 color = Color.White,
-                                style = MaterialTheme.typography.labelLarge,
+                                style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.ExtraBold,
                                 textAlign = TextAlign.Center
                             )
                         }
                         Column(
                             modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             Text(
                                 text = feedback.title,
                                 color = Color.White,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.ExtraBold,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             feedback.detail?.takeIf(String::isNotBlank)?.let { detail ->
                                 Text(
                                     text = detail,
-                                    color = Color.White.copy(alpha = 0.78f),
-                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.White.copy(alpha = 0.74f),
+                                    style = MaterialTheme.typography.labelSmall,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )

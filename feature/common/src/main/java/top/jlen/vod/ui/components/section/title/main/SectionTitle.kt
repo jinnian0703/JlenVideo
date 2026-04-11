@@ -1,5 +1,6 @@
 package top.jlen.vod.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -7,8 +8,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,10 +37,19 @@ fun SectionTitle(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             if (icon != null) {
-                icon()
-                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(UiPalette.AccentSoft.copy(alpha = 0.16f))
+                        .padding(6.dp)
+                ) {
+                    icon()
+                }
             }
             Text(
                 text = title,
@@ -46,16 +59,24 @@ fun SectionTitle(
             )
         }
         if (!action.isNullOrBlank()) {
-            Box(modifier = Modifier.clip(RoundedCornerShape(999.dp))) {
-                TextButton(
-                    onClick = onAction,
-                    colors = ButtonDefaults.textButtonColors(
-                        containerColor = UiPalette.AccentGlow.copy(alpha = 0.55f),
-                        contentColor = UiPalette.Accent
-                    )
-                ) {
-                    Text(action, fontWeight = FontWeight.Bold)
-                }
+            TextButton(
+                onClick = onAction,
+                colors = ButtonDefaults.textButtonColors(
+                    containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.55f),
+                    contentColor = UiPalette.Accent
+                )
+            ) {
+                Text(
+                    text = action,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.width(2.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.width(16.dp)
+                )
             }
         }
     }
