@@ -186,11 +186,11 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyEnrichHomeDisplay
         return payload
     }
 
-    val enrichedSlides = enrichHomePreviewItems(payload.slides, limit = 8)
-    val enrichedHot = enrichHomePreviewItems(payload.hot, limit = 8)
-    val enrichedFeatured = enrichHomePreviewItems(payload.featured, limit = 12)
-    val enrichedLatest = enrichHomePreviewItems(payload.latest, limit = 18)
-    val enrichedCategoryVideos = enrichHomePreviewItems(payload.categoryVideos, limit = 18)
+    val enrichedSlides = enrichHomePreviewItems(payload.slides, limit = 4)
+    val enrichedHot = enrichHomePreviewItems(payload.hot, limit = 4)
+    val enrichedFeatured = enrichHomePreviewItems(payload.featured, limit = 6)
+    val enrichedLatest = enrichHomePreviewItems(payload.latest, limit = 8)
+    val enrichedCategoryVideos = payload.categoryVideos
 
     val enrichedPayload = payload.copy(
         slides = enrichedSlides,
@@ -213,7 +213,14 @@ private suspend fun LegacyAppleCmsRuntimeRepositoryCore.enrichHomePreviewItems(
     limit: Int
 ): List<VodItem> {
     if (items.isEmpty() || limit <= 0) return items
-    val enrichTargets = items.take(limit)
+    val enrichTargets = items
+        .take(limit)
+        .filter { item ->
+            item.vodId.isNotBlank() &&
+                item.resolvedLatestEpisodeNumber == null &&
+                item.vodPlayUrl.isNullOrBlank()
+        }
+    if (enrichTargets.isEmpty()) return items
     val enrichedById = coroutineScope {
         enrichTargets.map { item ->
             async {

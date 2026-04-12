@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Rect
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
@@ -90,10 +89,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.SpanStyle
@@ -898,34 +894,14 @@ private fun PosterBadgeText(
     text: String,
     modifier: Modifier = Modifier
 ) {
-    val view = LocalView.current
-    var isVisibleInWindow by remember(text) { mutableStateOf(false) }
-
     Text(
         text = text,
         color = Color.White,
         style = MaterialTheme.typography.labelMedium,
         fontWeight = FontWeight.ExtraBold,
         maxLines = 1,
-        overflow = if (isVisibleInWindow) TextOverflow.Clip else TextOverflow.Ellipsis,
+        overflow = TextOverflow.Ellipsis,
         modifier = modifier
-            .onGloballyPositioned { coordinates ->
-                val visibleFrame = Rect()
-                view.getWindowVisibleDisplayFrame(visibleFrame)
-                val bounds = coordinates.boundsInWindow()
-                isVisibleInWindow =
-                    bounds.right > visibleFrame.left &&
-                        bounds.left < visibleFrame.right &&
-                        bounds.bottom > visibleFrame.top &&
-                        bounds.top < visibleFrame.bottom
-            }
-            .then(
-                if (isVisibleInWindow && text.length > 8) {
-                    Modifier.basicMarquee(iterations = Int.MAX_VALUE)
-                } else {
-                    Modifier
-                }
-            )
     )
 }
 
