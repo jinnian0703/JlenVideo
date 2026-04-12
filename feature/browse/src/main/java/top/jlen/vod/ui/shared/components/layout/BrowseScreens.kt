@@ -1183,7 +1183,12 @@ private fun posterBadgeText(raw: String, compact: Boolean): String {
             trimmedRankPrefix.replace(Regex("^更新至第(\\d{1,4})集?$"), "第$1集")
         compact && trimmedRankPrefix.matches(Regex("^更新至\\d{1,4}集?$")) ->
             trimmedRankPrefix.replace(Regex("^更新至(\\d{1,4})集?$"), "第$1集")
+        compact && trimmedRankPrefix.matches(Regex("^更新至第\\d{1,4}$")) ->
+            trimmedRankPrefix.replace(Regex("^更新至第(\\d{1,4})$"), "第$1集")
+        compact && trimmedRankPrefix.matches(Regex("^更新至\\d{1,4}$")) ->
+            trimmedRankPrefix.replace(Regex("^更新至(\\d{1,4})$"), "第$1集")
         trimmedRankPrefix.matches(Regex("^第\\d{1,4}$")) -> "${trimmedRankPrefix}集"
+        compact && trimmedRankPrefix.matches(Regex("^\\d{1,4}$")) -> "第${trimmedRankPrefix}集"
         else -> trimmedRankPrefix
     }
 
@@ -1199,8 +1204,12 @@ private fun isMeaningfulPosterBadge(text: String): Boolean {
     val normalized = text.replace(Regex("\\s+"), "")
     val patterns = listOf(
         Regex("""^更新至第?\d{1,4}集?$"""),
+        Regex("""^更新至第?\d{1,4}$"""),
         Regex("""^第\d{1,4}集$"""),
+        Regex("""^第\d{1,4}$"""),
         Regex("""^\d{1,4}集$"""),
+        Regex("""^\d{1,4}$"""),
+        Regex("""^更新至第?\d{1,8}期$"""),
         Regex("""^第\d{1,4}期$"""),
         Regex("""^\d{1,8}期$"""),
         Regex("""^全\d{1,4}集$"""),
