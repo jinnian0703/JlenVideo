@@ -120,6 +120,35 @@ data class VodItem(
     val badgeText: String
         get() = firstNotBlank(vodRemarks, vodSub, typeName, vodPubdate)
 
+    val resolvedLatestEpisodeNumber: Int?
+        get() = parseLatestEpisodeNumberFromPlayUrl(vodPlayUrl)
+
+    val resolvedUpdateLabel: String
+        get() = resolveUpdateLabel(
+            current = firstNotBlank(vodRemarks, vodPubdate, ""),
+            latestEpisodeNumber = resolvedLatestEpisodeNumber
+        )
+
+    val resolvedSubtitle: String
+        get() = listOf(
+            resolveUpdateLabel(vodRemarks.orEmpty(), resolvedLatestEpisodeNumber),
+            vodSub.orEmpty(),
+            typeName.orEmpty(),
+            vodYear.orEmpty(),
+            vodArea.orEmpty()
+        )
+            .map(::sanitizeDisplayValue)
+            .filter { it.isNotBlank() }
+            .joinToString(" | ")
+
+    val resolvedBadgeText: String
+        get() = firstNotBlank(
+            resolveUpdateLabel(vodRemarks.orEmpty(), resolvedLatestEpisodeNumber),
+            vodSub,
+            typeName,
+            vodPubdate
+        )
+
     val cleanActor: String
         get() = cleanText(vodActor).ifBlank { "暂无" }
 
@@ -177,6 +206,53 @@ data class VodItem(
             .replace('\u00A0', ' ')
             .replace(Regex("\\s+"), " ")
             .trim()
+
+    private fun parseLatestEpisodeNumberFromPlayUrl(playUrl: String?): Int? {
+        val raw = playUrl.orEmpty().trim()
+        if (raw.isBlank()) return null
+
+        val episodeNames = raw
+            .split("$$$")
+            .flatMap { group ->
+                group.split("#").map { entry ->
+                    entry.substringBefore("$").trim()
+                }
+            }
+            .filter { it.isNotBlank() }
+        if (episodeNames.isEmpty()) return null
+
+        return episodeNames
+            .mapNotNull(::extractEpisodeNumber)
+            .maxOrNull()
+            ?: episodeNames.size.takeIf { it > 1 }
+    }
+
+    private fun resolveUpdateLabel(current: String, latestEpisodeNumber: Int?): String {
+        val normalized = sanitizeDisplayValue(current)
+        if (latestEpisodeNumber == null || latestEpisodeNumber <= 1) return normalized
+        val parsedCurrentEpisodeNumber = extractEpisodeNumber(normalized)
+        return if (parsedCurrentEpisodeNumber == null || latestEpisodeNumber > parsedCurrentEpisodeNumber) {
+            "更新至第${latestEpisodeNumber}集"
+        } else {
+            normalized
+        }
+    }
+
+    private fun extractEpisodeNumber(text: String): Int? {
+        if (text.isBlank()) return null
+        val patterns = listOf(
+            Regex("""更新至第\s*(\d{1,4})\s*集?"""),
+            Regex("""更新至\s*(\d{1,4})\s*集?"""),
+            Regex("""第\s*(\d{1,4})\s*集"""),
+            Regex("""全\s*(\d{1,4})\s*集"""),
+            Regex("""共\s*(\d{1,4})\s*集"""),
+            Regex("""(\d{1,4})\s*集全"""),
+            Regex("""^(\d{1,4})$""")
+        )
+        return patterns.firstNotNullOfOrNull { pattern ->
+            pattern.find(text)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        }
+    }
 
     private fun firstNotBlank(vararg values: String?): String =
         values

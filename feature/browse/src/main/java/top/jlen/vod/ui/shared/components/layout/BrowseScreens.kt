@@ -450,8 +450,8 @@ fun FeaturedCard(
     onClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val badgeText = compactPosterBadgeText(item.badgeText)
-    val subtitle = item.subtitle.ifBlank { "精选推荐" }
+    val badgeText = compactPosterBadgeText(item.resolvedBadgeText)
+    val subtitle = item.resolvedSubtitle.ifBlank { "精选推荐" }
 
     Card(
         modifier = modifier
@@ -850,7 +850,7 @@ private fun CompactPosterCard(
     onClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val badgeText = compactPosterBadgeText(item.badgeText)
+    val badgeText = compactPosterBadgeText(item.resolvedBadgeText)
 
     Column(modifier = modifier.clickable { onClick(item.vodId) }) {
         Box {
@@ -889,7 +889,7 @@ private fun CompactPosterCard(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
-        item.subtitle.takeIf { it.isNotBlank() }?.let { subtitle ->
+        item.resolvedSubtitle.takeIf { it.isNotBlank() }?.let { subtitle ->
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = subtitle,
@@ -1296,10 +1296,10 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
         .takeIf {
             it.isNotBlank() &&
                 it != "暂无简介" &&
-                it != item.subtitle &&
-                it != item.badgeText
+                it != item.resolvedSubtitle &&
+                it != item.resolvedBadgeText
         }
-    val compactMeta = item.subtitle.ifBlank { "站内资源" }
+    val compactMeta = item.resolvedSubtitle.ifBlank { "站内资源" }
 
     Card(
         modifier = Modifier
@@ -1356,7 +1356,7 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    item.badgeText.takeIf { it.isNotBlank() }?.let { badge ->
+                    item.resolvedBadgeText.takeIf { it.isNotBlank() }?.let { badge ->
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(999.dp))

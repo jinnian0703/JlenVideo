@@ -2182,7 +2182,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 recordId = vod.vodId,
                 vodId = vod.vodId,
                 title = vod.displayTitle,
-                subtitle = vod.subtitle,
+                subtitle = vod.resolvedSubtitle,
                 actionLabel = "查看详情",
                 actionUrl = buildVodDetailUrl(vod)
             )
@@ -2238,7 +2238,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                     listOf(
                     sourceName.takeIf(String::isNotBlank),
                     episodeName.takeIf(String::isNotBlank),
-                    vod.subtitle.takeIf(String::isNotBlank)
+                    vod.resolvedSubtitle.takeIf(String::isNotBlank)
                     ).joinToString(" | ")
                 ),
                 actionLabel = if (currentPlay?.firstString("url", "source_url").isNullOrBlank()) "查看详情" else "继续观看",

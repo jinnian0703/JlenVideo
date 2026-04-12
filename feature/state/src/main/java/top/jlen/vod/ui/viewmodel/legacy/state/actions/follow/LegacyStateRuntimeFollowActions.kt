@@ -218,9 +218,9 @@ private suspend fun LegacyStateRuntimeViewModelCore.buildFollowItem(
 
     val latestEpisode = parseLatestEpisodeInfo(
         listOfNotNull(
-            detailItem?.vodRemarks,
-            detailItem?.subtitle,
-            detailItem?.badgeText,
+            detailItem?.resolvedUpdateLabel,
+            detailItem?.resolvedSubtitle,
+            detailItem?.resolvedBadgeText,
             favorite.subtitle,
             bestHistory?.subtitle,
             cached?.latestEpisodeLabel
@@ -242,7 +242,7 @@ private suspend fun LegacyStateRuntimeViewModelCore.buildFollowItem(
         ?: cached?.title
         ?: return null
     val subtitle = listOfNotNull(
-        detailItem?.subtitle?.takeIf { it.isNotBlank() },
+        detailItem?.resolvedSubtitle?.takeIf { it.isNotBlank() },
         favorite.subtitle.takeIf { it.isNotBlank() },
         bestHistory?.subtitle?.takeIf { it.isNotBlank() },
         cached?.subtitle?.takeIf { it.isNotBlank() }
