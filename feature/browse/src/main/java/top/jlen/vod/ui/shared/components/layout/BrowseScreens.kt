@@ -851,7 +851,6 @@ private fun CompactPosterCard(
     modifier: Modifier = Modifier
 ) {
     val badgeText = compactPosterBadgeText(item.resolvedBadgeText)
-    val compactSubtitle = compactPosterSubtitle(item.resolvedSubtitle, badgeText)
 
     Column(modifier = modifier.clickable { onClick(item.vodId) }) {
         Box {
@@ -890,16 +889,6 @@ private fun CompactPosterCard(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
-        compactSubtitle.takeIf { it.isNotBlank() }?.let { subtitle ->
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = UiPalette.TextSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
     }
 }
 
@@ -1224,38 +1213,6 @@ private fun compactPosterBadgeText(raw: String): String {
         compactEpisodeBadge.matches(Regex("^[.、·•-]+$")) -> ""
         compactEpisodeBadge.isBlank() -> ""
         else -> compactEpisodeBadge
-    }
-}
-
-private fun compactPosterSubtitle(subtitle: String, badgeText: String): String {
-    val normalizedSubtitle = subtitle.trim()
-    if (normalizedSubtitle.isBlank()) return ""
-    if (badgeText.isBlank()) return normalizedSubtitle
-
-    val badgeEpisodeNumber = extractPosterEpisodeNumber(badgeText) ?: return normalizedSubtitle
-    val parts = normalizedSubtitle
-        .split("|")
-        .map { it.trim() }
-        .filter { it.isNotBlank() }
-    if (parts.isEmpty()) return normalizedSubtitle
-
-    val filteredParts = parts.filterIndexed { index, part ->
-        index != 0 || extractPosterEpisodeNumber(part) != badgeEpisodeNumber
-    }
-    return filteredParts.joinToString(" | ")
-}
-
-private fun extractPosterEpisodeNumber(text: String): Int? {
-    if (text.isBlank()) return null
-    val patterns = listOf(
-        Regex("""更新至第\s*(\d{1,4})\s*集?"""),
-        Regex("""更新至\s*(\d{1,4})\s*集?"""),
-        Regex("""第\s*(\d{1,4})\s*集"""),
-        Regex("""^(\d{1,4})集$"""),
-        Regex("""^(\d{1,4})$""")
-    )
-    return patterns.firstNotNullOfOrNull { pattern ->
-        pattern.find(text)?.groupValues?.getOrNull(1)?.toIntOrNull()
     }
 }
 
