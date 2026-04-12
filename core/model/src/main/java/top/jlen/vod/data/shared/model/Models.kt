@@ -89,10 +89,13 @@ data class VodItem(
     @SerializedName("vod_id") val vodId: String = "",
     @SerializedName("vod_name") val vodName: String = "",
     @SerializedName("vod_sub") val vodSub: String? = null,
+    @SerializedName("subtitle") val compatSubtitle: String? = null,
     @SerializedName("vod_pic") val vodPic: String? = null,
     @SerializedName("vod_tag") val vodTag: String? = null,
     @SerializedName("vod_class") val vodClass: String? = null,
     @SerializedName("vod_remarks") val vodRemarks: String? = null,
+    @SerializedName("badgeText") val compatBadgeText: String? = null,
+    @SerializedName(value = "episode_remark", alternate = ["episodeRemark"]) val episodeRemark: String? = null,
     @SerializedName("vod_blurb") val vodBlurb: String? = null,
     @SerializedName("vod_content") val vodContent: String? = null,
     @SerializedName("vod_pubdate") val vodPubdate: String? = null,
@@ -112,26 +115,25 @@ data class VodItem(
         get() = vodName.ifBlank { "未命名影片" }
 
     val subtitle: String
-        get() = listOf(vodRemarks, vodSub, typeName, vodYear, vodArea)
-            .map(::sanitizeDisplayValue)
-            .filterNot(::isDuplicateTitleValue)
-            .filter { it.isNotBlank() }
-            .joinToString(" | ")
+        get() = firstNotBlank(compatSubtitle, vodSub)
 
     val badgeText: String
-        get() = firstNotBlank(vodRemarks, vodSub, typeName, vodPubdate)
+        get() = firstNotBlank(compatBadgeText, vodRemarks)
 
     val resolvedLatestEpisodeNumber: Int?
         get() = null
 
     val resolvedUpdateLabel: String
-        get() = selectUpdateValue()
+        get() = firstNotBlank(episodeRemark, vodRemarks)
 
     val resolvedSubtitle: String
         get() = subtitle
 
     val resolvedBadgeText: String
         get() = badgeText
+
+    val publishedAtText: String
+        get() = sanitizeDisplayValue(vodPubdate)
 
     val cleanActor: String
         get() = cleanText(vodActor).ifBlank { "暂无" }
@@ -143,14 +145,15 @@ data class VodItem(
         get() = vodScore.orEmpty().trim().ifBlank { "暂无评分" }
 
     val metaPairs: List<Pair<String, String>>
-        get() = listOf(
-            "导演" to cleanDirector,
-            "主演" to cleanActor,
-            "地区" to firstNotBlank(vodArea, "未知"),
-            "年份" to firstNotBlank(vodYear, "未知"),
-            "语言" to firstNotBlank(vodLang, "未知"),
-            "更新" to selectUpdateValue().ifBlank { "站内资源" }
-        )
+        get() = buildList {
+            add("导演" to cleanDirector)
+            add("主演" to cleanActor)
+            add("地区" to firstNotBlank(vodArea, "未知"))
+            add("年份" to firstNotBlank(vodYear, "未知"))
+            add("语言" to firstNotBlank(vodLang, "未知"))
+            add("更新" to resolvedUpdateLabel.ifBlank { "站内资源" })
+            publishedAtText.takeIf { it.isNotBlank() }?.let { add("发布日期" to it) }
+        }
 
     val tags: List<String>
         get() = (
@@ -198,14 +201,6 @@ data class VodItem(
             .firstOrNull { it.isNotBlank() }
             .orEmpty()
 
-    private fun selectUpdateValue(): String {
-        val remarks = sanitizeDisplayValue(vodRemarks)
-        if (remarks.isNotBlank()) return remarks
-
-        val publishMeta = sanitizeDisplayValue(vodPubdate)
-        return publishMeta.takeIf(::looksLikeUpdateLabel).orEmpty()
-    }
-
     private fun isDuplicateTitleValue(value: String): Boolean {
         val normalizedValue = value.trim()
         val normalizedTitle = displayTitle.trim()
@@ -214,22 +209,6 @@ data class VodItem(
             normalizedValue.equals(normalizedTitle, ignoreCase = true)
     }
 
-    private fun looksLikeUpdateLabel(value: String): Boolean {
-        if (value.isBlank()) return false
-        val normalized = value.replace(Regex("\\s+"), "")
-        val patterns = listOf(
-            Regex("""^更新至第?\d{1,4}集?$"""),
-            Regex("""^第\d{1,4}集$"""),
-            Regex("""^\d{1,4}集$"""),
-            Regex("""^第\d{1,4}期$"""),
-            Regex("""^\d{1,8}期$"""),
-            Regex("""^全\d{1,4}集$"""),
-            Regex("""^共\d{1,4}集$"""),
-            Regex("""^\d{1,4}集全$"""),
-            Regex("""^(完结|已完结|完結|全集|正片|抢先版?|抢先看|预告|HD|TC|SP|OVA|PV)$""")
-        )
-        return patterns.any { it.matches(normalized) }
-    }
 }
 
 fun sanitizeUserFacingToken(value: String?): String =

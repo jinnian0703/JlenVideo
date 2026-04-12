@@ -586,19 +586,9 @@ internal fun DetailActionNotice(
 }
 
 internal fun resolvedDetailSubtitle(
-    item: VodItem,
-    sources: List<PlaySource>
+    item: VodItem
 ): String {
-    val currentSubtitle = item.subtitle
-    val currentUpdate = item.metaPairs.firstOrNull { it.first == "更新" }?.second.orEmpty()
-    val resolvedUpdate = resolveDetailUpdateLabel(item, sources)
-    return when {
-        resolvedUpdate.isBlank() -> currentSubtitle
-        currentSubtitle.isBlank() -> resolvedUpdate
-        currentUpdate.isNotBlank() && currentSubtitle.contains(currentUpdate) ->
-            currentSubtitle.replaceFirst(currentUpdate, resolvedUpdate)
-        else -> currentSubtitle
-    }
+    return item.resolvedSubtitle
 }
 
 private fun buildDetailMetaPairs(
@@ -608,7 +598,11 @@ private fun buildDetailMetaPairs(
     val resolvedUpdate = resolveDetailUpdateLabel(item, sources)
 
     return item.metaPairs.map { (label, value) ->
-        if (label == "更新" && resolvedUpdate.isNotBlank()) label to resolvedUpdate else label to value
+        when (label) {
+            "更新" -> label to resolvedUpdate.ifBlank { value }
+            "发布日期" -> label to item.publishedAtText.ifBlank { value }
+            else -> label to value
+        }
     }
 }
 
@@ -622,7 +616,7 @@ private fun resolveDetailUpdateLabel(
         .maxOrNull()
         ?.takeIf { it > 1 }
 
-    val currentUpdate = item.metaPairs.firstOrNull { it.first == "更新" }?.second.orEmpty()
+    val currentUpdate = item.resolvedUpdateLabel
     val parsedUpdateEpisode = extractEpisodeNumber(currentUpdate)
     return when {
         detectedLatestEpisode != null && (parsedUpdateEpisode == null || detectedLatestEpisode > parsedUpdateEpisode) ->

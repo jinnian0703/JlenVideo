@@ -52,7 +52,7 @@ fun DetailScreen(
             val item = detailItem
             val source = state.selectedSource
             val detailSubtitle = remember(item, state.sources) {
-                resolvedDetailSubtitle(item, state.sources).ifBlank { "站内资源" }
+                resolvedDetailSubtitle(item).ifBlank { "站内资源" }
             }
             val detailListState = rememberLazyListState()
 
