@@ -22,16 +22,6 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshHome(forceRefresh: Boo
             }
         }.onSuccess { payload ->
             updateHomeState(homeStateFromPayload(payload))
-            viewModelScope.launch enrichLaunch@{
-                val enrichedPayload = runCatching {
-                    withContext(Dispatchers.IO) {
-                        legacyRepository().enrichHomeDisplayItems(payload)
-                    }
-                }.getOrNull() ?: return@enrichLaunch
-                if (enrichedPayload != payload) {
-                    updateHomeState(homeStateWithEnrichedPayload(currentHomeState(), enrichedPayload))
-                }
-            }
         }.onFailure { error ->
             updateHomeState(
                 homeStateWithHomeError(

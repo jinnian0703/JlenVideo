@@ -1,9 +1,6 @@
 package top.jlen.vod.data
 
 import java.io.IOException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import org.jsoup.nodes.Document
 
 internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyClearMemoryCaches() {
@@ -170,73 +167,5 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFreshHome(
     ).also { payload ->
         runtimeCacheHomePayload(payload)
         runtimeCleanupCachesIfNeeded()
-    }
-}
-
-internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyEnrichHomeDisplayItems(
-    payload: HomePayload
-): HomePayload {
-    if (
-        payload.slides.isEmpty() &&
-        payload.hot.isEmpty() &&
-        payload.featured.isEmpty() &&
-        payload.latest.isEmpty() &&
-        payload.categoryVideos.isEmpty()
-    ) {
-        return payload
-    }
-
-    val enrichedSlides = enrichHomePreviewItems(payload.slides, limit = 4)
-    val enrichedHot = enrichHomePreviewItems(payload.hot, limit = 4)
-    val enrichedFeatured = enrichHomePreviewItems(payload.featured, limit = 6)
-    val enrichedLatest = enrichHomePreviewItems(payload.latest, limit = 8)
-    val enrichedCategoryVideos = payload.categoryVideos
-
-    val enrichedPayload = payload.copy(
-        slides = enrichedSlides,
-        hot = enrichedHot,
-        featured = enrichedFeatured,
-        latest = enrichedLatest,
-        categoryVideos = enrichedCategoryVideos
-    )
-    if (enrichedPayload != payload) {
-        runtimeRememberPreviewItems(
-            enrichedSlides + enrichedHot + enrichedFeatured + enrichedLatest + enrichedCategoryVideos
-        )
-        runtimeCacheHomePayload(enrichedPayload)
-    }
-    return enrichedPayload
-}
-
-private suspend fun LegacyAppleCmsRuntimeRepositoryCore.enrichHomePreviewItems(
-    items: List<VodItem>,
-    limit: Int
-): List<VodItem> {
-    if (items.isEmpty() || limit <= 0) return items
-    val enrichTargets = items
-        .take(limit)
-        .filter { item ->
-            item.vodId.isNotBlank() &&
-                item.resolvedLatestEpisodeNumber == null &&
-                item.vodPlayUrl.isNullOrBlank()
-        }
-    if (enrichTargets.isEmpty()) return items
-    val enrichedById = coroutineScope {
-        enrichTargets.map { item ->
-            async {
-                val vodId = item.vodId.trim()
-                if (vodId.isBlank()) return@async vodId to item
-                val detailItem = runCatching { loadDetail(vodId) }.getOrNull()
-                val mergedItem = when {
-                    detailItem == null -> item
-                    detailMatchesPreview(detailItem, item) -> mergePreviewIntoDetail(item, detailItem)
-                    else -> item
-                }
-                vodId to mergedItem
-            }
-        }.awaitAll().toMap()
-    }
-    return items.map { item ->
-        enrichedById[item.vodId.trim()] ?: item
     }
 }
