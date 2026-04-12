@@ -125,7 +125,7 @@ data class VodItem(
         get() = null
 
     val resolvedUpdateLabel: String
-        get() = firstNotBlank(vodRemarks, vodPubdate, "")
+        get() = selectUpdateValue()
 
     val resolvedSubtitle: String
         get() = subtitle
@@ -149,7 +149,7 @@ data class VodItem(
             "地区" to firstNotBlank(vodArea, "未知"),
             "年份" to firstNotBlank(vodYear, "未知"),
             "语言" to firstNotBlank(vodLang, "未知"),
-            "更新" to firstNotBlank(vodRemarks, vodPubdate, "站内资源")
+            "更新" to selectUpdateValue().ifBlank { "站内资源" }
         )
 
     val tags: List<String>
@@ -198,12 +198,37 @@ data class VodItem(
             .firstOrNull { it.isNotBlank() }
             .orEmpty()
 
+    private fun selectUpdateValue(): String {
+        val remarks = sanitizeDisplayValue(vodRemarks)
+        if (remarks.isNotBlank()) return remarks
+
+        val publishMeta = sanitizeDisplayValue(vodPubdate)
+        return publishMeta.takeIf(::looksLikeUpdateLabel).orEmpty()
+    }
+
     private fun isDuplicateTitleValue(value: String): Boolean {
         val normalizedValue = value.trim()
         val normalizedTitle = displayTitle.trim()
         return normalizedValue.isNotBlank() &&
             normalizedTitle.isNotBlank() &&
             normalizedValue.equals(normalizedTitle, ignoreCase = true)
+    }
+
+    private fun looksLikeUpdateLabel(value: String): Boolean {
+        if (value.isBlank()) return false
+        val normalized = value.replace(Regex("\\s+"), "")
+        val patterns = listOf(
+            Regex("""^更新至第?\d{1,4}集?$"""),
+            Regex("""^第\d{1,4}集$"""),
+            Regex("""^\d{1,4}集$"""),
+            Regex("""^第\d{1,4}期$"""),
+            Regex("""^\d{1,8}期$"""),
+            Regex("""^全\d{1,4}集$"""),
+            Regex("""^共\d{1,4}集$"""),
+            Regex("""^\d{1,4}集全$"""),
+            Regex("""^(完结|已完结|完結|全集|正片|抢先版?|抢先看|预告|HD|TC|SP|OVA|PV)$""")
+        )
+        return patterns.any { it.matches(normalized) }
     }
 }
 

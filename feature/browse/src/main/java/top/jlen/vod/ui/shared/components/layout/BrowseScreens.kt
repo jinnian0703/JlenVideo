@@ -446,7 +446,7 @@ fun FeaturedCard(
     onClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val badgeText = compactPosterBadgeText(item.resolvedBadgeText)
+    val badgeText = posterBadgeText(item.resolvedBadgeText, compact = false)
     val subtitle = item.resolvedSubtitle.ifBlank { "精选推荐" }
 
     Card(
@@ -846,7 +846,7 @@ private fun CompactPosterCard(
     onClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val badgeText = compactPosterBadgeText(item.resolvedBadgeText)
+    val badgeText = posterBadgeText(item.resolvedBadgeText, compact = true)
 
     Column(modifier = modifier.clickable { onClick(item.vodId) }) {
         Box {
@@ -1166,7 +1166,7 @@ private val announcementBlockTags = setOf(
     "center"
 )
 
-private fun compactPosterBadgeText(raw: String): String {
+private fun posterBadgeText(raw: String, compact: Boolean): String {
     val normalized = raw
         .replace(Regex("\\s+"), " ")
         .trim()
@@ -1176,10 +1176,12 @@ private fun compactPosterBadgeText(raw: String): String {
         .replace(Regex("^NO\\s*\\d+[\\d\\s]*"), "")
         .trim()
 
+    if (!isMeaningfulPosterBadge(trimmedRankPrefix)) return ""
+
     val compactEpisodeBadge = when {
-        trimmedRankPrefix.matches(Regex("^更新至第\\d{1,4}集?$")) ->
+        compact && trimmedRankPrefix.matches(Regex("^更新至第\\d{1,4}集?$")) ->
             trimmedRankPrefix.replace(Regex("^更新至第(\\d{1,4})集?$"), "第$1集")
-        trimmedRankPrefix.matches(Regex("^更新至\\d{1,4}集?$")) ->
+        compact && trimmedRankPrefix.matches(Regex("^更新至\\d{1,4}集?$")) ->
             trimmedRankPrefix.replace(Regex("^更新至(\\d{1,4})集?$"), "第$1集")
         trimmedRankPrefix.matches(Regex("^第\\d{1,4}$")) -> "${trimmedRankPrefix}集"
         else -> trimmedRankPrefix
@@ -1192,44 +1194,21 @@ private fun compactPosterBadgeText(raw: String): String {
     }
 }
 
-private fun normalizePosterBadgeText(raw: String): String {
-    val normalized = raw
-        .replace(Regex("\\s+"), " ")
-        .trim()
-    if (normalized.isBlank()) return ""
-
-    val trimmedRankPrefix = normalized
-        .replace(Regex("^NO\\s*\\d+[\\d\\s]*"), "")
-        .trim()
-
-    val normalizedEpisodeBadge = when {
-        trimmedRankPrefix.matches(Regex("^更新至第\\d{1,4}$")) -> "${trimmedRankPrefix}集"
-        trimmedRankPrefix.matches(Regex("^第\\d{1,4}$")) -> "${trimmedRankPrefix}集"
-        else -> trimmedRankPrefix
-    }
-
-    return when {
-        normalizedEpisodeBadge.matches(Regex("^[.、·•-]+$")) -> ""
-        normalizedEpisodeBadge.isBlank() -> ""
-        else -> normalizedEpisodeBadge
-    }
-}
-
-private fun sanitizePosterBadge(raw: String): String {
-    val normalized = raw
-        .replace(Regex("\\s+"), " ")
-        .trim()
-    if (normalized.isBlank()) return ""
-
-    val trimmedRankPrefix = normalized
-        .replace(Regex("^NO\\s*\\d+[\\d\\s]*"), "")
-        .trim()
-
-    return when {
-        trimmedRankPrefix.matches(Regex("^[.、·•-]+$")) -> ""
-        trimmedRankPrefix.isBlank() -> ""
-        else -> trimmedRankPrefix
-    }
+private fun isMeaningfulPosterBadge(text: String): Boolean {
+    if (text.isBlank()) return false
+    val normalized = text.replace(Regex("\\s+"), "")
+    val patterns = listOf(
+        Regex("""^更新至第?\d{1,4}集?$"""),
+        Regex("""^第\d{1,4}集$"""),
+        Regex("""^\d{1,4}集$"""),
+        Regex("""^第\d{1,4}期$"""),
+        Regex("""^\d{1,8}期$"""),
+        Regex("""^全\d{1,4}集$"""),
+        Regex("""^共\d{1,4}集$"""),
+        Regex("""^\d{1,4}集全$"""),
+        Regex("""^(完结|已完结|完結|全集|正片|抢先版?|抢先看|预告|HD|TC|SP|OVA|PV)$""")
+    )
+    return patterns.any { it.matches(normalized) }
 }
 
 internal fun LazyListState.maxVisiblePosterRowIndex(rowKeyPrefix: String): Int =
@@ -1322,7 +1301,9 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    item.resolvedBadgeText.takeIf { it.isNotBlank() }?.let { badge ->
+                    posterBadgeText(item.resolvedBadgeText, compact = false)
+                        .takeIf { it.isNotBlank() }
+                        ?.let { badge ->
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(999.dp))
