@@ -180,7 +180,7 @@ fun DetailScreen(
                         }
                     }
                 }
-                item { DetailInfoCard(item = item) }
+                item { DetailInfoCard(item = item, sources = state.sources) }
                 if (state.sources.isNotEmpty()) {
                     item { SectionTitle(title = "播放线路", action = null, onAction = {}) }
                     item {

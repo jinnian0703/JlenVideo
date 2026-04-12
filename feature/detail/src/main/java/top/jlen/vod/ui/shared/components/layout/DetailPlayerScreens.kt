@@ -84,6 +84,7 @@ import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.delay
 import top.jlen.vod.data.Episode
+import top.jlen.vod.data.PlaySource
 import top.jlen.vod.data.VodItem
 
 @Composable
@@ -194,7 +195,10 @@ internal fun DetailHero(item: VodItem, onBack: () -> Unit, darkMode: Boolean = i
 }
 
 @Composable
-internal fun DetailInfoCard(item: VodItem) {
+internal fun DetailInfoCard(
+    item: VodItem,
+    sources: List<PlaySource> = emptyList()
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -203,8 +207,11 @@ internal fun DetailInfoCard(item: VodItem) {
         shape = RoundedCornerShape(24.dp),
         border = BorderStroke(1.dp, UiPalette.Border)
     ) {
+        val metaPairs = remember(item, sources) {
+            buildDetailMetaPairs(item, sources)
+        }
         Column(modifier = Modifier.padding(18.dp)) {
-            item.metaPairs.forEach { (label, value) ->
+            metaPairs.forEach { (label, value) ->
                 Text(
                     text = "$label：$value",
                     style = MaterialTheme.typography.bodyMedium,
@@ -575,6 +582,43 @@ internal fun DetailActionNotice(
                 color = textColor
             )
         }
+    }
+}
+
+private fun buildDetailMetaPairs(
+    item: VodItem,
+    sources: List<PlaySource>
+): List<Pair<String, String>> {
+    val detectedLatestEpisode = sources
+        .flatMap { source -> source.episodes }
+        .mapNotNull { episode -> extractEpisodeNumber(episode.name) }
+        .maxOrNull()
+        ?.takeIf { it > 1 }
+
+    val currentUpdate = item.metaPairs.firstOrNull { it.first == "更新" }?.second.orEmpty()
+    val parsedUpdateEpisode = extractEpisodeNumber(currentUpdate)
+    val resolvedUpdate = when {
+        detectedLatestEpisode != null && (parsedUpdateEpisode == null || detectedLatestEpisode > parsedUpdateEpisode) ->
+            "更新至第${detectedLatestEpisode}集"
+        else -> currentUpdate
+    }
+
+    return item.metaPairs.map { (label, value) ->
+        if (label == "更新" && resolvedUpdate.isNotBlank()) label to resolvedUpdate else label to value
+    }
+}
+
+private fun extractEpisodeNumber(text: String): Int? {
+    if (text.isBlank()) return null
+    val patterns = listOf(
+        Regex("""更新至第\s*(\d{1,4})\s*集?"""),
+        Regex("""第\s*(\d{1,4})\s*集"""),
+        Regex("""(\d{1,4})\s*集全"""),
+        Regex("""全\s*(\d{1,4})\s*集"""),
+        Regex("""共\s*(\d{1,4})\s*集""")
+    )
+    return patterns.firstNotNullOfOrNull { pattern ->
+        pattern.find(text)?.groupValues?.getOrNull(1)?.toIntOrNull()
     }
 }
 
