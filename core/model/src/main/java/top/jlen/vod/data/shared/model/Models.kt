@@ -114,6 +114,7 @@ data class VodItem(
     val subtitle: String
         get() = listOf(vodRemarks, vodSub, typeName, vodYear, vodArea)
             .map(::sanitizeDisplayValue)
+            .filterNot(::isDuplicateTitleValue)
             .filter { it.isNotBlank() }
             .joinToString(" | ")
 
@@ -193,8 +194,17 @@ data class VodItem(
     private fun firstNotBlank(vararg values: String?): String =
         values
             .map(::sanitizeDisplayValue)
+            .filterNot(::isDuplicateTitleValue)
             .firstOrNull { it.isNotBlank() }
             .orEmpty()
+
+    private fun isDuplicateTitleValue(value: String): Boolean {
+        val normalizedValue = value.trim()
+        val normalizedTitle = displayTitle.trim()
+        return normalizedValue.isNotBlank() &&
+            normalizedTitle.isNotBlank() &&
+            normalizedValue.equals(normalizedTitle, ignoreCase = true)
+    }
 }
 
 fun sanitizeUserFacingToken(value: String?): String =
