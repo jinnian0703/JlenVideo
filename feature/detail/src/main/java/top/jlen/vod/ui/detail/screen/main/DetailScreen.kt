@@ -19,6 +19,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +51,9 @@ fun DetailScreen(
         else -> {
             val item = detailItem
             val source = state.selectedSource
+            val detailSubtitle = remember(item, state.sources) {
+                resolvedDetailSubtitle(item, state.sources).ifBlank { "站内资源" }
+            }
             val detailListState = rememberLazyListState()
 
             LaunchedEffect(state.actionMessage, state.isActionError) {
@@ -86,7 +90,7 @@ fun DetailScreen(
                             color = UiPalette.Ink
                         )
                         Text(
-                            text = item.subtitle.ifBlank { "站内资源" },
+                            text = detailSubtitle,
                             style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
                             color = UiPalette.TextSecondary
                         )

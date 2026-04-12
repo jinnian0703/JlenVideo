@@ -28,7 +28,7 @@ internal fun mergePreviewIntoDetail(preview: VodItem, detail: VodItem): VodItem 
         vodName = preview.vodName.ifBlank { detail.vodName },
         vodSub = preview.vodSub ?: detail.vodSub,
         vodPic = preview.vodPic ?: detail.vodPic,
-        vodRemarks = preview.vodRemarks ?: detail.vodRemarks,
+        vodRemarks = detail.vodRemarks?.takeIf { it.isNotBlank() } ?: preview.vodRemarks,
         vodBlurb = preview.vodBlurb ?: detail.vodBlurb,
         vodContent = preview.vodContent ?: detail.vodContent,
         vodYear = preview.vodYear ?: detail.vodYear,
