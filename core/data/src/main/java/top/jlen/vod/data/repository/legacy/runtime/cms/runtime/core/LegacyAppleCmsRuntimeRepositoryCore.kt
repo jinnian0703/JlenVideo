@@ -555,6 +555,9 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     suspend fun loadHome(forceRefresh: Boolean = false): HomePayload = legacyLoadHome(forceRefresh)
 
+    suspend fun enrichHomeDisplayItems(payload: HomePayload): HomePayload =
+        legacyEnrichHomeDisplayItems(payload)
+
     private suspend fun loadEmergencyHome(): HomePayload = legacyLoadEmergencyHome()
 
     private suspend fun loadFreshHome(forceRefresh: Boolean): HomePayload =
