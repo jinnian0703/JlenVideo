@@ -160,13 +160,13 @@ fun HomeScreen(
 
     LaunchedEffect(
         state.featured.map(VodItem::stableKey),
-        state.visibleLatest.take(9).map(VodItem::stableKey)
+        state.visibleLatest.take(6).map(VodItem::stableKey)
     ) {
         val imageLoader = context.imageLoader
-        state.featured.take(4).forEach { item ->
+        state.featured.take(2).forEach { item ->
             imageLoader.enqueue(buildPosterRequest(context, item.vodPic, 720, 432))
         }
-        state.visibleLatest.take(9).forEach { item ->
+        state.visibleLatest.take(6).forEach { item ->
             imageLoader.enqueue(buildPosterRequest(context, item.vodPic, 360, 520))
         }
     }

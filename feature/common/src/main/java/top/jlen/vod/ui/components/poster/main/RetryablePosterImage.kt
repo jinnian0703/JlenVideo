@@ -41,7 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImagePainter
-import coil.compose.SubcomposeAsyncImage
+import coil.compose.rememberAsyncImagePainter
 
 enum class PosterFallbackStyle {
     Default,
@@ -59,39 +59,48 @@ fun RetryablePosterImage(
     retryLabel: String = "重试",
     showFallbackTitle: Boolean = true,
     fallbackStyle: PosterFallbackStyle = PosterFallbackStyle.Default,
-    fallbackBottomInset: Dp = 0.dp
+    fallbackBottomInset: Dp = 0.dp,
+    lightweightPlaceholder: Boolean = false
 ) {
     var retryToken by remember(data, title, width, height) { mutableIntStateOf(0) }
+    val request = rememberPosterRequest(
+        data = data,
+        width = width,
+        height = height,
+        retryToken = retryToken
+    )
+    val painter = rememberAsyncImagePainter(model = request, contentScale = contentScale)
 
-    SubcomposeAsyncImage(
-        model = rememberPosterRequest(
-            data = data,
-            width = width,
-            height = height,
-            retryToken = retryToken
-        ),
-        contentDescription = title,
-        modifier = modifier,
-        contentScale = contentScale
-    ) {
+    Box(modifier = modifier) {
         when (painter.state) {
-            is AsyncImagePainter.State.Loading -> PosterSkeletonPlaceholder(title = title)
-            is AsyncImagePainter.State.Error,
-            is AsyncImagePainter.State.Empty -> PosterRetryFallback(
-                title = title,
-                retryLabel = retryLabel,
-                onRetry = { retryToken += 1 },
-                showTitle = showFallbackTitle,
-                style = fallbackStyle,
-                bottomInset = fallbackBottomInset
-            )
+            is AsyncImagePainter.State.Success -> {
+                Image(
+                    painter = painter,
+                    contentDescription = title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = contentScale
+                )
+            }
 
-            else -> Image(
-                painter = painter,
-                contentDescription = title,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = contentScale
-            )
+            is AsyncImagePainter.State.Loading -> {
+                if (lightweightPlaceholder) {
+                    StaticPosterPlaceholder(title = title)
+                } else {
+                    PosterSkeletonPlaceholder(title = title)
+                }
+            }
+
+            is AsyncImagePainter.State.Error,
+            is AsyncImagePainter.State.Empty -> {
+                PosterRetryFallback(
+                    title = title,
+                    retryLabel = retryLabel,
+                    onRetry = { retryToken += 1 },
+                    showTitle = showFallbackTitle,
+                    style = fallbackStyle,
+                    bottomInset = fallbackBottomInset
+                )
+            }
         }
     }
 }
@@ -273,6 +282,26 @@ private fun PosterSkeletonPlaceholder(title: String) {
                     end = Offset(620f * (shift + 1.2f), 620f * (shift + 1.2f))
                 )
             )
+            .padding(12.dp),
+        contentAlignment = Alignment.BottomStart
+    ) {
+        Text(
+            text = title.ifBlank { "加载中" },
+            color = UiPalette.TextMuted,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun StaticPosterPlaceholder(title: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(UiPalette.SurfaceSoft)
             .padding(12.dp),
         contentAlignment = Alignment.BottomStart
     ) {

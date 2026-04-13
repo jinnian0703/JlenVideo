@@ -80,20 +80,14 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyEnrichSearchResul
                 val description = detailItem?.description
                     ?.takeIf { it.isNotBlank() && it != "暂无简介" }
                     .orEmpty()
-                item.vodId to (
-                    detailItem?.let { detail ->
-                        item.copy(
-                            vodSub = detail.vodSub?.takeIf { it.isNotBlank() } ?: item.vodSub,
-                            compatSubtitle = detail.compatSubtitle?.takeIf { it.isNotBlank() } ?: item.compatSubtitle,
-                            vodRemarks = detail.vodRemarks?.takeIf { it.isNotBlank() } ?: item.vodRemarks,
-                            compatBadgeText = detail.compatBadgeText?.takeIf { it.isNotBlank() } ?: item.compatBadgeText,
-                            episodeRemark = detail.episodeRemark?.takeIf { it.isNotBlank() } ?: item.episodeRemark,
-                            vodPlayUrl = detail.vodPlayUrl?.takeIf { it.isNotBlank() } ?: item.vodPlayUrl,
-                            vodBlurb = description.ifBlank { item.vodBlurb },
-                            vodContent = description.ifBlank { item.vodContent }
-                        )
-                    } ?: item
-                )
+                item.vodId to if (description.isNotBlank()) {
+                    item.copy(
+                        vodBlurb = description,
+                        vodContent = description
+                    )
+                } else {
+                    item
+                }
             }
         }.awaitAll().toMap()
     }

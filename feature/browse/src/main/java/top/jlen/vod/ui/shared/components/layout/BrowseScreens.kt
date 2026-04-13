@@ -424,7 +424,8 @@ private fun PosterImage(
     contentScale: ContentScale = ContentScale.Crop,
     showFallbackTitle: Boolean = true,
     fallbackStyle: PosterFallbackStyle = PosterFallbackStyle.Default,
-    fallbackBottomInset: Dp = 0.dp
+    fallbackBottomInset: Dp = 0.dp,
+    lightweightPlaceholder: Boolean = false
 ) {
     RetryablePosterImage(
         data = data,
@@ -435,7 +436,8 @@ private fun PosterImage(
         contentScale = contentScale,
         showFallbackTitle = showFallbackTitle,
         fallbackStyle = fallbackStyle,
-        fallbackBottomInset = fallbackBottomInset
+        fallbackBottomInset = fallbackBottomInset,
+        lightweightPlaceholder = lightweightPlaceholder
     )
 }
 
@@ -590,17 +592,13 @@ internal fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String
         else -> pagerState.settledPage - 1
     }
 
-    LaunchedEffect(actualCount, pagerState.settledPage) {
-        if (actualCount <= 1) return@LaunchedEffect
-        when (pagerState.settledPage) {
-            0 -> pagerState.scrollToPage(actualCount)
-            loopItems.lastIndex -> pagerState.scrollToPage(1)
-        }
-    }
-
     LaunchedEffect(actualCount) {
         if (actualCount <= 1) return@LaunchedEffect
         while (true) {
+            when (pagerState.currentPage) {
+                0 -> pagerState.scrollToPage(actualCount)
+                loopItems.lastIndex -> pagerState.scrollToPage(1)
+            }
             delay(UiMotion.CarouselAutoScrollMillis)
             if (!pagerState.isScrollInProgress) {
                 pagerState.animateScrollToPage(
@@ -626,17 +624,16 @@ internal fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String
             val pageOffset = (
                 (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
             ).absoluteValue.coerceIn(0f, 1f)
-            val scale = 1f - (pageOffset * 0.05f)
             val alpha = 1f - (pageOffset * 0.18f)
+            val translationX = pageOffset * 12f
             FeaturedCard(
                 item = loopItems[page],
                 onClick = onOpenDetail,
                 modifier = Modifier
                     .width(318.dp)
                     .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
                         this.alpha = alpha
+                        this.translationX = translationX
                     }
             )
         }
@@ -862,7 +859,8 @@ private fun CompactPosterCard(
                 contentScale = ContentScale.Crop,
                 showFallbackTitle = true,
                 fallbackStyle = PosterFallbackStyle.CompactTitle,
-                fallbackBottomInset = 30.dp
+                fallbackBottomInset = 30.dp,
+                lightweightPlaceholder = true
             )
             if (badgeText.isNotBlank()) {
                 PosterBadgeText(
