@@ -30,8 +30,8 @@ JlenVideo 是一个基于 **Kotlin + Jetpack Compose + Media3** 开发的苹果 
 | --- | --- |
 | 项目名 | `JlenVideo` |
 | Application Id | `top.jlen.vod` |
-| 当前版本 | `2.1.1.3` |
-| 当前 versionCode | `29` |
+| 当前版本 | `2.1.1.4` |
+| 当前 versionCode | `30` |
 | minSdk | `24` |
 | targetSdk | `34` |
 | compileSdk | `34` |
@@ -120,7 +120,7 @@ feature/player/.../NativeVideoPlayer.kt
 
 ### APK 输出
 
-- [JlenVideo-2.1.1.3-debug.apk](/F:/codex/1/app/build/outputs/apk/debug/JlenVideo-2.1.1.3-debug.apk)
+- [JlenVideo-2.1.1.4-debug.apk](/F:/codex/1/app/build/outputs/apk/debug/JlenVideo-2.1.1.4-debug.apk)
 
 ---
 
