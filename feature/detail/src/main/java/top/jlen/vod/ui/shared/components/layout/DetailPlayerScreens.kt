@@ -599,11 +599,23 @@ private fun buildDetailMetaPairs(
 
     return item.metaPairs.map { (label, value) ->
         when (label) {
-            "更新" -> label to resolvedUpdate.ifBlank { value }
+            "更新" -> detailUpdateMetaLabel(resolvedUpdate) to resolvedUpdate.ifBlank { value }
             "发布日期" -> label to item.publishedAtText.ifBlank { value }
             else -> label to value
         }
     }
+}
+
+private fun detailUpdateMetaLabel(value: String): String =
+    if (isEpisodeStyleUpdate(value)) "更新" else "状态"
+
+private fun isEpisodeStyleUpdate(value: String): Boolean {
+    if (value.isBlank()) return false
+    val normalized = value.replace(Regex("\\s+"), "")
+    return normalized.contains("更新至") ||
+        normalized.contains("集") ||
+        normalized.contains("期") ||
+        normalized.matches(Regex("""^第\d{1,8}$"""))
 }
 
 private fun resolveDetailUpdateLabel(

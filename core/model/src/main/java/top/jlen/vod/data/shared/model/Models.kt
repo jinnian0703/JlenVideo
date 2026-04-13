@@ -236,6 +236,7 @@ data class VodItem(
     private fun normalizeEpisodeBadge(raw: String): String {
         val normalized = sanitizeDisplayValue(raw).replace(Regex("\\s+"), "")
         if (normalized.isBlank()) return ""
+        val localizedStatusSuffix = "(国语|粤语|英语|日语|韩语|法语|德语|俄语|泰语|中字|双字|中字版|双语版|国语版|粤语版)?"
         return when {
             normalized.matches(Regex("""^更新至第?\d{1,4}集?$""")) -> normalized
             normalized.matches(Regex("""^更新至第?\d{1,8}期$""")) -> normalized
@@ -248,7 +249,9 @@ data class VodItem(
             normalized.matches(Regex("""^\d{1,4}集全$""")) -> normalized
             normalized.matches(Regex("""^\d{1,4}$""")) -> "第${normalized}集"
             normalized.matches(Regex("""^\d{8}$""")) -> "${normalized}期"
-            normalized in setOf("完结", "已完结", "完結", "全集", "正片", "抢先版", "抢先看", "预告", "HD", "TC", "SP", "OVA", "PV") -> normalized
+            normalized in setOf("完结", "已完结", "完結", "全集") -> normalized
+            normalized.matches(Regex("""^(正片|抢先版?|抢先看|预告)$localizedStatusSuffix$""")) -> normalized
+            normalized.matches(Regex("""^(HD|BD|TC|TS|CAM|DVD|4K|SP|OVA|PV)$localizedStatusSuffix$""")) -> normalized
             else -> ""
         }
     }

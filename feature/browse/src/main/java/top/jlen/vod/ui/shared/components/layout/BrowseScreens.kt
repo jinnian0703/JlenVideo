@@ -1202,6 +1202,7 @@ private fun posterBadgeText(raw: String, compact: Boolean): String {
 private fun isMeaningfulPosterBadge(text: String): Boolean {
     if (text.isBlank()) return false
     val normalized = text.replace(Regex("\\s+"), "")
+    val localizedStatusSuffix = "(国语|粤语|英语|日语|韩语|法语|德语|俄语|泰语|中字|双字|中字版|双语版|国语版|粤语版)?"
     val patterns = listOf(
         Regex("""^更新至第?\d{1,4}集?$"""),
         Regex("""^更新至第?\d{1,4}$"""),
@@ -1215,7 +1216,9 @@ private fun isMeaningfulPosterBadge(text: String): Boolean {
         Regex("""^全\d{1,4}集$"""),
         Regex("""^共\d{1,4}集$"""),
         Regex("""^\d{1,4}集全$"""),
-        Regex("""^(完结|已完结|完結|全集|正片|抢先版?|抢先看|预告|HD|TC|SP|OVA|PV)$""")
+        Regex("""^(完结|已完结|完結|全集)$"""),
+        Regex("""^(正片|抢先版?|抢先看|预告)$localizedStatusSuffix$"""),
+        Regex("""^(HD|BD|TC|TS|CAM|DVD|4K|SP|OVA|PV)$localizedStatusSuffix$""")
     )
     return patterns.any { it.matches(normalized) }
 }
