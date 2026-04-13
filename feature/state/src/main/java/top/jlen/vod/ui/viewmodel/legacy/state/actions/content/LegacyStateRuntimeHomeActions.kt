@@ -2,6 +2,7 @@ package top.jlen.vod.ui
 
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.jlen.vod.data.AppleCmsCategory
@@ -22,6 +23,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshHome(forceRefresh: Boo
             }
         }.onSuccess { payload ->
             updateHomeState(homeStateFromPayload(payload))
+            legacyScheduleHomePreviewEnrich()
         }.onFailure { error ->
             updateHomeState(
                 homeStateWithHomeError(
@@ -94,6 +96,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadCategoryContent(
             }
         }.onSuccess { payload ->
             updateHomeState(homeStateWithCategoryPage(currentHomeState(), payload))
+            legacyScheduleCategoryPreviewEnrich()
         }.onFailure { error ->
             updateHomeState(
                 homeStateWithCategoryError(
@@ -129,6 +132,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreHome() {
                     payload
                 )
             )
+            legacyScheduleHomePreviewEnrich()
         }.onFailure { error ->
             updateHomeState(
                 homeStateWithHomeAppendError(
@@ -169,6 +173,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreCategory() {
                     payload
                 )
             )
+            legacyScheduleCategoryPreviewEnrich()
         }.onFailure { error ->
             updateHomeState(
                 homeStateWithCategoryAppendError(
@@ -190,4 +195,43 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshCategoryTab(forceRefre
     } else {
         legacySelectCategory(selectedCategory, forceRefresh = forceRefresh)
     }
+}
+
+private fun LegacyStateRuntimeViewModelCore.legacyScheduleHomePreviewEnrich() {
+    currentHomePreviewEnrichJob()?.cancel()
+    val featuredSnapshot = currentHomeState().featured
+    val latestSnapshot = currentHomeState().latest
+    replaceHomePreviewEnrichJob(viewModelScope.launch {
+        delay(180)
+        val enrichedFeatured = withContext(Dispatchers.IO) {
+            legacyRepository().enrichPreviewDisplayMetadata(featuredSnapshot, limit = 4)
+        }
+        val enrichedLatest = withContext(Dispatchers.IO) {
+            legacyRepository().enrichPreviewDisplayMetadata(latestSnapshot, limit = 8)
+        }
+        val current = currentHomeState()
+        if (current.featured != featuredSnapshot && current.latest != latestSnapshot) return@launch
+        updateHomeState(
+            current.copy(
+                featured = if (current.featured == featuredSnapshot) enrichedFeatured else current.featured,
+                latest = if (current.latest == latestSnapshot) enrichedLatest else current.latest
+            )
+        )
+    })
+}
+
+private fun LegacyStateRuntimeViewModelCore.legacyScheduleCategoryPreviewEnrich() {
+    currentCategoryPreviewEnrichJob()?.cancel()
+    val selectedTypeId = currentHomeState().selectedCategory?.typeId.orEmpty()
+    val categorySnapshot = currentHomeState().categoryVideos
+    replaceCategoryPreviewEnrichJob(viewModelScope.launch {
+        delay(180)
+        val enriched = withContext(Dispatchers.IO) {
+            legacyRepository().enrichPreviewDisplayMetadata(categorySnapshot, limit = 8)
+        }
+        val current = currentHomeState()
+        if (current.selectedCategory?.typeId.orEmpty() != selectedTypeId) return@launch
+        if (current.categoryVideos != categorySnapshot) return@launch
+        updateHomeState(current.copy(categoryVideos = enriched))
+    })
 }

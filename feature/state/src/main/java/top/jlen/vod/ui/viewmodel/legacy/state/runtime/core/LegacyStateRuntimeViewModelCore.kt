@@ -40,6 +40,8 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
     private var searchJob: Job? = null
     private var searchSuggestJob: Job? = null
     private var searchEnrichJob: Job? = null
+    private var homePreviewEnrichJob: Job? = null
+    private var categoryPreviewEnrichJob: Job? = null
     private var historyEnrichJob: Job? = null
     private var searchRequestVersion: Long = 0L
     private var searchSuggestRequestVersion: Long = 0L
@@ -178,6 +180,18 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
 
     internal fun replaceSearchEnrichJob(value: Job?) {
         searchEnrichJob = value
+    }
+
+    internal fun currentHomePreviewEnrichJob(): Job? = homePreviewEnrichJob
+
+    internal fun replaceHomePreviewEnrichJob(value: Job?) {
+        homePreviewEnrichJob = value
+    }
+
+    internal fun currentCategoryPreviewEnrichJob(): Job? = categoryPreviewEnrichJob
+
+    internal fun replaceCategoryPreviewEnrichJob(value: Job?) {
+        categoryPreviewEnrichJob = value
     }
 
     internal fun currentSearchSuggestJob(): Job? = searchSuggestJob

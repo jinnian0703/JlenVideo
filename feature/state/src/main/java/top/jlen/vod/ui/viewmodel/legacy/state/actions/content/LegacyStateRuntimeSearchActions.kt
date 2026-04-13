@@ -115,6 +115,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyPerformSearch(keyword: String
 
             if (firstPage.items.isNotEmpty()) {
                 replaceSearchEnrichJob(viewModelScope.launch searchEnrichLaunch@{
+                    delay(180)
                     val enrichedResults = withContext(Dispatchers.IO) {
                         legacyRepository().enrichSearchResults(firstPage.items, limit = 8)
                     }
@@ -155,6 +156,16 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreSearchResults() {
             }
         }.onSuccess { page ->
             updateSearchState(searchStateWithAppendedPage(currentSearchState(), page))
+            val mergedResults = currentSearchState().results
+            currentSearchEnrichJob()?.cancel()
+            replaceSearchEnrichJob(viewModelScope.launch searchAppendEnrichLaunch@{
+                delay(180)
+                val enrichedResults = withContext(Dispatchers.IO) {
+                    legacyRepository().enrichPreviewDisplayMetadata(mergedResults, limit = 8)
+                }
+                if (currentSearchState().results != mergedResults) return@searchAppendEnrichLaunch
+                updateSearchState(searchStateWithEnrichedResults(currentSearchState(), enrichedResults))
+            })
         }.onFailure { error ->
             updateSearchState(
                 searchStateWithAppendError(

@@ -785,6 +785,29 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     suspend fun enrichSearchResults(items: List<VodItem>, limit: Int = 8): List<VodItem> =
         legacyEnrichSearchResults(items, limit)
 
+    suspend fun enrichPreviewDisplayMetadata(items: List<VodItem>, limit: Int = 6): List<VodItem> {
+        if (items.isEmpty()) return items
+        val enrichTargets = items
+            .asSequence()
+            .filter { it.needsPreviewMetadataEnrich() }
+            .distinctBy { it.vodId }
+            .take(limit)
+            .toList()
+        if (enrichTargets.isEmpty()) return items
+
+        val enrichedById = coroutineScope {
+            enrichTargets.map { item ->
+                async {
+                    val detailItem = runCatching { loadDetail(item.vodId) }.getOrNull()
+                    item.vodId to (detailItem?.let { item.mergeDisplayMetadataFrom(it) } ?: item)
+                }
+            }.awaitAll().toMap()
+        }
+
+        return items.map { item -> enrichedById[item.vodId] ?: item }
+            .also(::rememberPreviewItems)
+    }
+
     suspend fun loadHotSearchGroups(forceRefresh: Boolean = false): List<HotSearchGroup> {
         if (!forceRefresh) {
             hotSearchCache
@@ -3083,6 +3106,20 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         else previewItemCache[vodId]
             ?.takeIf { isCacheValid(it.timestampMs, PREVIEW_ITEM_CACHE_TTL_MS) }
             ?.value
+
+    private fun VodItem.needsPreviewMetadataEnrich(): Boolean =
+        vodId.isNotBlank() &&
+            resolvedBadgeText.isBlank() &&
+            (compatBadgeText.isNullOrBlank() && vodRemarks.isNullOrBlank() && vodPlayUrl.isNullOrBlank())
+
+    private fun VodItem.mergeDisplayMetadataFrom(detail: VodItem): VodItem = copy(
+        vodSub = vodSub.takeUnless { it.isNullOrBlank() } ?: detail.vodSub,
+        compatSubtitle = compatSubtitle.takeUnless { it.isNullOrBlank() } ?: detail.compatSubtitle,
+        vodRemarks = vodRemarks.takeUnless { it.isNullOrBlank() } ?: detail.vodRemarks,
+        compatBadgeText = compatBadgeText.takeUnless { it.isNullOrBlank() } ?: detail.compatBadgeText,
+        episodeRemark = episodeRemark.takeUnless { it.isNullOrBlank() } ?: detail.episodeRemark,
+        vodPlayUrl = vodPlayUrl.takeUnless { it.isNullOrBlank() } ?: detail.vodPlayUrl
+    )
 
     @Suppress("UNCHECKED_CAST")
     private suspend fun <T> awaitSharedRequest(
