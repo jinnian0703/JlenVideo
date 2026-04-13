@@ -188,7 +188,10 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             ?.rows
             .orEmpty()
             .distinctBy { it.vodId }
-        return filterPlayablePreviewItems(rawItems)
+        return enrichMissingPreviewBadges(
+            items = filterPlayablePreviewItems(rawItems),
+            limit = PREVIEW_BADGE_ENRICH_LIMIT
+        )
     }
 
     internal suspend fun runtimeLoadBrowsableCategories(
@@ -647,7 +650,10 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 )
             )
         }.toCursorPagedVodItems()
-        val playableItems = filterPlayablePreviewItems(payload.items)
+        val playableItems = enrichMissingPreviewBadges(
+            items = filterPlayablePreviewItems(payload.items),
+            limit = PREVIEW_BADGE_ENRICH_LIMIT
+        )
         return payload.copy(items = playableItems).also { filtered ->
             rememberPreviewItems(filtered.items)
         }
@@ -744,9 +750,52 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             }
         }
 
-        return requestApi { getCursorList(queryParameters) }
-            .toCursorPagedVodItems()
+        val payload = requestApi { getCursorList(queryParameters) }.toCursorPagedVodItems()
+        val enrichedItems = enrichMissingPreviewBadges(
+            items = payload.items,
+            limit = PREVIEW_BADGE_ENRICH_LIMIT
+        )
+        return payload.copy(items = enrichedItems)
             .also { rememberPreviewItems(it.items) }
+    }
+
+    private suspend fun enrichMissingPreviewBadges(
+        items: List<VodItem>,
+        limit: Int
+    ): List<VodItem> {
+        if (items.isEmpty()) return items
+        val targets = items
+            .asSequence()
+            .filter { it.resolvedBadgeText.isBlank() && it.vodId.isNotBlank() }
+            .distinctBy(VodItem::vodId)
+            .take(limit)
+            .toList()
+        if (targets.isEmpty()) return items
+
+        val enrichedById = coroutineScope {
+            targets.map { item ->
+                async {
+                    val detailItem = runCatching { loadDetail(item.vodId) }.getOrNull()
+                    item.vodId to detailItem?.let { detail -> item.mergeDisplayMetadataFrom(detail) }
+                }
+            }.awaitAll()
+                .mapNotNull { (vodId, enriched) -> enriched?.let { vodId to it } }
+                .toMap()
+        }
+        if (enrichedById.isEmpty()) return items
+        return items.map { item -> enrichedById[item.vodId] ?: item }
+    }
+
+    private fun VodItem.mergeDisplayMetadataFrom(detailItem: VodItem): VodItem {
+        val merged = copy(
+            vodSub = detailItem.vodSub?.takeIf { it.isNotBlank() } ?: vodSub,
+            compatSubtitle = detailItem.compatSubtitle?.takeIf { it.isNotBlank() } ?: compatSubtitle,
+            vodRemarks = detailItem.vodRemarks?.takeIf { it.isNotBlank() } ?: vodRemarks,
+            compatBadgeText = detailItem.compatBadgeText?.takeIf { it.isNotBlank() } ?: compatBadgeText,
+            episodeRemark = detailItem.episodeRemark?.takeIf { it.isNotBlank() } ?: episodeRemark,
+            vodPlayUrl = detailItem.vodPlayUrl?.takeIf { it.isNotBlank() } ?: vodPlayUrl
+        )
+        return if (merged.resolvedBadgeText.isNotBlank()) merged else this
     }
 
     suspend fun search(keyword: String, forceRefresh: Boolean = false): List<VodItem> =
@@ -4526,6 +4575,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         private const val HEARTBEAT_DEVICE_ID_KEY = "device_id"
         private const val HOME_CURSOR_PAGE_LIMIT = 20
         private const val CATEGORY_CURSOR_PAGE_LIMIT = 20
+        private const val PREVIEW_BADGE_ENRICH_LIMIT = 8
         private const val SEARCH_CURSOR_PAGE_LIMIT = 20
         private const val HOME_CACHE_TTL_MS = 60_000L
         private const val DISK_HOME_CACHE_TTL_MS = 43_200_000L

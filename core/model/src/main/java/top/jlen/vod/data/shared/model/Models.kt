@@ -121,19 +121,22 @@ data class VodItem(
         get() = firstNotBlank(compatBadgeText, vodRemarks)
 
     val resolvedLatestEpisodeNumber: Int?
-        get() = null
+        get() = parseLatestEpisodeNumberFromPlayUrl(vodPlayUrl)
 
     val resolvedUpdateLabel: String
-        get() = firstNotBlank(episodeRemark, vodRemarks)
+        get() = firstNotBlank(episodeRemark, vodRemarks).ifBlank { fallbackBadgeFromPlayUrl }
 
     val resolvedSubtitle: String
         get() = subtitle
 
     val resolvedBadgeText: String
-        get() = badgeText
+        get() = badgeText.ifBlank { fallbackBadgeFromPlayUrl }
 
     val publishedAtText: String
         get() = sanitizeDisplayValue(vodPubdate)
+
+    private val fallbackBadgeFromPlayUrl: String
+        get() = parseEpisodeBadgeFromPlayUrl(vodPlayUrl)
 
     val cleanActor: String
         get() = cleanText(vodActor).ifBlank { "暂无" }
@@ -194,12 +197,78 @@ data class VodItem(
             .replace(Regex("\\s+"), " ")
             .trim()
 
+    private fun parseLatestEpisodeNumberFromPlayUrl(playUrl: String?): Int? =
+        extractEpisodeNames(playUrl)
+            .mapNotNull(::extractEpisodeNumber)
+            .maxOrNull()
+
+    private fun parseEpisodeBadgeFromPlayUrl(playUrl: String?): String {
+        val episodeNames = extractEpisodeNames(playUrl)
+        if (episodeNames.isEmpty()) return ""
+
+        val lastMeaningfulName = episodeNames
+            .asReversed()
+            .map(::normalizeEpisodeBadge)
+            .firstOrNull { it.isNotBlank() }
+        if (!lastMeaningfulName.isNullOrBlank()) return lastMeaningfulName
+
+        val maxEpisode = episodeNames.mapNotNull(::extractEpisodeNumber).maxOrNull() ?: return ""
+        return when {
+            episodeNames.any { it.contains("期") } -> "${maxEpisode}期"
+            else -> "第${maxEpisode}集"
+        }
+    }
+
+    private fun extractEpisodeNames(playUrl: String?): List<String> =
+        playUrl.orEmpty()
+            .split("$$$")
+            .flatMap { group -> group.split("#") }
+            .map { entry -> entry.substringBefore("$").trim() }
+            .filter { it.isNotBlank() }
+
     private fun firstNotBlank(vararg values: String?): String =
         values
             .map(::sanitizeDisplayValue)
             .filterNot(::isDuplicateTitleValue)
             .firstOrNull { it.isNotBlank() }
             .orEmpty()
+
+    private fun normalizeEpisodeBadge(raw: String): String {
+        val normalized = sanitizeDisplayValue(raw).replace(Regex("\\s+"), "")
+        if (normalized.isBlank()) return ""
+        return when {
+            normalized.matches(Regex("""^更新至第?\d{1,4}集?$""")) -> normalized
+            normalized.matches(Regex("""^更新至第?\d{1,8}期$""")) -> normalized
+            normalized.matches(Regex("""^第\d{1,4}集$""")) -> normalized
+            normalized.matches(Regex("""^\d{1,4}集$""")) -> normalized
+            normalized.matches(Regex("""^第\d{1,8}期$""")) -> normalized
+            normalized.matches(Regex("""^\d{1,8}期$""")) -> normalized
+            normalized.matches(Regex("""^全\d{1,4}集$""")) -> normalized
+            normalized.matches(Regex("""^共\d{1,4}集$""")) -> normalized
+            normalized.matches(Regex("""^\d{1,4}集全$""")) -> normalized
+            normalized.matches(Regex("""^\d{1,4}$""")) -> "第${normalized}集"
+            normalized.matches(Regex("""^\d{8}$""")) -> "${normalized}期"
+            normalized in setOf("完结", "已完结", "完結", "全集", "正片", "抢先版", "抢先看", "预告", "HD", "TC", "SP", "OVA", "PV") -> normalized
+            else -> ""
+        }
+    }
+
+    private fun extractEpisodeNumber(text: String): Int? {
+        if (text.isBlank()) return null
+        val normalized = text.replace(Regex("\\s+"), "")
+        val patterns = listOf(
+            Regex("""更新至第?(\d{1,8})[集期]?$"""),
+            Regex("""第(\d{1,8})[集期]$"""),
+            Regex("""^(\d{1,8})[集期]$"""),
+            Regex("""^全(\d{1,8})集$"""),
+            Regex("""^共(\d{1,8})集$"""),
+            Regex("""^(\d{1,8})集全$"""),
+            Regex("""^(\d{1,8})$""")
+        )
+        return patterns.firstNotNullOfOrNull { pattern ->
+            pattern.find(normalized)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        }
+    }
 
     private fun isDuplicateTitleValue(value: String): Boolean {
         val normalizedValue = value.trim()
