@@ -1,6 +1,7 @@
 ﻿package top.jlen.vod.ui
 
 import top.jlen.vod.data.PlaySource
+import top.jlen.vod.data.PlaybackResumeBucket
 import top.jlen.vod.data.PlaybackResumeRecord
 import top.jlen.vod.data.VodItem
 
@@ -14,6 +15,7 @@ data class DetailUiState(
     val actionMessage: String? = null,
     val isActionError: Boolean = false,
     val isFavorited: Boolean = false,
+    val playbackResumeBucket: PlaybackResumeBucket? = null,
     val pendingResumePlayback: PlaybackResumeRecord? = null
 ) {
     val selectedSource: PlaySource?

@@ -105,6 +105,15 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     internal fun runtimeLoadPlaybackResume(vodId: String): PlaybackResumeRecord? =
         playbackResumeStore.load(vodId)
 
+    internal fun runtimeLoadPlaybackResumeBucket(vodId: String): PlaybackResumeBucket? =
+        playbackResumeStore.loadBucket(vodId)
+
+    internal fun runtimeLoadPlaybackResumeForSource(
+        vodId: String,
+        sourceName: String,
+        sourceIndex: Int = -1
+    ): PlaybackResumeRecord? = playbackResumeStore.loadForSource(vodId, sourceName, sourceIndex)
+
     internal fun runtimeSavePlaybackResume(record: PlaybackResumeRecord) {
         playbackResumeStore.save(record)
     }
@@ -2095,6 +2104,15 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     fun loadPlaybackResumeForApp(vodId: String): PlaybackResumeRecord? =
         playbackResumeStore.load(vodId)
+
+    fun loadPlaybackResumeBucketForApp(vodId: String): PlaybackResumeBucket? =
+        playbackResumeStore.loadBucket(vodId)
+
+    fun loadPlaybackResumeForSourceForApp(
+        vodId: String,
+        sourceName: String,
+        sourceIndex: Int = -1
+    ): PlaybackResumeRecord? = playbackResumeStore.loadForSource(vodId, sourceName, sourceIndex)
 
     fun savePlaybackResumeForApp(record: PlaybackResumeRecord) {
         playbackResumeStore.save(record)

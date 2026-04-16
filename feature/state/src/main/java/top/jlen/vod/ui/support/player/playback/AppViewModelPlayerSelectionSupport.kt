@@ -1,6 +1,7 @@
 package top.jlen.vod.ui
 
 import top.jlen.vod.data.PlaySource
+import top.jlen.vod.data.PlaybackResumeRecord
 import top.jlen.vod.data.VodItem
 
 internal fun resolveHeartbeatVodId(playerState: PlayerUiState): String {
@@ -53,16 +54,27 @@ internal fun updatePlayerEpisodeSelection(
 
 internal fun updatePlayerSourceSelection(
     playerState: PlayerUiState,
-    index: Int
+    index: Int,
+    resumeRecord: PlaybackResumeRecord? = null
 ): PlayerUiState? {
     if (playerState.sources.isEmpty()) return null
     val safeIndex = index.coerceIn(0, playerState.sources.lastIndex)
     val targetEpisodes = playerState.sources.getOrNull(safeIndex)?.episodes.orEmpty()
-    val preservedEpisodeIndex = playerState.selectedEpisodeIndex
-        .coerceIn(0, (targetEpisodes.size - 1).coerceAtLeast(0))
+    val resumedEpisodeIndex = resumeRecord
+        ?.episodeIndex
+        ?.coerceIn(0, (targetEpisodes.size - 1).coerceAtLeast(0))
+        ?: 0
     return playerState.copy(
         selectedSourceIndex = safeIndex,
-        selectedEpisodeIndex = preservedEpisodeIndex,
-        playbackSnapshot = PlaybackSnapshot()
+        selectedEpisodeIndex = resumedEpisodeIndex,
+        playbackSnapshot = resumeRecord.toPlaybackSnapshot()
+    )
+}
+
+private fun PlaybackResumeRecord?.toPlaybackSnapshot(): PlaybackSnapshot = when {
+    this == null -> PlaybackSnapshot()
+    else -> PlaybackSnapshot(
+        positionMs = positionMs.coerceAtLeast(0L),
+        speed = speed.coerceIn(0.5f, 3f)
     )
 }

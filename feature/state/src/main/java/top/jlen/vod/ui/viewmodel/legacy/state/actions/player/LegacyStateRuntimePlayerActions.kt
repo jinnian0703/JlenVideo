@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.jlen.vod.data.normalizePlaybackSourceKey
 import top.jlen.vod.data.PlaybackResumeRecord
 import top.jlen.vod.data.PlaySource
 import top.jlen.vod.data.VodItem
@@ -82,7 +83,21 @@ internal fun LegacyStateRuntimeViewModelCore.legacySelectPlayerEpisode(index: In
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacySelectPlayerSource(index: Int) {
-    val updatedState = updatePlayerSourceSelection(currentPlayerState(), index) ?: return
+    val playerState = currentPlayerState()
+    val item = playerState.item
+    val resolvedVodId = item?.let { resolvePlaybackResumeVodId(it, playerState.episodePageUrl) }.orEmpty()
+    val safeIndex = index.coerceIn(0, (playerState.sources.lastIndex).coerceAtLeast(0))
+    val targetSource = playerState.sources.getOrNull(safeIndex)
+    val resumeRecord = if (resolvedVodId.isNotBlank() && targetSource != null) {
+        legacyRepository().loadPlaybackResumeForSourceForApp(
+            vodId = resolvedVodId,
+            sourceName = targetSource.name,
+            sourceIndex = safeIndex
+        )
+    } else {
+        null
+    }
+    val updatedState = updatePlayerSourceSelection(playerState, index, resumeRecord) ?: return
     updatePlayerState(updatedState)
     persistCurrentPlaybackResume()
     legacyResolveCurrentPlayerUrl()
@@ -145,6 +160,11 @@ private fun LegacyStateRuntimeViewModelCore.persistCurrentPlaybackResume() {
     val normalizedSnapshot = normalizePlaybackResumeSnapshot(playerState.playbackSnapshot)
     val record = PlaybackResumeRecord(
         vodId = resolvedVodId,
+        sourceKey = normalizePlaybackSourceKey(
+            sourceName = playerState.currentSource?.name.orEmpty(),
+            sourceIndex = playerState.selectedSourceIndex
+        ),
+        sourceName = playerState.currentSource?.name.orEmpty(),
         sourceIndex = playerState.selectedSourceIndex,
         episodeIndex = playerState.selectedEpisodeIndex,
         positionMs = normalizedSnapshot.positionMs,

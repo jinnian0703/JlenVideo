@@ -65,7 +65,18 @@ internal fun detailStateWithoutFavorite(detailState: DetailUiState): DetailUiSta
 internal fun detailStateWithSelectedSource(
     detailState: DetailUiState,
     index: Int
-): DetailUiState = detailState.copy(selectedSourceIndex = index)
+): DetailUiState {
+    val safeIndex = index.coerceIn(0, (detailState.sources.lastIndex).coerceAtLeast(0))
+    val selectedSource = detailState.sources.getOrNull(safeIndex)
+    val pendingResume = detailState.playbackResumeBucket?.recordForSource(
+        sourceName = selectedSource?.name.orEmpty(),
+        sourceIndex = safeIndex
+    )
+    return detailState.copy(
+        selectedSourceIndex = safeIndex,
+        pendingResumePlayback = pendingResume
+    )
+}
 
 internal fun detailStateWithoutPendingResume(detailState: DetailUiState): DetailUiState =
     detailState.copy(pendingResumePlayback = null)

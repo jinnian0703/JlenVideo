@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.jlen.vod.data.PlaybackResumeBucket
 import top.jlen.vod.data.PlaybackResumeRecord
 import top.jlen.vod.data.UserCenterItem
 import top.jlen.vod.data.VodItem
@@ -198,7 +199,8 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadDetail(vodId: String) {
                 updateDetailState(missingDetailState())
             } else {
                 val sources = legacyRepository().parseSources(item)
-                val resumeRecord = resolvePlaybackResumeRecord(item, vodId)
+                val resumeBucket = resolvePlaybackResumeBucket(item, vodId)
+                val resumeRecord = resolvePlaybackResumeRecordForSources(resumeBucket, sources)
                 val selectedSourceIndex = when {
                     sources.isEmpty() -> 0
                     resumeRecord != null -> resumeRecord.sourceIndex.coerceIn(0, sources.lastIndex)
@@ -210,6 +212,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadDetail(vodId: String) {
                         sources = sources,
                         isFavorited = currentAccountState().favoriteItems.any { favorite -> favorite.vodId == item.vodId },
                         selectedSourceIndex = selectedSourceIndex,
+                        playbackResumeBucket = resumeBucket,
                         pendingResumePlayback = resumeRecord
                     )
                 )
@@ -224,10 +227,10 @@ internal fun LegacyStateRuntimeViewModelCore.legacySelectSource(index: Int) {
     updateDetailState(detailStateWithSelectedSource(currentDetailState(), index))
 }
 
-private fun LegacyStateRuntimeViewModelCore.resolvePlaybackResumeRecord(
+private fun LegacyStateRuntimeViewModelCore.resolvePlaybackResumeBucket(
     item: VodItem,
     requestedVodId: String
-): PlaybackResumeRecord? {
+): PlaybackResumeBucket? {
     val candidateIds = linkedSetOf(
         requestedVodId.trim(),
         item.vodId.trim(),
@@ -237,6 +240,28 @@ private fun LegacyStateRuntimeViewModelCore.resolvePlaybackResumeRecord(
     ).filter(String::isNotBlank)
 
     return candidateIds.firstNotNullOfOrNull { candidate ->
-        legacyRepository().loadPlaybackResumeForApp(candidate)
+        legacyRepository().loadPlaybackResumeBucketForApp(candidate)
     }
+}
+
+private fun resolvePlaybackResumeRecordForSources(
+    bucket: PlaybackResumeBucket?,
+    sources: List<top.jlen.vod.data.PlaySource>
+): PlaybackResumeRecord? {
+    if (bucket == null) return null
+    val latestRecord = bucket.latestOrLastSourceRecord() ?: return null
+    if (sources.isEmpty()) return latestRecord
+
+    val resolvedIndex = when {
+        latestRecord.sourceName.isNotBlank() -> sources.indexOfFirst {
+            it.name.equals(latestRecord.sourceName, ignoreCase = true)
+        }
+        else -> -1
+    }.takeIf { it >= 0 } ?: latestRecord.sourceIndex.coerceIn(0, sources.lastIndex)
+
+    val selectedSource = sources.getOrNull(resolvedIndex)
+    return bucket.recordForSource(
+        sourceName = selectedSource?.name.orEmpty(),
+        sourceIndex = resolvedIndex
+    ) ?: latestRecord.copy(sourceIndex = resolvedIndex)
 }

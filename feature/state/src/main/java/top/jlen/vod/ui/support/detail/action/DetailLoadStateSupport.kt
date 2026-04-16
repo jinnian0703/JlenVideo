@@ -1,6 +1,7 @@
 package top.jlen.vod.ui
 
 import top.jlen.vod.data.PlaySource
+import top.jlen.vod.data.PlaybackResumeBucket
 import top.jlen.vod.data.PlaybackResumeRecord
 import top.jlen.vod.data.VodItem
 
@@ -21,6 +22,7 @@ internal fun loadedDetailState(
     sources: List<PlaySource>,
     isFavorited: Boolean,
     selectedSourceIndex: Int = 0,
+    playbackResumeBucket: PlaybackResumeBucket? = null,
     pendingResumePlayback: PlaybackResumeRecord? = null
 ): DetailUiState = DetailUiState(
     isLoading = false,
@@ -30,6 +32,7 @@ internal fun loadedDetailState(
     actionMessage = null,
     isActionLoading = false,
     isFavorited = isFavorited,
+    playbackResumeBucket = playbackResumeBucket,
     pendingResumePlayback = pendingResumePlayback
 )
 

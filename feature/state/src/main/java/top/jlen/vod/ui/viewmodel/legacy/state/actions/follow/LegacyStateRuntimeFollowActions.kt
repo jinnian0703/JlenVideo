@@ -250,7 +250,9 @@ private suspend fun LegacyStateRuntimeViewModelCore.buildFollowItem(
         .map(::sanitizeUserFacingComposite)
         .firstOrNull { it.isNotBlank() }
         .orEmpty()
-    val sourceName = bestHistory?.sourceName
+    val sourceName = localResume?.sourceName
+        ?.takeIf { it.isNotBlank() }
+        ?: bestHistory?.sourceName
         ?.takeIf { it.isNotBlank() }
         ?: cached?.sourceName.orEmpty()
 

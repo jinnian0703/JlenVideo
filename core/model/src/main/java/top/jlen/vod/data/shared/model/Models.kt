@@ -4,6 +4,7 @@ import androidx.core.text.HtmlCompat
 import com.google.gson.JsonParser
 import com.google.gson.annotations.SerializedName
 import kotlin.LazyThreadSafetyMode
+import java.util.Locale
 
 data class AppleCmsResponse(
     @SerializedName("code") val code: Int = 0,
@@ -481,12 +482,67 @@ data class SearchSuggestionPage(
 
 data class PlaybackResumeRecord(
     val vodId: String = "",
+    val sourceKey: String = "",
+    val sourceName: String = "",
     val sourceIndex: Int = 0,
     val episodeIndex: Int = 0,
     val positionMs: Long = 0L,
     val speed: Float = 1f,
     val updatedAt: Long = 0L
 )
+
+data class PlaybackResumeBucket(
+    val vodId: String = "",
+    val lastSourceKey: String = "",
+    val records: List<PlaybackResumeRecord> = emptyList()
+) {
+    val latestRecord: PlaybackResumeRecord?
+        get() = records
+            .maxWithOrNull(
+                compareBy<PlaybackResumeRecord> { it.updatedAt }
+                    .thenBy { it.sourceIndex }
+            )
+
+    fun latestOrLastSourceRecord(): PlaybackResumeRecord? =
+        recordForSourceKey(lastSourceKey) ?: latestRecord
+
+    fun recordForSource(
+        sourceName: String,
+        sourceIndex: Int = -1
+    ): PlaybackResumeRecord? {
+        val normalizedKey = normalizePlaybackSourceKey(sourceName, sourceIndex)
+        return recordForSourceKey(normalizedKey)
+            ?: records.firstOrNull { candidate ->
+                candidate.sourceName.isNotBlank() && candidate.sourceName.equals(sourceName.trim(), ignoreCase = true)
+            }
+            ?: records.firstOrNull { candidate ->
+                sourceIndex >= 0 && candidate.sourceIndex == sourceIndex
+            }
+    }
+
+    fun recordForSourceKey(sourceKey: String): PlaybackResumeRecord? {
+        val normalizedKey = sourceKey.trim()
+        if (normalizedKey.isBlank()) return null
+        return records.firstOrNull { candidate ->
+            candidate.sourceKey.equals(normalizedKey, ignoreCase = true)
+        }
+    }
+}
+
+fun normalizePlaybackSourceKey(
+    sourceName: String,
+    sourceIndex: Int = -1
+): String {
+    val normalizedName = sourceName.trim()
+    if (normalizedName.isNotBlank()) {
+        return normalizedName.lowercase(Locale.ROOT)
+    }
+    return if (sourceIndex >= 0) {
+        "source-index:$sourceIndex"
+    } else {
+        "source-default"
+    }
+}
 
 data class HotSearchCacheSnapshot(
     val groups: List<HotSearchGroup> = emptyList(),

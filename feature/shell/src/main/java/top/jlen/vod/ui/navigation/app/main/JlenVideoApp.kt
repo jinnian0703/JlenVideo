@@ -467,12 +467,26 @@ fun JlenVideoApp() {
                                 },
                                 onDismissActionMessage = viewModel::dismissDetailActionMessage,
                                 onPlay = { title, sourceIndex, episodeIndex ->
+                                    val pendingResume = viewModel.detailState.pendingResumePlayback
+                                    val resumeSnapshot = if (
+                                        pendingResume != null &&
+                                        pendingResume.sourceIndex == sourceIndex &&
+                                        pendingResume.episodeIndex == episodeIndex
+                                    ) {
+                                        PlaybackSnapshot(
+                                            positionMs = pendingResume.positionMs,
+                                            speed = pendingResume.speed
+                                        )
+                                    } else {
+                                        PlaybackSnapshot()
+                                    }
                                     viewModel.openPlayer(
                                         title = title,
                                         item = viewModel.detailState.item,
                                         sources = viewModel.detailState.sources,
                                         sourceIndex = sourceIndex,
-                                        episodeIndex = episodeIndex
+                                        episodeIndex = episodeIndex,
+                                        snapshot = resumeSnapshot
                                     )
                                     navController.navigate("player")
                                 }
