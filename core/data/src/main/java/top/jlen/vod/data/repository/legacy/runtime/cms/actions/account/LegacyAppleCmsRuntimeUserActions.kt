@@ -95,17 +95,6 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacySendEmailBindCode
         runtimeExtractVideoApiMessage(json, "验证码已发送")
     }.getOrNull()?.let { return it }
 
-    runCatching {
-        runtimeSubmitAppCenterUserProfileMutation(
-            FormBody.Builder()
-                .add("ac", "email")
-                .add("to", email.trim())
-                .add("op", "send_bind_code")
-                .add("action", "send_bind_code")
-                .build()
-        )
-    }.getOrNull()?.let { return it }
-
     val form = FormBody.Builder()
         .add("ac", "email")
         .add("to", email.trim())
@@ -133,18 +122,6 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyBindEmail(
         runtimeExtractVideoApiMessage(json, "邮箱已绑定")
     }.getOrNull()?.let { return it }
 
-    runCatching {
-        runtimeSubmitAppCenterUserProfileMutation(
-            FormBody.Builder()
-                .add("ac", "email")
-                .add("to", email.trim())
-                .add("code", code.trim())
-                .add("op", "bind_email")
-                .add("action", "bind_email")
-                .build()
-        )
-    }.getOrNull()?.let { return it }
-
     val form = FormBody.Builder()
         .add("ac", "email")
         .add("to", email.trim())
@@ -166,16 +143,6 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyUnbindEmail(): St
                 .build()
         )
         runtimeExtractVideoApiMessage(json, "邮箱已解绑")
-    }.getOrNull()?.let { return it }
-
-    runCatching {
-        runtimeSubmitAppCenterUserProfileMutation(
-            FormBody.Builder()
-                .add("ac", "email")
-                .add("op", "unbind_email")
-                .add("action", "unbind_email")
-                .build()
-        )
     }.getOrNull()?.let { return it }
 
     val form = FormBody.Builder()
