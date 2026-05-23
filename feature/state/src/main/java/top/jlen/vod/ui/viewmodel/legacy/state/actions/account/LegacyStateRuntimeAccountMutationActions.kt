@@ -238,7 +238,6 @@ internal fun LegacyStateRuntimeViewModelCore.legacyBindEmail() {
         successMessage = "邮箱已绑定",
         onSuccess = {
             updateAccountState(accountStateAfterEmailBound(currentAccountState(), email))
-            selectAccountSection(AccountSection.Profile, forceRefresh = true)
         }
     )
 }

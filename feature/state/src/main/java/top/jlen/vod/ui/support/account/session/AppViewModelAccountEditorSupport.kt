@@ -122,13 +122,20 @@ internal fun accountStateAfterProfileSaved(accountState: AccountUiState): Accoun
 internal fun accountStateAfterEmailBound(
     accountState: AccountUiState,
     email: String
-): AccountUiState = accountState.copy(
-    profileEditor = accountState.profileEditor.copy(
-        email = email,
-        pendingEmail = "",
-        emailCode = ""
+): AccountUiState {
+    val updatedFields = accountState.profileFields
+        .filterNot { it.first == "邮箱" }
+        .let { fields -> fields + ("邮箱" to email) }
+    return accountState.copy(
+        isProfileEditTab = true,
+        profileFields = updatedFields,
+        profileEditor = accountState.profileEditor.copy(
+            email = email,
+            pendingEmail = "",
+            emailCode = ""
+        )
     )
-)
+}
 
 internal fun accountStateAfterEmailUnbound(accountState: AccountUiState): AccountUiState =
     accountState.copy(
