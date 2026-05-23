@@ -17,6 +17,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,8 +55,6 @@ import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Whatshot
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -234,70 +234,14 @@ private fun SearchLandingContent(
         }
         if (state.history.isNotEmpty()) {
             item {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = UiPalette.Surface.copy(alpha = 0.92f)
-                    ),
-                    shape = RoundedCornerShape(26.dp),
-                    border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.7f))
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.History,
-                                    contentDescription = null,
-                                    tint = UiPalette.TextSecondary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    text = "搜索记录",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = UiPalette.Ink
-                                )
-                            }
-                            TextButton(onClick = onClearHistory) {
-                                Text("清空")
-                            }
-                        }
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            items(
-                                items = state.history,
-                                key = { it },
-                                contentType = { "history" }
-                            ) { keyword ->
-                                AssistChip(
-                                    onClick = {
-                                        onSearchHistory(keyword)
-                                        onOpenSearchResults(keyword)
-                                    },
-                                    label = { Text(keyword) },
-                                    colors = AssistChipDefaults.assistChipColors(
-                                        containerColor = UiPalette.SurfaceSoft,
-                                        labelColor = UiPalette.Ink
-                                    ),
-                                    border = AssistChipDefaults.assistChipBorder(
-                                        borderColor = UiPalette.BorderSoft,
-                                        enabled = true
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
+                SearchHistoryPanel(
+                    history = state.history,
+                    onPickKeyword = { keyword ->
+                        onSearchHistory(keyword)
+                        onOpenSearchResults(keyword)
+                    },
+                    onClearHistory = onClearHistory
+                )
             }
         }
         item {
@@ -456,6 +400,118 @@ fun SearchResultsScreen(
                 )
             }
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SearchHistoryPanel(
+    history: List<String>,
+    onPickKeyword: (String) -> Unit,
+    onClearHistory: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.94f)),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.72f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(UiPalette.SurfaceSoft.copy(alpha = 0.9f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.History,
+                            contentDescription = null,
+                            tint = UiPalette.TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(
+                            text = "最近搜索",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = UiPalette.Ink
+                        )
+                        Text(
+                            text = "${history.size} 条记录",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = UiPalette.TextMuted
+                        )
+                    }
+                }
+                TextButton(
+                    onClick = onClearHistory,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                ) {
+                    Text(
+                        text = "清空",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                history.forEach { keyword ->
+                    SearchHistoryChip(
+                        keyword = keyword,
+                        onClick = { onPickKeyword(keyword) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchHistoryChip(
+    keyword: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(UiPalette.SurfaceSoft.copy(alpha = 0.92f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Search,
+            contentDescription = null,
+            tint = UiPalette.TextMuted,
+            modifier = Modifier.size(14.dp)
+        )
+        Text(
+            text = keyword,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = UiPalette.Ink,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
