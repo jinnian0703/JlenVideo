@@ -203,7 +203,7 @@ internal fun LegacyAccountScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 18.dp, bottom = 28.dp)
     ) {
-        item {
+        item(key = "account_title", contentType = "account_header") {
             Column {
                 Text(
                     text = "我的",
@@ -215,7 +215,7 @@ internal fun LegacyAccountScreen(
         }
 
         if (showLoggedInContent) {
-            item {
+            item(key = "account_signed_in_header", contentType = "account_header") {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
                     shape = RoundedCornerShape(28.dp),
@@ -329,17 +329,17 @@ internal fun LegacyAccountScreen(
                 }
             }
 
-            item {
+            item(key = "account_section_tabs", contentType = "account_tabs") {
                 AccountSegmentBar {
                     visibleSections.forEach { section ->
                         AccountUnderlineTab(
                             text = when (section) {
-                        AccountSection.Overview -> "总览"
-                        AccountSection.Profile -> "资料"
-                        AccountSection.History -> "记录"
-                        AccountSection.Member -> "会员"
-                        AccountSection.About -> "关于"
-                        AccountSection.Favorites -> ""
+                                AccountSection.Overview -> "总览"
+                                AccountSection.Profile -> "资料"
+                                AccountSection.History -> "记录"
+                                AccountSection.Member -> "会员"
+                                AccountSection.About -> "关于"
+                                AccountSection.Favorites -> ""
                             },
                             selected = state.selectedSection == section,
                             onClick = { onSelectSection(section) },
@@ -350,7 +350,7 @@ internal fun LegacyAccountScreen(
             }
 
             noticeMessage?.let { message ->
-                item {
+                item(key = "account_notice_logged_in", contentType = "account_notice") {
                     AccountStatusNotice(
                         message = message,
                         tone = noticeTone,
@@ -373,7 +373,10 @@ internal fun LegacyAccountScreen(
                     onDeleteItem = onDeleteHistory,
                     onClearAll = onClearHistory
                 )
-                else -> item {
+                else -> item(
+                    key = "account_section_${state.selectedSection.name}",
+                    contentType = "account_section"
+                ) {
                     when (state.selectedSection) {
                         AccountSection.Overview -> AccountOverviewPane(
                             state = state,
@@ -452,12 +455,12 @@ internal fun LegacyAccountScreen(
                 }
             }
         } else {
-            item {
+            item(key = "account_guest_intro", contentType = "account_guest_intro") {
                 AccountGuestIntroCard()
             }
 
             noticeMessage?.let { message ->
-                item {
+                item(key = "account_notice_guest", contentType = "account_notice") {
                     AccountStatusNotice(
                         message = message,
                         tone = noticeTone,
@@ -471,7 +474,10 @@ internal fun LegacyAccountScreen(
                 }
             }
 
-            item {
+            item(
+                key = "account_guest_auth_${state.authMode.name}",
+                contentType = "account_guest_auth"
+            ) {
                 when (state.authMode) {
                     AccountAuthMode.Register -> {
                         Card(
