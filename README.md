@@ -35,6 +35,10 @@ JlenVideo 是一个基于 Kotlin、Jetpack Compose 和 Media3 的 Android 视频
 - 公告列表、公告弹窗、公告详情和 HTML 富文本展示
 - 应用更新检查、发布页跳转和崩溃日志查看/清理
 
+## 开发引导
+
+新接手项目时可以先阅读 [JlenVideo 开发引导](docs/guide.md)，里面整理了推荐阅读顺序、常见问题定位入口和模块改动建议。
+
 ## 技术栈
 
 - Kotlin
