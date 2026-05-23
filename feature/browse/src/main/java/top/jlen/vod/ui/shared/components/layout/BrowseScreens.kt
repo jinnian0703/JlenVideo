@@ -1509,7 +1509,7 @@ private fun isMeaningfulPosterBadge(text: String): Boolean {
         Regex("""^\d{1,4}集全$"""),
         Regex("""^(完结|已完结|完結|全集)$"""),
         Regex("""^(正片|抢先版?|抢先看|预告)$localizedStatusSuffix$"""),
-        Regex("""^(HD|BD|TC|TS|CAM|DVD|4K|SP|OVA|PV)$localizedStatusSuffix$""")
+        Regex("""^(更新)?(HD|BD|TC|TS|CAM|DVD|4K|720P|1080P|2160P|蓝光|超清|高清|标清|SP|OVA|PV)$localizedStatusSuffix$""")
     )
     return patterns.any { it.matches(normalized) }
 }
