@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.graphics.BitmapFactory
+import android.os.SystemClock
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.EnterTransition
@@ -211,6 +212,21 @@ fun JlenVideoApp() {
     val currentRoute = backStackEntry?.destination?.route
     val currentTopLevelRoute = normalizeTopLevelRoute(currentRoute)
     var pendingTopLevelRoute by rememberSaveable { mutableStateOf<String?>(null) }
+    var homeScrollToTopSignal by rememberSaveable { mutableStateOf(0) }
+    var categoryScrollToTopSignal by rememberSaveable { mutableStateOf(0) }
+    var searchScrollToTopSignal by rememberSaveable { mutableStateOf(0) }
+    val scrollTopSignals = mapOf(
+        "home" to homeScrollToTopSignal,
+        "categories" to categoryScrollToTopSignal,
+        "search" to searchScrollToTopSignal
+    )
+    val triggerTopLevelScrollToTop: (String) -> Unit = { route ->
+        when (route) {
+            "home" -> homeScrollToTopSignal += 1
+            "categories" -> categoryScrollToTopSignal += 1
+            "search" -> searchScrollToTopSignal += 1
+        }
+    }
     val heartbeatRoute = normalizeHeartbeatRoute(currentRoute)
     val heartbeatPlaybackKey = if (heartbeatRoute == "player") {
         listOf(
@@ -318,7 +334,9 @@ fun JlenVideoApp() {
                         if (showBottomBar) {
                             AppBottomBar(
                                 currentRoute = currentTopLevelRoute.orEmpty(),
-                                onNavigate = navigateToTopLevel
+                                scrollTopSignals = scrollTopSignals,
+                                onNavigate = navigateToTopLevel,
+                                onScrollToTop = triggerTopLevelScrollToTop
                             )
                         }
                     }
@@ -366,6 +384,7 @@ fun JlenVideoApp() {
                             HomeScreen(
                                 state = viewModel.homeState,
                                 noticeState = viewModel.noticeState,
+                                scrollToTopSignal = homeScrollToTopSignal,
                                 onRefresh = viewModel::refreshHomeAndClearCaches,
                                 onRefreshAnnouncements = { viewModel.refreshNotices(forceRefresh = true) },
                                 onLoadMore = viewModel::loadMoreHome,
@@ -382,6 +401,7 @@ fun JlenVideoApp() {
                         composable("categories") {
                             CategoryScreen(
                                 state = viewModel.homeState,
+                                scrollToTopSignal = categoryScrollToTopSignal,
                                 onSelectCategory = viewModel::selectCategory,
                                 onSelectFilter = viewModel::updateCategoryFilter,
                                 onRetryCategory = { viewModel.refreshCategoryTab(forceRefresh = true) },
@@ -392,6 +412,7 @@ fun JlenVideoApp() {
                         composable("search") {
                             SearchScreen(
                                 state = viewModel.searchState,
+                                scrollToTopSignal = searchScrollToTopSignal,
                                 onQueryChange = viewModel::updateQuery,
                                 onOpenSearchResults = openSearchResults,
                                 onSearchHistory = viewModel::searchHistory,
@@ -1791,16 +1812,36 @@ private fun UpdateVersionPill(
 }
 
 @Composable
-private fun AppBottomBar(currentRoute: String, onNavigate: (String) -> Unit) {
+private fun AppBottomBar(
+    currentRoute: String,
+    scrollTopSignals: Map<String, Int>,
+    onNavigate: (String) -> Unit,
+    onScrollToTop: (String) -> Unit
+) {
+    var lastTapRoute by remember { mutableStateOf("") }
+    var lastTapAt by remember { mutableStateOf(0L) }
     NavigationBar(
         containerColor = UiPalette.Surface.copy(alpha = 0.96f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 0.dp
     ) {
         bottomBarItems.forEach { (route, label, icon) ->
+            val selected = currentRoute == route
             NavigationBarItem(
-                selected = currentRoute == route,
-                onClick = { onNavigate(route) },
+                selected = selected,
+                onClick = {
+                    val now = SystemClock.elapsedRealtime()
+                    val isDoubleTap = selected &&
+                        lastTapRoute == route &&
+                        now - lastTapAt <= BOTTOM_BAR_DOUBLE_TAP_MS
+                    lastTapRoute = route
+                    lastTapAt = now
+                    if (isDoubleTap && route in scrollTopSignals) {
+                        onScrollToTop(route)
+                    } else {
+                        onNavigate(route)
+                    }
+                },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = UiPalette.AccentText,
                     selectedTextColor = UiPalette.Ink,
@@ -1812,11 +1853,13 @@ private fun AppBottomBar(currentRoute: String, onNavigate: (String) -> Unit) {
                 label = {
                     Text(
                         text = label,
-                        color = if (currentRoute == route) UiPalette.Ink else UiPalette.TextMuted
+                        color = if (selected) UiPalette.Ink else UiPalette.TextMuted
                     )
                 }
             )
         }
     }
 }
+
+private const val BOTTOM_BAR_DOUBLE_TAP_MS = 450L
 

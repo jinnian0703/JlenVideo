@@ -725,18 +725,7 @@ internal fun LegacyAboutPane(
                     }
                 }
                 if (notes.isNotBlank()) {
-                    AccountToolSection(
-                        title = "更新说明",
-                        description = "最近版本变更"
-                    ) {
-                        Text(
-                            text = notes,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = UiPalette.Ink,
-                            maxLines = 8,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    UpdateNotesSection(notes = notes)
                 }
                 AccountToolSection(
                     title = "用户协议与隐私说明",
@@ -854,6 +843,38 @@ internal fun LegacyCrashLogCard(
                 ) {
                     Text("清空日志")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpdateNotesSection(notes: String) {
+    var expanded by remember(notes) { mutableStateOf(false) }
+    AccountToolSection(
+        title = "更新说明",
+        description = "最近版本变更"
+    ) {
+        Text(
+            text = notes,
+            style = MaterialTheme.typography.bodySmall,
+            color = UiPalette.Ink,
+            maxLines = if (expanded) Int.MAX_VALUE else 8,
+            overflow = if (expanded) TextOverflow.Clip else TextOverflow.Ellipsis
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(
+                onClick = { expanded = !expanded },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Text(
+                    text = if (expanded) "收起" else "展开",
+                    fontWeight = FontWeight.Bold,
+                    color = UiPalette.Accent
+                )
             }
         }
     }

@@ -137,6 +137,7 @@ import top.jlen.vod.data.sanitizeUserFacingComposite
 fun HomeScreen(
     state: HomeUiState,
     noticeState: NoticeUiState,
+    scrollToTopSignal: Int = 0,
     onRefresh: () -> Unit,
     onRefreshAnnouncements: () -> Unit,
     onLoadMore: () -> Unit,
@@ -154,6 +155,11 @@ fun HomeScreen(
     val context = LocalContext.current
     val listState = rememberSaveable(saver = LazyListState.Saver) {
         LazyListState()
+    }
+    LaunchedEffect(scrollToTopSignal) {
+        if (scrollToTopSignal > 0) {
+            listState.animateScrollToItem(0)
+        }
     }
     val pauseHomeMotion = listState.isScrollInProgress
     val hotRows = remember(state.hot) { state.hot.chunked(POSTER_GRID_COLUMNS) }
@@ -329,6 +335,7 @@ fun HomeScreen(
 @Composable
 fun CategoryScreen(
     state: HomeUiState,
+    scrollToTopSignal: Int = 0,
     onSelectCategory: (AppleCmsCategory) -> Unit,
     onSelectFilter: (String, String) -> Unit,
     onRetryCategory: () -> Unit,
@@ -337,6 +344,11 @@ fun CategoryScreen(
 ) {
     val listState = rememberSaveable(saver = LazyListState.Saver) {
         LazyListState()
+    }
+    LaunchedEffect(scrollToTopSignal) {
+        if (scrollToTopSignal > 0) {
+            listState.animateScrollToItem(0)
+        }
     }
     val categoryRows = remember(state.visibleCategoryVideos) {
         state.visibleCategoryVideos.chunked(POSTER_GRID_COLUMNS)

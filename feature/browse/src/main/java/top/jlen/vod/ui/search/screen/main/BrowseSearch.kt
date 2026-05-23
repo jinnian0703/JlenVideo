@@ -137,6 +137,7 @@ import top.jlen.vod.data.sanitizeUserFacingComposite
 @Composable
 fun SearchScreen(
     state: SearchUiState,
+    scrollToTopSignal: Int = 0,
     onQueryChange: (String) -> Unit,
     onOpenSearchResults: (String) -> Unit,
     onSearchHistory: (String) -> Unit,
@@ -148,6 +149,7 @@ fun SearchScreen(
     }
     SearchLandingContent(
         state = state,
+        scrollToTopSignal = scrollToTopSignal,
         onQueryChange = onQueryChange,
         onOpenSearchResults = onOpenSearchResults,
         onSearchHistory = onSearchHistory,
@@ -182,13 +184,23 @@ internal fun LazyListScope.posterGridRows(
 @Composable
 private fun SearchLandingContent(
     state: SearchUiState,
+    scrollToTopSignal: Int,
     onQueryChange: (String) -> Unit,
     onOpenSearchResults: (String) -> Unit,
     onSearchHistory: (String) -> Unit,
     onClearHistory: () -> Unit,
     onLoadHotSearches: () -> Unit
 ) {
+    val listState = rememberSaveable(saver = LazyListState.Saver) {
+        LazyListState()
+    }
+    LaunchedEffect(scrollToTopSignal) {
+        if (scrollToTopSignal > 0) {
+            listState.animateScrollToItem(0)
+        }
+    }
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .background(UiPalette.BackgroundBottom)

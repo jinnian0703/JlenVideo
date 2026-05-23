@@ -2,7 +2,9 @@ package top.jlen.vod.ui
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -44,15 +46,20 @@ fun ExpandableText(
             }
         )
         if (hasOverflow || expanded) {
-            TextButton(
-                onClick = { expanded = !expanded },
-                colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent),
-                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
-                Text(
-                    text = if (expanded) "收起" else "展开",
-                    fontWeight = FontWeight.Bold
-                )
+                TextButton(
+                    onClick = { expanded = !expanded },
+                    colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                ) {
+                    Text(
+                        text = if (expanded) "收起" else "展开",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
