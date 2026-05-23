@@ -19,8 +19,10 @@ JlenVideo 是一个基于 Kotlin、Jetpack Compose 和 Media3 的 Android 视频
 
 相关仓库：
 
-- [maccms-pure-video-api](https://github.com/jinnian0703/maccms-pure-video-api)
-- [appcenter-standalone-admin](https://github.com/jinnian0703/appcenter-standalone-admin)
+| 仓库 | 作用 |
+| --- | --- |
+| [maccms-pure-video-api](https://github.com/jinnian0703/maccms-pure-video-api) | 客户端使用的影视数据 API，负责苹果 CMS 内容接口、搜索、详情和播放数据适配。 |
+| [appcenter-standalone-admin](https://github.com/jinnian0703/appcenter-standalone-admin) | 独立后台管理系统，负责应用公告、版本发布、心跳设备信息和运营工具管理。 |
 
 ## 功能概览
 
