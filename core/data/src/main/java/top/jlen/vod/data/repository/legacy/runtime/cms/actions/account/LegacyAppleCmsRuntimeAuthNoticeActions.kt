@@ -316,15 +316,14 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyFindPassword(
     editor: FindPasswordEditor
 ): String {
     val form = FormBody.Builder()
-        .add("user_name", editor.userName.trim())
-        .add("user_question", editor.question.trim())
-        .add("user_answer", editor.answer.trim())
+        .add("to", editor.email.trim())
+        .add("code", editor.code.trim())
         .add("user_pwd", editor.password)
         .add("user_pwd2", editor.confirmPassword)
-        .add("verify", editor.verify.trim())
+        .add("ac", "email")
         .build()
     return runtimeSubmitPublicAction(
-        url = "${runtimeBaseUrl()}/index.php/user/findpass",
+        url = "${runtimeBaseUrl()}/index.php/user/findpass_reset",
         referer = "${runtimeBaseUrl()}/index.php/user/findpass.html",
         formBody = form
     )

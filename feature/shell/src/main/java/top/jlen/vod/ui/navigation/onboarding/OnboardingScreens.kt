@@ -257,7 +257,7 @@ fun FirstLoginOnboardingScreen(
     onSendRegisterCode: () -> Unit,
     onRegister: () -> Unit,
     onFindPasswordEditorChange: ((FindPasswordEditor) -> FindPasswordEditor) -> Unit,
-    onRefreshFindPasswordCaptcha: () -> Unit,
+    onSendFindPasswordCode: () -> Unit,
     onFindPassword: () -> Unit
 ) {
     val title = when (state.authMode) {
@@ -332,7 +332,7 @@ fun FirstLoginOnboardingScreen(
                     AccountAuthMode.FindPassword -> FirstLoginFindPasswordPane(
                         state = state,
                         onEditorChange = onFindPasswordEditorChange,
-                        onRefreshCaptcha = onRefreshFindPasswordCaptcha,
+                        onSendCode = onSendFindPasswordCode,
                         onSubmit = onFindPassword
                     )
 
@@ -523,28 +523,45 @@ private fun FirstLoginRegisterPane(
 private fun FirstLoginFindPasswordPane(
     state: AccountUiState,
     onEditorChange: ((FindPasswordEditor) -> FindPasswordEditor) -> Unit,
-    onRefreshCaptcha: () -> Unit,
+    onSendCode: () -> Unit,
     onSubmit: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         OnboardingTextField(
-            value = state.findPasswordEditor.userName,
-            onValueChange = { value -> onEditorChange { it.copy(userName = value) } },
-            label = "用户名",
-            placeholder = "请输入登录账号"
+            value = state.findPasswordEditor.email,
+            onValueChange = { value -> onEditorChange { it.copy(email = value) } },
+            label = "邮箱",
+            placeholder = "请输入绑定邮箱",
+            keyboardType = KeyboardType.Email
         )
-        OnboardingTextField(
-            value = state.findPasswordEditor.question,
-            onValueChange = { value -> onEditorChange { it.copy(question = value) } },
-            label = "密保问题",
-            placeholder = "请输入密保问题"
-        )
-        OnboardingTextField(
-            value = state.findPasswordEditor.answer,
-            onValueChange = { value -> onEditorChange { it.copy(answer = value) } },
-            label = "密保答案",
-            placeholder = "请输入密保答案"
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OnboardingTextField(
+                value = state.findPasswordEditor.code,
+                onValueChange = { value -> onEditorChange { it.copy(code = value) } },
+                label = "邮箱验证码",
+                placeholder = "请输入验证码",
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedButton(
+                onClick = onSendCode,
+                enabled = !state.isActionLoading && state.findPasswordCodeCountdown <= 0,
+                modifier = Modifier.heightIn(min = UiDimens.SecondaryButtonHeight),
+                shape = RoundedCornerShape(UiDimens.ControlRadius),
+                border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp)
+            ) {
+                Text(
+                    text = if (state.findPasswordCodeCountdown > 0) {
+                        "${state.findPasswordCodeCountdown}s"
+                    } else if (state.isActionLoading) {
+                        "发送中"
+                    } else {
+                        "获取验证码"
+                    },
+                    maxLines = 1
+                )
+            }
+        }
         OnboardingTextField(
             value = state.findPasswordEditor.password,
             onValueChange = { value -> onEditorChange { it.copy(password = value) } },
@@ -559,19 +576,6 @@ private fun FirstLoginFindPasswordPane(
             placeholder = "请再次输入新密码",
             isPassword = true
         )
-        if (state.findPasswordRequiresVerify) {
-            OnboardingTextField(
-                value = state.findPasswordEditor.verify,
-                onValueChange = { value -> onEditorChange { it.copy(verify = value) } },
-                label = "验证码",
-                placeholder = "请输入图片验证码"
-            )
-            CaptchaImageBox(
-                bytes = state.findPasswordCaptcha,
-                isLoading = state.isContentLoading,
-                onRefresh = onRefreshCaptcha
-            )
-        }
 
         Button(
             onClick = onSubmit,
@@ -585,7 +589,7 @@ private fun FirstLoginFindPasswordPane(
                 contentColor = UiPalette.AccentText
             )
         ) {
-            Text(if (state.isActionLoading) "提交中..." else "立即找回", fontWeight = FontWeight.ExtraBold)
+            Text(if (state.isActionLoading) "重置中..." else "重置密码", fontWeight = FontWeight.ExtraBold)
         }
     }
 }
@@ -596,13 +600,14 @@ private fun OnboardingTextField(
     onValueChange: (String) -> Unit,
     label: String,
     placeholder: String,
+    modifier: Modifier = Modifier,
     isPassword: Boolean = false,
     keyboardType: KeyboardType = if (isPassword) KeyboardType.Password else KeyboardType.Text
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(UiDimens.ControlRadius),
         singleLine = true,
         label = { Text(label) },

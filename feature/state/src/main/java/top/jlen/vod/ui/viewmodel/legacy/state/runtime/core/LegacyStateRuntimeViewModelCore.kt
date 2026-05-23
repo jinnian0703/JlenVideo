@@ -355,6 +355,8 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
 
     fun sendRegisterCode() = legacySendRegisterCode()
 
+    fun sendFindPasswordCode() = legacySendFindPasswordCode()
+
     fun register() = legacyRegister()
 
     fun findPassword() = legacyFindPassword()

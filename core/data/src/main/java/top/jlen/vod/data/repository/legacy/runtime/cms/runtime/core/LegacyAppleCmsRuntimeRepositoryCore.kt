@@ -1431,15 +1431,14 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     private suspend fun findPasswordOriginal(editor: FindPasswordEditor): String {
         val form = FormBody.Builder()
-            .add("user_name", editor.userName.trim())
-            .add("user_question", editor.question.trim())
-            .add("user_answer", editor.answer.trim())
+            .add("to", editor.email.trim())
+            .add("code", editor.code.trim())
             .add("user_pwd", editor.password)
             .add("user_pwd2", editor.confirmPassword)
-            .add("verify", editor.verify.trim())
+            .add("ac", "email")
             .build()
         return submitPublicAction(
-            url = "$baseUrl/index.php/user/findpass",
+            url = "$baseUrl/index.php/user/findpass_reset",
             referer = "$baseUrl/index.php/user/findpass.html",
             formBody = form
         )
@@ -1954,6 +1953,23 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         return authResponse?.msg?.takeIf(String::isNotBlank) ?: "验证码发送成功"
     }
 
+    suspend fun sendFindPasswordCodeForApp(email: String): String {
+        val body = executeUserRequest(
+            path = "/index.php/user/findpass_msg",
+            refererPath = "/index.php/user/findpass.html",
+            requestBody = FormBody.Builder()
+                .add("to", email.trim())
+                .add("ac", "email")
+                .build(),
+            extraHeaders = mapOf("X-Requested-With" to "XMLHttpRequest")
+        )
+        val authResponse = runCatching { gson.fromJson(body, AuthResponse::class.java) }.getOrNull()
+        if (authResponse != null && authResponse.code != 1) {
+            throw IOException(authResponse.msg.ifBlank { "验证码发送失败" })
+        }
+        return authResponse?.msg?.takeIf(String::isNotBlank) ?: "验证码已发送"
+    }
+
     suspend fun registerForApp(editor: RegisterEditor): String {
         val body = executeUserRequest(
             path = "/index.php/user/reg",
@@ -1978,15 +1994,14 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     suspend fun findPasswordForApp(editor: FindPasswordEditor): String {
         val body = executeUserRequest(
-            path = "/index.php/user/findpass",
+            path = "/index.php/user/findpass_reset",
             refererPath = "/index.php/user/findpass.html",
             requestBody = FormBody.Builder()
-                .add("user_name", editor.userName.trim())
-                .add("user_question", editor.question.trim())
-                .add("user_answer", editor.answer.trim())
+                .add("to", editor.email.trim())
+                .add("code", editor.code.trim())
                 .add("user_pwd", editor.password)
                 .add("user_pwd2", editor.confirmPassword)
-                .add("verify", editor.verify.trim())
+                .add("ac", "email")
                 .build(),
             extraHeaders = mapOf("X-Requested-With" to "XMLHttpRequest")
         )
@@ -1994,7 +2009,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         if (authResponse != null && authResponse.code != 1) {
             throw IOException(authResponse.msg.ifBlank { "找回密码失败" })
         }
-        return authResponse?.msg?.takeIf(String::isNotBlank) ?: "密码已重置"
+        return authResponse?.msg?.takeIf(String::isNotBlank) ?: "密码重置成功"
     }
 
     suspend fun logoutForApp() {

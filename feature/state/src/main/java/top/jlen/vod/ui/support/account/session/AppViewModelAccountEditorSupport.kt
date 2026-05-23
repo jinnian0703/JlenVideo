@@ -103,6 +103,13 @@ internal fun accountStateWithFindPasswordPage(
     findPasswordCaptcha = page.captchaBytes
 )
 
+internal fun accountStateWithFindPasswordCodeCountdown(
+    accountState: AccountUiState,
+    seconds: Int
+): AccountUiState = accountState.copy(
+    findPasswordCodeCountdown = seconds.coerceAtLeast(0)
+)
+
 internal fun accountStateAfterProfileSaved(accountState: AccountUiState): AccountUiState =
     accountState.copy(
         profileEditor = accountState.profileEditor.copy(
@@ -148,12 +155,13 @@ internal fun accountStateAfterRegisterSuccess(
 
 internal fun accountStateAfterFindPasswordSuccess(
     accountState: AccountUiState,
-    userName: String
+    email: String
 ): AccountUiState = accountState.copy(
     authMode = AccountAuthMode.Login,
-    userName = userName,
+    userName = email,
     password = "",
     error = null,
-    message = "密码已重置，请登录。",
-    findPasswordEditor = FindPasswordEditor()
+    message = "密码重置成功",
+    findPasswordEditor = FindPasswordEditor(),
+    findPasswordCodeCountdown = 0
 )

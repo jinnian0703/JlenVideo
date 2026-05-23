@@ -391,12 +391,10 @@ data class FindPasswordPage(
 )
 
 data class FindPasswordEditor(
-    val userName: String = "",
-    val question: String = "",
-    val answer: String = "",
+    val email: String = "",
+    val code: String = "",
     val password: String = "",
-    val confirmPassword: String = "",
-    val verify: String = ""
+    val confirmPassword: String = ""
 )
 
 data class UserCenterItem(

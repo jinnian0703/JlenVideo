@@ -23,11 +23,11 @@ internal fun AccountRegisterPane(
 internal fun AccountFindPasswordPane(
     state: AccountUiState,
     onEditorChange: ((FindPasswordEditor) -> FindPasswordEditor) -> Unit,
-    onRefreshCaptcha: () -> Unit,
+    onSendCode: () -> Unit,
     onSubmit: () -> Unit
 ) = LegacyAccountFindPasswordPane(
     state = state,
     onEditorChange = onEditorChange,
-    onRefreshCaptcha = onRefreshCaptcha,
+    onSendCode = onSendCode,
     onSubmit = onSubmit
 )

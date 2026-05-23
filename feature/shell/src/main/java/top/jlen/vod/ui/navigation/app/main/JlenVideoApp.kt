@@ -334,7 +334,7 @@ fun JlenVideoApp() {
                                 onSendRegisterCode = viewModel::sendRegisterCode,
                                 onRegister = viewModel::register,
                                 onFindPasswordEditorChange = viewModel::updateFindPasswordEditor,
-                                onRefreshFindPasswordCaptcha = viewModel::refreshFindPasswordCaptcha,
+                                onSendFindPasswordCode = viewModel::sendFindPasswordCode,
                                 onFindPassword = viewModel::findPassword
                             )
                         }
@@ -467,7 +467,7 @@ fun JlenVideoApp() {
                                 onSendRegisterCode = viewModel::sendRegisterCode,
                                 onRegister = viewModel::register,
                                 onFindPasswordEditorChange = viewModel::updateFindPasswordEditor,
-                                onRefreshFindPasswordCaptcha = viewModel::refreshFindPasswordCaptcha,
+                                onSendFindPasswordCode = viewModel::sendFindPasswordCode,
                                 onFindPassword = viewModel::findPassword,
                                 onSendEmailCode = viewModel::sendEmailBindCode,
                                 onBindEmail = viewModel::bindEmail,

@@ -162,7 +162,7 @@ internal fun LegacyAccountScreen(
     onSendRegisterCode: () -> Unit,
     onRegister: () -> Unit,
     onFindPasswordEditorChange: ((FindPasswordEditor) -> FindPasswordEditor) -> Unit,
-    onRefreshFindPasswordCaptcha: () -> Unit,
+    onSendFindPasswordCode: () -> Unit,
     onFindPassword: () -> Unit,
     onSendEmailCode: () -> Unit,
     onBindEmail: () -> Unit,
@@ -517,7 +517,7 @@ internal fun LegacyAccountScreen(
                                 AccountFindPasswordPane(
                                     state = state,
                                     onEditorChange = onFindPasswordEditorChange,
-                                    onRefreshCaptcha = onRefreshFindPasswordCaptcha,
+                                    onSendCode = onSendFindPasswordCode,
                                     onSubmit = onFindPassword
                                 )
                             }
@@ -1018,7 +1018,7 @@ internal fun LegacyAccountRegisterPane(
 internal fun LegacyAccountFindPasswordPane(
     state: AccountUiState,
     onEditorChange: ((FindPasswordEditor) -> FindPasswordEditor) -> Unit,
-    onRefreshCaptcha: () -> Unit,
+    onSendCode: () -> Unit,
     onSubmit: () -> Unit
 ) {
     Column(
@@ -1028,13 +1028,16 @@ internal fun LegacyAccountFindPasswordPane(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         OutlinedTextField(
-            value = state.findPasswordEditor.userName,
-            onValueChange = { value -> onEditorChange { it.copy(userName = value) } },
+            value = state.findPasswordEditor.email,
+            onValueChange = { value -> onEditorChange { it.copy(email = value) } },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             singleLine = true,
-            label = { Text("用户名") },
-            placeholder = { Text("请输入登录账号") },
+            label = { Text("邮箱") },
+            placeholder = { Text("请输入绑定邮箱") },
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = KeyboardType.Email
+            ),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = UiPalette.Accent,
                 unfocusedBorderColor = UiPalette.BorderSoft,
@@ -1045,42 +1048,45 @@ internal fun LegacyAccountFindPasswordPane(
                 unfocusedContainerColor = UiPalette.Surface
             )
         )
-        OutlinedTextField(
-            value = state.findPasswordEditor.question,
-            onValueChange = { value -> onEditorChange { it.copy(question = value) } },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            singleLine = true,
-            label = { Text("密保问题") },
-            placeholder = { Text("请输入密保问题") },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = UiPalette.Accent,
-                unfocusedBorderColor = UiPalette.BorderSoft,
-                focusedTextColor = UiPalette.Ink,
-                unfocusedTextColor = UiPalette.Ink,
-                cursorColor = UiPalette.Accent,
-                focusedContainerColor = UiPalette.Surface,
-                unfocusedContainerColor = UiPalette.Surface
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(
+                value = state.findPasswordEditor.code,
+                onValueChange = { value -> onEditorChange { it.copy(code = value) } },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(20.dp),
+                singleLine = true,
+                label = { Text("邮箱验证码") },
+                placeholder = { Text("请输入验证码") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = UiPalette.Accent,
+                    unfocusedBorderColor = UiPalette.BorderSoft,
+                    focusedTextColor = UiPalette.Ink,
+                    unfocusedTextColor = UiPalette.Ink,
+                    cursorColor = UiPalette.Accent,
+                    focusedContainerColor = UiPalette.Surface,
+                    unfocusedContainerColor = UiPalette.Surface
+                )
             )
-        )
-        OutlinedTextField(
-            value = state.findPasswordEditor.answer,
-            onValueChange = { value -> onEditorChange { it.copy(answer = value) } },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            singleLine = true,
-            label = { Text("密保答案") },
-            placeholder = { Text("请输入密保答案") },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = UiPalette.Accent,
-                unfocusedBorderColor = UiPalette.BorderSoft,
-                focusedTextColor = UiPalette.Ink,
-                unfocusedTextColor = UiPalette.Ink,
-                cursorColor = UiPalette.Accent,
-                focusedContainerColor = UiPalette.Surface,
-                unfocusedContainerColor = UiPalette.Surface
-            )
-        )
+            OutlinedButton(
+                onClick = onSendCode,
+                enabled = !state.isActionLoading && state.findPasswordCodeCountdown <= 0,
+                modifier = Modifier.height(64.dp),
+                border = BorderStroke(1.dp, UiPalette.BorderSoft),
+                shape = RoundedCornerShape(18.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+            ) {
+                Text(
+                    text = if (state.findPasswordCodeCountdown > 0) {
+                        "${state.findPasswordCodeCountdown}s"
+                    } else if (state.isActionLoading) {
+                        "发送中"
+                    } else {
+                        "获取验证码"
+                    },
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
         OutlinedTextField(
             value = state.findPasswordEditor.password,
             onValueChange = { value -> onEditorChange { it.copy(password = value) } },
@@ -1125,31 +1131,6 @@ internal fun LegacyAccountFindPasswordPane(
                 unfocusedContainerColor = UiPalette.Surface
             )
         )
-        if (state.findPasswordRequiresVerify) {
-            OutlinedTextField(
-                value = state.findPasswordEditor.verify,
-                onValueChange = { value -> onEditorChange { it.copy(verify = value) } },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                singleLine = true,
-                label = { Text("验证码") },
-                placeholder = { Text("请输入图片验证码") },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = UiPalette.Accent,
-                    unfocusedBorderColor = UiPalette.BorderSoft,
-                    focusedTextColor = UiPalette.Ink,
-                    unfocusedTextColor = UiPalette.Ink,
-                    cursorColor = UiPalette.Accent,
-                    focusedContainerColor = UiPalette.Surface,
-                    unfocusedContainerColor = UiPalette.Surface
-                )
-            )
-            CaptchaImageBox(
-                bytes = state.findPasswordCaptcha,
-                isLoading = state.isContentLoading,
-                onRefresh = onRefreshCaptcha
-            )
-        }
 
         Button(
             onClick = onSubmit,
@@ -1161,7 +1142,7 @@ internal fun LegacyAccountFindPasswordPane(
                 contentColor = UiPalette.AccentText
             )
         ) {
-            Text(if (state.isActionLoading) "提交中..." else "立即找回", fontWeight = FontWeight.Bold)
+            Text(if (state.isActionLoading) "重置中..." else "重置密码", fontWeight = FontWeight.Bold)
         }
     }
 }
