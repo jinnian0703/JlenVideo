@@ -147,7 +147,7 @@ fun HomeScreen(
     onOpenSearch: () -> Unit
 ) {
     if (state.isLoading) {
-        LoadingPane("首页加载中...")
+        LoadingPane("首页加载中...", style = FeedbackPaneStyle.FullscreenPlain)
         return
     }
 

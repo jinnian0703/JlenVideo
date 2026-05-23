@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 
 enum class FeedbackPaneStyle {
     Fullscreen,
+    FullscreenPlain,
     Card
 }
 
@@ -150,7 +151,8 @@ private fun FeedbackPaneContainer(
     content: @Composable ColumnScope.() -> Unit
 ) {
     when (style) {
-        FeedbackPaneStyle.Fullscreen -> {
+        FeedbackPaneStyle.Fullscreen,
+        FeedbackPaneStyle.FullscreenPlain -> {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -158,21 +160,30 @@ private fun FeedbackPaneContainer(
                     .padding(horizontal = 24.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = UiPalette.Surface.copy(alpha = 0.96f)
-                    ),
-                    shape = RoundedCornerShape(UiDimens.LargeContainerRadius),
-                    border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.78f))
-                ) {
+                if (style == FeedbackPaneStyle.FullscreenPlain) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = UiDimens.LargeContainerRadius),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                         content = content
                     )
+                } else {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = UiPalette.Surface.copy(alpha = 0.96f)
+                        ),
+                        shape = RoundedCornerShape(UiDimens.LargeContainerRadius),
+                        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.78f))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = UiDimens.LargeContainerRadius),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(14.dp),
+                            content = content
+                        )
+                    }
                 }
             }
         }
