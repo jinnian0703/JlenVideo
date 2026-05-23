@@ -20,9 +20,44 @@ internal fun resolveNoticeActive(obj: JsonObject, startAt: String, endAt: String
     val now = System.currentTimeMillis()
     val startMs = parseNoticeTimeToMillis(startAt)
     if (startMs != null && now < startMs) return false
+    if (endAt.isNeverExpireNoticeTime()) return true
     val endMs = parseNoticeTimeToMillis(endAt)
     if (endMs != null && now > endMs) return false
     return true
+}
+
+internal fun String.isNeverExpireNoticeTime(): Boolean {
+    val raw = trim()
+    if (raw.isBlank()) return true
+    val normalized = raw.lowercase(Locale.ROOT)
+    if (
+        normalized in setOf(
+            "never",
+            "forever",
+            "permanent",
+            "no_expire",
+            "no_expiry",
+            "unlimited",
+            "0",
+            "0000-00-00",
+            "0000-00-00 00:00",
+            "0000-00-00 00:00:00",
+            "永不失效",
+            "永不过期",
+            "长期有效",
+            "永久"
+        )
+    ) {
+        return true
+    }
+    if (normalized.startsWith("1970-01-01")) return true
+    val millis = parseNoticeTimeToMillis(raw)
+    val year = millis?.let {
+        java.util.Calendar.getInstance().apply {
+            timeInMillis = it
+        }.get(java.util.Calendar.YEAR)
+    }
+    return year != null && (year <= 1970 || year >= 2035)
 }
 
 internal fun resolveNoticeAlwaysShowDialog(obj: JsonObject): Boolean {
