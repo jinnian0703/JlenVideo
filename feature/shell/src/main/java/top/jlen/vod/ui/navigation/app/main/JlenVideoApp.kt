@@ -282,6 +282,7 @@ fun JlenVideoApp() {
                             dismissedUpdateVersion = updateInfo?.latestVersion.orEmpty()
                             openUpdateLink()
                         },
+                        onOpenLink = openAnnouncementLink
                     )
                 }
                 Scaffold(

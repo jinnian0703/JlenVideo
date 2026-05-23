@@ -30,6 +30,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -186,11 +187,14 @@ fun AnnouncementPromptDialog(
                                 }
                             }
                         }
-                        Text(
-                            text = notice.title,
+                        AnnouncementRichInlineText(
+                            content = notice.title,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = UiPalette.Ink
+                            color = UiPalette.Ink,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            onOpenLink = onOpenLink
                         )
                     }
                 }
@@ -237,13 +241,10 @@ fun UpdatePromptDialog(
     updateInfo: AppUpdateInfo,
     onDismiss: () -> Unit,
     onOpenRelease: () -> Unit,
-    onUpdate: () -> Unit
+    onUpdate: () -> Unit,
+    onOpenLink: (String) -> Unit = {}
 ) {
-    val notes = updateInfo.notes
-        .lineSequence()
-        .map { it.trim() }
-        .filter { it.isNotBlank() }
-        .toList()
+    val notes = remember(updateInfo.notes) { updateInfo.notes.trim() }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -342,30 +343,19 @@ fun UpdatePromptDialog(
                                 .verticalScroll(rememberScrollState()),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            if (notes.isEmpty()) {
+                            if (notes.isBlank()) {
                                 Text(
                                     text = "本次版本已发布，建议直接更新体验最新内容。",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = UiPalette.TextSecondary
                                 )
                             } else {
-                                notes.forEach { note ->
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Text(
-                                            text = "•",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = UiPalette.Accent
-                                        )
-                                        Text(
-                                            text = note.removePrefix("•").removePrefix("-").trim(),
-                                            modifier = Modifier.weight(1f),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = UiPalette.TextPrimary,
-                                            maxLines = 8,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
+                                AnnouncementRichHtmlContent(
+                                    htmlContent = notes,
+                                    fallbackContent = notes,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onOpenLink = onOpenLink
+                                )
                             }
                         }
                     }

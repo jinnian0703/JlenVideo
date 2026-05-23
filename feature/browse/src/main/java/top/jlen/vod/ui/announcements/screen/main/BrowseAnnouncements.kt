@@ -210,11 +210,12 @@ fun AnnouncementDetailScreen(
                                     )
                                 }
                             }
-                            Text(
-                                text = notice.title,
+                            AnnouncementRichInlineText(
+                                content = notice.title,
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = UiPalette.Ink
+                                color = UiPalette.Ink,
+                                onOpenLink = onOpenLink
                             )
                             notice.formattedActiveTime.takeIf(String::isNotBlank)?.let { activeTime ->
                                 Text(
@@ -278,8 +279,8 @@ private fun AnnouncementListCard(
                         )
                     }
                 }
-                Text(
-                    text = notice.title,
+                AnnouncementRichInlineText(
+                    content = notice.title,
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.ExtraBold,
@@ -355,8 +356,8 @@ private fun AnnouncementListCardCompact(
                         )
                     }
                 }
-                Text(
-                    text = notice.title,
+                AnnouncementRichInlineText(
+                    content = notice.title,
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.ExtraBold,

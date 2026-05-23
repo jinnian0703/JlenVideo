@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -21,8 +22,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+
 @Composable
 internal fun UpdateNotesSection(notes: String) {
     var expanded by remember(notes) { mutableStateOf(false) }
@@ -30,13 +31,21 @@ internal fun UpdateNotesSection(notes: String) {
         title = "更新说明",
         description = "最近版本变更"
     ) {
-        Text(
-            text = notes,
-            style = MaterialTheme.typography.bodySmall,
-            color = UiPalette.Ink,
-            maxLines = if (expanded) Int.MAX_VALUE else 8,
-            overflow = if (expanded) TextOverflow.Clip else TextOverflow.Ellipsis
-        )
+        Box(
+            modifier = if (expanded) {
+                Modifier.fillMaxWidth()
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 184.dp)
+                    .clip(RoundedCornerShape(12.dp))
+            }
+        ) {
+            AnnouncementRichHtmlContent(
+                htmlContent = notes,
+                fallbackContent = notes
+            )
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End

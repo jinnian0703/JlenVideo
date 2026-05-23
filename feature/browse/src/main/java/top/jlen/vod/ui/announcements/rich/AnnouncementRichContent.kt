@@ -24,11 +24,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,32 +42,90 @@ import org.jsoup.parser.Parser
 import java.util.Locale
 import top.jlen.vod.data.AppNotice
 
+private val NoAnnouncementLinkHandler: (String) -> Unit = {}
+
 @Composable
 fun AnnouncementRichContent(
     notice: AppNotice,
     modifier: Modifier = Modifier,
-    onOpenLink: (String) -> Unit = {}
+    onOpenLink: (String) -> Unit = NoAnnouncementLinkHandler
 ) {
-    val richBlocks = remember(notice.htmlContent) {
-        parseAnnouncementHtmlBlocks(notice.htmlContent)
-    }
+    AnnouncementRichHtmlContent(
+        htmlContent = notice.htmlContent,
+        fallbackContent = notice.displayContent,
+        modifier = modifier,
+        onOpenLink = onOpenLink
+    )
+}
+
+@Composable
+fun AnnouncementRichHtmlContent(
+    htmlContent: String,
+    modifier: Modifier = Modifier,
+    fallbackContent: String = htmlContent,
+    onOpenLink: (String) -> Unit = NoAnnouncementLinkHandler
+) {
+    val richBlocks = remember(htmlContent) { parseAnnouncementHtmlBlocks(htmlContent) }
 
     if (richBlocks.isEmpty()) {
-        AnnouncementRichText(content = notice.displayContent.stripAnnouncementCodeFenceForDisplay())
-        return
-    }
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        richBlocks.forEach { block ->
-            AnnouncementRichBlockText(
-                block = block,
-                onOpenLink = onOpenLink
-            )
+        AnnouncementRichText(content = fallbackContent.stripAnnouncementCodeFenceForDisplay())
+    } else {
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            richBlocks.forEach { block ->
+                AnnouncementRichBlockText(
+                    block = block,
+                    onOpenLink = onOpenLink
+                )
+            }
         }
     }
+}
+
+@Composable
+fun AnnouncementRichInlineText(
+    content: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = MaterialTheme.typography.bodyMedium,
+    color: Color = UiPalette.Ink,
+    fontWeight: FontWeight? = null,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
+    textAlign: TextAlign? = null,
+    onOpenLink: (String) -> Unit = NoAnnouncementLinkHandler
+) {
+    val annotated = remember(content) { parseAnnouncementInlineHtml(content) }
+    var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val hasLinks = remember(annotated) {
+        annotated.getStringAnnotations(AnnouncementUrlTag, 0, annotated.length).isNotEmpty()
+    }
+    val textModifier = if (hasLinks && onOpenLink !== NoAnnouncementLinkHandler) {
+        modifier.pointerInput(annotated, onOpenLink) {
+            detectTapGestures { offset ->
+                val layout = layoutResult ?: return@detectTapGestures
+                val textOffset = layout.getOffsetForPosition(offset)
+                annotated.getStringAnnotations(AnnouncementUrlTag, textOffset, textOffset)
+                    .firstOrNull()
+                    ?.item
+                    ?.let(onOpenLink)
+            }
+        }
+    } else {
+        modifier
+    }
+    Text(
+        text = annotated,
+        modifier = textModifier,
+        onTextLayout = { layoutResult = it },
+        style = style,
+        color = color,
+        fontWeight = fontWeight,
+        maxLines = maxLines,
+        overflow = overflow,
+        textAlign = textAlign
+    )
 }
 
 @Composable
@@ -218,6 +278,25 @@ internal fun parseAnnouncementHtmlBlocks(html: String): List<AnnouncementRichBlo
         blocks += node.toAnnouncementBlocks()
     }
     return blocks.filter { it.text.text.isNotBlank() }
+}
+
+internal fun parseAnnouncementInlineHtml(html: String): AnnotatedString {
+    val normalized = Parser.unescapeEntities(html.stripAnnouncementCodeFence(), false).trim()
+    if (normalized.isBlank()) return AnnotatedString("")
+
+    val blocks = parseAnnouncementHtmlBlocks(normalized)
+    if (blocks.isNotEmpty()) {
+        return buildAnnotatedString {
+            blocks.forEachIndexed { index, block ->
+                if (index > 0 && !endsWithWhitespace()) {
+                    append(' ')
+                }
+                append(block.text.trimAnnouncementInlineText())
+            }
+        }
+    }
+
+    return AnnotatedString(normalized.replace(Regex("<[^>]+>"), "").trim())
 }
 
 private fun Node.toAnnouncementBlocks(): List<AnnouncementRichBlock> {
@@ -582,6 +661,17 @@ private fun Element.containsBoldContent(): Boolean =
 
 private fun AnnotatedString.Builder.endsWithLineBreak(): Boolean =
     length > 0 && toAnnotatedString().text.last() == '\n'
+
+private fun AnnotatedString.Builder.endsWithWhitespace(): Boolean =
+    length > 0 && toAnnotatedString().text.last().isWhitespace()
+
+private fun AnnotatedString.trimAnnouncementInlineText(): AnnotatedString {
+    val raw = text
+    val start = raw.indexOfFirst { !it.isWhitespace() }
+    if (start < 0) return AnnotatedString("")
+    val endExclusive = raw.indexOfLast { !it.isWhitespace() } + 1
+    return subSequence(start, endExclusive)
+}
 
 private fun Element.isAnnouncementBlockElement(): Boolean =
     tagName().lowercase(Locale.ROOT) in announcementBlockTags

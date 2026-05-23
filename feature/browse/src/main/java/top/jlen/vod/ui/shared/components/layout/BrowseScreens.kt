@@ -364,8 +364,8 @@ private fun AnnouncementTickerStrip(
                                     )
                                 }
                             }
-                            Text(
-                                text = notice.title,
+                            AnnouncementRichInlineText(
+                                content = notice.title,
                                 modifier = Modifier
                                     .weight(1f)
                                     .then(
@@ -374,7 +374,7 @@ private fun AnnouncementTickerStrip(
                                         } else {
                                             Modifier
                                         }
-                                    ),
+                                ),
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.SemiBold,
                                 color = UiPalette.Ink,
