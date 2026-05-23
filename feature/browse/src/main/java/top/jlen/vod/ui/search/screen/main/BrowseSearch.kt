@@ -307,6 +307,7 @@ fun SearchResultsScreen(
     resultKey: String,
     initialScrollIndex: Int,
     initialScrollOffset: Int,
+    scrollToTopSignal: Int = 0,
     onScrollPositionChange: (Int, Int) -> Unit,
     onBack: () -> Unit,
     onQueryChange: (String) -> Unit,
@@ -327,6 +328,11 @@ fun SearchResultsScreen(
             .collect { (index, offset) ->
                 onScrollPositionChange(index, offset)
             }
+    }
+    LaunchedEffect(scrollToTopSignal) {
+        if (scrollToTopSignal > 0) {
+            listState.animateScrollToItem(0)
+        }
     }
     LaunchedEffect(listState, state.results.size, state.hasMore, state.isAppending, state.isLoading) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }

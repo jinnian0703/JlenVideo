@@ -411,6 +411,7 @@ fun JlenVideoApp() {
                                 resultKey = query.trim(),
                                 initialScrollIndex = scrollPosition.index,
                                 initialScrollOffset = scrollPosition.offset,
+                                scrollToTopSignal = searchScrollToTopSignal,
                                 onScrollPositionChange = { index, offset ->
                                     viewModel.updateSearchResultScroll(query, index, offset)
                                 },
