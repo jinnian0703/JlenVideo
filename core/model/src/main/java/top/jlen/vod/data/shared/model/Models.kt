@@ -97,8 +97,8 @@ data class VodItem(
     @SerializedName(value = "vod_remarks", alternate = ["remarks", "remark"]) val vodRemarks: String? = null,
     @SerializedName(value = "badgeText", alternate = ["badge_text"]) val compatBadgeText: String? = null,
     @SerializedName(value = "episode_remark", alternate = ["episodeRemark"]) val episodeRemark: String? = null,
-    @SerializedName("vod_blurb") val vodBlurb: String? = null,
-    @SerializedName("vod_content") val vodContent: String? = null,
+    @SerializedName(value = "vod_blurb", alternate = ["blurb", "summary", "vod_summary", "brief"]) val vodBlurb: String? = null,
+    @SerializedName(value = "vod_content", alternate = ["content", "description", "desc", "plot", "synopsis", "vod_desc"]) val vodContent: String? = null,
     @SerializedName("vod_pubdate") val vodPubdate: String? = null,
     @SerializedName("vod_year") val vodYear: String? = null,
     @SerializedName("vod_area") val vodArea: String? = null,
@@ -171,10 +171,13 @@ data class VodItem(
             .take(8)
 
     val description: String
-        get() = when {
-            !vodBlurb.isNullOrBlank() -> cleanText(vodBlurb)
-            !vodContent.isNullOrBlank() -> cleanText(vodContent)
-            else -> "暂无简介"
+        get() {
+            val blurb = cleanText(vodBlurb)
+            val content = cleanText(vodContent)
+            return listOf(content, blurb)
+                .filter { it.isNotBlank() }
+                .maxByOrNull { it.length }
+                ?: "暂无简介"
         }
 
     private fun splitTags(value: String?): List<String> =
