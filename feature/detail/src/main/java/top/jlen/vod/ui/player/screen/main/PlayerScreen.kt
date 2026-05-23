@@ -86,12 +86,15 @@ fun PlayerScreen(
     onSelectEpisode: (Int) -> Unit,
     onSelectSource: (Int) -> Unit,
     onPlayNext: () -> Unit,
-    onPlaybackSnapshotChange: (PlaybackSnapshot) -> Unit
+    onPlaybackSnapshotChange: (PlaybackSnapshot) -> Unit,
+    onDetectedStream: (String) -> Unit,
+    onResolveFallbackFailed: (String) -> Unit
 ) {
     val isDarkTheme = isSystemInDarkTheme()
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val playUrl = state.playUrl
+    val resolveError = state.resolveError
     val directPlayable = playUrl.isNotBlank() && isDirectVideoUrl(playUrl)
     var detectedLandscapeVideo by remember {
         mutableStateOf<Boolean?>(null)
@@ -294,12 +297,17 @@ fun PlayerScreen(
                         state.isResolving && !isFullscreen -> ResolveLoadingSurface(
                             message = "正在获取播放地址..."
                         )
-                        state.useWebPlayer && !isFullscreen -> ResolveUnavailableSurface()
+                        state.useWebPlayer && !isFullscreen -> ResolveLoadingSurface(
+                            message = "正在尝试解析线路..."
+                        )
+                        resolveError != null && !isFullscreen -> ResolveUnavailableSurface(
+                            message = resolveError
+                        )
                         directPlayable && !isFullscreen -> playerContent(false)
                         directPlayable -> Spacer(modifier = Modifier.height(0.dp))
                         else -> EmptyPane(
                             message = "暂无可播放地址",
-                            description = "可以尝试切换线路，或者稍后再回来看看"
+                            description = resolveError ?: "可以尝试切换线路，或者稍后再回来看看"
                         )
                     }
                 }
@@ -395,12 +403,20 @@ fun PlayerScreen(
                     .fillMaxSize()
                     .background(Color.Black)
             ) {
-                ResolveUnavailableSurface(
+                ResolveLoadingSurface(
                     fullscreenMode = true,
-                    title = "该线路暂不支持",
-                    message = "请换个线路试试"
+                    message = "正在尝试解析线路...",
+                    subtitle = "请稍候"
                 )
             }
+        }
+
+        if (state.useWebPlayer && playUrl.isNotBlank()) {
+            HiddenStreamResolver(
+                pageUrl = playUrl,
+                onDetected = onDetectedStream,
+                onFailed = onResolveFallbackFailed
+            )
         }
 
         transitionFeedback?.let { feedback ->

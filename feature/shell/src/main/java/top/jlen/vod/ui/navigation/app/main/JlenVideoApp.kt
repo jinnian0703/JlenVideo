@@ -583,7 +583,9 @@ fun JlenVideoApp() {
                                 onSelectEpisode = viewModel::selectPlayerEpisode,
                                 onSelectSource = viewModel::selectPlayerSource,
                                 onPlayNext = viewModel::playNextEpisode,
-                                onPlaybackSnapshotChange = viewModel::updatePlaybackSnapshot
+                                onPlaybackSnapshotChange = viewModel::updatePlaybackSnapshot,
+                                onDetectedStream = viewModel::adoptDetectedStream,
+                                onResolveFallbackFailed = viewModel::reportTakeoverFailure
                             )
                         }
                     }
