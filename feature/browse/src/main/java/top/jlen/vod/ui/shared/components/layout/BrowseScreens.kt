@@ -91,6 +91,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.input.KeyboardType
@@ -102,6 +103,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
@@ -1146,35 +1148,57 @@ private fun Element.resolveAnnouncementBlockKind(): AnnouncementBlockKind {
 }
 
 private fun Element.resolveAnnouncementAlignment(): TextAlign {
-    val style = attr("style").lowercase(Locale.ROOT)
+    val style = attr("style").compactAnnouncementStyle()
+    val align = attr("align").trim().lowercase(Locale.ROOT)
     return when {
-        style.contains("text-align:center") || tagName().equals("center", ignoreCase = true) -> TextAlign.Center
-        style.contains("text-align:right") -> TextAlign.End
+        style.contains("text-align:center") ||
+            align == "center" ||
+            tagName().equals("center", ignoreCase = true) -> TextAlign.Center
+        style.contains("text-align:right") || align == "right" -> TextAlign.End
         else -> TextAlign.Start
     }
 }
 
 private fun Element.resolveAnnouncementTextColor(): Color? {
-    val style = attr("style")
-    val colorValue = Regex("""color\s*:\s*([^;]+)""", RegexOption.IGNORE_CASE)
-        .find(style)
-        ?.groupValues
-        ?.getOrNull(1)
-        ?.trim()
-        .orEmpty()
-    if (colorValue.isBlank()) return null
-    return runCatching { Color(android.graphics.Color.parseColor(colorValue)) }.getOrNull()
+    return styleValue("color")
+        .takeIf(String::isNotBlank)
+        ?.parseAnnouncementColor()
+        ?: attr("color")
+            .takeIf(String::isNotBlank)
+            ?.parseAnnouncementColor()
 }
 
 private fun Element.resolveAnnouncementSpanStyle(): SpanStyle? {
     var hasStyle = false
     var color: Color? = null
+    var background: Color? = null
     var fontWeight: FontWeight? = null
+    var fontStyle: FontStyle? = null
+    var textDecoration: TextDecoration? = null
+    var fontSize = androidx.compose.ui.unit.TextUnit.Unspecified
 
     when (tagName().lowercase(Locale.ROOT)) {
         "b", "strong" -> {
             fontWeight = FontWeight.Bold
             hasStyle = true
+        }
+        "i", "em" -> {
+            fontStyle = FontStyle.Italic
+            hasStyle = true
+        }
+        "u", "ins" -> {
+            textDecoration = TextDecoration.Underline
+            hasStyle = true
+        }
+        "s", "strike", "del" -> {
+            textDecoration = TextDecoration.LineThrough
+            hasStyle = true
+        }
+        "font" -> {
+            attr("size").parseAnnouncementFontTagSize()?.let {
+                fontSize = it
+                hasStyle = true
+            }
         }
     }
 
@@ -1182,16 +1206,170 @@ private fun Element.resolveAnnouncementSpanStyle(): SpanStyle? {
         color = it
         hasStyle = true
     }
+    resolveAnnouncementBackgroundColor()?.let {
+        background = it
+        hasStyle = true
+    }
+    resolveAnnouncementFontWeight()?.let {
+        fontWeight = it
+        hasStyle = true
+    }
+    resolveAnnouncementFontSize()?.let {
+        fontSize = it
+        hasStyle = true
+    }
+    if (hasAnnouncementFontStyle("italic", "oblique")) {
+        fontStyle = FontStyle.Italic
+        hasStyle = true
+    }
+    resolveAnnouncementTextDecoration()?.let {
+        textDecoration = it
+        hasStyle = true
+    }
 
     if (!hasStyle) return null
     return SpanStyle(
         color = color ?: Color.Unspecified,
-        fontWeight = fontWeight
+        background = background ?: Color.Unspecified,
+        fontWeight = fontWeight,
+        fontStyle = fontStyle,
+        fontSize = fontSize,
+        textDecoration = textDecoration
     )
 }
 
+private fun Element.resolveAnnouncementBackgroundColor(): Color? =
+    (styleValue("background-color").ifBlank { styleValue("background") })
+        .takeIf(String::isNotBlank)
+        ?.parseAnnouncementColor()
+
+private fun Element.resolveAnnouncementFontWeight(): FontWeight? {
+    val raw = styleValue("font-weight").lowercase(Locale.ROOT)
+    return when {
+        raw in setOf("bold", "bolder", "600", "700", "800", "900") -> FontWeight.Bold
+        raw == "500" -> FontWeight.Medium
+        else -> null
+    }
+}
+
+private fun Element.resolveAnnouncementFontSize() =
+    styleValue("font-size").parseAnnouncementFontSize()
+
+private fun Element.hasAnnouncementFontStyle(vararg values: String): Boolean {
+    val raw = styleValue("font-style").lowercase(Locale.ROOT)
+    return values.any { raw.contains(it) }
+}
+
+private fun Element.resolveAnnouncementTextDecoration(): TextDecoration? {
+    val raw = listOf(
+        styleValue("text-decoration"),
+        styleValue("text-decoration-line")
+    ).joinToString(" ").lowercase(Locale.ROOT)
+    return when {
+        raw.contains("line-through") -> TextDecoration.LineThrough
+        raw.contains("underline") -> TextDecoration.Underline
+        else -> null
+    }
+}
+
+private fun Element.styleValue(name: String): String {
+    val escaped = Regex.escape(name)
+    return Regex("""(?:^|;)\s*$escaped\s*:\s*([^;]+)""", RegexOption.IGNORE_CASE)
+        .find(attr("style"))
+        ?.groupValues
+        ?.getOrNull(1)
+        ?.trim()
+        .orEmpty()
+}
+
+private fun String.compactAnnouncementStyle(): String =
+    lowercase(Locale.ROOT).replace(Regex("\\s+"), "")
+
+private fun String.parseAnnouncementFontSize() =
+    trim()
+        .lowercase(Locale.ROOT)
+        .let { raw ->
+            when {
+                raw.endsWith("px") -> raw.removeSuffix("px").toFloatOrNull()?.sp
+                raw.endsWith("sp") -> raw.removeSuffix("sp").toFloatOrNull()?.sp
+                raw.endsWith("pt") -> raw.removeSuffix("pt").toFloatOrNull()?.let { (it * 1.333f).sp }
+                raw.endsWith("em") -> raw.removeSuffix("em").toFloatOrNull()?.let { (it * 16f).sp }
+                raw in setOf("xx-small", "x-small") -> 11.sp
+                raw == "small" -> 13.sp
+                raw == "medium" -> 16.sp
+                raw == "large" -> 18.sp
+                raw == "x-large" -> 22.sp
+                raw == "xx-large" -> 26.sp
+                else -> null
+            }
+        }
+
+private fun String.parseAnnouncementFontTagSize() =
+    trim().toIntOrNull()?.let { size ->
+        when (size.coerceIn(1, 7)) {
+            1 -> 11.sp
+            2 -> 13.sp
+            3 -> 16.sp
+            4 -> 18.sp
+            5 -> 22.sp
+            6 -> 26.sp
+            else -> 30.sp
+        }
+    }
+
+private fun String.parseAnnouncementColor(): Color? {
+    val raw = trim()
+        .trim('"', '\'')
+        .replace(Regex("""\s*!important$""", RegexOption.IGNORE_CASE), "")
+        .trim()
+    if (raw.isBlank()) return null
+    val androidColor = raw.toAndroidColorString()
+    return runCatching { Color(android.graphics.Color.parseColor(androidColor)) }
+        .getOrNull()
+        ?: parseAnnouncementRgbColor(raw)
+}
+
+private fun String.toAndroidColorString(): String =
+    when (trim().lowercase(Locale.ROOT)) {
+        "red", "crimson" -> "#d32f2f"
+        "orange" -> "#f57c00"
+        "yellow" -> "#f9a825"
+        "green" -> "#2e7d32"
+        "blue" -> "#1976d2"
+        "purple" -> "#7b1fa2"
+        "pink" -> "#c2185b"
+        "gray", "grey" -> "#757575"
+        "black" -> "#000000"
+        "white" -> "#ffffff"
+        "transparent" -> "#00000000"
+        else -> trim()
+    }
+
+private fun parseAnnouncementRgbColor(raw: String): Color? {
+    val match = Regex("""rgba?\(([^)]+)\)""", RegexOption.IGNORE_CASE).find(raw) ?: return null
+    val parts = match.groupValues[1]
+        .split(',')
+        .map { it.trim() }
+    if (parts.size < 3) return null
+    fun String.channel(): Int? =
+        if (endsWith("%")) {
+            removeSuffix("%").toFloatOrNull()?.let { (it * 2.55f).toInt().coerceIn(0, 255) }
+        } else {
+            toFloatOrNull()?.toInt()?.coerceIn(0, 255)
+        }
+    val red = parts[0].channel() ?: return null
+    val green = parts[1].channel() ?: return null
+    val blue = parts[2].channel() ?: return null
+    val alpha = parts.getOrNull(3)
+        ?.toFloatOrNull()
+        ?.coerceIn(0f, 1f)
+        ?: 1f
+    return Color(red, green, blue, (alpha * 255).toInt().coerceIn(0, 255))
+}
+
 private fun Element.containsBoldContent(): Boolean =
-    select("strong, b").isNotEmpty()
+    select("strong, b").isNotEmpty() ||
+        styleValue("font-weight").lowercase(Locale.ROOT) in setOf("bold", "bolder", "600", "700", "800", "900")
 
 private fun AnnotatedString.Builder.endsWithLineBreak(): Boolean =
     length > 0 && toAnnotatedString().text.last() == '\n'
