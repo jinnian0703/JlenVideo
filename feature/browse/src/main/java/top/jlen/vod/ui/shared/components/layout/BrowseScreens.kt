@@ -147,7 +147,8 @@ internal fun HomeTopBlock(
     onRefreshAnnouncements: () -> Unit,
     onOpenAnnouncementList: () -> Unit,
     onOpenAnnouncementDetail: (String) -> Unit,
-    onOpenSearch: () -> Unit
+    onOpenSearch: () -> Unit,
+    pauseMotion: Boolean = false
 ) {
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
         Row(
@@ -180,7 +181,8 @@ internal fun HomeTopBlock(
             state = noticeState,
             onRefresh = onRefreshAnnouncements,
             onOpenList = onOpenAnnouncementList,
-            onOpenDetail = onOpenAnnouncementDetail
+            onOpenDetail = onOpenAnnouncementDetail,
+            pauseMotion = pauseMotion
         )
     }
 }
@@ -229,7 +231,8 @@ private fun AnnouncementTickerStrip(
     state: NoticeUiState,
     onRefresh: () -> Unit,
     onOpenList: () -> Unit,
-    onOpenDetail: (String) -> Unit
+    onOpenDetail: (String) -> Unit,
+    pauseMotion: Boolean
 ) {
     val activeNotices = state.activeNotices
 
@@ -334,10 +337,11 @@ private fun AnnouncementTickerStrip(
 
                 else -> {
                     val pagerState = rememberPagerState(pageCount = { activeNotices.size })
-                    LaunchedEffect(activeNotices.size) {
+                    LaunchedEffect(activeNotices.size, pauseMotion) {
                         if (activeNotices.size <= 1) return@LaunchedEffect
                         while (true) {
                             delay(3200)
+                            if (pauseMotion) continue
                             val nextPage = (pagerState.currentPage + 1) % activeNotices.size
                             pagerState.animateScrollToPage(nextPage, animationSpec = tween(durationMillis = 600))
                         }
@@ -377,7 +381,7 @@ private fun AnnouncementTickerStrip(
                                 modifier = Modifier
                                     .weight(1f)
                                     .then(
-                                        if (notice.title.length > 14) {
+                                        if (!pauseMotion && notice.title.length > 14) {
                                             Modifier.basicMarquee(iterations = Int.MAX_VALUE)
                                         } else {
                                             Modifier
@@ -569,7 +573,11 @@ fun FeaturedCard(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String) -> Unit) {
+internal fun FeaturedCarouselSection(
+    items: List<VodItem>,
+    onOpenDetail: (String) -> Unit,
+    pauseMotion: Boolean = false
+) {
     val actualCount = items.size
     val loopItems = remember(items) {
         when {
@@ -595,7 +603,7 @@ internal fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String
         else -> pagerState.settledPage - 1
     }
 
-    LaunchedEffect(actualCount) {
+    LaunchedEffect(actualCount, pauseMotion) {
         if (actualCount <= 1) return@LaunchedEffect
         while (true) {
             when (pagerState.currentPage) {
@@ -603,7 +611,7 @@ internal fun FeaturedCarouselSection(items: List<VodItem>, onOpenDetail: (String
                 loopItems.lastIndex -> pagerState.scrollToPage(1)
             }
             delay(UiMotion.CarouselAutoScrollMillis)
-            if (!pagerState.isScrollInProgress) {
+            if (!pauseMotion && !pagerState.isScrollInProgress) {
                 pagerState.animateScrollToPage(
                     page = pagerState.currentPage + 1,
                     animationSpec = tween(UiMotion.CarouselSlideMillis)
@@ -1561,7 +1569,9 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                 modifier = Modifier
                     .size(width = 94.dp, height = 128.dp)
                     .clip(RoundedCornerShape(14.dp)),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                fallbackStyle = PosterFallbackStyle.CompactTitle,
+                lightweightPlaceholder = true
             )
             Column(
                 modifier = Modifier.weight(1f),

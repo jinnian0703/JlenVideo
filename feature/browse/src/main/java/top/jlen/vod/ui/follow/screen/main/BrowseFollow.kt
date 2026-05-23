@@ -200,7 +200,9 @@ private fun FollowUpCard(
                     height = 414,
                     modifier = Modifier
                         .size(width = 90.dp, height = 122.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(16.dp)),
+                    fallbackStyle = PosterFallbackStyle.CompactTitle,
+                    lightweightPlaceholder = true
                 )
                 if (item.hasUpdate) {
                     Box(

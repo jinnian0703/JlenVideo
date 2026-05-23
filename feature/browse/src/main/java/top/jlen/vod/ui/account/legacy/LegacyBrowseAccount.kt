@@ -363,96 +363,99 @@ internal fun LegacyAccountScreen(
                 }
             }
 
-            item {
-                when (state.selectedSection) {
-                    AccountSection.Overview -> AccountOverviewPane(
-                        state = state,
-                        isActionLoading = state.isActionLoading,
-                        onEditProfile = {
-                            onSelectSection(AccountSection.Profile)
-                            onProfileTabChange(true)
-                        },
-                        onBindEmail = {
-                            onSelectSection(AccountSection.Profile)
-                            onProfileTabChange(true)
-                        },
-                        onSignIn = onSignInMembership,
-                        onOpenPointLogs = onOpenPointLogs,
-                        onOpenFollow = onOpenFollow,
-                        onOpenLogs = {
-                            onSelectSection(AccountSection.About)
-                            onRefreshCrashLog()
-                        }
-                    )
-                    AccountSection.Profile -> AccountProfilePaneV2(
-                        isLoading = state.isContentLoading,
-                        fields = state.profileFields,
-                        editor = state.profileEditor,
-                        isSaving = state.isActionLoading,
-                        isEditTab = state.isProfileEditTab,
-                        onTabChange = onProfileTabChange,
-                        onEditorChange = onProfileEditorChange,
-                        onSave = onSaveProfile,
-                        onSendEmailCode = onSendEmailCode,
-                        onBindEmail = onBindEmail,
-                        onUnbindEmail = onUnbindEmail
-                    )
-                    AccountSection.Favorites -> EmptyPane(
-                        message = "追剧入口已移到底栏",
-                        description = "想追的影片请在详情页加入追剧，然后到底栏“追剧”里查看更新和续播",
-                        style = FeedbackPaneStyle.Card
-                    )
-                    AccountSection.History -> AccountRecordPane(
-                        title = "播放记录",
-                        emptyMessage = "还没有播放记录",
-                        isLoading = state.isContentLoading,
-                        items = state.historyItems,
-                        hasMore = !state.historyNextPageUrl.isNullOrBlank(),
-                        isActionLoading = state.isActionLoading,
-                        onLoadMore = onLoadMoreHistory,
-                        onPrimaryAction = onOpenHistoryRecord,
-                        onDeleteItem = onDeleteHistory,
-                        onClearAll = onClearHistory
-                    )
-                    AccountSection.Member -> MembershipPaneV2(
-                        isLoading = state.isContentLoading,
-                        info = state.membershipInfo,
-                        plans = state.membershipPlans,
-                        signInInfo = state.membershipSignInInfo,
-                        pointLogs = state.membershipPointLogs,
-                        isActionLoading = state.isActionLoading,
-                        message = state.message,
-                        onUpgrade = onUpgradeMembership,
-                        onSignIn = onSignInMembership,
-                        onOpenPointLogs = onOpenPointLogs
-                    )
-                    AccountSection.About -> AboutPane(
-                        currentVersion = state.updateInfo?.currentVersion?.ifBlank { AppRuntimeInfo.versionName }
-                            ?: AppRuntimeInfo.versionName,
-                        latestVersion = state.updateInfo?.latestVersion.orEmpty(),
-                        notes = state.updateInfo?.notes.orEmpty(),
-                        hasUpdate = state.updateInfo?.hasUpdate == true,
-                        isUpdateLoading = state.isUpdateLoading,
-                        crashLogText = state.latestCrashLog,
-                        hasCrashLog = state.hasCrashLog,
-                        onCheckUpdate = onCheckUpdate,
-                        onRefreshCrashLog = onRefreshCrashLog,
-                        onClearCrashLog = onClearCrashLog,
-                        onOpenRelease = {
-                            val targetUrl = state.updateInfo?.releasePageUrl
-                                ?.takeIf { it.isNotBlank() }
-                                ?: "https://github.com/jinnian0703/JlenVideo/releases"
-                            openExternalUrl(context, targetUrl)
-                        },
-                        onDownloadUpdate = {
-                            val targetUrl = state.updateInfo?.downloadUrl
-                                ?.takeIf { it.isNotBlank() }
-                                ?: state.updateInfo?.releasePageUrl
-                                ?.takeIf { it.isNotBlank() }
-                                ?: "https://github.com/jinnian0703/JlenVideo/releases"
-                            openExternalUrl(context, targetUrl)
-                        }
-                    )
+            when (state.selectedSection) {
+                AccountSection.History -> accountRecordPaneItems(
+                    title = "播放记录",
+                    emptyMessage = "还没有播放记录",
+                    isLoading = state.isContentLoading,
+                    items = state.historyItems,
+                    hasMore = !state.historyNextPageUrl.isNullOrBlank(),
+                    isActionLoading = state.isActionLoading,
+                    onLoadMore = onLoadMoreHistory,
+                    onPrimaryAction = onOpenHistoryRecord,
+                    onDeleteItem = onDeleteHistory,
+                    onClearAll = onClearHistory
+                )
+                else -> item {
+                    when (state.selectedSection) {
+                        AccountSection.Overview -> AccountOverviewPane(
+                            state = state,
+                            isActionLoading = state.isActionLoading,
+                            onEditProfile = {
+                                onSelectSection(AccountSection.Profile)
+                                onProfileTabChange(true)
+                            },
+                            onBindEmail = {
+                                onSelectSection(AccountSection.Profile)
+                                onProfileTabChange(true)
+                            },
+                            onSignIn = onSignInMembership,
+                            onOpenPointLogs = onOpenPointLogs,
+                            onOpenFollow = onOpenFollow,
+                            onOpenLogs = {
+                                onSelectSection(AccountSection.About)
+                                onRefreshCrashLog()
+                            }
+                        )
+                        AccountSection.Profile -> AccountProfilePaneV2(
+                            isLoading = state.isContentLoading,
+                            fields = state.profileFields,
+                            editor = state.profileEditor,
+                            isSaving = state.isActionLoading,
+                            isEditTab = state.isProfileEditTab,
+                            onTabChange = onProfileTabChange,
+                            onEditorChange = onProfileEditorChange,
+                            onSave = onSaveProfile,
+                            onSendEmailCode = onSendEmailCode,
+                            onBindEmail = onBindEmail,
+                            onUnbindEmail = onUnbindEmail
+                        )
+                        AccountSection.Favorites -> EmptyPane(
+                            message = "追剧入口已移到底栏",
+                            description = "想追的影片请在详情页加入追剧，然后到底栏“追剧”里查看更新和续播",
+                            style = FeedbackPaneStyle.Card
+                        )
+                        AccountSection.History -> Unit
+                        AccountSection.Member -> MembershipPaneV2(
+                            isLoading = state.isContentLoading,
+                            info = state.membershipInfo,
+                            plans = state.membershipPlans,
+                            signInInfo = state.membershipSignInInfo,
+                            pointLogs = state.membershipPointLogs,
+                            isActionLoading = state.isActionLoading,
+                            message = state.message,
+                            onUpgrade = onUpgradeMembership,
+                            onSignIn = onSignInMembership,
+                            onOpenPointLogs = onOpenPointLogs
+                        )
+                        AccountSection.About -> AboutPane(
+                            currentVersion = state.updateInfo?.currentVersion?.ifBlank { AppRuntimeInfo.versionName }
+                                ?: AppRuntimeInfo.versionName,
+                            latestVersion = state.updateInfo?.latestVersion.orEmpty(),
+                            notes = state.updateInfo?.notes.orEmpty(),
+                            hasUpdate = state.updateInfo?.hasUpdate == true,
+                            isUpdateLoading = state.isUpdateLoading,
+                            crashLogText = state.latestCrashLog,
+                            hasCrashLog = state.hasCrashLog,
+                            onCheckUpdate = onCheckUpdate,
+                            onRefreshCrashLog = onRefreshCrashLog,
+                            onClearCrashLog = onClearCrashLog,
+                            onOpenRelease = {
+                                val targetUrl = state.updateInfo?.releasePageUrl
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?: "https://github.com/jinnian0703/JlenVideo/releases"
+                                openExternalUrl(context, targetUrl)
+                            },
+                            onDownloadUpdate = {
+                                val targetUrl = state.updateInfo?.downloadUrl
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?: state.updateInfo?.releasePageUrl
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?: "https://github.com/jinnian0703/JlenVideo/releases"
+                                openExternalUrl(context, targetUrl)
+                            }
+                        )
+                    }
                 }
             }
         } else {
@@ -2418,6 +2421,129 @@ internal fun LegacyAccountRecordPane(
                 isLoading = isLoading && items.isNotEmpty(),
                 onLoadMore = onLoadMore
             )
+        }
+    }
+}
+
+private fun LazyListScope.accountRecordPaneItems(
+    title: String,
+    emptyMessage: String,
+    isLoading: Boolean,
+    items: List<top.jlen.vod.data.UserCenterItem>,
+    hasMore: Boolean,
+    isActionLoading: Boolean,
+    onLoadMore: () -> Unit,
+    onPrimaryAction: (top.jlen.vod.data.UserCenterItem) -> Unit,
+    onDeleteItem: (String) -> Unit,
+    onClearAll: () -> Unit
+) {
+    when {
+        isLoading && items.isEmpty() -> item(key = "account_record_loading") {
+            LoadingPane("$title 加载中...", style = FeedbackPaneStyle.Card)
+        }
+        items.isEmpty() -> item(key = "account_record_empty") {
+            EmptyPane(
+                message = emptyMessage,
+                description = "这里会展示你最近关注和操作过的内容",
+                style = FeedbackPaneStyle.Card
+            )
+        }
+        else -> {
+            item(key = "account_record_header") {
+                AccountRecordHeaderCard(
+                    title = title,
+                    count = items.size,
+                    isActionLoading = isActionLoading,
+                    onClearAll = onClearAll
+                )
+            }
+            items(
+                items = items,
+                key = { item ->
+                    item.recordId.ifBlank {
+                        listOf(item.vodId, item.title, item.playUrl).joinToString("|")
+                    }
+                },
+                contentType = { "account_record" }
+            ) { item ->
+                AccountRecordCard(
+                    item = item,
+                    isActionLoading = isActionLoading,
+                    onPrimaryAction = onPrimaryAction,
+                    onDelete = onDeleteItem
+                )
+            }
+            item(key = "account_record_footer") {
+                LoadMoreFooter(
+                    hasMore = hasMore,
+                    isLoading = isLoading && items.isNotEmpty(),
+                    onLoadMore = onLoadMore
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountRecordHeaderCard(
+    title: String,
+    count: Int,
+    isActionLoading: Boolean,
+    onClearAll: () -> Unit
+) {
+    var showClearAllConfirm by rememberSaveable { mutableStateOf(false) }
+
+    if (showClearAllConfirm) {
+        ClearHistoryConfirmDialog(
+            count = count,
+            onDismiss = { showClearAllConfirm = false },
+            onConfirm = {
+                showClearAllConfirm = false
+                onClearAll()
+            }
+        )
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, UiPalette.BorderSoft)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            UiPalette.Surface,
+                            UiPalette.SurfaceStrong,
+                            UiPalette.AccentGlow.copy(alpha = 0.18f)
+                        )
+                    )
+                )
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Ink
+                )
+                Text(
+                    text = "共 $count 条",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = UiPalette.TextSecondary
+                )
+            }
+            TextButton(
+                onClick = { showClearAllConfirm = true },
+                enabled = !isActionLoading
+            ) {
+                Text(if (isActionLoading) "处理中..." else "清空")
+            }
         }
     }
 }

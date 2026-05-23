@@ -155,6 +155,7 @@ fun HomeScreen(
     val listState = rememberSaveable(saver = LazyListState.Saver) {
         LazyListState()
     }
+    val pauseHomeMotion = listState.isScrollInProgress
     val hotRows = remember(state.hot) { state.hot.chunked(POSTER_GRID_COLUMNS) }
     val latestRows = remember(state.visibleLatest) { state.visibleLatest.chunked(POSTER_GRID_COLUMNS) }
 
@@ -204,7 +205,8 @@ fun HomeScreen(
                 onRefreshAnnouncements = onRefreshAnnouncements,
                 onOpenAnnouncementList = onOpenAnnouncementList,
                 onOpenAnnouncementDetail = onOpenAnnouncementDetail,
-                onOpenSearch = onOpenSearch
+                onOpenSearch = onOpenSearch,
+                pauseMotion = pauseHomeMotion
             )
         }
         state.error?.let { message ->
@@ -286,7 +288,8 @@ fun HomeScreen(
             item {
                 FeaturedCarouselSection(
                     items = state.featured,
-                    onOpenDetail = onOpenDetail
+                    onOpenDetail = onOpenDetail,
+                    pauseMotion = pauseHomeMotion
                 )
             }
         }
