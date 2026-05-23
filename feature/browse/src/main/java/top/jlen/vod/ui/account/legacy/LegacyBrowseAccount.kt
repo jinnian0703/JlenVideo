@@ -511,7 +511,7 @@ internal fun LegacyAccountScreen(
                             Column {
                                 AccountGuestModeHeader(
                                     title = "找回密码",
-                                    description = "通过密保信息重置登录密码。",
+                                    description = "通过邮箱验证码重置登录密码。",
                                     onBack = { onAuthModeChange(AccountAuthMode.Login) }
                                 )
                                 AccountFindPasswordPane(
@@ -1052,7 +1052,9 @@ internal fun LegacyAccountFindPasswordPane(
             OutlinedTextField(
                 value = state.findPasswordEditor.code,
                 onValueChange = { value -> onEditorChange { it.copy(code = value) } },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(58.dp),
                 shape = RoundedCornerShape(20.dp),
                 singleLine = true,
                 label = { Text("邮箱验证码") },
@@ -1070,10 +1072,12 @@ internal fun LegacyAccountFindPasswordPane(
             OutlinedButton(
                 onClick = onSendCode,
                 enabled = !state.isActionLoading && state.findPasswordCodeCountdown <= 0,
-                modifier = Modifier.height(64.dp),
+                modifier = Modifier
+                    .width(126.dp)
+                    .height(58.dp),
                 border = BorderStroke(1.dp, UiPalette.BorderSoft),
                 shape = RoundedCornerShape(18.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
             ) {
                 Text(
                     text = if (state.findPasswordCodeCountdown > 0) {
@@ -1083,6 +1087,7 @@ internal fun LegacyAccountFindPasswordPane(
                     } else {
                         "获取验证码"
                     },
+                    maxLines = 1,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -1656,7 +1661,7 @@ internal fun LegacyAccountProfilePaneV2(
                                 color = UiPalette.Ink
                             )
                             Text(
-                                text = "按分组管理找回信息、邮箱绑定和密码设置",
+                                text = "管理账号资料、邮箱绑定和密码设置",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = UiPalette.TextSecondary
                             )
@@ -1667,16 +1672,6 @@ internal fun LegacyAccountProfilePaneV2(
                                 label = "QQ号码",
                                 value = editor.qq,
                                 onValueChange = { value -> onEditorChange { it.copy(qq = value) } }
-                            )
-                            ProfileEditorField(
-                                label = "找回问题",
-                                value = editor.question,
-                                onValueChange = { value -> onEditorChange { it.copy(question = value) } }
-                            )
-                            ProfileEditorField(
-                                label = "找回答案",
-                                value = editor.answer,
-                                onValueChange = { value -> onEditorChange { it.copy(answer = value) } }
                             )
                         }
 
@@ -1891,16 +1886,6 @@ internal fun LegacyAccountProfilePane(
                     label = "手机号",
                     value = editor.phone,
                     onValueChange = { value -> onEditorChange { it.copy(phone = value) } }
-                )
-                ProfileEditorField(
-                    label = "找回问题",
-                    value = editor.question,
-                    onValueChange = { value -> onEditorChange { it.copy(question = value) } }
-                )
-                ProfileEditorField(
-                    label = "找回答案",
-                    value = editor.answer,
-                    onValueChange = { value -> onEditorChange { it.copy(answer = value) } }
                 )
                 ProfileEditorField(
                     label = "当前密码",

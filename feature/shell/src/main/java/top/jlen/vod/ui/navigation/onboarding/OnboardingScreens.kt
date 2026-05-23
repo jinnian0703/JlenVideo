@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -540,15 +542,19 @@ private fun FirstLoginFindPasswordPane(
                 onValueChange = { value -> onEditorChange { it.copy(code = value) } },
                 label = "邮箱验证码",
                 placeholder = "请输入验证码",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .height(56.dp)
             )
             OutlinedButton(
                 onClick = onSendCode,
                 enabled = !state.isActionLoading && state.findPasswordCodeCountdown <= 0,
-                modifier = Modifier.heightIn(min = UiDimens.SecondaryButtonHeight),
+                modifier = Modifier
+                    .width(122.dp)
+                    .height(56.dp),
                 shape = RoundedCornerShape(UiDimens.ControlRadius),
                 border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp)
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
             ) {
                 Text(
                     text = if (state.findPasswordCodeCountdown > 0) {

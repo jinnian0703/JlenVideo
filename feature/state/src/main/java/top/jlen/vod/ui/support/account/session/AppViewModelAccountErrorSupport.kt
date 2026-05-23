@@ -71,6 +71,7 @@ internal fun historyRecordKey(item: UserCenterItem): String =
 
 private fun normalizeKnownUiMessage(message: String): String =
     message
+        .replace("邮箱地址不正确", "该邮箱未绑定账号或站点未接受该邮箱")
         .replace("璇峰厛鐧诲綍", "请先登录")
         .replace("鐧诲綍鎴愬姛", "登录成功")
         .replace("鐧诲綍澶辫触", "登录失败")
