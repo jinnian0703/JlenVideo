@@ -909,7 +909,7 @@ private val noticeDisplayFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale
 internal val AppNotice.formattedActiveTime: String
     get() {
         val start = startAt.formatNoticeTime()
-        val end = endAt.formatNoticeTime()
+        val end = if (endAt.isNeverExpireNoticeTime()) "永不过期" else endAt.formatNoticeTime()
         return when {
             start.isNotBlank() && end.isNotBlank() -> "$start - $end"
             start.isNotBlank() -> start
@@ -946,6 +946,44 @@ private fun String.formatNoticeTime(): String {
     return runCatching {
         noticeDisplayFormatter.format(Date(timeMillis))
     }.getOrDefault(raw)
+}
+
+private fun String.isNeverExpireNoticeTime(): Boolean {
+    val raw = trim()
+    if (raw.isBlank()) return true
+    val normalized = raw.lowercase(Locale.ROOT)
+    if (
+        normalized in setOf(
+            "never",
+            "forever",
+            "permanent",
+            "no_expire",
+            "no_expiry",
+            "unlimited",
+            "0",
+            "0000-00-00",
+            "0000-00-00 00:00",
+            "0000-00-00 00:00:00",
+            "永不失效",
+            "永不过期",
+            "长期有效",
+            "永久"
+        )
+    ) {
+        return true
+    }
+    if (normalized.startsWith("1970-01-01")) return true
+    val millis = raw.toLongOrNull()?.let { numeric ->
+        if (raw.length <= 10) numeric * 1000 else numeric
+    } ?: runCatching {
+        noticeDisplayFormatter.parse(raw)?.time
+    }.getOrNull()
+    val year = millis?.let {
+        java.util.Calendar.getInstance().apply {
+            timeInMillis = it
+        }.get(java.util.Calendar.YEAR)
+    }
+    return year != null && (year <= 1970 || year >= 2035)
 }
 
 internal fun isAnnouncementListLine(text: String): Boolean =
