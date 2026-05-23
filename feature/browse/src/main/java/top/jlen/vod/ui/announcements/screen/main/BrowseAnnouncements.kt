@@ -14,6 +14,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -89,6 +90,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.input.KeyboardType
@@ -97,6 +99,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -206,7 +209,8 @@ fun AnnouncementDetailScreen(
     notice: AppNotice?,
     isLoading: Boolean,
     onBack: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onOpenLink: (String) -> Unit = {}
 ) {
     when {
         isLoading && notice == null -> LoadingPane("公告加载中...")
@@ -324,7 +328,10 @@ fun AnnouncementDetailScreen(
                                     color = UiPalette.TextSecondary
                                 )
                             }
-                            AnnouncementRichContent(notice = notice)
+                            AnnouncementRichContent(
+                                notice = notice,
+                                onOpenLink = onOpenLink
+                            )
                         }
                     }
                 }
@@ -483,45 +490,79 @@ private fun AnnouncementRichText(content: String) {
 }
 
 @Composable
-private fun AnnouncementRichContent(notice: AppNotice) {
+fun AnnouncementRichContent(
+    notice: AppNotice,
+    modifier: Modifier = Modifier,
+    onOpenLink: (String) -> Unit = {}
+) {
     val richBlocks = remember(notice.htmlContent) {
         parseAnnouncementHtmlBlocks(notice.htmlContent)
     }
 
     if (richBlocks.isEmpty()) {
-        AnnouncementRichText(content = notice.displayContent)
+        AnnouncementRichText(content = notice.displayContent.stripAnnouncementCodeFenceForDisplay())
         return
     }
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         richBlocks.forEach { block ->
-            Text(
-                text = block.text,
-                modifier = Modifier.fillMaxWidth(),
-                style = when (block.kind) {
-                    AnnouncementBlockKind.Title -> MaterialTheme.typography.titleLarge
-                    AnnouncementBlockKind.Heading -> MaterialTheme.typography.titleMedium
-                    AnnouncementBlockKind.Paragraph -> MaterialTheme.typography.bodyMedium
-                },
-                fontWeight = when (block.kind) {
-                    AnnouncementBlockKind.Title -> FontWeight.ExtraBold
-                    AnnouncementBlockKind.Heading -> FontWeight.Bold
-                    AnnouncementBlockKind.Paragraph -> FontWeight.Normal
-                },
-                color = block.textColor ?: UiPalette.Ink,
-                textAlign = block.alignment,
-                lineHeight = when (block.kind) {
-                    AnnouncementBlockKind.Title -> MaterialTheme.typography.titleLarge.lineHeight
-                    AnnouncementBlockKind.Heading -> MaterialTheme.typography.titleMedium.lineHeight
-                    AnnouncementBlockKind.Paragraph -> MaterialTheme.typography.bodyMedium.lineHeight
-                }
+            AnnouncementRichBlockText(
+                block = block,
+                onOpenLink = onOpenLink
             )
         }
     }
 }
+
+@Composable
+private fun AnnouncementRichBlockText(
+    block: AnnouncementRichBlock,
+    onOpenLink: (String) -> Unit
+) {
+    var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    Text(
+        text = block.text,
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(block.text, onOpenLink) {
+                detectTapGestures { offset ->
+                    val layout = layoutResult ?: return@detectTapGestures
+                    val textOffset = layout.getOffsetForPosition(offset)
+                    block.text.getStringAnnotations(AnnouncementUrlTag, textOffset, textOffset)
+                        .firstOrNull()
+                        ?.item
+                        ?.let(onOpenLink)
+                }
+            },
+        onTextLayout = { layoutResult = it },
+        style = when (block.kind) {
+            AnnouncementBlockKind.Title -> MaterialTheme.typography.titleLarge
+            AnnouncementBlockKind.Heading -> MaterialTheme.typography.titleMedium
+            AnnouncementBlockKind.Paragraph -> MaterialTheme.typography.bodyMedium
+        },
+        fontWeight = when (block.kind) {
+            AnnouncementBlockKind.Title -> FontWeight.ExtraBold
+            AnnouncementBlockKind.Heading -> FontWeight.Bold
+            AnnouncementBlockKind.Paragraph -> FontWeight.Normal
+        },
+        color = block.textColor ?: UiPalette.Ink,
+        textAlign = block.alignment,
+        lineHeight = when (block.kind) {
+            AnnouncementBlockKind.Title -> MaterialTheme.typography.titleLarge.lineHeight
+            AnnouncementBlockKind.Heading -> MaterialTheme.typography.titleMedium.lineHeight
+            AnnouncementBlockKind.Paragraph -> MaterialTheme.typography.bodyMedium.lineHeight
+        }
+    )
+}
+
+private fun String.stripAnnouncementCodeFenceForDisplay(): String =
+    trim()
+        .replace(Regex("""(?is)^```\s*(?:html)?\s*"""), "")
+        .replace(Regex("""(?is)\s*```\s*$"""), "")
+        .trim()
 
 @Composable
 private fun AnnouncementListCardCompact(

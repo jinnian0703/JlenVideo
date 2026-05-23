@@ -247,6 +247,9 @@ fun JlenVideoApp() {
             ?: "https://github.com/jinnian0703/JlenVideo/releases"
         openExternalUrl(context, targetUrl)
     }
+    val openAnnouncementLink: (String) -> Unit = { url ->
+        openExternalUrl(context, url.normalizeAnnouncementUrl(), "无法打开公告链接")
+    }
     val navigateToTopLevel: (String) -> Unit = { route ->
         if (currentTopLevelRoute != route && pendingTopLevelRoute != route) {
             pendingTopLevelRoute = route
@@ -288,6 +291,7 @@ fun JlenVideoApp() {
                     AnnouncementPromptDialog(
                         notice = noticeDialog,
                         onDismiss = viewModel::dismissNoticeDialog,
+                        onOpenLink = openAnnouncementLink,
                         onOpenDetail = {
                             viewModel.markNoticeOpened(noticeDialog.id)
                             navController.navigate("announcement/${Uri.encode(noticeDialog.id)}")
@@ -527,7 +531,8 @@ fun JlenVideoApp() {
                                 notice = viewModel.findNotice(noticeId),
                                 isLoading = viewModel.noticeState.isLoading,
                                 onBack = { navController.popBackStack() },
-                                onRefresh = { viewModel.refreshNotices(forceRefresh = true) }
+                                onRefresh = { viewModel.refreshNotices(forceRefresh = true) },
+                                onOpenLink = openAnnouncementLink
                             )
                         }
                         composable(
@@ -1437,6 +1442,7 @@ private fun FollowRemoveConfirmDialog(
 private fun AnnouncementPromptDialog(
     notice: AppNotice,
     onDismiss: () -> Unit,
+    onOpenLink: (String) -> Unit,
     onOpenDetail: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -1506,16 +1512,18 @@ private fun AnnouncementPromptDialog(
                     colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
                     shape = RoundedCornerShape(22.dp)
                 ) {
-                    Text(
-                        text = notice.displayContent,
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(max = 280.dp)
                             .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 18.dp, vertical = 16.dp),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = UiPalette.TextPrimary
-                    )
+                            .padding(horizontal = 18.dp, vertical = 16.dp)
+                    ) {
+                        AnnouncementRichContent(
+                            notice = notice,
+                            onOpenLink = onOpenLink
+                        )
+                    }
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),

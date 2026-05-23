@@ -98,6 +98,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -933,6 +934,9 @@ internal data class AnnouncementRichBlock(
     val textColor: Color? = null
 )
 
+internal const val AnnouncementUrlTag = "announcement_url"
+private val bareAnnouncementUrlRegex = Regex("""(?i)\b((?:https?://|www\.)[^\s<>"']+)""")
+
 private fun String.formatNoticeTime(): String {
     val raw = trim()
     if (raw.isBlank()) return ""
@@ -956,7 +960,7 @@ internal fun String.removeAnnouncementListPrefix(): String =
         .trim()
 
 internal fun parseAnnouncementHtmlBlocks(html: String): List<AnnouncementRichBlock> {
-    val normalized = Parser.unescapeEntities(html.trim(), false).trim()
+    val normalized = Parser.unescapeEntities(html.stripAnnouncementCodeFence(), false).trim()
     if (normalized.isBlank() || !normalized.contains('<')) return emptyList()
 
     val body = Jsoup.parseBodyFragment(normalized).body()
@@ -1055,7 +1059,7 @@ private fun appendAnnouncementNode(builder: AnnotatedString.Builder, node: Node)
         is TextNode -> {
             val normalized = node.text()
                 .replace(Regex("\\s+"), " ")
-            builder.append(normalized)
+            builder.appendAnnouncementTextWithBareLinks(normalized)
         }
         is Element -> {
             if (node.tagName().equals("br", ignoreCase = true)) {
@@ -1064,7 +1068,15 @@ private fun appendAnnouncementNode(builder: AnnotatedString.Builder, node: Node)
             }
 
             val style = node.resolveAnnouncementSpanStyle()
+            val href = node.takeIf { it.tagName().equals("a", ignoreCase = true) }
+                ?.attr("href")
+                ?.normalizeAnnouncementUrl()
+                ?.takeIf(String::isNotBlank)
             val handledBlock = node.tagName().lowercase(Locale.ROOT) in setOf("p", "div", "section", "article")
+            if (href != null) {
+                builder.pushStringAnnotation(AnnouncementUrlTag, href)
+                builder.pushStyle(announcementLinkStyle())
+            }
             if (style != null) {
                 builder.pushStyle(style)
             }
@@ -1072,6 +1084,10 @@ private fun appendAnnouncementNode(builder: AnnotatedString.Builder, node: Node)
                 appendAnnouncementNode(builder, child)
             }
             if (style != null) {
+                builder.pop()
+            }
+            if (href != null) {
+                builder.pop()
                 builder.pop()
             }
             if (handledBlock && !builder.endsWithLineBreak()) {
@@ -1196,6 +1212,59 @@ private fun posterBadgeText(raw: String, compact: Boolean): String {
         else -> compactEpisodeBadge
     }
 }
+
+private fun String.stripAnnouncementCodeFence(): String {
+    val trimmed = trim()
+    return trimmed
+        .replace(Regex("""(?is)^```\s*(?:html)?\s*"""), "")
+        .replace(Regex("""(?is)\s*```\s*$"""), "")
+        .trim()
+}
+
+private fun AnnotatedString.Builder.appendAnnouncementTextWithBareLinks(text: String) {
+    if (text.isBlank()) return
+    var index = 0
+    bareAnnouncementUrlRegex.findAll(text).forEach { match ->
+        if (match.range.first > index) {
+            append(text.substring(index, match.range.first))
+        }
+        val rawUrl = match.value.trimEnd('.', ',', '，', '。', '、', ')', '）')
+        val trailing = match.value.substring(rawUrl.length)
+        val url = rawUrl.normalizeAnnouncementUrl()
+        if (url.isBlank()) {
+            append(match.value)
+        } else {
+            pushStringAnnotation(AnnouncementUrlTag, url)
+            withStyle(announcementLinkStyle()) {
+                append(rawUrl)
+            }
+            pop()
+            append(trailing)
+        }
+        index = match.range.last + 1
+    }
+    if (index < text.length) {
+        append(text.substring(index))
+    }
+}
+
+fun String.normalizeAnnouncementUrl(): String {
+    val normalized = trim()
+    if (normalized.isBlank()) return ""
+    return when {
+        normalized.contains("://") -> normalized
+        normalized.startsWith("www.", ignoreCase = true) -> "https://$normalized"
+        normalized.contains('.') && !normalized.contains(' ') -> "https://$normalized"
+        else -> normalized
+    }
+}
+
+private fun announcementLinkStyle(): SpanStyle =
+    SpanStyle(
+        color = UiPalette.Accent,
+        fontWeight = FontWeight.SemiBold,
+        textDecoration = TextDecoration.Underline
+    )
 
 private fun isMeaningfulPosterBadge(text: String): Boolean {
     if (text.isBlank()) return false
