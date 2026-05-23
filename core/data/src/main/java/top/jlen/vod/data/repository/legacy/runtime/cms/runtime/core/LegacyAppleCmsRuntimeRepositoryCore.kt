@@ -893,10 +893,20 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     }
 
     suspend fun loadLatestRelease(currentVersion: String): AppUpdateInfo {
+        return try {
+            loadLatestReleaseFromGithubApi(currentVersion)
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            loadLatestReleaseFromGithubPage(currentVersion)
+        }
+    }
+
+    private fun loadLatestReleaseFromGithubApi(currentVersion: String): AppUpdateInfo {
         val request = Request.Builder()
-            .url("https://api.github.com/repos/jinnian0703/JlenVideo/releases/latest")
+            .url(GITHUB_RELEASE_API_URL)
             .header("Accept", "application/vnd.github+json")
             .header("X-GitHub-Api-Version", "2022-11-28")
+            .header("User-Agent", "JlenVideo-Android")
             .build()
 
         client.newCall(request).execute().use { response ->
@@ -925,6 +935,53 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 downloadUrl = downloadUrl,
                 notes = notes,
                 hasUpdate = compareVersionNames(latestVersion, currentVersion) > 0
+            )
+        }
+    }
+
+    private fun loadLatestReleaseFromGithubPage(currentVersion: String): AppUpdateInfo {
+        val request = Request.Builder()
+            .url(GITHUB_RELEASE_LATEST_URL)
+            .header("User-Agent", "JlenVideo-Android")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("妫€鏌ユ洿鏂板け璐ワ細HTTP ${response.code}")
+            }
+
+            val finalUrl = response.request.url.toString()
+            val latestVersion = finalUrl
+                .substringAfterLast("/tag/", "")
+                .substringBefore('?')
+                .substringBefore('#')
+                .removePrefix("v")
+                .trim()
+            val body = response.body?.string().orEmpty()
+            val document = Jsoup.parse(body, finalUrl)
+            val titleVersion = document.selectFirst("title")
+                ?.text()
+                ?.let { Regex("""v?(\d+(?:[._-]\d+)+)""").find(it)?.groupValues?.getOrNull(1) }
+                ?.replace('_', '.')
+                ?.replace('-', '.')
+                ?.trim()
+                .orEmpty()
+            val resolvedVersion = latestVersion.ifBlank { titleVersion }
+            val notes = document.selectFirst("[data-test-selector=body-content]")?.text()
+                ?: document.selectFirst(".markdown-body")?.text()
+                ?: ""
+
+            if (resolvedVersion.isBlank()) {
+                throw IOException("妫€鏌ユ洿鏂板け璐ワ細鐗堟湰淇℃伅涓虹┖")
+            }
+
+            return AppUpdateInfo(
+                currentVersion = currentVersion.trim(),
+                latestVersion = resolvedVersion,
+                releasePageUrl = finalUrl,
+                downloadUrl = "",
+                notes = notes.trim(),
+                hasUpdate = compareVersionNames(resolvedVersion, currentVersion) > 0
             )
         }
     }
@@ -4579,6 +4636,8 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     companion object {
         private const val APP_CENTER_API_URL = "https://user.jlen.top/api.php"
+        private const val GITHUB_RELEASE_API_URL = "https://api.github.com/repos/jinnian0703/JlenVideo/releases/latest"
+        private const val GITHUB_RELEASE_LATEST_URL = "https://github.com/jinnian0703/JlenVideo/releases/latest"
         private const val HOME_CACHE_PREF_KEY = "home_payload"
         private val SUPPORTED_MEMBERSHIP_DURATIONS = listOf("day", "week", "month", "year")
         private const val DISABLE_APP_CACHE = false
