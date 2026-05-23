@@ -125,20 +125,20 @@ internal fun MembershipPaneV2(
 private fun MembershipSuccessBanner(message: String) {
     Card(
         colors = CardDefaults.cardColors(containerColor = UiPalette.Accent.copy(alpha = 0.10f)),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(UiDimens.CardRadius),
         border = BorderStroke(1.dp, UiPalette.Accent.copy(alpha = 0.28f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(UiDimens.CardPadding),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
                     .size(34.dp)
-                    .background(UiPalette.Accent.copy(alpha = 0.14f), RoundedCornerShape(12.dp)),
+                    .background(UiPalette.Accent.copy(alpha = 0.14f), RoundedCornerShape(UiDimens.ControlRadius)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -181,13 +181,13 @@ private fun MembershipSummaryCard(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(UiDimens.CardRadius),
         border = BorderStroke(1.dp, UiPalette.Border)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(UiDimens.CardPadding),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Row(
@@ -203,7 +203,7 @@ private fun MembershipSummaryCard(
                 )
                 TextButton(
                     onClick = onOpenPointLogs,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(UiDimens.ControlRadius),
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
                 ) {
                     Text(
@@ -251,7 +251,7 @@ private fun MembershipSummaryRow(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(UiDimens.ControlRadius))
             .background(UiPalette.SurfaceSoft)
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
@@ -280,13 +280,13 @@ private fun MembershipSignInCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(UiDimens.CardRadius),
         border = BorderStroke(1.dp, UiPalette.Border)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 16.dp),
+                .padding(UiDimens.CardPadding),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -299,7 +299,7 @@ private fun MembershipSignInCard(
                         } else {
                             UiPalette.SurfaceSoft
                         },
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(UiDimens.ControlRadius)
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -343,8 +343,8 @@ private fun MembershipSignInCard(
                 Button(
                     onClick = onSignIn,
                     enabled = signInInfo.enabled && !isActionLoading,
-                    modifier = Modifier.height(42.dp),
-                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.height(UiDimens.CompactButtonHeight),
+                    shape = RoundedCornerShape(UiDimens.ControlRadius),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = UiPalette.Accent,
                         contentColor = UiPalette.AccentText,
@@ -363,13 +363,13 @@ private fun MembershipSignInCard(
 private fun MembershipTrendCard(points: List<PointTrendPoint>) {
     Card(
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(UiDimens.CardRadius),
         border = BorderStroke(1.dp, UiPalette.Border)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp),
+                .padding(UiDimens.CardPadding),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Row(
@@ -379,7 +379,7 @@ private fun MembershipTrendCard(points: List<PointTrendPoint>) {
                 Box(
                     modifier = Modifier
                         .size(32.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(UiDimens.ControlRadius))
                         .background(UiPalette.Accent.copy(alpha = 0.12f)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -409,7 +409,7 @@ private fun MembershipTrendCard(points: List<PointTrendPoint>) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(18.dp))
+                        .clip(RoundedCornerShape(UiDimens.ControlRadius))
                         .background(UiPalette.SurfaceSoft)
                         .padding(horizontal = 14.dp, vertical = 18.dp)
                 ) {
@@ -439,7 +439,7 @@ private fun MembershipTrendCard(points: List<PointTrendPoint>) {
 private fun TrendStatChip(label: String, value: String) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(UiDimens.ControlRadius))
             .background(UiPalette.SurfaceSoft)
     ) {
         Column(
@@ -473,7 +473,7 @@ private fun PointTrendChart(points: List<PointTrendPoint>) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(132.dp)
-                .clip(RoundedCornerShape(18.dp))
+                .clip(RoundedCornerShape(UiDimens.ControlRadius))
                 .background(UiPalette.SurfaceSoft)
         ) {
             val baseline = size.height * 0.58f
@@ -546,13 +546,13 @@ private fun MembershipPlanCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(UiDimens.CardRadius),
         border = BorderStroke(1.dp, UiPalette.Border)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp),
+                .padding(UiDimens.CardPadding),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -575,8 +575,8 @@ private fun MembershipPlanCard(
             Button(
                 onClick = { onUpgrade(plan) },
                 enabled = !isActionLoading,
-                modifier = Modifier.height(42.dp),
-                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.height(UiDimens.CompactButtonHeight),
+                shape = RoundedCornerShape(UiDimens.ControlRadius),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = UiPalette.Accent,
                     contentColor = UiPalette.AccentText

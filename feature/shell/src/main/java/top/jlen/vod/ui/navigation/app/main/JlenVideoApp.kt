@@ -1077,8 +1077,10 @@ private fun FirstLoginRegisterPane(
             OutlinedButton(
                 onClick = onSendCode,
                 enabled = !state.isActionLoading,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = UiDimens.SecondaryButtonHeight),
+                shape = RoundedCornerShape(UiDimens.ControlRadius),
                 border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft)
             ) {
                 Text(if (state.isActionLoading) "发送中..." else "发送${state.registerCodeLabel}")
@@ -1103,8 +1105,8 @@ private fun FirstLoginRegisterPane(
             enabled = !state.isActionLoading,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 52.dp),
-            shape = RoundedCornerShape(18.dp),
+                .heightIn(min = UiDimens.PrimaryButtonHeight),
+            shape = RoundedCornerShape(UiDimens.ControlRadius),
             colors = ButtonDefaults.buttonColors(
                 containerColor = UiPalette.Accent,
                 contentColor = UiPalette.AccentText
@@ -1174,8 +1176,8 @@ private fun FirstLoginFindPasswordPane(
             enabled = !state.isActionLoading,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 52.dp),
-            shape = RoundedCornerShape(18.dp),
+                .heightIn(min = UiDimens.PrimaryButtonHeight),
+            shape = RoundedCornerShape(UiDimens.ControlRadius),
             colors = ButtonDefaults.buttonColors(
                 containerColor = UiPalette.Accent,
                 contentColor = UiPalette.AccentText
@@ -1199,7 +1201,7 @@ private fun OnboardingTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(UiDimens.ControlRadius),
         singleLine = true,
         label = { Text(label) },
         placeholder = { Text(placeholder) },
@@ -1238,7 +1240,7 @@ private fun OnboardingCaptchaBox(
             modifier = Modifier
                 .weight(1f)
                 .height(56.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(UiDimens.ControlRadius))
                 .background(UiPalette.SurfaceSoft)
                 .clickable(onClick = onRefresh),
             contentAlignment = Alignment.Center
@@ -1260,7 +1262,7 @@ private fun OnboardingCaptchaBox(
         OutlinedButton(
             onClick = onRefresh,
             enabled = !isLoading,
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(UiDimens.ControlRadius),
             border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft)
         ) {
             Text("刷新")

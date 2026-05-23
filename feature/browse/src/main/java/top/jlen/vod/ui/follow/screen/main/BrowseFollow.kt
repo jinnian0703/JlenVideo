@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -176,6 +175,7 @@ private fun FollowUpCard(
     item: FollowUpItem,
     onOpenDetail: (String) -> Unit
 ) {
+    val badgeText = rememberFollowPosterBadge(item)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -200,18 +200,28 @@ private fun FollowUpCard(
                     height = 414,
                     modifier = Modifier
                         .size(width = 90.dp, height = 122.dp)
-                        .clip(RoundedCornerShape(UiDimens.ControlRadius)),
+                        .clip(RoundedCornerShape(UiDimens.PosterRadius)),
                     fallbackStyle = PosterFallbackStyle.CompactTitle,
                     lightweightPlaceholder = true
                 )
-                if (item.hasUpdate) {
+                if (badgeText.isNotBlank()) {
                     Box(
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
+                            .align(Alignment.BottomStart)
                             .padding(8.dp)
-                            .size(10.dp)
-                            .background(UiPalette.Accent, CircleShape)
-                    )
+                            .clip(RoundedCornerShape(UiDimens.PillRadius))
+                            .background(Color(0xDE111419))
+                            .padding(horizontal = 9.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = badgeText,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 
@@ -322,6 +332,14 @@ private fun FollowUpCard(
         }
     }
 }
+
+@Composable
+private fun rememberFollowPosterBadge(item: FollowUpItem): String =
+    androidx.compose.runtime.remember(item.latestEpisodeLabel, item.updateLabel, item.hasUpdate) {
+        formatPosterBadge(item.latestEpisodeLabel, compact = true)
+            .ifBlank { formatPosterBadge(item.updateLabel, compact = true) }
+            .ifBlank { if (item.hasUpdate) "有更新" else "" }
+    }
 
 @Composable
 private fun FollowMetaLine(

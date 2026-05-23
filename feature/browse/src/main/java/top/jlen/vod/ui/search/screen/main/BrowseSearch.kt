@@ -548,7 +548,7 @@ private fun SearchInputCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(UiDimens.CardRadius),
         border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.78f))
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -569,7 +569,7 @@ private fun SearchInputCard(
                     onValueChange = onQueryChange,
                     modifier = Modifier.weight(1f),
                     singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(UiDimens.ControlRadius),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color.Transparent,
                         unfocusedBorderColor = Color.Transparent,
@@ -660,7 +660,7 @@ private fun SearchSuggestionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(UiDimens.ControlRadius))
             .clickable(onClick = onClick)
             .padding(horizontal = 6.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -669,7 +669,7 @@ private fun SearchSuggestionRow(
         Box(
             modifier = Modifier
                 .size(22.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(UiDimens.ControlRadius))
                 .background(UiPalette.SurfaceSoft.copy(alpha = 0.78f)),
             contentAlignment = Alignment.Center
         ) {
