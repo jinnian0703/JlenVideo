@@ -146,7 +146,7 @@ fun AnnouncementListScreen(
             .fillMaxSize()
             .background(UiPalette.BackgroundBottom)
             .statusBarsPadding()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = UiDimens.PagePadding),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
     ) {
@@ -220,7 +220,7 @@ fun AnnouncementDetailScreen(
                     .fillMaxSize()
                     .background(UiPalette.BackgroundBottom)
                     .statusBarsPadding()
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = UiDimens.PagePadding),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
             ) {
@@ -253,7 +253,7 @@ fun AnnouncementDetailScreen(
                     .fillMaxSize()
                     .background(UiPalette.BackgroundBottom)
                     .statusBarsPadding()
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = UiDimens.PagePadding),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
             ) {

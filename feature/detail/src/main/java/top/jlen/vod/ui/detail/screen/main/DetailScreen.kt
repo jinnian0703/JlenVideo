@@ -80,7 +80,7 @@ fun DetailScreen(
                 }
                 item {
                     Column(
-                        modifier = Modifier.padding(horizontal = 16.dp),
+                        modifier = Modifier.padding(horizontal = UiDimens.PagePadding),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
@@ -119,8 +119,8 @@ fun DetailScreen(
                                 enabled = source != null,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(54.dp),
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                                    .height(UiDimens.PrimaryButtonHeight),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(UiDimens.ControlRadius),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = UiPalette.Accent,
                                     contentColor = UiPalette.AccentText
@@ -138,8 +138,8 @@ fun DetailScreen(
                                     enabled = !state.isActionLoading,
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(48.dp),
-                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                                        .height(UiDimens.SecondaryButtonHeight),
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(UiDimens.ControlRadius),
                                     border = androidx.compose.foundation.BorderStroke(
                                         1.dp,
                                         if (state.isFavorited) UiPalette.Accent.copy(alpha = 0.24f) else UiPalette.BorderSoft
@@ -160,8 +160,8 @@ fun DetailScreen(
                                     onClick = onBack,
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(48.dp),
-                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                                        .height(UiDimens.SecondaryButtonHeight),
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(UiDimens.ControlRadius),
                                     border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft),
                                     colors = ButtonDefaults.outlinedButtonColors(
                                         containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.38f),
@@ -175,7 +175,7 @@ fun DetailScreen(
                     }
                 }
                 item {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Column(modifier = Modifier.padding(horizontal = UiDimens.PagePadding)) {
                         state.actionMessage?.takeIf { it.isNotBlank() }?.let { message ->
                             DetailActionNotice(
                                 message = message,

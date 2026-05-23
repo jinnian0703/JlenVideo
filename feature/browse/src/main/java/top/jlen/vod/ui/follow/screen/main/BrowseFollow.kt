@@ -181,7 +181,7 @@ private fun FollowUpCard(
             .fillMaxWidth()
             .clickable { onOpenDetail(item.vodId) },
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.96f)),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(UiDimens.CardRadius),
         border = BorderStroke(
             1.dp,
             if (item.hasUpdate) UiPalette.Accent.copy(alpha = 0.24f) else UiPalette.BorderSoft.copy(alpha = 0.78f)
@@ -200,7 +200,7 @@ private fun FollowUpCard(
                     height = 414,
                     modifier = Modifier
                         .size(width = 90.dp, height = 122.dp)
-                        .clip(RoundedCornerShape(16.dp)),
+                        .clip(RoundedCornerShape(UiDimens.ControlRadius)),
                     fallbackStyle = PosterFallbackStyle.CompactTitle,
                     lightweightPlaceholder = true
                 )
@@ -236,7 +236,7 @@ private fun FollowUpCard(
                     if (item.hasUpdate) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
+                                .clip(RoundedCornerShape(UiDimens.PillRadius))
                                 .background(UiPalette.Accent.copy(alpha = 0.12f))
                                 .padding(horizontal = 10.dp, vertical = 5.dp)
                         ) {
@@ -305,7 +305,8 @@ private fun FollowUpCard(
                     }
                     Button(
                         onClick = { onOpenDetail(item.vodId) },
-                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.height(UiDimens.CompactButtonHeight),
+                        shape = RoundedCornerShape(UiDimens.ControlRadius),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (item.hasUpdate) UiPalette.Accent else UiPalette.SurfaceSoft,
                             contentColor = if (item.hasUpdate) UiPalette.AccentText else UiPalette.Ink

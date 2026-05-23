@@ -86,7 +86,7 @@ fun EmptyPane(
                                 UiPalette.Accent.copy(alpha = 0.1f)
                             )
                         ),
-                        shape = RoundedCornerShape(18.dp)
+                        shape = RoundedCornerShape(UiDimens.ControlRadius)
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -120,7 +120,7 @@ fun EmptyPane(
             if (!actionLabel.isNullOrBlank() && onAction != null) {
                 OutlinedButton(
                     onClick = onAction,
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(UiDimens.ControlRadius),
                     border = BorderStroke(1.dp, UiPalette.BorderSoft),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = Color.Transparent,
@@ -162,13 +162,13 @@ private fun FeedbackPaneContainer(
                     colors = CardDefaults.cardColors(
                         containerColor = UiPalette.Surface.copy(alpha = 0.96f)
                     ),
-                    shape = RoundedCornerShape(28.dp),
+                    shape = RoundedCornerShape(UiDimens.LargeContainerRadius),
                     border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.78f))
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 28.dp),
+                            .padding(horizontal = 24.dp, vertical = UiDimens.LargeContainerRadius),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                         content = content
@@ -182,14 +182,14 @@ private fun FeedbackPaneContainer(
                 colors = CardDefaults.cardColors(
                     containerColor = UiPalette.Surface.copy(alpha = 0.96f)
                 ),
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(UiDimens.CardRadius),
                 border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.74f))
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 156.dp)
-                        .padding(horizontal = 20.dp, vertical = 20.dp),
+                        .padding(UiDimens.CardPadding),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                     content = content

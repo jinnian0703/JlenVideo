@@ -651,7 +651,7 @@ private fun UserAgreementOnboardingScreen(
         ) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
+                shape = RoundedCornerShape(UiDimens.LargeContainerRadius),
                 colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
                 border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.Border)
             ) {
@@ -666,8 +666,8 @@ private fun UserAgreementOnboardingScreen(
                         Box(
                             modifier = Modifier
                                 .size(46.dp)
-                                .background(UiPalette.DangerSurface, RoundedCornerShape(16.dp))
-                                .border(1.dp, UiPalette.DangerBorder, RoundedCornerShape(16.dp)),
+                                .background(UiPalette.DangerSurface, RoundedCornerShape(UiDimens.ControlRadius))
+                                .border(1.dp, UiPalette.DangerBorder, RoundedCornerShape(UiDimens.ControlRadius)),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -694,7 +694,7 @@ private fun UserAgreementOnboardingScreen(
 
                     Card(
                         colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
-                        shape = RoundedCornerShape(20.dp)
+                        shape = RoundedCornerShape(UiDimens.ControlRadius)
                     ) {
                         Text(
                             text = "不同意用户协议与隐私说明将无法继续使用 JlenVideo。你可以返回继续阅读，或确定退出应用。",
@@ -712,8 +712,8 @@ private fun UserAgreementOnboardingScreen(
                             onClick = { showExitConfirm = false },
                             modifier = Modifier
                                 .weight(1f)
-                                .heightIn(min = 48.dp),
-                            shape = RoundedCornerShape(16.dp),
+                                .heightIn(min = UiDimens.SecondaryButtonHeight),
+                            shape = RoundedCornerShape(UiDimens.ControlRadius),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = UiPalette.TextPrimary),
                             border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft)
                         ) {
@@ -723,8 +723,8 @@ private fun UserAgreementOnboardingScreen(
                             onClick = onExit,
                             modifier = Modifier
                                 .weight(1f)
-                                .heightIn(min = 48.dp),
-                            shape = RoundedCornerShape(16.dp),
+                                .heightIn(min = UiDimens.SecondaryButtonHeight),
+                            shape = RoundedCornerShape(UiDimens.ControlRadius),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = UiPalette.DangerText,
                                 contentColor = UiPalette.Surface
@@ -741,7 +741,7 @@ private fun UserAgreementOnboardingScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 24.dp),
+            .padding(horizontal = UiDimens.PagePadding, vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -763,7 +763,7 @@ private fun UserAgreementOnboardingScreen(
                 .fillMaxWidth()
                 .weight(1f),
             colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(UiDimens.LargeContainerRadius),
             border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.Border)
         ) {
             Column(
@@ -800,8 +800,8 @@ private fun UserAgreementOnboardingScreen(
             onClick = onAccept,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 54.dp),
-            shape = RoundedCornerShape(18.dp),
+                .heightIn(min = UiDimens.PrimaryButtonHeight),
+            shape = RoundedCornerShape(UiDimens.ControlRadius),
             colors = ButtonDefaults.buttonColors(
                 containerColor = UiPalette.Accent,
                 contentColor = UiPalette.AccentText
@@ -892,7 +892,7 @@ private fun FirstLoginOnboardingScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(UiDimens.LargeContainerRadius),
             border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.Border)
         ) {
             Column(
@@ -904,7 +904,7 @@ private fun FirstLoginOnboardingScreen(
                 state.error?.takeIf { it.isNotBlank() }?.let { error ->
                     Card(
                         colors = CardDefaults.cardColors(containerColor = UiPalette.DangerSurface),
-                        shape = RoundedCornerShape(18.dp),
+                        shape = RoundedCornerShape(UiDimens.ControlRadius),
                         border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.DangerBorder)
                     ) {
                         Text(
@@ -950,7 +950,7 @@ private fun FirstLoginOnboardingScreen(
                         OutlinedButton(
                             onClick = { onAuthModeChange(AccountAuthMode.Register) },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = RoundedCornerShape(UiDimens.ControlRadius),
                             border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft)
                         ) {
                             Text("注册账号", maxLines = 1)
@@ -958,7 +958,7 @@ private fun FirstLoginOnboardingScreen(
                         OutlinedButton(
                             onClick = { onAuthModeChange(AccountAuthMode.FindPassword) },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = RoundedCornerShape(UiDimens.ControlRadius),
                             border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft)
                         ) {
                             Text("找回密码", maxLines = 1)
@@ -967,7 +967,7 @@ private fun FirstLoginOnboardingScreen(
                         OutlinedButton(
                             onClick = { onAuthModeChange(AccountAuthMode.Login) },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = RoundedCornerShape(UiDimens.ControlRadius),
                             border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft)
                         ) {
                             Text("返回登录", maxLines = 1)
@@ -1019,8 +1019,8 @@ private fun FirstLoginLoginPane(
             enabled = !state.isLoading,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 52.dp),
-            shape = RoundedCornerShape(18.dp),
+                .heightIn(min = UiDimens.PrimaryButtonHeight),
+            shape = RoundedCornerShape(UiDimens.ControlRadius),
             colors = ButtonDefaults.buttonColors(
                 containerColor = UiPalette.Accent,
                 contentColor = UiPalette.AccentText

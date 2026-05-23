@@ -2506,7 +2506,7 @@ private fun AccountRecordHeaderCard(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(UiDimens.CardRadius),
         border = BorderStroke(1.dp, UiPalette.BorderSoft)
     ) {
         Row(
@@ -2648,7 +2648,7 @@ internal fun LegacyAccountRecordCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp),
+                .padding(UiDimens.CardPadding),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
@@ -2670,9 +2670,9 @@ internal fun LegacyAccountRecordCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(UiDimens.ControlRadius))
                         .background(UiPalette.SurfaceSoft)
-                        .border(BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.7f)), RoundedCornerShape(16.dp))
+                        .border(BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.7f)), RoundedCornerShape(UiDimens.ControlRadius))
                         .padding(horizontal = 12.dp, vertical = 10.dp)
                 ) {
                     Text(
@@ -2690,8 +2690,8 @@ internal fun LegacyAccountRecordCard(
                     enabled = !isActionLoading && (item.vodId.isNotBlank() || item.playUrl.isNotBlank()),
                     modifier = Modifier
                         .weight(1f)
-                        .height(44.dp),
-                    shape = RoundedCornerShape(18.dp),
+                        .height(UiDimens.CompactButtonHeight),
+                    shape = RoundedCornerShape(UiDimens.ControlRadius),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = UiPalette.Accent,
                         contentColor = UiPalette.AccentText,
@@ -2706,8 +2706,8 @@ internal fun LegacyAccountRecordCard(
                     enabled = item.recordId.isNotBlank() && !isActionLoading,
                     modifier = Modifier
                         .weight(1f)
-                        .height(44.dp),
-                    shape = RoundedCornerShape(18.dp),
+                        .height(UiDimens.CompactButtonHeight),
+                    shape = RoundedCornerShape(UiDimens.ControlRadius),
                     border = BorderStroke(1.dp, UiPalette.DangerBorder),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = UiPalette.DangerSurface,

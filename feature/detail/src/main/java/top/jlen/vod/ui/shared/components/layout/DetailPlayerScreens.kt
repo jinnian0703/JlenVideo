@@ -202,15 +202,15 @@ internal fun DetailInfoCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = UiDimens.PagePadding),
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(UiDimens.CardRadius),
         border = BorderStroke(1.dp, UiPalette.Border)
     ) {
         val metaPairs = remember(item, sources) {
             buildDetailMetaPairs(item, sources)
         }
-        Column(modifier = Modifier.padding(18.dp)) {
+        Column(modifier = Modifier.padding(UiDimens.CardPadding)) {
             metaPairs.forEach { (label, value) ->
                 Text(
                     text = "$label：$value",
@@ -225,7 +225,7 @@ internal fun DetailInfoCard(
                 color = UiPalette.TextSecondary
             )
             Spacer(modifier = Modifier.height(12.dp))
-            Text(
+            ExpandableText(
                 text = item.description,
                 style = MaterialTheme.typography.bodyLarge,
                 color = UiPalette.Ink
@@ -266,9 +266,9 @@ internal fun EpisodePanel(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = UiDimens.PagePadding),
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(UiDimens.LargeContainerRadius),
         border = BorderStroke(1.dp, UiPalette.Border)
     ) {
         Column(
@@ -316,8 +316,8 @@ internal fun EpisodePanel(
                             onClick = { onEpisodeClick(absoluteIndex) },
                             modifier = Modifier
                                 .weight(1f)
-                                .heightIn(min = 48.dp),
-                            shape = RoundedCornerShape(14.dp),
+                                .heightIn(min = UiDimens.SecondaryButtonHeight),
+                            shape = RoundedCornerShape(UiDimens.ControlRadius),
                             border = BorderStroke(1.dp, if (selected) UiPalette.Accent else UiPalette.Border),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 containerColor = if (selected) UiPalette.AccentGlow else UiPalette.SurfaceSoft,

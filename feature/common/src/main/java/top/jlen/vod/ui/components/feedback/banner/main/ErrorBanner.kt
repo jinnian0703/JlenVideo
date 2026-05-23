@@ -47,7 +47,7 @@ fun ErrorBanner(
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = UiPalette.DangerSurface),
-        shape = RoundedCornerShape(if (compact) 20.dp else 24.dp),
+        shape = RoundedCornerShape(if (compact) 20.dp else UiDimens.CardRadius),
         border = BorderStroke(1.dp, UiPalette.DangerBorder)
     ) {
         Row(
@@ -84,7 +84,7 @@ fun ErrorBanner(
             )
             OutlinedButton(
                 onClick = onRetry,
-                shape = RoundedCornerShape(if (compact) 16.dp else 18.dp),
+                shape = RoundedCornerShape(UiDimens.ControlRadius),
                 border = BorderStroke(1.dp, UiPalette.DangerBorder),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = UiPalette.DangerText)
             ) {

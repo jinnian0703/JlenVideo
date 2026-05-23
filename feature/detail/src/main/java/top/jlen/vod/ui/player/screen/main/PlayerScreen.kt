@@ -419,7 +419,7 @@ private fun PlayerTransitionFeedbackChip(feedback: PlayerTransitionFeedback, mod
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.92f)),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(UiDimens.CardRadius),
         border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.82f))
     ) {
         Row(
@@ -430,7 +430,7 @@ private fun PlayerTransitionFeedbackChip(feedback: PlayerTransitionFeedback, mod
             Box(
                 modifier = Modifier
                     .size(30.dp)
-                    .clip(RoundedCornerShape(11.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .background(UiPalette.Accent.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {

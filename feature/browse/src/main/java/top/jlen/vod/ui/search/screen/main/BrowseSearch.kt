@@ -765,13 +765,13 @@ private fun HotSearchBoard(
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.96f)),
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(UiDimens.LargeContainerRadius),
         border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.75f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 16.dp),
+                .padding(horizontal = UiDimens.CardPadding, vertical = UiDimens.PagePadding),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
@@ -780,7 +780,7 @@ private fun HotSearchBoard(
             ) {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
+                        .clip(RoundedCornerShape(UiDimens.PillRadius))
                         .background(UiPalette.AccentSoft.copy(alpha = 0.16f))
                         .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
@@ -802,7 +802,7 @@ private fun HotSearchBoard(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(UiDimens.ControlRadius))
                         .clickable { onPickKeyword(item.keyword) }
                         .padding(horizontal = 6.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
