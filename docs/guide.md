@@ -20,6 +20,22 @@ feature:shell
 feature:state
 ```
 
+模块职责可以按下面的边界判断：
+
+- `app`：只负责最终 Android 应用装配，不承载业务页面和站点逻辑。
+- `core:model`：放跨模块共享的数据模型，避免各页面重复定义同类数据。
+- `core:common`：放应用运行时配置、版本信息、日志等不依赖 UI 的基础能力。
+- `core:design`：放视觉 token、颜色、尺寸和动效规则。
+- `core:data`：放接口、仓库、缓存、Cookie、HTML/JSON 解析和站点兼容逻辑。
+- `feature:common`：放跨页面复用的 Compose 组件、展示辅助和 UI 状态模型。
+- `feature:browse`：放首页、片库、搜索、追剧、公告、账号等浏览侧页面。
+- `feature:detail`：放详情页和内嵌播放页。
+- `feature:player`：放播放器实现、全屏播放、手势控制和播放地址解析。
+- `feature:shell`：放顶层导航、底栏、首次启动引导和全局弹窗挂载。
+- `feature:state`：放 ViewModel 和业务动作调度，连接 UI 事件与数据仓库。
+
+依赖方向上，`app` 装配 `feature:shell`，`feature:shell` 串联页面、状态和播放器；页面模块可以依赖 `feature:common`、`core:design`、`core:data`，但 `core:*` 不应依赖具体页面。新增能力时先判断“模型、数据、视觉、通用组件、具体页面、状态调度”分别属于哪一层，避免把业务逻辑堆到页面或顶层导航里。
+
 推荐先按下面的顺序理解：
 
 1. `settings.gradle.kts`：确认项目模块。

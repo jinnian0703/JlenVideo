@@ -967,8 +967,8 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 ?.trim()
                 .orEmpty()
             val resolvedVersion = latestVersion.ifBlank { titleVersion }
-            val notes = document.selectFirst("[data-test-selector=body-content]")?.text()
-                ?: document.selectFirst(".markdown-body")?.text()
+            val notes = document.selectFirst("[data-test-selector=body-content]")?.html()
+                ?: document.selectFirst(".markdown-body")?.html()
                 ?: ""
 
             if (resolvedVersion.isBlank()) {

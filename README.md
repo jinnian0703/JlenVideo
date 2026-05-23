@@ -68,6 +68,28 @@ feature:shell
 feature:state
 ```
 
+可以按四组理解这套结构：
+
+- `app` 是最终装配层，只放 Application、Activity 和打包配置。
+- `core:*` 是基础能力层，放模型、配置、视觉规范、数据访问和站点解析。
+- `feature:*` 是业务功能层，放可见页面、播放器、共享组件和状态调度。
+- `feature:shell` 是应用壳层，负责把各业务模块接到顶层导航、底栏、引导和全局弹窗上。
+
+整体依赖方向保持从外到内：
+
+```text
+app
+└─ feature:shell
+   ├─ feature:browse
+   ├─ feature:detail
+   ├─ feature:player
+   ├─ feature:state
+   └─ feature:common
+      └─ core:*
+```
+
+实际 Gradle 依赖以各模块 `build.gradle.kts` 为准。维护时尽量让 `core:*` 保持可复用，避免反向依赖具体页面；页面模块负责展示和交互，接口请求、站点解析和缓存逻辑优先留在 `core:data`。
+
 ### `app`
 
 最终应用壳层，负责 Android Application、Activity 入口和打包配置。

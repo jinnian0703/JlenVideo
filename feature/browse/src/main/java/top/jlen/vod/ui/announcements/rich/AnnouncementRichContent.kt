@@ -130,19 +130,16 @@ fun AnnouncementRichInlineText(
 
 @Composable
 private fun AnnouncementRichText(content: String) {
-    val blocks = remember(content) {
-        content
-            .split(Regex("\\n\\s*\\n"))
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-    }
+    val blocks = remember(content) { content.toAnnouncementPlainBlocks() }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         blocks.forEach { block ->
+            val text = block.text
             val lines = block
+                .text
                 .lineSequence()
                 .map { it.trim() }
                 .filter { it.isNotBlank() }
@@ -150,7 +147,7 @@ private fun AnnouncementRichText(content: String) {
 
             when {
                 lines.isEmpty() -> Unit
-                lines.all(::isAnnouncementListLine) -> {
+                block.kind == AnnouncementPlainBlockKind.List -> {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         lines.forEach { line ->
                             val label = line.removeAnnouncementListPrefix()
@@ -177,18 +174,28 @@ private fun AnnouncementRichText(content: String) {
                     }
                 }
 
-                lines.size == 1 && block.length <= 20 -> {
+                block.kind == AnnouncementPlainBlockKind.Heading ||
+                    block.kind == AnnouncementPlainBlockKind.Title ||
+                    (lines.size == 1 && text.length <= 20) -> {
                     Text(
-                        text = block,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        text = text.removeAnnouncementMarkdownHeadingPrefix(),
+                        style = if (block.kind == AnnouncementPlainBlockKind.Title) {
+                            MaterialTheme.typography.titleLarge
+                        } else {
+                            MaterialTheme.typography.titleMedium
+                        },
+                        fontWeight = if (block.kind == AnnouncementPlainBlockKind.Title) {
+                            FontWeight.ExtraBold
+                        } else {
+                            FontWeight.Bold
+                        },
                         color = UiPalette.Ink
                     )
                 }
 
                 else -> {
                     Text(
-                        text = block,
+                        text = text,
                         style = MaterialTheme.typography.bodyLarge,
                         color = UiPalette.Ink,
                         lineHeight = MaterialTheme.typography.bodyLarge.lineHeight,
@@ -267,6 +274,64 @@ internal fun String.removeAnnouncementListPrefix(): String =
     replaceFirst(Regex("^(-|\\*|•)\\s*"), "")
         .replaceFirst(Regex("^\\d+[.、]\\s*"), "")
         .trim()
+
+internal enum class AnnouncementPlainBlockKind {
+    Title,
+    Heading,
+    Paragraph,
+    List
+}
+
+internal data class AnnouncementPlainBlock(
+    val text: String,
+    val kind: AnnouncementPlainBlockKind = AnnouncementPlainBlockKind.Paragraph
+)
+
+internal fun String.toAnnouncementPlainBlocks(): List<AnnouncementPlainBlock> {
+    val normalized = stripAnnouncementCodeFenceForDisplay()
+        .replace("\r\n", "\n")
+        .replace('\r', '\n')
+        .lineSequence()
+        .map { it.trimEnd() }
+        .toList()
+    val blocks = mutableListOf<AnnouncementPlainBlock>()
+    val pending = mutableListOf<String>()
+
+    fun flushParagraph() {
+        val text = pending.joinToString("\n").trim()
+        if (text.isNotBlank()) {
+            blocks += AnnouncementPlainBlock(text)
+        }
+        pending.clear()
+    }
+
+    normalized.forEach { rawLine ->
+        val line = rawLine.trim()
+        when {
+            line.isBlank() -> flushParagraph()
+            line.startsWith("### ") || line.startsWith("## ") -> {
+                flushParagraph()
+                blocks += AnnouncementPlainBlock(
+                    text = line.removeAnnouncementMarkdownHeadingPrefix(),
+                    kind = if (line.startsWith("## ")) AnnouncementPlainBlockKind.Title else AnnouncementPlainBlockKind.Heading
+                )
+            }
+            isAnnouncementListLine(line) -> {
+                flushParagraph()
+                blocks += AnnouncementPlainBlock(
+                    text = line,
+                    kind = AnnouncementPlainBlockKind.List
+                )
+            }
+            else -> pending += line
+        }
+    }
+    flushParagraph()
+    return blocks
+}
+
+private fun String.removeAnnouncementMarkdownHeadingPrefix(): String =
+    replaceFirst(Regex("^#{1,6}\\s*"), "").trim()
 
 internal fun parseAnnouncementHtmlBlocks(html: String): List<AnnouncementRichBlock> {
     val normalized = Parser.unescapeEntities(html.stripAnnouncementCodeFence(), false).trim()

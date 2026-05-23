@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -245,10 +246,16 @@ fun UpdatePromptDialog(
     onOpenLink: (String) -> Unit = {}
 ) {
     val notes = remember(updateInfo.notes) { updateInfo.notes.trim() }
+    val configuration = LocalConfiguration.current
+    val dialogMaxHeight = (configuration.screenHeightDp.dp * 0.88f).coerceAtLeast(420.dp)
+    val notesMaxHeight = (configuration.screenHeightDp.dp * 0.34f).coerceIn(140.dp, 260.dp)
+    val notesScrollState = rememberScrollState()
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = dialogMaxHeight),
             shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = UiPalette.Surface)
         ) {
@@ -323,6 +330,9 @@ fun UpdatePromptDialog(
                 }
 
                 Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false),
                     colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
                     shape = RoundedCornerShape(20.dp)
                 ) {
@@ -339,8 +349,8 @@ fun UpdatePromptDialog(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 220.dp)
-                                .verticalScroll(rememberScrollState()),
+                                .heightIn(min = 96.dp, max = notesMaxHeight)
+                                .verticalScroll(notesScrollState),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             if (notes.isBlank()) {
