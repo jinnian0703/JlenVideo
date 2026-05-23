@@ -5,12 +5,10 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Rect
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -84,7 +82,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
@@ -337,12 +334,12 @@ internal fun LegacyAccountScreen(
                     visibleSections.forEach { section ->
                         AccountUnderlineTab(
                             text = when (section) {
-                                AccountSection.Overview -> "总览"
-                                AccountSection.Profile -> "资料"
-                                AccountSection.History -> "记录"
-                                AccountSection.Member -> "会员"
-                                AccountSection.About -> "关于"
-                                AccountSection.Favorites -> "追剧"
+                        AccountSection.Overview -> "总览"
+                        AccountSection.Profile -> "资料"
+                        AccountSection.History -> "记录"
+                        AccountSection.Member -> "会员"
+                        AccountSection.About -> "关于"
+                        AccountSection.Favorites -> ""
                             },
                             selected = state.selectedSection == section,
                             onClick = { onSelectSection(section) },
@@ -410,11 +407,7 @@ internal fun LegacyAccountScreen(
                             onBindEmail = onBindEmail,
                             onUnbindEmail = onUnbindEmail
                         )
-                        AccountSection.Favorites -> EmptyPane(
-                            message = "追剧入口已移到底栏",
-                            description = "想追的影片请在详情页加入追剧，然后到底栏“追剧”里查看更新和续播",
-                            style = FeedbackPaneStyle.Card
-                        )
+                        AccountSection.Favorites -> Unit
                         AccountSection.History -> Unit
                         AccountSection.Member -> MembershipPaneV2(
                             isLoading = state.isContentLoading,
@@ -849,70 +842,6 @@ internal fun LegacyCrashLogCard(
 }
 
 @Composable
-private fun UpdateNotesSection(notes: String) {
-    var expanded by remember(notes) { mutableStateOf(false) }
-    AccountToolSection(
-        title = "更新说明",
-        description = "最近版本变更"
-    ) {
-        Text(
-            text = notes,
-            style = MaterialTheme.typography.bodySmall,
-            color = UiPalette.Ink,
-            maxLines = if (expanded) Int.MAX_VALUE else 8,
-            overflow = if (expanded) TextOverflow.Clip else TextOverflow.Ellipsis
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            TextButton(
-                onClick = { expanded = !expanded },
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-            ) {
-                Text(
-                    text = if (expanded) "收起" else "展开",
-                    fontWeight = FontWeight.Bold,
-                    color = UiPalette.Accent
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AccountToolSection(
-    title: String,
-    description: String,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(UiPalette.SurfaceSoft)
-            .padding(horizontal = 14.dp, vertical = 12.dp)
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = UiPalette.Ink
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = UiPalette.TextSecondary
-                )
-            }
-            content()
-        }
-    }
-}
-
-@Composable
 internal fun LegacyAccountRegisterPane(
     state: AccountUiState,
     onEditorChange: ((RegisterEditor) -> RegisterEditor) -> Unit,
@@ -920,14 +849,6 @@ internal fun LegacyAccountRegisterPane(
     onSendCode: () -> Unit,
     onSubmit: () -> Unit
 ) {
-    val captchaBitmap = remember(state.registerCaptcha) {
-        runCatching {
-            state.registerCaptcha?.let { bytes ->
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-            }
-        }.getOrNull()
-    }
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1065,43 +986,11 @@ internal fun LegacyAccountRegisterPane(
                     unfocusedContainerColor = UiPalette.Surface
                 )
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(56.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(UiPalette.SurfaceSoft),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (captchaBitmap != null) {
-                        Image(
-                            bitmap = captchaBitmap,
-                            contentDescription = "图片验证码",
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clickable(onClick = onRefreshCaptcha),
-                            contentScale = ContentScale.Fit
-                        )
-                    } else {
-                        Text(
-                            text = if (state.isContentLoading) "加载中..." else "点击刷新验证码",
-                            color = UiPalette.TextSecondary
-                        )
-                    }
-                }
-                OutlinedButton(
-                    onClick = onRefreshCaptcha,
-                    enabled = !state.isContentLoading,
-                    border = BorderStroke(1.dp, UiPalette.BorderSoft)
-                ) {
-                    Text("刷新")
-                }
-            }
+            CaptchaImageBox(
+                bytes = state.registerCaptcha,
+                isLoading = state.isContentLoading,
+                onRefresh = onRefreshCaptcha
+            )
         }
 
         Button(
@@ -1126,14 +1015,6 @@ internal fun LegacyAccountFindPasswordPane(
     onRefreshCaptcha: () -> Unit,
     onSubmit: () -> Unit
 ) {
-    val captchaBitmap = remember(state.findPasswordCaptcha) {
-        runCatching {
-            state.findPasswordCaptcha?.let { bytes ->
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-            }
-        }.getOrNull()
-    }
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1257,43 +1138,11 @@ internal fun LegacyAccountFindPasswordPane(
                     unfocusedContainerColor = UiPalette.Surface
                 )
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(56.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(UiPalette.SurfaceSoft),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (captchaBitmap != null) {
-                        Image(
-                            bitmap = captchaBitmap,
-                            contentDescription = "图片验证码",
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clickable(onClick = onRefreshCaptcha),
-                            contentScale = ContentScale.Fit
-                        )
-                    } else {
-                        Text(
-                            text = if (state.isContentLoading) "加载中..." else "点击刷新验证码",
-                            color = UiPalette.TextSecondary
-                        )
-                    }
-                }
-                OutlinedButton(
-                    onClick = onRefreshCaptcha,
-                    enabled = !state.isContentLoading,
-                    border = BorderStroke(1.dp, UiPalette.BorderSoft)
-                ) {
-                    Text("刷新")
-                }
-            }
+            CaptchaImageBox(
+                bytes = state.findPasswordCaptcha,
+                isLoading = state.isContentLoading,
+                onRefresh = onRefreshCaptcha
+            )
         }
 
         Button(
@@ -1356,158 +1205,6 @@ private fun AccountUnderlineTab(
                 .clip(RoundedCornerShape(999.dp))
                 .background(if (selected) UiPalette.Accent else Color.Transparent)
         )
-    }
-}
-
-@Composable
-private fun AccountGuestIntroCard(
-) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(28.dp),
-        border = BorderStroke(1.dp, UiPalette.Border)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(54.dp)
-                        .clip(CircleShape)
-                        .background(UiPalette.Accent.copy(alpha = 0.14f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Person,
-                        contentDescription = null,
-                        tint = UiPalette.Accent
-                    )
-                }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = "账号登录",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = UiPalette.Ink
-                    )
-                    Text(
-                        text = "登录后可同步追剧、播放记录、会员积分和个人资料。",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = UiPalette.TextSecondary
-                    )
-                }
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                AccountGuestBenefitChip(text = "追剧同步")
-                AccountGuestBenefitChip(text = "播放记录")
-                AccountGuestBenefitChip(text = "会员积分")
-            }
-        }
-    }
-}
-
-@Composable
-private fun AccountGuestBenefitChip(text: String) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(UiPalette.SurfaceSoft)
-            .border(1.dp, UiPalette.BorderSoft, RoundedCornerShape(999.dp))
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = UiPalette.TextPrimary
-        )
-    }
-}
-
-@Composable
-private fun AccountGuestModeHeader(
-    title: String,
-    description: String,
-    onBack: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        TextButton(
-            onClick = onBack,
-            contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
-            colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("返回登录", fontWeight = FontWeight.Bold)
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = UiPalette.Ink
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = UiPalette.TextSecondary
-            )
-        }
-    }
-}
-
-@Composable
-private fun AccountGuestAuxiliaryActions(
-    onRegister: () -> Unit,
-    onFindPassword: () -> Unit,
-    onAbout: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedButton(
-                onClick = onRegister,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, UiPalette.BorderSoft)
-            ) {
-                Text("注册账号", maxLines = 1)
-            }
-            OutlinedButton(
-                onClick = onFindPassword,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, UiPalette.BorderSoft)
-            ) {
-                Text("找回密码", maxLines = 1)
-            }
-        }
-        TextButton(
-            onClick = onAbout,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.TextSecondary)
-        ) {
-            Text("关于与日志", fontWeight = FontWeight.Bold)
-        }
     }
 }
 
@@ -2564,91 +2261,6 @@ private fun AccountRecordHeaderCard(
                 enabled = !isActionLoading
             ) {
                 Text(if (isActionLoading) "处理中..." else "清空")
-            }
-        }
-    }
-}
-
-@Composable
-private fun ClearHistoryConfirmDialog(
-    count: Int,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(26.dp),
-            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .background(UiPalette.DangerSurface.copy(alpha = 0.68f), RoundedCornerShape(999.dp))
-                        .border(1.dp, UiPalette.DangerBorder.copy(alpha = 0.5f), RoundedCornerShape(999.dp))
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Text(
-                        text = "播放记录",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = UiPalette.DangerText
-                    )
-                }
-                Text(
-                    text = "清空播放记录",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = UiPalette.Ink
-                )
-                Text(
-                    text = "确认清空当前账号的全部播放记录吗？",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = UiPalette.TextSecondary
-                )
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.76f)),
-                    shape = RoundedCornerShape(18.dp)
-                ) {
-                    Text(
-                        text = "将删除已加载的 $count 条记录，并同步执行清空操作。该操作完成后无法从本页恢复。",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 13.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = UiPalette.TextPrimary
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)
-                ) {
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.width(110.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.36f),
-                            contentColor = UiPalette.TextPrimary
-                        )
-                    ) {
-                        Text("取消", fontWeight = FontWeight.Bold)
-                    }
-                    Button(
-                        onClick = onConfirm,
-                        modifier = Modifier.width(122.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = UiPalette.DangerText,
-                            contentColor = UiPalette.Surface
-                        )
-                    ) {
-                        Text("确认清空", fontWeight = FontWeight.Bold)
-                    }
-                }
             }
         }
     }

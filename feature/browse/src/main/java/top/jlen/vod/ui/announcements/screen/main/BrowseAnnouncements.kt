@@ -1,20 +1,8 @@
 package top.jlen.vod.ui
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Rect
-import android.net.Uri
-import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,115 +11,28 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.GridView
-import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.NewReleases
-import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Whatshot
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import coil.size.Precision
-import coil.size.Scale
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Element
-import org.jsoup.nodes.Node
-import org.jsoup.nodes.TextNode
-import org.jsoup.parser.Parser
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import top.jlen.vod.AppConfig
-import top.jlen.vod.AppRuntimeInfo
-import top.jlen.vod.PLAYER_DESKTOP_UA
 import top.jlen.vod.data.AppNotice
-import top.jlen.vod.data.AppleCmsCategory
-import top.jlen.vod.data.CategoryFilterGroup
-import top.jlen.vod.data.FindPasswordEditor
-import top.jlen.vod.data.HotSearchGroup
-import top.jlen.vod.data.MembershipPlan
-import top.jlen.vod.data.PersistentCookieJar
-import top.jlen.vod.data.RegisterEditor
-import top.jlen.vod.data.UserProfileEditor
-import top.jlen.vod.data.VodItem
-import top.jlen.vod.data.sanitizeUserFacingComposite
 
 
 @Composable
@@ -416,153 +317,6 @@ private fun AnnouncementListCard(
         }
     }
 }
-
-@Composable
-private fun AnnouncementRichText(content: String) {
-    val blocks = remember(content) {
-        content
-            .split(Regex("\\n\\s*\\n"))
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-    }
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        blocks.forEach { block ->
-            val lines = block
-                .lineSequence()
-                .map { it.trim() }
-                .filter { it.isNotBlank() }
-                .toList()
-
-            when {
-                lines.isEmpty() -> Unit
-                lines.all(::isAnnouncementListLine) -> {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        lines.forEach { line ->
-                            val label = line.removeAnnouncementListPrefix()
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .padding(top = 8.dp)
-                                        .size(6.dp)
-                                        .background(UiPalette.Accent, CircleShape)
-                                )
-                                Text(
-                                    text = label,
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = UiPalette.Ink,
-                                    lineHeight = MaterialTheme.typography.bodyLarge.lineHeight
-                                )
-                            }
-                        }
-                    }
-                }
-
-                lines.size == 1 && block.length <= 20 -> {
-                    Text(
-                        text = block,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = UiPalette.Ink
-                    )
-                }
-
-                else -> {
-                    Text(
-                        text = block,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = UiPalette.Ink,
-                        lineHeight = MaterialTheme.typography.bodyLarge.lineHeight,
-                        textAlign = TextAlign.Start
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun AnnouncementRichContent(
-    notice: AppNotice,
-    modifier: Modifier = Modifier,
-    onOpenLink: (String) -> Unit = {}
-) {
-    val richBlocks = remember(notice.htmlContent) {
-        parseAnnouncementHtmlBlocks(notice.htmlContent)
-    }
-
-    if (richBlocks.isEmpty()) {
-        AnnouncementRichText(content = notice.displayContent.stripAnnouncementCodeFenceForDisplay())
-        return
-    }
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        richBlocks.forEach { block ->
-            AnnouncementRichBlockText(
-                block = block,
-                onOpenLink = onOpenLink
-            )
-        }
-    }
-}
-
-@Composable
-private fun AnnouncementRichBlockText(
-    block: AnnouncementRichBlock,
-    onOpenLink: (String) -> Unit
-) {
-    var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
-    Text(
-        text = block.text,
-        modifier = Modifier
-            .fillMaxWidth()
-            .pointerInput(block.text, onOpenLink) {
-                detectTapGestures { offset ->
-                    val layout = layoutResult ?: return@detectTapGestures
-                    val textOffset = layout.getOffsetForPosition(offset)
-                    block.text.getStringAnnotations(AnnouncementUrlTag, textOffset, textOffset)
-                        .firstOrNull()
-                        ?.item
-                        ?.let(onOpenLink)
-                }
-            },
-        onTextLayout = { layoutResult = it },
-        style = when (block.kind) {
-            AnnouncementBlockKind.Title -> MaterialTheme.typography.titleLarge
-            AnnouncementBlockKind.Heading -> MaterialTheme.typography.titleMedium
-            AnnouncementBlockKind.Paragraph -> MaterialTheme.typography.bodyMedium
-        },
-        fontWeight = when (block.kind) {
-            AnnouncementBlockKind.Title -> FontWeight.ExtraBold
-            AnnouncementBlockKind.Heading -> FontWeight.Bold
-            AnnouncementBlockKind.Paragraph -> FontWeight.Normal
-        },
-        color = block.textColor ?: UiPalette.Ink,
-        textAlign = block.alignment,
-        lineHeight = when (block.kind) {
-            AnnouncementBlockKind.Title -> MaterialTheme.typography.titleLarge.lineHeight
-            AnnouncementBlockKind.Heading -> MaterialTheme.typography.titleMedium.lineHeight
-            AnnouncementBlockKind.Paragraph -> MaterialTheme.typography.bodyMedium.lineHeight
-        }
-    )
-}
-
-private fun String.stripAnnouncementCodeFenceForDisplay(): String =
-    trim()
-        .replace(Regex("""(?is)^```\s*(?:html)?\s*"""), "")
-        .replace(Regex("""(?is)\s*```\s*$"""), "")
-        .trim()
 
 @Composable
 private fun AnnouncementListCardCompact(

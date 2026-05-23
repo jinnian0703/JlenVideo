@@ -13,7 +13,7 @@
         android:theme="@style/Theme.JlenVideo"
         android:usesCleartextTraffic="true">
         <activity
-            android:name=".ui.FullscreenPlayerActivity"
+            android:name="top.jlen.vod.ui.FullscreenPlayerActivity"
             android:configChanges="keyboardHidden|orientation|screenSize"
             android:exported="false"
             android:screenOrientation="fullSensor"

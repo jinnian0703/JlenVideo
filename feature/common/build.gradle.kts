@@ -38,7 +38,6 @@ dependencies {
     implementation(composeBom)
     implementation(project(":core:data"))
     implementation(project(":core:design"))
-    implementation(project(":feature:player"))
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.compose.ui:ui")

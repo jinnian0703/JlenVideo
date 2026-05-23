@@ -107,6 +107,7 @@ dependencies {
     androidTestImplementation(composeBom)
     implementation(project(":core:common"))
     implementation(project(":core:data"))
+    implementation(project(":feature:player"))
     implementation(project(":feature:shell"))
     implementation("io.coil-kt:coil:2.7.0")
 
