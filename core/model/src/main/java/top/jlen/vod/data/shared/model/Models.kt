@@ -550,6 +550,54 @@ data class HotSearchCacheSnapshot(
     val cachedAt: Long = 0L
 )
 
+enum class CacheRetentionOption(
+    val key: String,
+    val label: String,
+    val durationMs: Long?
+) {
+    OneDay("1d", "1天", 86_400_000L),
+    ThreeDays("3d", "3天", 259_200_000L),
+    SevenDays("7d", "7天", 604_800_000L),
+    ThirtyDays("30d", "30天", 2_592_000_000L),
+    Forever("forever", "永久", null);
+
+    companion object {
+        val default: CacheRetentionOption = ThreeDays
+
+        fun fromKey(key: String?): CacheRetentionOption =
+            entries.firstOrNull { it.key == key } ?: default
+    }
+}
+
+data class CacheSettings(
+    val retention: CacheRetentionOption = CacheRetentionOption.default
+)
+
+data class CacheSizeSummary(
+    val contentBytes: Long = 0L,
+    val imageBytes: Long = 0L,
+    val isAvailable: Boolean = true
+) {
+    val totalBytes: Long
+        get() = contentBytes + imageBytes
+}
+
+fun formatCacheSize(bytes: Long): String {
+    val safeBytes = bytes.coerceAtLeast(0L)
+    val units = listOf("B", "KB", "MB", "GB")
+    var value = safeBytes.toDouble()
+    var unitIndex = 0
+    while (value >= 1024.0 && unitIndex < units.lastIndex) {
+        value /= 1024.0
+        unitIndex += 1
+    }
+    return if (unitIndex == 0) {
+        "${safeBytes}B"
+    } else {
+        String.format(Locale.ROOT, "%.1f%s", value, units[unitIndex])
+    }
+}
+
 data class AppUpdateInfo(
     val currentVersion: String = "",
     val latestVersion: String = "",

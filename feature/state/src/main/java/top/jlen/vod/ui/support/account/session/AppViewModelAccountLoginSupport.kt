@@ -42,7 +42,11 @@ internal fun loggedOutAccountState(accountState: AccountUiState): AccountUiState
     message = "已退出登录",
     updateInfo = accountState.updateInfo,
     hasCrashLog = accountState.hasCrashLog,
-    latestCrashLog = accountState.latestCrashLog
+    latestCrashLog = accountState.latestCrashLog,
+    cacheRetention = accountState.cacheRetention,
+    cacheSizeSummary = accountState.cacheSizeSummary,
+    isCacheSizeLoading = accountState.isCacheSizeLoading,
+    isCacheClearing = accountState.isCacheClearing
 )
 
 internal fun expiredAccountState(accountState: AccountUiState): AccountUiState = AccountUiState(
@@ -51,5 +55,9 @@ internal fun expiredAccountState(accountState: AccountUiState): AccountUiState =
     message = "登录已失效，请重新登录",
     updateInfo = accountState.updateInfo,
     hasCrashLog = accountState.hasCrashLog,
-    latestCrashLog = accountState.latestCrashLog
+    latestCrashLog = accountState.latestCrashLog,
+    cacheRetention = accountState.cacheRetention,
+    cacheSizeSummary = accountState.cacheSizeSummary,
+    isCacheSizeLoading = accountState.isCacheSizeLoading,
+    isCacheClearing = accountState.isCacheClearing
 )

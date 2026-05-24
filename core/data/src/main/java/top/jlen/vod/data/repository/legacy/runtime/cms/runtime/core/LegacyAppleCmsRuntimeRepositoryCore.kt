@@ -66,6 +66,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     private val noticePrefs = appContext.getSharedPreferences("app_notice_store", Context.MODE_PRIVATE)
     private val heartbeatPrefs = appContext.getSharedPreferences("app_heartbeat_store", Context.MODE_PRIVATE)
     private val hotSearchCacheStore = HotSearchCacheStore(appContext)
+    private val cacheSettingsStore = CacheSettingsStore(appContext)
     private val playbackResumeStore = PlaybackResumeStore(appContext)
     private val defaultCategories = listOf(
         AppleCmsCategory(typeId = "GCCCCG", typeName = "电影", parentId = "GCCCCG"),
@@ -170,6 +171,28 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         homeCachePrefs.edit().clear().apply()
     }
 
+    internal fun runtimeClearPersistedHotSearchCache() {
+        hotSearchCacheStore.clear()
+    }
+
+    internal fun runtimeContentCacheSizeBytes(): Long =
+        sharedPrefsFileSize("library_page_cache") +
+            sharedPrefsFileSize("home_cache_store") +
+            sharedPrefsFileSize("hot_search_cache_store")
+
+    internal fun runtimeImageCacheSizeBytes(): Long =
+        directorySize(appContext.cacheDir.resolve(IMAGE_CACHE_DIR_NAME))
+
+    internal fun runtimeClearImageCacheFiles() {
+        appContext.cacheDir.resolve(IMAGE_CACHE_DIR_NAME).deleteRecursively()
+    }
+
+    internal fun runtimeLoadCacheSettings(): CacheSettings =
+        cacheSettingsStore.load()
+
+    internal fun runtimeSaveCacheRetention(option: CacheRetentionOption): CacheSettings =
+        cacheSettingsStore.saveRetention(option)
+
     internal fun runtimePeekHomeCacheEntry(): CachedValue<HomePayload>? = homeCache
 
     internal fun runtimeUpdateHomeCacheEntry(value: CachedValue<HomePayload>?) {
@@ -178,8 +201,8 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     internal fun runtimeReadPersistedHomeCache(): CachedValue<HomePayload>? = readPersistedHomeCache()
 
-    internal fun runtimeHomeCacheTtlMs(allowStale: Boolean): Long =
-        if (allowStale) DISK_HOME_CACHE_TTL_MS else HOME_CACHE_TTL_MS
+    internal fun runtimeHomeCacheTtlMs(@Suppress("UNUSED_PARAMETER") allowStale: Boolean): Long =
+        runtimeCacheRetentionMs()
 
     internal fun runtimeIsCacheValid(timestampMs: Long, ttlMs: Long): Boolean =
         isCacheValid(timestampMs, ttlMs)
@@ -252,8 +275,8 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     internal fun runtimeReadPersistedCategoryPageCache(cacheKey: String): CachedValue<PagedVodItems>? =
         readPersistedPageCache(cacheKey)
 
-    internal fun runtimePageCacheTtlMs(allowStale: Boolean = false): Long =
-        if (allowStale) DISK_PAGE_CACHE_TTL_MS else PAGE_CACHE_TTL_MS
+    internal fun runtimePageCacheTtlMs(@Suppress("UNUSED_PARAMETER") allowStale: Boolean = false): Long =
+        runtimeCacheRetentionMs()
 
     internal suspend fun runtimeGetBrowsableCategories(forceRefresh: Boolean = false): List<AppleCmsCategory> =
         getBrowsableCategories(forceRefresh = forceRefresh)
@@ -311,7 +334,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         detailCache[vodId] = value
     }
 
-    internal fun runtimeDetailCacheTtlMs(): Long = DETAIL_CACHE_TTL_MS
+    internal fun runtimeDetailCacheTtlMs(): Long = runtimeCacheRetentionMs()
 
     internal fun runtimeFindPreviewItem(vodId: String): VodItem? = findPreviewItem(vodId)
 
@@ -361,7 +384,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     internal fun runtimeParseNoticeTimeToMillis(value: String): Long? =
         parseNoticeTimeToMillis(value)
 
-    internal fun runtimeNoticeCacheTtlMs(): Long = NOTICE_CACHE_TTL_MS
+    internal fun runtimeNoticeCacheTtlMs(): Long = runtimeCacheRetentionMs()
 
     internal suspend fun runtimeFetchUserDocument(pathOrUrl: String): Document =
         fetchUserDocument(pathOrUrl)
@@ -441,7 +464,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         searchCache[cacheKey] = value
     }
 
-    internal fun runtimeSearchCacheTtlMs(): Long = SEARCH_CACHE_TTL_MS
+    internal fun runtimeSearchCacheTtlMs(): Long = runtimeCacheRetentionMs()
 
     internal suspend fun runtimeRequestSearch(keyword: String, page: Int = 1, limit: Int = 20): List<VodItem> =
         requestApi { search(keyword = keyword, page = page, limit = limit) }
@@ -560,6 +583,22 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     fun clearProcessMemoryCaches() = legacyClearProcessMemoryCaches()
 
     fun clearRuntimeCaches() = legacyClearRuntimeCaches()
+
+    fun loadCacheSettings(): CacheSettings = runtimeLoadCacheSettings()
+
+    fun saveCacheRetention(option: CacheRetentionOption): CacheSettings =
+        runtimeSaveCacheRetention(option)
+
+    fun loadCacheSizeSummary(): CacheSizeSummary =
+        CacheSizeSummary(
+            contentBytes = runtimeContentCacheSizeBytes(),
+            imageBytes = runtimeImageCacheSizeBytes()
+        )
+
+    fun clearAppContentAndImageCaches() {
+        legacyClearAllAppCaches()
+        runtimeClearImageCacheFiles()
+    }
 
     fun peekHomePayload(allowStale: Boolean = false): HomePayload? = legacyPeekHomePayload(allowStale)
 
@@ -693,11 +732,11 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         val cacheKey = "$typeId:$safePage"
         if (!forceRefresh) {
             categoryPageCache[cacheKey]
-                ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
+                ?.takeIf { isCacheValid(it.timestampMs, runtimePageCacheTtlMs()) }
                 ?.value
                 ?.let { return it }
             readPersistedPageCache(cacheKey)
-                ?.takeIf { isCacheValid(it.timestampMs, DISK_PAGE_CACHE_TTL_MS) }
+                ?.takeIf { isCacheValid(it.timestampMs, runtimePageCacheTtlMs(allowStale = true)) }
                 ?.also { cached ->
                     categoryPageCache[cacheKey] = cached
                     return cached.value
@@ -708,10 +747,10 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         } else {
             awaitSharedRequest("category_page:$cacheKey") {
                 categoryPageCache[cacheKey]
-                    ?.takeIf { isCacheValid(it.timestampMs, PAGE_CACHE_TTL_MS) }
+                    ?.takeIf { isCacheValid(it.timestampMs, runtimePageCacheTtlMs()) }
                     ?.value
                     ?: readPersistedPageCache(cacheKey)
-                        ?.takeIf { isCacheValid(it.timestampMs, DISK_PAGE_CACHE_TTL_MS) }
+                        ?.takeIf { isCacheValid(it.timestampMs, runtimePageCacheTtlMs(allowStale = true)) }
                         ?.also { cached -> categoryPageCache[cacheKey] = cached }
                         ?.value
                     ?: loadFreshCategoryPage(typeId = typeId, page = safePage)
@@ -821,12 +860,12 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     suspend fun loadHotSearchGroups(forceRefresh: Boolean = false): List<HotSearchGroup> {
         if (!forceRefresh) {
             hotSearchCache
-                ?.takeIf { isCacheValid(it.timestampMs, HOT_SEARCH_CACHE_TTL_MS) }
+                ?.takeIf { isCacheValid(it.timestampMs, runtimeCacheRetentionMs()) }
                 ?.value
                 ?.let { return it }
 
             hotSearchCacheStore.load()
-                ?.takeIf { isCacheValid(it.cachedAt, HOT_SEARCH_CACHE_TTL_MS) }
+                ?.takeIf { isCacheValid(it.cachedAt, runtimeCacheRetentionMs()) }
                 ?.groups
                 ?.takeIf { it.isNotEmpty() }
                 ?.let { cachedGroups ->
@@ -844,7 +883,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         } else {
             awaitSharedRequest("hot_search") {
                 hotSearchCache
-                    ?.takeIf { isCacheValid(it.timestampMs, HOT_SEARCH_CACHE_TTL_MS) }
+                    ?.takeIf { isCacheValid(it.timestampMs, runtimeCacheRetentionMs()) }
                     ?.value
                     ?: runCatching { loadFreshHotSearchGroups() }
                         .getOrElse { error ->
@@ -1245,7 +1284,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     ): List<AppNotice> {
         if (!forceRefresh) {
             noticeCache
-                ?.takeIf { isCacheValid(it.timestampMs, NOTICE_CACHE_TTL_MS) }
+                ?.takeIf { isCacheValid(it.timestampMs, runtimeNoticeCacheTtlMs()) }
                 ?.value
                 ?.let { return it }
         }
@@ -1262,7 +1301,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         } else {
             awaitSharedRequest(requestKey) {
                 noticeCache
-                    ?.takeIf { isCacheValid(it.timestampMs, NOTICE_CACHE_TTL_MS) }
+                    ?.takeIf { isCacheValid(it.timestampMs, runtimeNoticeCacheTtlMs()) }
                     ?.value
                     ?: loadFreshNoticesOriginal(appVersion = appVersion, userId = userId)
             }
@@ -2993,13 +3032,13 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     private suspend fun loadHistorySources(vodId: String): List<PlaySource> {
         historySourceCache[vodId]
-            ?.takeIf { isCacheValid(it.timestampMs, HISTORY_SOURCE_CACHE_TTL_MS) }
+            ?.takeIf { isCacheValid(it.timestampMs, runtimeCacheRetentionMs()) }
             ?.value
             ?.let { return it }
 
         return awaitSharedRequest("history_sources:$vodId") {
             historySourceCache[vodId]
-                ?.takeIf { isCacheValid(it.timestampMs, HISTORY_SOURCE_CACHE_TTL_MS) }
+                ?.takeIf { isCacheValid(it.timestampMs, runtimeCacheRetentionMs()) }
                 ?.value
                 ?: runCatching {
                     loadDetail(vodId)?.let(::parseSources).orEmpty()
@@ -3115,27 +3154,27 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     }
 
     private fun cleanupMemoryCaches(now: Long) {
-        pruneExpiredEntries(categoryPageCache, now, PAGE_CACHE_TTL_MS)
-        pruneExpiredEntries(detailCache, now, DETAIL_CACHE_TTL_MS)
-        pruneExpiredEntries(searchCache, now, SEARCH_CACHE_TTL_MS)
-        pruneExpiredEntries(historySourceCache, now, HISTORY_SOURCE_CACHE_TTL_MS)
-        pruneExpiredEntries(previewItemCache, now, PREVIEW_ITEM_CACHE_TTL_MS)
+        pruneExpiredEntries(categoryPageCache, now, runtimePageCacheTtlMs())
+        pruneExpiredEntries(detailCache, now, runtimeDetailCacheTtlMs())
+        pruneExpiredEntries(searchCache, now, runtimeSearchCacheTtlMs())
+        pruneExpiredEntries(historySourceCache, now, runtimeCacheRetentionMs())
+        pruneExpiredEntries(previewItemCache, now, runtimeCacheRetentionMs())
         trimToSize(categoryPageCache, MAX_MEMORY_PAGE_CACHE_ENTRIES)
         trimToSize(detailCache, MAX_DETAIL_CACHE_ENTRIES)
         trimToSize(searchCache, MAX_SEARCH_CACHE_ENTRIES)
         trimToSize(historySourceCache, MAX_HISTORY_SOURCE_CACHE_ENTRIES)
         trimToSize(previewItemCache, MAX_PREVIEW_ITEM_CACHE_ENTRIES)
 
-        if (homeCache?.let { !isCacheValid(it.timestampMs, HOME_CACHE_TTL_MS, now) } == true) {
+        if (homeCache?.let { !isCacheValid(it.timestampMs, runtimeHomeCacheTtlMs(allowStale = false), now) } == true) {
             homeCache = null
         }
-        if (hotSearchCache?.let { !isCacheValid(it.timestampMs, HOT_SEARCH_CACHE_TTL_MS, now) } == true) {
+        if (hotSearchCache?.let { !isCacheValid(it.timestampMs, runtimeCacheRetentionMs(), now) } == true) {
             hotSearchCache = null
         }
-        if (noticeCache?.let { !isCacheValid(it.timestampMs, NOTICE_CACHE_TTL_MS, now) } == true) {
+        if (noticeCache?.let { !isCacheValid(it.timestampMs, runtimeNoticeCacheTtlMs(), now) } == true) {
             noticeCache = null
         }
-        if (browsableCategoriesCache?.let { !isCacheValid(it.timestampMs, CATEGORY_CACHE_TTL_MS, now) } == true) {
+        if (browsableCategoriesCache?.let { !isCacheValid(it.timestampMs, runtimeCacheRetentionMs(), now) } == true) {
             browsableCategoriesCache = null
         }
     }
@@ -3151,7 +3190,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             val persisted = raw?.let(::parsePersistedPageCache)
             when {
                 persisted == null -> staleKeys += key
-                !isCacheValid(persisted.timestampMs, DISK_PAGE_CACHE_TTL_MS, now) -> staleKeys += key
+                !isCacheValid(persisted.timestampMs, runtimePageCacheTtlMs(allowStale = true), now) -> staleKeys += key
                 else -> survivors += key to persisted.timestampMs
             }
         }
@@ -3202,7 +3241,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     private fun findPreviewItem(vodId: String): VodItem? =
         if (!isAppCacheEnabled()) null
         else previewItemCache[vodId]
-            ?.takeIf { isCacheValid(it.timestampMs, PREVIEW_ITEM_CACHE_TTL_MS) }
+            ?.takeIf { isCacheValid(it.timestampMs, runtimeCacheRetentionMs()) }
             ?.value
 
     private fun VodItem.needsPreviewMetadataEnrich(): Boolean =
@@ -3250,7 +3289,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     ): List<AppleCmsCategory> {
         if (!forceRefresh) {
             browsableCategoriesCache
-                ?.takeIf { isCacheValid(it.timestampMs, CATEGORY_CACHE_TTL_MS) }
+                ?.takeIf { isCacheValid(it.timestampMs, runtimeCacheRetentionMs()) }
                 ?.value
                 ?.takeIf { it.isNotEmpty() }
                 ?.let { return it }
@@ -3258,7 +3297,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         if (!forceRefresh && homeDocument == null) {
             return awaitSharedRequest("browsable_categories") {
                 browsableCategoriesCache
-                    ?.takeIf { isCacheValid(it.timestampMs, CATEGORY_CACHE_TTL_MS) }
+                    ?.takeIf { isCacheValid(it.timestampMs, runtimeCacheRetentionMs()) }
                     ?.value
                     ?.takeIf { it.isNotEmpty() }
                     ?: loadBrowsableCategories(forceRefresh = true)
@@ -3314,10 +3353,53 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     private fun getCachedBrowsableCategories(): List<AppleCmsCategory> =
         browsableCategoriesCache
-            ?.takeIf { isCacheValid(it.timestampMs, CATEGORY_CACHE_TTL_MS) }
+            ?.takeIf { isCacheValid(it.timestampMs, runtimeCacheRetentionMs()) }
             ?.value
             ?.takeIf { it.isNotEmpty() }
             ?: defaultCategories.map(::normalizeCategory)
+
+    private fun runtimeCacheRetentionMs(): Long =
+        cacheSettingsStore.load().retention.durationMs ?: Long.MAX_VALUE
+
+    private fun sharedPrefsFileSize(
+        prefsName: String,
+        excludedKeys: Set<String> = emptySet()
+    ): Long {
+        val prefs = appContext.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
+        val estimatedValuesBytes = if (excludedKeys.isEmpty()) {
+            0L
+        } else {
+            prefs.all
+                .filterKeys { it in excludedKeys }
+                .values
+                .sumOf(::estimatePreferenceValueSize)
+        }
+        val prefsDir = appContext.filesDir
+            .resolve("../shared_prefs")
+            .canonicalFile
+        val base = prefsDir.resolve("$prefsName.xml")
+        val backup = prefsDir.resolve("$prefsName.xml.bak")
+        return (base.lengthIfFile() + backup.lengthIfFile() - estimatedValuesBytes)
+            .coerceAtLeast(0L)
+    }
+
+    private fun estimatePreferenceValueSize(value: Any?): Long =
+        when (value) {
+            is String -> value.toByteArray(StandardCharsets.UTF_8).size.toLong()
+            is Set<*> -> value.sumOf { estimatePreferenceValueSize(it) }
+            else -> value?.toString()?.toByteArray(StandardCharsets.UTF_8)?.size?.toLong() ?: 0L
+        }
+
+    private fun directorySize(file: java.io.File): Long {
+        if (!file.exists()) return 0L
+        if (file.isFile) return file.length()
+        return file.listFiles()
+            ?.sumOf(::directorySize)
+            ?: 0L
+    }
+
+    private fun java.io.File.lengthIfFile(): Long =
+        if (isFile) length() else 0L
 
     private suspend fun loadCategoryPageFromWeb(typeId: String, page: Int): PagedVodItems {
         val safePage = page.coerceAtLeast(1)
@@ -4664,17 +4746,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         private const val HOME_CURSOR_PAGE_LIMIT = 20
         private const val CATEGORY_CURSOR_PAGE_LIMIT = 20
         private const val SEARCH_CURSOR_PAGE_LIMIT = 20
-        private const val HOME_CACHE_TTL_MS = 60_000L
-        private const val DISK_HOME_CACHE_TTL_MS = 43_200_000L
-        private const val NOTICE_CACHE_TTL_MS = 60_000L
-        private const val CATEGORY_CACHE_TTL_MS = 300_000L
-        private const val PAGE_CACHE_TTL_MS = 300_000L
-        private const val DISK_PAGE_CACHE_TTL_MS = 43_200_000L
-        private const val SEARCH_CACHE_TTL_MS = 30_000L
-        private const val DETAIL_CACHE_TTL_MS = 60_000L
-        private const val HISTORY_SOURCE_CACHE_TTL_MS = 600_000L
-        private const val PREVIEW_ITEM_CACHE_TTL_MS = 600_000L
-        private const val HOT_SEARCH_CACHE_TTL_MS = 1_800_000L
+        private const val IMAGE_CACHE_DIR_NAME = "image_cache"
         private const val MEMORY_CACHE_CLEANUP_INTERVAL_MS = 60_000L
         private const val DISK_CACHE_CLEANUP_INTERVAL_MS = 300_000L
         private const val API_FAILOVER_COOLDOWN_MS = 300_000L

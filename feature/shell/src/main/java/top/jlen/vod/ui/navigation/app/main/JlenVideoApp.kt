@@ -474,7 +474,10 @@ fun JlenVideoApp() {
                                 onBindEmail = viewModel::bindEmail,
                                 onUnbindEmail = viewModel::unbindEmail,
                                 onRefreshCrashLog = viewModel::refreshCrashLog,
-                                onClearCrashLog = viewModel::clearCrashLog
+                                onClearCrashLog = viewModel::clearCrashLog,
+                                onRefreshCacheSize = viewModel::refreshCacheSize,
+                                onSetCacheRetention = viewModel::setCacheRetention,
+                                onClearAppCache = viewModel::clearAppCache
                             )
                         }
                         composable("announcements") {

@@ -22,6 +22,7 @@ internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyClearAllAppCaches() {
     legacyClearMemoryCaches()
     runtimeClearPersistedPageCache()
     runtimeClearPersistedHomeCache()
+    runtimeClearPersistedHotSearchCache()
 }
 
 internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyClearProcessMemoryCaches() {

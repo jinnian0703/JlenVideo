@@ -121,6 +121,8 @@ import top.jlen.vod.AppRuntimeInfo
 import top.jlen.vod.PLAYER_DESKTOP_UA
 import top.jlen.vod.data.AppNotice
 import top.jlen.vod.data.AppleCmsCategory
+import top.jlen.vod.data.CacheRetentionOption
+import top.jlen.vod.data.CacheSizeSummary
 import top.jlen.vod.data.CategoryFilterGroup
 import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.HotSearchGroup
@@ -131,6 +133,7 @@ import top.jlen.vod.data.PointLogItem
 import top.jlen.vod.data.RegisterEditor
 import top.jlen.vod.data.UserProfileEditor
 import top.jlen.vod.data.VodItem
+import top.jlen.vod.data.formatCacheSize
 import top.jlen.vod.data.sanitizeUserFacingComposite
 
 
@@ -169,7 +172,10 @@ internal fun LegacyAccountScreen(
     onBindEmail: () -> Unit,
     onUnbindEmail: () -> Unit,
     onRefreshCrashLog: () -> Unit,
-    onClearCrashLog: () -> Unit
+    onClearCrashLog: () -> Unit,
+    onRefreshCacheSize: () -> Unit,
+    onSetCacheRetention: (CacheRetentionOption) -> Unit,
+    onClearAppCache: () -> Unit
 ) {
     val context = LocalContext.current
     val showLoggedInContent = state.session.isLoggedIn
@@ -434,9 +440,16 @@ internal fun LegacyAccountScreen(
                             notes = state.updateInfo?.notes.orEmpty(),
                             hasUpdate = state.updateInfo?.hasUpdate == true,
                             isUpdateLoading = state.isUpdateLoading,
+                            cacheRetention = state.cacheRetention,
+                            cacheSizeSummary = state.cacheSizeSummary,
+                            isCacheSizeLoading = state.isCacheSizeLoading,
+                            isCacheClearing = state.isCacheClearing,
                             crashLogText = state.latestCrashLog,
                             hasCrashLog = state.hasCrashLog,
                             onCheckUpdate = onCheckUpdate,
+                            onRefreshCacheSize = onRefreshCacheSize,
+                            onSetCacheRetention = onSetCacheRetention,
+                            onClearAppCache = onClearAppCache,
                             onRefreshCrashLog = onRefreshCrashLog,
                             onClearCrashLog = onClearCrashLog,
                             onOpenRelease = {
@@ -541,9 +554,16 @@ internal fun LegacyAccountScreen(
                                 notes = state.updateInfo?.notes.orEmpty(),
                                 hasUpdate = state.updateInfo?.hasUpdate == true,
                                 isUpdateLoading = state.isUpdateLoading,
+                                cacheRetention = state.cacheRetention,
+                                cacheSizeSummary = state.cacheSizeSummary,
+                                isCacheSizeLoading = state.isCacheSizeLoading,
+                                isCacheClearing = state.isCacheClearing,
                                 crashLogText = state.latestCrashLog,
                                 hasCrashLog = state.hasCrashLog,
                                 onCheckUpdate = onCheckUpdate,
+                                onRefreshCacheSize = onRefreshCacheSize,
+                                onSetCacheRetention = onSetCacheRetention,
+                                onClearAppCache = onClearAppCache,
                                 onRefreshCrashLog = onRefreshCrashLog,
                                 onClearCrashLog = onClearCrashLog,
                                 onOpenRelease = {
@@ -649,9 +669,16 @@ internal fun LegacyAboutPane(
     notes: String,
     hasUpdate: Boolean,
     isUpdateLoading: Boolean,
+    cacheRetention: CacheRetentionOption,
+    cacheSizeSummary: CacheSizeSummary,
+    isCacheSizeLoading: Boolean,
+    isCacheClearing: Boolean,
     crashLogText: String,
     hasCrashLog: Boolean,
     onCheckUpdate: () -> Unit,
+    onRefreshCacheSize: () -> Unit,
+    onSetCacheRetention: (CacheRetentionOption) -> Unit,
+    onClearAppCache: () -> Unit,
     onRefreshCrashLog: () -> Unit,
     onClearCrashLog: () -> Unit,
     onOpenRelease: () -> Unit,
@@ -729,6 +756,15 @@ internal fun LegacyAboutPane(
                 if (notes.isNotBlank()) {
                     UpdateNotesSection(notes = notes)
                 }
+                CacheSettingsSection(
+                    retention = cacheRetention,
+                    summary = cacheSizeSummary,
+                    isLoading = isCacheSizeLoading,
+                    isClearing = isCacheClearing,
+                    onRefreshSize = onRefreshCacheSize,
+                    onSetRetention = onSetCacheRetention,
+                    onClearCache = onClearAppCache
+                )
                 AccountToolSection(
                     title = "用户协议与隐私说明",
                     description = "首次启动确认内容"
@@ -847,6 +883,147 @@ internal fun LegacyCrashLogCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+internal fun CacheSettingsSection(
+    retention: CacheRetentionOption,
+    summary: CacheSizeSummary,
+    isLoading: Boolean,
+    isClearing: Boolean,
+    onRefreshSize: () -> Unit,
+    onSetRetention: (CacheRetentionOption) -> Unit,
+    onClearCache: () -> Unit
+) {
+    var showClearConfirm by rememberSaveable { mutableStateOf(false) }
+    if (showClearConfirm) {
+        ClearCacheConfirmDialog(
+            totalSize = if (summary.isAvailable) formatCacheSize(summary.totalBytes) else "无法统计",
+            onDismiss = { showClearConfirm = false },
+            onConfirm = {
+                showClearConfirm = false
+                onClearCache()
+            }
+        )
+    }
+
+    AccountToolSection(
+        title = "缓存设置",
+        description = "管理内容缓存和图片缓存"
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.74f)),
+            shape = RoundedCornerShape(18.dp),
+            border = BorderStroke(1.dp, UiPalette.Border)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                CacheSizeLine(
+                    title = "总缓存大小",
+                    value = when {
+                        isLoading -> "统计中..."
+                        !summary.isAvailable -> "无法统计"
+                        else -> formatCacheSize(summary.totalBytes)
+                    },
+                    highlight = true
+                )
+                CacheSizeLine(
+                    title = "内容缓存",
+                    value = if (summary.isAvailable) formatCacheSize(summary.contentBytes) else "无法统计"
+                )
+                CacheSizeLine(
+                    title = "图片缓存",
+                    value = if (summary.isAvailable) formatCacheSize(summary.imageBytes) else "无法统计"
+                )
+            }
+        }
+        Text(
+            text = "缓存保存时间",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = UiPalette.Ink
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(CacheRetentionOption.entries, key = { it.key }) { option ->
+                val selected = option == retention
+                OutlinedButton(
+                    onClick = { onSetRetention(option) },
+                    modifier = Modifier.height(40.dp),
+                    border = BorderStroke(
+                        1.dp,
+                        if (selected) UiPalette.Accent else UiPalette.BorderSoft
+                    ),
+                    shape = RoundedCornerShape(999.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = if (selected) UiPalette.AccentSoft else UiPalette.Surface,
+                        contentColor = if (selected) UiPalette.Accent else UiPalette.TextPrimary
+                    )
+                ) {
+                    Text(option.label, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlinedButton(
+                onClick = onRefreshSize,
+                enabled = !isLoading && !isClearing,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp),
+                border = BorderStroke(1.dp, UiPalette.BorderSoft),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(if (isLoading) "统计中..." else "刷新大小")
+            }
+            Button(
+                onClick = { showClearConfirm = true },
+                enabled = !isClearing,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = UiPalette.Accent,
+                    contentColor = UiPalette.AccentText
+                )
+            ) {
+                Text(if (isClearing) "清除中..." else "清除缓存", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CacheSizeLine(
+    title: String,
+    value: String,
+    highlight: Boolean = false
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = UiPalette.TextSecondary
+        )
+        Text(
+            text = value,
+            style = if (highlight) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodySmall,
+            fontWeight = if (highlight) FontWeight.ExtraBold else FontWeight.Bold,
+            color = if (highlight) UiPalette.Ink else UiPalette.TextPrimary
+        )
     }
 }
 

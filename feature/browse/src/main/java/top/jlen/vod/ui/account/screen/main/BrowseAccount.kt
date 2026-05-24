@@ -1,6 +1,7 @@
 package top.jlen.vod.ui
 
 import androidx.compose.runtime.Composable
+import top.jlen.vod.data.CacheRetentionOption
 import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.RegisterEditor
@@ -41,7 +42,10 @@ fun AccountScreen(
     onBindEmail: () -> Unit,
     onUnbindEmail: () -> Unit,
     onRefreshCrashLog: () -> Unit,
-    onClearCrashLog: () -> Unit
+    onClearCrashLog: () -> Unit,
+    onRefreshCacheSize: () -> Unit,
+    onSetCacheRetention: (CacheRetentionOption) -> Unit,
+    onClearAppCache: () -> Unit
 ) = LegacyAccountScreen(
     state = state,
     onUserNameChange = onUserNameChange,
@@ -76,5 +80,8 @@ fun AccountScreen(
     onBindEmail = onBindEmail,
     onUnbindEmail = onUnbindEmail,
     onRefreshCrashLog = onRefreshCrashLog,
-    onClearCrashLog = onClearCrashLog
+    onClearCrashLog = onClearCrashLog,
+    onRefreshCacheSize = onRefreshCacheSize,
+    onSetCacheRetention = onSetCacheRetention,
+    onClearAppCache = onClearAppCache
 )

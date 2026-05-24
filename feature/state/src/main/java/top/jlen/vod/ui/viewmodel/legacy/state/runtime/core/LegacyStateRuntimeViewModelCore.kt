@@ -245,6 +245,14 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
 
     fun clearCrashLog() = legacyClearCrashLog()
 
+    fun refreshCacheSettings() = legacyRefreshCacheSettings()
+
+    fun refreshCacheSize() = legacyRefreshCacheSize()
+
+    fun setCacheRetention(option: top.jlen.vod.data.CacheRetentionOption) = legacySetCacheRetention(option)
+
+    fun clearAppCache() = legacyClearAppCache()
+
     fun checkAppUpdate() = legacyCheckAppUpdate()
 
     fun refreshNotices(forceRefresh: Boolean = false) = legacyRefreshNotices(forceRefresh)

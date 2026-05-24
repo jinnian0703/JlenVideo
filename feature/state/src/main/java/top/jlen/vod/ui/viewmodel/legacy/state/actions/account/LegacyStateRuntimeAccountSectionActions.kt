@@ -18,7 +18,10 @@ internal fun LegacyStateRuntimeViewModelCore.legacySetAccountAuthMode(mode: Acco
         AccountAuthMode.Login -> Unit
         AccountAuthMode.Register -> runtimeLoadRegisterPage(forceRefresh = true)
         AccountAuthMode.FindPassword -> runtimeLoadFindPasswordPage(forceRefresh = true)
-        AccountAuthMode.About -> refreshCrashLog()
+        AccountAuthMode.About -> {
+            refreshCrashLog()
+            refreshCacheSettings()
+        }
     }
 }
 
@@ -104,7 +107,10 @@ internal fun LegacyStateRuntimeViewModelCore.legacySelectAccountSection(
             }
         }
 
-        AccountSection.About -> refreshCrashLog()
+        AccountSection.About -> {
+            refreshCrashLog()
+            refreshCacheSettings()
+        }
     }
 }
 

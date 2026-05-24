@@ -25,7 +25,11 @@ internal fun refreshedAccountState(
         session = session,
         updateInfo = accountState.updateInfo,
         hasCrashLog = accountState.hasCrashLog,
-        latestCrashLog = accountState.latestCrashLog
+        latestCrashLog = accountState.latestCrashLog,
+        cacheRetention = accountState.cacheRetention,
+        cacheSizeSummary = accountState.cacheSizeSummary,
+        isCacheSizeLoading = accountState.isCacheSizeLoading,
+        isCacheClearing = accountState.isCacheClearing
     )
 }
 
