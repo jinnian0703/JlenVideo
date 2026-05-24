@@ -51,10 +51,13 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshCacheSize() {
 internal fun LegacyStateRuntimeViewModelCore.legacySetCacheRetention(option: CacheRetentionOption) {
     val settings = legacyRepository().saveCacheRetention(option)
     updateAccountState(
-        currentAccountState().copy(
-            cacheRetention = settings.retention,
-            message = "缓存保存时间已设为${settings.retention.label}",
-            error = null
+        accountStateWithToast(
+            currentAccountState().copy(
+                cacheRetention = settings.retention,
+                message = "缓存保存时间已设为${settings.retention.label}",
+                error = null
+            ),
+            "缓存保存时间已设为${settings.retention.label}"
         )
     )
 }
@@ -79,23 +82,31 @@ internal fun LegacyStateRuntimeViewModelCore.legacyClearAppCache() {
         }.onSuccess {
             clearSearchResultScrollPositions()
             updateAccountState(
-                currentAccountState().copy(
-                    cacheSizeSummary = CacheSizeSummary(),
-                    isCacheClearing = false,
-                    isCacheSizeLoading = false,
-                    message = "缓存已清除",
-                    error = null
+                accountStateWithToast(
+                    currentAccountState().copy(
+                        cacheSizeSummary = CacheSizeSummary(),
+                        isCacheClearing = false,
+                        isCacheSizeLoading = false,
+                        message = "缓存已清除",
+                        error = null
+                    ),
+                    "缓存已清除"
                 )
             )
             legacyRefreshHome(forceRefresh = true)
             legacyRefreshCacheSize()
         }.onFailure { error ->
             updateAccountState(
-                currentAccountState().copy(
-                    isCacheClearing = false,
-                    isCacheSizeLoading = false,
-                    error = toUserFacingMessage(error, "清除缓存失败")
-                )
+                toUserFacingMessage(error, "清除缓存失败").let { message ->
+                    accountStateWithToast(
+                        currentAccountState().copy(
+                            isCacheClearing = false,
+                            isCacheSizeLoading = false,
+                            error = message
+                        ),
+                        message
+                    )
+                }
             )
         }
     }

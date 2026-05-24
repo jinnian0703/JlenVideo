@@ -87,20 +87,12 @@ internal fun MembershipPaneV2(
         return
     }
 
-    val membershipSuccessMessage = message
-        ?.takeIf { it.isMembershipSuccessMessage() }
-        ?.trim()
-        .orEmpty()
-    val shouldHighlightPoints = membershipSuccessMessage.isNotBlank() || signInInfo.rewardPoints.isNotBlank()
+    val shouldHighlightPoints = message?.isMembershipSuccessMessage() == true || signInInfo.rewardPoints.isNotBlank()
     val trendPoints = remember(pointLogs) { buildPointTrendPoints(pointLogs, days = 30) }
     var showRechargeDialog by remember { mutableStateOf(false) }
     var plansExpanded by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        if (membershipSuccessMessage.isNotBlank()) {
-            MembershipSuccessBanner(message = membershipSuccessMessage)
-        }
-
         MembershipSummaryCard(
             info = info,
             signInInfo = signInInfo,
@@ -139,43 +131,6 @@ internal fun MembershipPaneV2(
                 onRedeemCard(cardNo, cardPassword)
             }
         )
-    }
-}
-
-@Composable
-private fun MembershipSuccessBanner(message: String) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Accent.copy(alpha = 0.10f)),
-        shape = RoundedCornerShape(UiDimens.CardRadius),
-        border = BorderStroke(1.dp, UiPalette.Accent.copy(alpha = 0.28f))
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(UiDimens.CardPadding),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .background(UiPalette.Accent.copy(alpha = 0.14f), RoundedCornerShape(UiDimens.ControlRadius)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.CheckCircle,
-                    contentDescription = null,
-                    tint = UiPalette.Accent,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = UiPalette.Ink,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
     }
 }
 

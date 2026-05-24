@@ -42,16 +42,22 @@ internal fun accountStateWithHydratedSession(
 
 internal fun accountStateWithCrashLog(
     accountState: AccountUiState,
-    latestCrashLog: String
+    latestCrashLog: String,
+    entries: List<AccountIssueLogEntry> = accountState.issueLogEntries
 ): AccountUiState = accountState.copy(
-    hasCrashLog = latestCrashLog.isNotBlank(),
-    latestCrashLog = latestCrashLog
+    hasCrashLog = latestCrashLog.isNotBlank() || entries.isNotEmpty(),
+    latestCrashLog = latestCrashLog,
+    issueLogEntries = entries
 )
 
 internal fun accountStateAfterCrashLogCleared(accountState: AccountUiState): AccountUiState =
-    accountState.copy(
-        hasCrashLog = false,
-        latestCrashLog = "",
-        message = "已清空崩溃日志",
-        error = null
+    accountStateWithToast(
+        accountState.copy(
+            hasCrashLog = false,
+            latestCrashLog = "",
+            issueLogEntries = emptyList(),
+            message = "已清空问题日志",
+            error = null
+        ),
+        "已清空问题日志"
     )

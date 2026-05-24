@@ -245,6 +245,14 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
 
     fun clearCrashLog() = legacyClearCrashLog()
 
+    fun deleteIssueLog(id: String) = legacyDeleteIssueLog(id)
+
+    fun readIssueLog(id: String): String = CrashLogger.readIssueLog(getApplication(), id)
+
+    fun recordIssueRoute(route: String) {
+        CrashLogger.recordRoute(getApplication(), route)
+    }
+
     fun refreshCacheSettings() = legacyRefreshCacheSettings()
 
     fun refreshCacheSize() = legacyRefreshCacheSize()
@@ -377,6 +385,10 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
     fun cancelCurrentDetailFavorite() = legacyCancelCurrentDetailFavorite()
 
     fun dismissDetailActionMessage() = legacyDismissDetailActionMessage()
+
+    fun consumeAccountToast() {
+        updateAccountState(accountStateWithoutToast(currentAccountState()))
+    }
 
     fun login() = legacyLogin()
 

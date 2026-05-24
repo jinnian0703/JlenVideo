@@ -235,22 +235,11 @@ fun HomeScreen(
                 )
             }
             item {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    items(
-                        items = state.slides,
-                        key = { it.stableKey() },
-                        contentType = { "slide" }
-                    ) { item ->
-                        FeaturedCard(
-                            item = item,
-                            onClick = onOpenDetail,
-                            modifier = Modifier.width(318.dp)
-                        )
-                    }
-                }
+                FeaturedCarouselSection(
+                    items = state.slides,
+                    onOpenDetail = onOpenDetail,
+                    pauseMotion = pauseHomeMotion
+                )
             }
         }
         if (state.hot.isNotEmpty()) {

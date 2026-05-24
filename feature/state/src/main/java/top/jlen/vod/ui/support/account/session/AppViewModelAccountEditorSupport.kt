@@ -9,7 +9,11 @@ import top.jlen.vod.data.UserProfileEditor
 internal fun accountStateWithValidationError(
     accountState: AccountUiState,
     message: String
-): AccountUiState = accountState.copy(error = message, message = null)
+): AccountUiState =
+    accountStateWithToast(
+        accountState.copy(error = message, message = null),
+        message
+    )
 
 internal fun accountStateWithUserName(
     accountState: AccountUiState,
@@ -167,25 +171,33 @@ internal fun accountStateAfterEmailUnbound(accountState: AccountUiState): Accoun
 internal fun accountStateAfterRegisterSuccess(
     accountState: AccountUiState,
     userName: String
-): AccountUiState = accountState.copy(
-    authMode = AccountAuthMode.Login,
-    userName = userName,
-    password = "",
-    error = null,
-    message = "注册成功，请登录。",
-    registerEditor = RegisterEditor(channel = accountState.registerChannel),
-    registerCodeCountdown = 0
-)
+): AccountUiState =
+    accountStateWithToast(
+        accountState.copy(
+            authMode = AccountAuthMode.Login,
+            userName = userName,
+            password = "",
+            error = null,
+            message = "注册成功，请登录。",
+            registerEditor = RegisterEditor(channel = accountState.registerChannel),
+            registerCodeCountdown = 0
+        ),
+        "注册成功，请登录。"
+    )
 
 internal fun accountStateAfterFindPasswordSuccess(
     accountState: AccountUiState,
     email: String
-): AccountUiState = accountState.copy(
-    authMode = AccountAuthMode.Login,
-    userName = email,
-    password = "",
-    error = null,
-    message = "密码重置成功",
-    findPasswordEditor = FindPasswordEditor(),
-    findPasswordCodeCountdown = 0
-)
+): AccountUiState =
+    accountStateWithToast(
+        accountState.copy(
+            authMode = AccountAuthMode.Login,
+            userName = email,
+            password = "",
+            error = null,
+            message = "密码重置成功",
+            findPasswordEditor = FindPasswordEditor(),
+            findPasswordCodeCountdown = 0
+        ),
+        "密码重置成功"
+    )

@@ -567,37 +567,48 @@ internal fun FeaturedCarouselSection(
     pauseMotion: Boolean = false
 ) {
     val actualCount = items.size
-    val loopItems = remember(items) {
-        when {
-            items.isEmpty() -> emptyList()
-            items.size == 1 -> items
-            else -> listOf(items.last()) + items + listOf(items.first())
+    if (actualCount <= 0) return
+    if (actualCount == 1) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp)
+            ) {
+                FeaturedCard(
+                    item = items.first(),
+                    onClick = onOpenDetail,
+                    modifier = Modifier.width(318.dp)
+                )
+            }
         }
-    }
-    val pagerState = rememberPagerState(
-        initialPage = if (actualCount > 1) 1 else 0,
-        pageCount = { loopItems.size }
-    )
-    val currentIndex = when {
-        actualCount <= 1 -> 0
-        pagerState.currentPage <= 0 -> actualCount - 1
-        pagerState.currentPage >= loopItems.lastIndex -> 0
-        else -> pagerState.currentPage - 1
-    }
-    val settledIndex = when {
-        actualCount <= 1 -> 0
-        pagerState.settledPage <= 0 -> actualCount - 1
-        pagerState.settledPage >= loopItems.lastIndex -> 0
-        else -> pagerState.settledPage - 1
+        return
     }
 
+    val virtualPageCount = Int.MAX_VALUE
+    val centeredInitialPage = remember(actualCount) {
+        centeredCarouselPage(actualCount)
+    }
+    val pagerState = rememberPagerState(
+        initialPage = centeredInitialPage,
+        pageCount = { virtualPageCount }
+    )
+
+    LaunchedEffect(actualCount) {
+        val currentRealIndex = carouselRealIndex(pagerState.currentPage, actualCount)
+        val targetPage = centeredCarouselPage(actualCount) + currentRealIndex
+        if (pagerState.currentPage != targetPage && !pagerState.isScrollInProgress) {
+            pagerState.scrollToPage(targetPage)
+        }
+    }
+    val currentIndex = carouselRealIndex(pagerState.currentPage, actualCount)
+    val settledIndex = carouselRealIndex(pagerState.settledPage, actualCount)
+
     LaunchedEffect(actualCount, pauseMotion) {
-        if (actualCount <= 1) return@LaunchedEffect
         while (true) {
-            when (pagerState.currentPage) {
-                0 -> pagerState.scrollToPage(actualCount)
-                loopItems.lastIndex -> pagerState.scrollToPage(1)
-            }
             delay(UiMotion.CarouselAutoScrollMillis)
             if (!pauseMotion && !pagerState.isScrollInProgress) {
                 pagerState.animateScrollToPage(
@@ -617,16 +628,20 @@ internal fun FeaturedCarouselSection(
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(horizontal = 18.dp),
             pageSpacing = 10.dp,
-            userScrollEnabled = actualCount > 1,
-            key = { page -> loopItems[page].vodId.ifBlank { "featured_$page" } + "_$page" }
+            userScrollEnabled = true,
+            key = { page ->
+                val item = items[carouselRealIndex(page, actualCount)]
+                item.vodId.ifBlank { "featured_${carouselRealIndex(page, actualCount)}" } + "_$page"
+            }
         ) { page ->
+            val item = items[carouselRealIndex(page, actualCount)]
             val pageOffset = (
                 (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
             ).absoluteValue.coerceIn(0f, 1f)
             val alpha = 1f - (pageOffset * 0.18f)
             val translationX = pageOffset * 12f
             FeaturedCard(
-                item = loopItems[page],
+                item = item,
                 onClick = onOpenDetail,
                 modifier = Modifier
                     .width(318.dp)
@@ -660,6 +675,18 @@ internal fun FeaturedCarouselSection(
             }
         }
     }
+}
+
+private fun centeredCarouselPage(itemCount: Int): Int {
+    if (itemCount <= 0) return 0
+    val center = Int.MAX_VALUE / 2
+    return center - (center % itemCount)
+}
+
+private fun carouselRealIndex(page: Int, itemCount: Int): Int {
+    if (itemCount <= 0) return 0
+    val index = page % itemCount
+    return if (index < 0) index + itemCount else index
 }
 
 internal enum class AccountNoticeTone {

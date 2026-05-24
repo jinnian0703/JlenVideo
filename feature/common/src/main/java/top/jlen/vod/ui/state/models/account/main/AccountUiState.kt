@@ -29,6 +29,13 @@ enum class AccountAuthMode {
     About
 }
 
+data class AccountIssueLogEntry(
+    val id: String,
+    val title: String,
+    val time: String,
+    val summary: String
+)
+
 data class AccountUiState(
     val isLoading: Boolean = false,
     val isContentLoading: Boolean = false,
@@ -36,6 +43,8 @@ data class AccountUiState(
     val isUpdateLoading: Boolean = false,
     val error: String? = null,
     val message: String? = null,
+    val toastMessage: String? = null,
+    val toastSerial: Long = 0L,
     val userName: String = "",
     val password: String = "",
     val authMode: AccountAuthMode = AccountAuthMode.Login,
@@ -70,6 +79,7 @@ data class AccountUiState(
     val updateInfo: AppUpdateInfo? = null,
     val hasCrashLog: Boolean = false,
     val latestCrashLog: String = "",
+    val issueLogEntries: List<AccountIssueLogEntry> = emptyList(),
     val cacheRetention: CacheRetentionOption = CacheRetentionOption.default,
     val cacheSizeSummary: CacheSizeSummary = CacheSizeSummary(),
     val isCacheSizeLoading: Boolean = false,

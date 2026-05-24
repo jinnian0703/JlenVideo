@@ -1,10 +1,14 @@
 package top.jlen.vod.ui
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.Intent
 import android.net.Uri
 import android.os.SystemClock
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.EnterTransition
@@ -44,6 +48,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -54,6 +59,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import kotlinx.coroutines.delay
+import java.io.File
+import java.nio.charset.StandardCharsets
 import top.jlen.vod.data.AppUpdateInfo
 
 private const val ONBOARDING_PREFS = "jlen_video_onboarding"
@@ -194,6 +201,17 @@ fun JlenVideoApp() {
         ).joinToString("|")
     } else {
         heartbeatRoute
+    }
+    LaunchedEffect(heartbeatRoute, heartbeatPlaybackKey) {
+        viewModel.recordIssueRoute(heartbeatPlaybackKey)
+    }
+    val accountToastMessage = viewModel.accountState.toastMessage
+    val accountToastSerial = viewModel.accountState.toastSerial
+    LaunchedEffect(currentRoute, accountToastSerial) {
+        if (!accountToastMessage.isNullOrBlank() && isAccountRoute(currentRoute)) {
+            Toast.makeText(context, accountToastMessage, Toast.LENGTH_SHORT).show()
+            viewModel.consumeAccountToast()
+        }
     }
     val showBottomBar = currentTopLevelRoute != null &&
         !isSearchResultsRoute(currentRoute) &&
@@ -458,7 +476,6 @@ fun JlenVideoApp() {
                                 onLogin = viewModel::login,
                                 onLogout = viewModel::logout,
                                 onSelectSection = viewModel::selectAccountSection,
-                                onRefreshSection = viewModel::refreshSelectedAccountSection,
                                 onChangePortrait = { portraitPicker.launch("image/*") },
                                 onOpenHistoryRecord = { item ->
                                     viewModel.resumeHistoryRecord(item)
@@ -551,10 +568,47 @@ fun JlenVideoApp() {
                             }
                             AccountCrashLogSettingsScreen(
                                 crashLogText = viewModel.accountState.latestCrashLog,
+                                issueLogEntries = viewModel.accountState.issueLogEntries,
                                 hasCrashLog = viewModel.accountState.hasCrashLog,
                                 onBack = backToAccount,
                                 onRefreshCrashLog = viewModel::refreshCrashLog,
-                                onClearCrashLog = viewModel::clearCrashLog
+                                onClearCrashLog = viewModel::clearCrashLog,
+                                onOpenIssueLog = { issueLog ->
+                                    navController.navigate("account/settings/logs/detail/${Uri.encode(issueLog.id)}")
+                                },
+                                onReadIssueLog = viewModel::readIssueLog,
+                                onDeleteIssueLog = viewModel::deleteIssueLog
+                            )
+                        }
+                        composable(
+                            route = "account/settings/logs/detail/{logId}",
+                            arguments = listOf(navArgument("logId") { type = NavType.StringType })
+                        ) { entry ->
+                            val logId = entry.arguments?.getString("logId").orEmpty()
+                            val issueLog = viewModel.accountState.issueLogEntries.firstOrNull { it.id == logId }
+                            val logText = remember(logId, viewModel.accountState.latestCrashLog) {
+                                viewModel.readIssueLog(logId)
+                            }
+                            if (issueLog == null) {
+                                LaunchedEffect(logId) {
+                                    viewModel.refreshCrashLog()
+                                }
+                            }
+                            AccountIssueLogDetailScreen(
+                                entry = issueLog ?: AccountIssueLogEntry(
+                                    id = logId,
+                                    title = "问题日志",
+                                    time = "",
+                                    summary = ""
+                                ),
+                                logText = logText,
+                                onBack = { navController.popBackStack() },
+                                onCopy = { copyTextToClipboard(context, "issue_log", logText, "问题日志已复制") },
+                                onShare = { shareIssueLogText(context, logId, issueLog?.title ?: "问题日志", logText) },
+                                onDelete = {
+                                    viewModel.deleteIssueLog(logId)
+                                    navController.popBackStack()
+                                }
                             )
                         }
                         composable(
@@ -681,12 +735,40 @@ private fun isSearchResultsRoute(route: String?): Boolean =
 private fun isAccountSettingsDetailRoute(route: String?): Boolean =
     route?.startsWith("account/settings/") == true
 
+private fun isAccountRoute(route: String?): Boolean =
+    route == "account" || route == ROUTE_ONBOARDING_LOGIN || route?.startsWith("account/") == true
+
 private fun normalizeHeartbeatRoute(route: String?): String = when {
     route.isNullOrBlank() -> "home"
     isSearchResultsRoute(route) -> "search_results"
     route.startsWith("detail/") || route == "detail/{vodId}" -> "detail"
     route.startsWith("announcement/") || route == "announcement/{noticeId}" -> "announcement_detail"
     else -> route
+}
+
+private fun copyTextToClipboard(context: Context, label: String, text: String, toast: String) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
+    Toast.makeText(context, toast, Toast.LENGTH_SHORT).show()
+}
+
+private fun shareIssueLogText(context: Context, logId: String, title: String, text: String) {
+    runCatching {
+        val safeName = logId.ifBlank { "issue_log" }.removeSuffix(".txt")
+        val dir = File(context.cacheDir, "shared_logs").apply { mkdirs() }
+        val file = File(dir, "$safeName.txt")
+        file.writeText(text, StandardCharsets.UTF_8)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, title)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "分享问题日志"))
+    }.onFailure {
+        Toast.makeText(context, "分享日志失败", Toast.LENGTH_SHORT).show()
+    }
 }
 
 @Composable

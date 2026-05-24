@@ -13,6 +13,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +26,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -45,7 +48,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
@@ -144,7 +146,6 @@ internal fun LegacyAccountScreen(
     onLogin: () -> Unit,
     onLogout: () -> Unit,
     onSelectSection: (AccountSection) -> Unit,
-    onRefreshSection: () -> Unit,
     onChangePortrait: () -> Unit,
     onOpenHistoryRecord: (top.jlen.vod.data.UserCenterItem) -> Unit,
     onOpenFollow: () -> Unit,
@@ -175,12 +176,6 @@ internal fun LegacyAccountScreen(
     onUnbindEmail: () -> Unit
 ) {
     val showLoggedInContent = state.session.isLoggedIn
-    val noticeMessage = state.error?.takeIf { it.isNotBlank() } ?: state.message?.takeIf { it.isNotBlank() }
-    val noticeTone = if (!state.error.isNullOrBlank()) {
-        AccountNoticeTone.Error
-    } else {
-        AccountNoticeTone.Info
-    }
     val visibleSections = remember {
         listOf(
             AccountSection.Overview,
@@ -355,17 +350,6 @@ internal fun LegacyAccountScreen(
                 }
             }
 
-            noticeMessage?.let { message ->
-                item(key = "account_notice_logged_in", contentType = "account_notice") {
-                    AccountStatusNotice(
-                        message = message,
-                        tone = noticeTone,
-                        actionLabel = if (noticeTone == AccountNoticeTone.Error) "刷新" else null,
-                        onAction = if (noticeTone == AccountNoticeTone.Error) onRefreshSection else null
-                    )
-                }
-            }
-
             when (state.selectedSection) {
                 AccountSection.History -> accountRecordPaneItems(
                     title = "播放记录",
@@ -449,21 +433,6 @@ internal fun LegacyAccountScreen(
         } else {
             item(key = "account_guest_intro", contentType = "account_guest_intro") {
                 AccountGuestIntroCard()
-            }
-
-            noticeMessage?.let { message ->
-                item(key = "account_notice_guest", contentType = "account_notice") {
-                    AccountStatusNotice(
-                        message = message,
-                        tone = noticeTone,
-                        actionLabel = if (noticeTone == AccountNoticeTone.Error) "刷新" else null,
-                        onAction = if (noticeTone == AccountNoticeTone.Error) {
-                            onRefreshSection
-                        } else {
-                            null
-                        }
-                    )
-                }
             }
 
             item(
@@ -760,7 +729,7 @@ internal fun LegacyAboutPane(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "当前没有崩溃日志。",
+                                text = "当前没有本机问题日志。",
                                 modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = UiPalette.TextSecondary
@@ -787,6 +756,7 @@ internal fun LegacyCrashLogCard(
     onClear: () -> Unit
 ) {
     val context = LocalContext.current
+    val logScrollState = rememberScrollState()
 
     Card(
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
@@ -800,54 +770,65 @@ internal fun LegacyCrashLogCard(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                text = "最近一次崩溃日志",
+                text = "本机问题日志",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.ExtraBold,
                 color = UiPalette.Ink
             )
-            Text(
-                text = logText.ifBlank { "暂无崩溃日志" },
-                style = MaterialTheme.typography.bodySmall,
-                color = UiPalette.TextSecondary,
-                maxLines = 12,
-                overflow = TextOverflow.Ellipsis
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp, max = 260.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(UiPalette.SurfaceSoft.copy(alpha = 0.7f))
+                    .verticalScroll(logScrollState)
+                    .padding(12.dp)
+            ) {
+                Text(
+                    text = logText.ifBlank { "暂无问题日志" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = UiPalette.TextSecondary
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 OutlinedButton(
                     onClick = onRefresh,
                     modifier = Modifier
                         .weight(1f)
-                        .height(42.dp),
+                        .height(46.dp),
                     border = BorderStroke(1.dp, UiPalette.BorderSoft),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    Text("刷新日志")
+                    Text("刷新", maxLines = 1)
                 }
                 OutlinedButton(
                     onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("crash_log", logText))
-                        Toast.makeText(context, "崩溃日志已复制", Toast.LENGTH_SHORT).show()
+                        clipboard.setPrimaryClip(ClipData.newPlainText("issue_log", logText))
+                        Toast.makeText(context, "问题日志已复制", Toast.LENGTH_SHORT).show()
                     },
                     enabled = logText.isNotBlank(),
                     modifier = Modifier
                         .weight(1f)
-                        .height(42.dp),
+                        .height(46.dp),
                     border = BorderStroke(1.dp, UiPalette.BorderSoft),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    Text("复制日志")
+                    Text("复制", maxLines = 1)
                 }
                 OutlinedButton(
                     onClick = onClear,
                     enabled = logText.isNotBlank(),
                     modifier = Modifier
                         .weight(1f)
-                        .height(42.dp),
+                        .height(46.dp),
                     border = BorderStroke(1.dp, UiPalette.BorderSoft),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    Text("清空日志")
+                    Text("清空", maxLines = 1)
                 }
             }
         }
@@ -1747,6 +1728,11 @@ internal fun LegacyAccountProfilePaneV2(
     var showBindEmailDialog by rememberSaveable { mutableStateOf(false) }
     var showChangePasswordDialog by rememberSaveable { mutableStateOf(false) }
     var showUnbindEmailConfirm by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(showBindEmailDialog, editor.email) {
+        if (showBindEmailDialog && editor.email.contains("@") && editor.email.contains(".")) {
+            showBindEmailDialog = false
+        }
+    }
     val overviewFields = remember(fields, editor.email) {
         if (editor.email.isBlank() || fields.any { it.first == "邮箱" }) {
             fields

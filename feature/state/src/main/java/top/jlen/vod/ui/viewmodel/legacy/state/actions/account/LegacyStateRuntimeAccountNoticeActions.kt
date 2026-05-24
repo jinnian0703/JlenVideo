@@ -42,12 +42,25 @@ internal fun LegacyStateRuntimeViewModelCore.legacyHydrateAccountSession() {
 
 internal fun LegacyStateRuntimeViewModelCore.legacyRefreshCrashLog() {
     val latestCrashLog = CrashLogger.readLatest(getApplication())
-    updateAccountState(accountStateWithCrashLog(currentAccountState(), latestCrashLog))
+    val entries = CrashLogger.readIssueLogEntries(getApplication()).map {
+        AccountIssueLogEntry(
+            id = it.id,
+            title = it.title,
+            time = it.time,
+            summary = it.summary
+        )
+    }
+    updateAccountState(accountStateWithCrashLog(currentAccountState(), latestCrashLog, entries))
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyClearCrashLog() {
     CrashLogger.clear(getApplication())
     updateAccountState(accountStateAfterCrashLogCleared(currentAccountState()))
+}
+
+internal fun LegacyStateRuntimeViewModelCore.legacyDeleteIssueLog(id: String) {
+    CrashLogger.deleteIssueLog(getApplication(), id)
+    legacyRefreshCrashLog()
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyCheckAppUpdate() {

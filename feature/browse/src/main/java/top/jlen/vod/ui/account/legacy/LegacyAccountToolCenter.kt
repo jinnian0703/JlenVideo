@@ -1,7 +1,14 @@
 package top.jlen.vod.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,9 +51,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
+import java.io.File
+import java.nio.charset.StandardCharsets
 import top.jlen.vod.data.CacheRetentionOption
 import top.jlen.vod.data.CacheSizeSummary
 import top.jlen.vod.data.formatCacheSize
@@ -107,7 +118,7 @@ fun AccountSettingsHomePane(
         AccountSettingsEntryCard(
             title = "问题日志",
             description = if (hasCrashLog) "已有本机日志" else "暂无本机日志",
-            meta = "刷新、复制或清空本机崩溃日志",
+            meta = "刷新、复制或清空本机问题日志",
             icon = Icons.Rounded.BugReport,
             onClick = onOpenLogs
         )
@@ -260,11 +271,16 @@ fun AccountAgreementSettingsScreen(onBack: () -> Unit) {
 @Composable
 fun AccountCrashLogSettingsScreen(
     crashLogText: String,
+    issueLogEntries: List<AccountIssueLogEntry>,
     hasCrashLog: Boolean,
     onBack: () -> Unit,
     onRefreshCrashLog: () -> Unit,
-    onClearCrashLog: () -> Unit
+    onClearCrashLog: () -> Unit,
+    onOpenIssueLog: (AccountIssueLogEntry) -> Unit,
+    onReadIssueLog: (String) -> String,
+    onDeleteIssueLog: (String) -> Unit
 ) {
+    val context = LocalContext.current
     AccountSettingsScaffold(
         title = "问题日志",
         subtitle = "排查本机运行问题",
@@ -275,35 +291,180 @@ fun AccountCrashLogSettingsScreen(
                 title = "问题日志",
                 description = if (hasCrashLog) "已有本机日志" else "暂无本机日志"
             ) {
-                if (hasCrashLog) {
-                    CrashLogCard(
-                        logText = crashLogText,
-                        onRefresh = onRefreshCrashLog,
-                        onClear = onClearCrashLog
-                    )
-                } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = onRefreshCrashLog,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(46.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft),
+                        shape = RoundedCornerShape(16.dp)
                     ) {
-                        Text(
-                            text = "当前没有崩溃日志。",
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = UiPalette.TextSecondary
-                        )
-                        OutlinedButton(
-                            onClick = onRefreshCrashLog,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft),
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Text("刷新")
-                        }
+                        Text("刷新", maxLines = 1)
+                    }
+                    OutlinedButton(
+                        onClick = onClearCrashLog,
+                        enabled = hasCrashLog,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(46.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text("清空全部", maxLines = 1)
                     }
                 }
             }
         }
+        if (issueLogEntries.isEmpty()) {
+            item {
+                Text(
+                    text = "当前没有本机问题日志。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = UiPalette.TextSecondary,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+            }
+        } else {
+            items(issueLogEntries, key = { it.id }) { entry ->
+                val logText = remember(entry.id, crashLogText) { onReadIssueLog(entry.id) }
+                IssueLogEntryCard(
+                    entry = entry,
+                    onOpen = { onOpenIssueLog(entry) },
+                    onCopy = { copyIssueLog(context, logText) },
+                    onShare = { shareIssueLog(context, entry, logText) },
+                    onDelete = { onDeleteIssueLog(entry.id) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun IssueLogEntryCard(
+    entry: AccountIssueLogEntry,
+    onOpen: () -> Unit,
+    onCopy: () -> Unit,
+    onShare: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen),
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        shape = RoundedCornerShape(22.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.Border)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = entry.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = UiPalette.Ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = listOf(entry.time, entry.summary).filter { it.isNotBlank() }.joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = UiPalette.TextSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onCopy, modifier = Modifier.weight(1f), shape = RoundedCornerShape(16.dp)) {
+                    Text("复制", maxLines = 1)
+                }
+                OutlinedButton(onClick = onShare, modifier = Modifier.weight(1f), shape = RoundedCornerShape(16.dp)) {
+                    Text("分享", maxLines = 1)
+                }
+                OutlinedButton(onClick = onDelete, modifier = Modifier.weight(1f), shape = RoundedCornerShape(16.dp)) {
+                    Text("删除", maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AccountIssueLogDetailScreen(
+    entry: AccountIssueLogEntry,
+    logText: String,
+    onBack: () -> Unit,
+    onCopy: () -> Unit,
+    onShare: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val scrollState = rememberScrollState()
+    AccountSettingsScaffold(
+        title = "日志详情",
+        subtitle = entry.title,
+        onBack = onBack
+    ) {
+        item {
+            AccountToolSection(title = entry.title, description = entry.time) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 280.dp, max = 520.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(UiPalette.SurfaceSoft.copy(alpha = 0.7f))
+                        .verticalScroll(scrollState)
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = logText.ifBlank { "暂无问题日志" },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = UiPalette.TextSecondary
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onCopy, modifier = Modifier.weight(1f), shape = RoundedCornerShape(16.dp)) {
+                        Text("复制", maxLines = 1)
+                    }
+                    OutlinedButton(onClick = onShare, modifier = Modifier.weight(1f), shape = RoundedCornerShape(16.dp)) {
+                        Text("分享", maxLines = 1)
+                    }
+                    OutlinedButton(onClick = onDelete, modifier = Modifier.weight(1f), shape = RoundedCornerShape(16.dp)) {
+                        Text("删除", maxLines = 1)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun copyIssueLog(context: Context, logText: String) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText("issue_log", logText))
+    Toast.makeText(context, "问题日志已复制", Toast.LENGTH_SHORT).show()
+}
+
+private fun shareIssueLog(context: Context, entry: AccountIssueLogEntry, logText: String) {
+    runCatching {
+        val dir = File(context.cacheDir, "shared_logs").apply { mkdirs() }
+        val file = File(dir, "${entry.id.removeSuffix(".txt")}.txt")
+        file.writeText(logText, StandardCharsets.UTF_8)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, entry.title)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "分享问题日志"))
+    }.onFailure {
+        Toast.makeText(context, "分享日志失败", Toast.LENGTH_SHORT).show()
     }
 }
 

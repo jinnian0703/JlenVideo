@@ -16,6 +16,7 @@ class JlenVideoApplication : Application(), ImageLoaderFactory {
             applicationId = BuildConfig.APPLICATION_ID
         )
         CrashLogger.install(this)
+        CrashLogger.registerApplicationCallbacks(this)
     }
 
     override fun newImageLoader(): ImageLoader =
@@ -37,11 +38,13 @@ class JlenVideoApplication : Application(), ImageLoaderFactory {
 
     override fun onLowMemory() {
         super.onLowMemory()
+        CrashLogger.recordLowMemory(this)
         AppleCmsRepository.clearMemoryCaches(this)
     }
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
+        CrashLogger.recordMemoryTrim(this, level)
         if (level >= TRIM_MEMORY_RUNNING_LOW) {
             AppleCmsRepository.clearMemoryCaches(this)
         }

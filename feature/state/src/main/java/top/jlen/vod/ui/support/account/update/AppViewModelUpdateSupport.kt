@@ -15,7 +15,10 @@ internal fun accountStateWithUpdateInfo(
 )
 
 internal fun accountStateWithUpdateError(accountState: AccountUiState): AccountUiState =
-    accountState.copy(
-        isUpdateLoading = false,
-        message = "检查更新失败，请稍后重试"
+    accountStateWithToast(
+        accountState.copy(
+            isUpdateLoading = false,
+            message = "检查更新失败，请稍后重试"
+        ),
+        "检查更新失败，请稍后重试"
     )
