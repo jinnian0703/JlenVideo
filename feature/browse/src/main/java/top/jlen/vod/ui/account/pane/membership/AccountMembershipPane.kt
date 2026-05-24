@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -93,6 +94,7 @@ internal fun MembershipPaneV2(
     val shouldHighlightPoints = signInSuccessMessage.isNotBlank() || signInInfo.rewardPoints.isNotBlank()
     val trendPoints = remember(pointLogs) { buildPointTrendPoints(pointLogs, days = 30) }
     var showRechargeDialog by remember { mutableStateOf(false) }
+    var plansExpanded by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (signInSuccessMessage.isNotBlank()) {
@@ -119,21 +121,13 @@ internal fun MembershipPaneV2(
 
         MembershipTrendCard(points = trendPoints)
 
-        if (plans.isEmpty()) {
-            EmptyPane(
-                message = "暂无可升级套餐",
-                description = "当前站点暂未提供可购买的会员方案",
-                style = FeedbackPaneStyle.Card
-            )
-        } else {
-            plans.forEach { plan ->
-                MembershipPlanCard(
-                    plan = plan,
-                    isActionLoading = isActionLoading,
-                    onUpgrade = onUpgrade
-                )
-            }
-        }
+        MembershipPlansCard(
+            plans = plans,
+            expanded = plansExpanded,
+            isActionLoading = isActionLoading,
+            onToggleExpanded = { plansExpanded = !plansExpanded },
+            onUpgrade = onUpgrade
+        )
     }
 
     if (showRechargeDialog) {
@@ -387,6 +381,95 @@ private fun MembershipSignInCard(
 }
 
 @Composable
+private fun MembershipPlansCard(
+    plans: List<MembershipPlan>,
+    expanded: Boolean,
+    isActionLoading: Boolean,
+    onToggleExpanded: () -> Unit,
+    onUpgrade: (MembershipPlan) -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        shape = RoundedCornerShape(UiDimens.CardRadius),
+        border = BorderStroke(1.dp, UiPalette.Border)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(UiDimens.CardPadding),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .background(UiPalette.Accent.copy(alpha = 0.10f), RoundedCornerShape(UiDimens.ControlRadius)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Payments,
+                        contentDescription = null,
+                        tint = UiPalette.Accent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Text(
+                        text = "会员套餐",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = UiPalette.Ink
+                    )
+                    Text(
+                        text = if (plans.isEmpty()) {
+                            "暂无可升级套餐"
+                        } else {
+                            "${plans.size} 个套餐"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = UiPalette.TextSecondary
+                    )
+                }
+
+                TextButton(
+                    onClick = onToggleExpanded,
+                    shape = RoundedCornerShape(UiDimens.ControlRadius),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+                ) {
+                    Text(
+                        text = if (expanded) "收起" else "展开",
+                        color = UiPalette.Accent,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            if (expanded) {
+                if (plans.isEmpty()) {
+                    MembershipPlansEmptyRow()
+                } else {
+                    plans.forEach { plan ->
+                        MembershipPlanRow(
+                            plan = plan,
+                            isActionLoading = isActionLoading,
+                            onUpgrade = onUpgrade
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun MembershipRechargeCard(
     isActionLoading: Boolean,
     onOpen: () -> Unit
@@ -448,6 +531,32 @@ private fun MembershipRechargeCard(
             ) {
                 Text(if (isActionLoading) "处理中..." else "立即充值")
             }
+        }
+    }
+}
+
+@Composable
+private fun MembershipPlansEmptyRow() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(UiDimens.ControlRadius))
+            .background(UiPalette.SurfaceSoft)
+            .border(BorderStroke(1.dp, UiPalette.BorderSoft), RoundedCornerShape(UiDimens.ControlRadius))
+            .padding(horizontal = 14.dp, vertical = 16.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = "暂无可升级套餐",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = UiPalette.Ink
+            )
+            Text(
+                text = "当前站点暂未提供可购买的会员方案",
+                style = MaterialTheme.typography.bodySmall,
+                color = UiPalette.TextSecondary
+            )
         }
     }
 }
@@ -778,51 +887,48 @@ private fun signInRangeHint(signInInfo: MembershipSignInInfo): String? =
     }
 
 @Composable
-private fun MembershipPlanCard(
+private fun MembershipPlanRow(
     plan: MembershipPlan,
     isActionLoading: Boolean,
     onUpgrade: (MembershipPlan) -> Unit
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(UiDimens.CardRadius),
-        border = BorderStroke(1.dp, UiPalette.Border)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(UiDimens.ControlRadius))
+            .background(UiPalette.SurfaceSoft)
+            .border(BorderStroke(1.dp, UiPalette.BorderSoft), RoundedCornerShape(UiDimens.ControlRadius))
+            .padding(14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(UiDimens.CardPadding),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = "${plan.groupName} ${plan.duration.toMembershipDuration()}",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = UiPalette.Ink
-                )
-                Text(
-                    text = "${plan.points} 积分",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = UiPalette.TextSecondary
-                )
-            }
-            Button(
-                onClick = { onUpgrade(plan) },
-                enabled = !isActionLoading,
-                modifier = Modifier.height(UiDimens.CompactButtonHeight),
-                shape = RoundedCornerShape(UiDimens.ControlRadius),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = UiPalette.Accent,
-                    contentColor = UiPalette.AccentText
-                )
-            ) {
-                Text(if (isActionLoading) "处理中..." else "立即升级")
-            }
+            Text(
+                text = "${plan.groupName} ${plan.duration.toMembershipDuration()}",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = UiPalette.Ink
+            )
+            Text(
+                text = "${plan.points} 积分",
+                style = MaterialTheme.typography.bodyMedium,
+                color = UiPalette.TextSecondary
+            )
+        }
+        Button(
+            onClick = { onUpgrade(plan) },
+            enabled = !isActionLoading,
+            modifier = Modifier.height(UiDimens.CompactButtonHeight),
+            shape = RoundedCornerShape(UiDimens.ControlRadius),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = UiPalette.Accent,
+                contentColor = UiPalette.AccentText
+            )
+        ) {
+            Text(if (isActionLoading) "处理中..." else "升级")
         }
     }
 }
