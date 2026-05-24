@@ -177,26 +177,12 @@ fun UserAgreementOnboardingScreen(
                     .padding(horizontal = 20.dp, vertical = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                AgreementSection(
-                    title = "应用用途",
-                    body = "JlenVideo 是视频浏览与播放客户端，用于展示站点提供的影视信息、搜索结果、播放记录和追剧内容。"
-                )
-                AgreementSection(
-                    title = "内容与播放",
-                    body = "应用本身不生产影视内容，列表、详情和播放地址来自当前配置站点。请在合法合规的前提下使用相关内容。"
-                )
-                AgreementSection(
-                    title = "账号与数据",
-                    body = "登录后会使用站点账号能力同步资料、会员积分、追剧和播放记录；本地会保存必要的引导状态、搜索历史、播放进度和问题日志。"
-                )
-                AgreementSection(
-                    title = "隐私与日志",
-                    body = "崩溃日志仅用于排查运行问题，通常保存在本机。请不要在问题日志中主动填写敏感账号、密码或验证码。"
-                )
-                AgreementSection(
-                    title = "合规使用",
-                    body = "继续使用即表示你承诺遵守所在地法律法规、站点规则和内容版权要求，并自行承担因不当使用产生的责任。"
-                )
+                JlenUserAgreementSections.forEach { section ->
+                    AgreementSection(
+                        title = section.title,
+                        body = section.body
+                    )
+                }
             }
         }
 

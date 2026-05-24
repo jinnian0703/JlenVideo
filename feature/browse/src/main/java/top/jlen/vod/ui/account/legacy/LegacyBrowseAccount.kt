@@ -735,10 +735,10 @@ internal fun LegacyAboutPane(
                 )
                 AccountToolSection(
                     title = "用户协议与隐私说明",
-                    description = "首次启动确认内容"
+                    description = "用户协议、隐私和免责声明"
                 ) {
                     Text(
-                        text = "应用用于浏览和播放站点提供的影视信息。登录后会使用站点账号能力同步资料、会员积分、追剧和播放记录；本地会保存必要的引导状态、搜索历史、播放进度和问题日志。请在合法合规的前提下使用。",
+                        text = JlenUserAgreementPlainText,
                         style = MaterialTheme.typography.bodySmall,
                         color = UiPalette.TextPrimary
                     )

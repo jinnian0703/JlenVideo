@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -49,9 +50,6 @@ import androidx.compose.ui.unit.dp
 import top.jlen.vod.data.CacheRetentionOption
 import top.jlen.vod.data.CacheSizeSummary
 import top.jlen.vod.data.formatCacheSize
-
-private const val ACCOUNT_AGREEMENT_TEXT =
-    "应用用于浏览和播放站点提供的影视信息。登录后会使用站点账号能力同步资料、会员积分、追剧和播放记录；本地会保存必要的引导状态、搜索历史、播放进度和问题日志。请在合法合规的前提下使用。"
 
 @Composable
 fun AccountSettingsHomePane(
@@ -227,17 +225,30 @@ fun AccountCacheSettingsScreen(
 @Composable
 fun AccountAgreementSettingsScreen(onBack: () -> Unit) {
     AccountSettingsScaffold(
-        title = "用户协议与隐私说明",
-        subtitle = "查看首次启动确认内容",
+        title = "协议与免责说明",
+        subtitle = "查看用户协议、隐私和免责声明",
         onBack = onBack
     ) {
-        item {
+        items(
+            items = JlenUserAgreementSections,
+            key = { it.title }
+        ) { section ->
             AccountToolSection(
-                title = "用户协议与隐私说明",
-                description = "应用用途、账号数据和本地数据说明"
+                title = section.title,
+                description = when (section.title) {
+                    "应用用途" -> "应用提供的基础能力"
+                    "内容来源与播放说明" -> "站点内容和线路可用性"
+                    "账号与会员数据" -> "登录后的站点账号信息"
+                    "本地数据使用" -> "设备本机保存的数据范围"
+                    "设备与运行信息" -> "版本统计和兼容性排查"
+                    "隐私与日志" -> "问题日志和敏感信息提醒"
+                    "合法合规使用" -> "使用边界和责任要求"
+                    "免责说明" -> "第三方内容和异常情况说明"
+                    else -> "继续使用前的确认内容"
+                }
             ) {
                 Text(
-                    text = ACCOUNT_AGREEMENT_TEXT,
+                    text = section.body,
                     style = MaterialTheme.typography.bodyMedium,
                     color = UiPalette.TextPrimary
                 )
