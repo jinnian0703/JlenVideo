@@ -208,8 +208,10 @@ fun JlenVideoApp() {
     val accountToastMessage = viewModel.accountState.toastMessage
     val accountToastSerial = viewModel.accountState.toastSerial
     LaunchedEffect(currentRoute, accountToastSerial) {
-        if (!accountToastMessage.isNullOrBlank() && isAccountRoute(currentRoute)) {
-            Toast.makeText(context, accountToastMessage, Toast.LENGTH_SHORT).show()
+        if (!accountToastMessage.isNullOrBlank()) {
+            if (isAccountRoute(currentRoute)) {
+                Toast.makeText(context, accountToastMessage, Toast.LENGTH_SHORT).show()
+            }
             viewModel.consumeAccountToast()
         }
     }
