@@ -166,7 +166,10 @@ internal fun LegacyAccountScreen(
     onFindPasswordEditorChange: ((FindPasswordEditor) -> FindPasswordEditor) -> Unit,
     onSendFindPasswordCode: () -> Unit,
     onFindPassword: () -> Unit,
-    onOpenSettings: () -> Unit,
+    onOpenSettingsUpdate: () -> Unit,
+    onOpenSettingsCache: () -> Unit,
+    onOpenSettingsAgreement: () -> Unit,
+    onOpenSettingsLogs: () -> Unit,
     onSendEmailCode: () -> Unit,
     onBindEmail: () -> Unit,
     onUnbindEmail: () -> Unit
@@ -192,19 +195,8 @@ internal fun LegacyAccountScreen(
         if (showLoggedInContent) {
             when (state.selectedSection) {
                 AccountSection.Favorites -> onSelectSection(AccountSection.Overview)
-                AccountSection.About -> {
-                    onSelectSection(AccountSection.Overview)
-                    onOpenSettings()
-                }
                 else -> Unit
             }
-        }
-    }
-
-    LaunchedEffect(showLoggedInContent, state.authMode) {
-        if (!showLoggedInContent && state.authMode == AccountAuthMode.About) {
-            onAuthModeChange(AccountAuthMode.Login)
-            onOpenSettings()
         }
     }
 
@@ -356,13 +348,7 @@ internal fun LegacyAccountScreen(
                                 AccountSection.Favorites -> ""
                             },
                             selected = state.selectedSection == section,
-                            onClick = {
-                                if (section == AccountSection.About) {
-                                    onOpenSettings()
-                                } else {
-                                    onSelectSection(section)
-                                }
-                            },
+                            onClick = { onSelectSection(section) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -412,7 +398,7 @@ internal fun LegacyAccountScreen(
                             onSignIn = onSignInMembership,
                             onOpenPointLogs = onOpenPointLogs,
                             onOpenFollow = onOpenFollow,
-                            onOpenLogs = onOpenSettings
+                            onOpenLogs = { onSelectSection(AccountSection.About) }
                         )
                         AccountSection.Profile -> AccountProfilePaneV2(
                             isLoading = state.isContentLoading,
@@ -443,7 +429,20 @@ internal fun LegacyAccountScreen(
                             onSignIn = onSignInMembership,
                             onOpenPointLogs = onOpenPointLogs
                         )
-                        AccountSection.About -> Unit
+                        AccountSection.About -> AccountSettingsHomePane(
+                            currentVersion = state.updateInfo?.currentVersion?.ifBlank { "--" } ?: "--",
+                            latestVersion = state.updateInfo?.latestVersion.orEmpty(),
+                            hasUpdate = state.updateInfo?.hasUpdate == true,
+                            isUpdateLoading = state.isUpdateLoading,
+                            cacheRetention = state.cacheRetention,
+                            cacheSizeSummary = state.cacheSizeSummary,
+                            isCacheSizeLoading = state.isCacheSizeLoading,
+                            hasCrashLog = state.hasCrashLog,
+                            onOpenUpdate = onOpenSettingsUpdate,
+                            onOpenCache = onOpenSettingsCache,
+                            onOpenAgreement = onOpenSettingsAgreement,
+                            onOpenLogs = onOpenSettingsLogs
+                        )
                     }
                 }
             }
@@ -517,7 +516,41 @@ internal fun LegacyAccountScreen(
                         }
                     }
 
-                    AccountAuthMode.About -> Spacer(Modifier.height(1.dp))
+                    AccountAuthMode.About -> {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+                            shape = RoundedCornerShape(24.dp),
+                            border = BorderStroke(1.dp, UiPalette.Border)
+                        ) {
+                            Column {
+                                AccountGuestModeHeader(
+                                    title = "设置与工具",
+                                    description = "查看版本、缓存、协议和问题日志。",
+                                    onBack = { onAuthModeChange(AccountAuthMode.Login) }
+                                )
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 20.dp, vertical = 18.dp)
+                                ) {
+                                    AccountSettingsHomePane(
+                                        currentVersion = state.updateInfo?.currentVersion?.ifBlank { "--" } ?: "--",
+                                        latestVersion = state.updateInfo?.latestVersion.orEmpty(),
+                                        hasUpdate = state.updateInfo?.hasUpdate == true,
+                                        isUpdateLoading = state.isUpdateLoading,
+                                        cacheRetention = state.cacheRetention,
+                                        cacheSizeSummary = state.cacheSizeSummary,
+                                        isCacheSizeLoading = state.isCacheSizeLoading,
+                                        hasCrashLog = state.hasCrashLog,
+                                        onOpenUpdate = onOpenSettingsUpdate,
+                                        onOpenCache = onOpenSettingsCache,
+                                        onOpenAgreement = onOpenSettingsAgreement,
+                                        onOpenLogs = onOpenSettingsLogs
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     AccountAuthMode.Login -> {
                         Card(
@@ -587,7 +620,7 @@ internal fun LegacyAccountScreen(
                                 AccountGuestAuxiliaryActions(
                                     onRegister = { onAuthModeChange(AccountAuthMode.Register) },
                                     onFindPassword = { onAuthModeChange(AccountAuthMode.FindPassword) },
-                                    onAbout = onOpenSettings
+                                    onAbout = { onAuthModeChange(AccountAuthMode.About) }
                                 )
                             }
                         }

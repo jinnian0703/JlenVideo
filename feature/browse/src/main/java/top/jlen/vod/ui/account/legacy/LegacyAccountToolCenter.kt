@@ -54,7 +54,7 @@ private const val ACCOUNT_AGREEMENT_TEXT =
     "应用用于浏览和播放站点提供的影视信息。登录后会使用站点账号能力同步资料、会员积分、追剧和播放记录；本地会保存必要的引导状态、搜索历史、播放进度和问题日志。请在合法合规的前提下使用。"
 
 @Composable
-fun AccountSettingsHomeScreen(
+fun AccountSettingsHomePane(
     currentVersion: String,
     latestVersion: String,
     hasUpdate: Boolean,
@@ -63,69 +63,56 @@ fun AccountSettingsHomeScreen(
     cacheSizeSummary: CacheSizeSummary,
     isCacheSizeLoading: Boolean,
     hasCrashLog: Boolean,
-    onBack: () -> Unit,
     onOpenUpdate: () -> Unit,
     onOpenCache: () -> Unit,
     onOpenAgreement: () -> Unit,
     onOpenLogs: () -> Unit
 ) {
-    AccountSettingsScaffold(
-        title = "设置",
-        subtitle = "版本、缓存、协议和问题日志",
-        onBack = onBack
-    ) {
-        item {
-            AccountSettingsEntryCard(
-                title = "版本更新",
-                description = when {
-                    isUpdateLoading -> "正在检查更新"
-                    hasUpdate -> "发现新版本"
-                    latestVersion.isNotBlank() -> "当前已是最新版本"
-                    else -> "可手动检查发布页"
-                },
-                meta = buildString {
-                    append("当前版本：")
-                    append(currentVersion)
-                    if (latestVersion.isNotBlank()) {
-                        append(" / 最新版本：")
-                        append(latestVersion)
-                    }
-                },
-                icon = Icons.Rounded.NewReleases,
-                onClick = onOpenUpdate
-            )
-        }
-        item {
-            AccountSettingsEntryCard(
-                title = "缓存设置",
-                description = "保存时间：${cacheRetention.label}",
-                meta = when {
-                    isCacheSizeLoading -> "总缓存：统计中..."
-                    !cacheSizeSummary.isAvailable -> "总缓存：无法统计"
-                    else -> "总缓存：${formatCacheSize(cacheSizeSummary.totalBytes)}"
-                },
-                icon = Icons.Rounded.Cached,
-                onClick = onOpenCache
-            )
-        }
-        item {
-            AccountSettingsEntryCard(
-                title = "用户协议与隐私说明",
-                description = "首次启动确认内容",
-                meta = "查看应用用途、账号数据和本地数据说明",
-                icon = Icons.AutoMirrored.Rounded.Article,
-                onClick = onOpenAgreement
-            )
-        }
-        item {
-            AccountSettingsEntryCard(
-                title = "问题日志",
-                description = if (hasCrashLog) "已有本机日志" else "暂无本机日志",
-                meta = "刷新、复制或清空本机崩溃日志",
-                icon = Icons.Rounded.BugReport,
-                onClick = onOpenLogs
-            )
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        AccountSettingsEntryCard(
+            title = "版本更新",
+            description = when {
+                isUpdateLoading -> "正在检查更新"
+                hasUpdate -> "发现新版本"
+                latestVersion.isNotBlank() -> "当前已是最新版本"
+                else -> "可手动检查发布页"
+            },
+            meta = buildString {
+                append("当前版本：")
+                append(currentVersion)
+                if (latestVersion.isNotBlank()) {
+                    append(" / 最新版本：")
+                    append(latestVersion)
+                }
+            },
+            icon = Icons.Rounded.NewReleases,
+            onClick = onOpenUpdate
+        )
+        AccountSettingsEntryCard(
+            title = "缓存设置",
+            description = "保存时间：${cacheRetention.label}",
+            meta = when {
+                isCacheSizeLoading -> "总缓存：统计中..."
+                !cacheSizeSummary.isAvailable -> "总缓存：无法统计"
+                else -> "总缓存：${formatCacheSize(cacheSizeSummary.totalBytes)}"
+            },
+            icon = Icons.Rounded.Cached,
+            onClick = onOpenCache
+        )
+        AccountSettingsEntryCard(
+            title = "用户协议与隐私说明",
+            description = "首次启动确认内容",
+            meta = "查看应用用途、账号数据和本地数据说明",
+            icon = Icons.AutoMirrored.Rounded.Article,
+            onClick = onOpenAgreement
+        )
+        AccountSettingsEntryCard(
+            title = "问题日志",
+            description = if (hasCrashLog) "已有本机日志" else "暂无本机日志",
+            meta = "刷新、复制或清空本机崩溃日志",
+            icon = Icons.Rounded.BugReport,
+            onClick = onOpenLogs
+        )
     }
 }
 

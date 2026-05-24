@@ -249,21 +249,14 @@ fun JlenVideoApp() {
             navController.navigate("search/results/${Uri.encode(normalized)}")
         }
     }
-    val openAccountSettings: () -> Unit = {
-        viewModel.refreshCacheSettings()
-        viewModel.refreshCrashLog()
-        navController.navigate("account/settings") {
-            launchSingleTop = true
-        }
-    }
     val openAccountSettingsChild: (String) -> Unit = { route ->
         navController.navigate(route) {
             launchSingleTop = true
         }
     }
-    val backToAccountSettings: () -> Unit = {
+    val backToAccount: () -> Unit = {
         if (!navController.popBackStack()) {
-            navController.navigate("account/settings") {
+            navController.navigate("account") {
                 launchSingleTop = true
             }
         }
@@ -488,7 +481,10 @@ fun JlenVideoApp() {
                                 onFindPasswordEditorChange = viewModel::updateFindPasswordEditor,
                                 onSendFindPasswordCode = viewModel::sendFindPasswordCode,
                                 onFindPassword = viewModel::findPassword,
-                                onOpenSettings = openAccountSettings,
+                                onOpenSettingsUpdate = { openAccountSettingsChild("account/settings/update") },
+                                onOpenSettingsCache = { openAccountSettingsChild("account/settings/cache") },
+                                onOpenSettingsAgreement = { openAccountSettingsChild("account/settings/agreement") },
+                                onOpenSettingsLogs = { openAccountSettingsChild("account/settings/logs") },
                                 onSendEmailCode = viewModel::sendEmailBindCode,
                                 onBindEmail = viewModel::bindEmail,
                                 onUnbindEmail = viewModel::unbindEmail
@@ -514,29 +510,6 @@ fun JlenVideoApp() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
-                        composable("account/settings") {
-                            LaunchedEffect(Unit) {
-                                viewModel.refreshCacheSettings()
-                                viewModel.refreshCrashLog()
-                            }
-                            AccountSettingsHomeScreen(
-                                currentVersion = viewModel.accountState.updateInfo?.currentVersion
-                                    ?.ifBlank { "--" }
-                                    ?: "--",
-                                latestVersion = viewModel.accountState.updateInfo?.latestVersion.orEmpty(),
-                                hasUpdate = viewModel.accountState.updateInfo?.hasUpdate == true,
-                                isUpdateLoading = viewModel.accountState.isUpdateLoading,
-                                cacheRetention = viewModel.accountState.cacheRetention,
-                                cacheSizeSummary = viewModel.accountState.cacheSizeSummary,
-                                isCacheSizeLoading = viewModel.accountState.isCacheSizeLoading,
-                                hasCrashLog = viewModel.accountState.hasCrashLog,
-                                onBack = { navController.popBackStack() },
-                                onOpenUpdate = { openAccountSettingsChild("account/settings/update") },
-                                onOpenCache = { openAccountSettingsChild("account/settings/cache") },
-                                onOpenAgreement = { openAccountSettingsChild("account/settings/agreement") },
-                                onOpenLogs = { openAccountSettingsChild("account/settings/logs") }
-                            )
-                        }
                         composable("account/settings/update") {
                             AccountUpdateSettingsScreen(
                                 currentVersion = viewModel.accountState.updateInfo?.currentVersion
@@ -546,7 +519,7 @@ fun JlenVideoApp() {
                                 notes = viewModel.accountState.updateInfo?.notes.orEmpty(),
                                 hasUpdate = viewModel.accountState.updateInfo?.hasUpdate == true,
                                 isUpdateLoading = viewModel.accountState.isUpdateLoading,
-                                onBack = backToAccountSettings,
+                                onBack = backToAccount,
                                 onCheckUpdate = viewModel::checkAppUpdate,
                                 onOpenRelease = openReleaseLink,
                                 onDownloadUpdate = openUpdateLink
@@ -561,14 +534,14 @@ fun JlenVideoApp() {
                                 cacheSizeSummary = viewModel.accountState.cacheSizeSummary,
                                 isCacheSizeLoading = viewModel.accountState.isCacheSizeLoading,
                                 isCacheClearing = viewModel.accountState.isCacheClearing,
-                                onBack = backToAccountSettings,
+                                onBack = backToAccount,
                                 onRefreshCacheSize = viewModel::refreshCacheSize,
                                 onSetCacheRetention = viewModel::setCacheRetention,
                                 onClearAppCache = viewModel::clearAppCache
                             )
                         }
                         composable("account/settings/agreement") {
-                            AccountAgreementSettingsScreen(onBack = backToAccountSettings)
+                            AccountAgreementSettingsScreen(onBack = backToAccount)
                         }
                         composable("account/settings/logs") {
                             LaunchedEffect(Unit) {
@@ -577,7 +550,7 @@ fun JlenVideoApp() {
                             AccountCrashLogSettingsScreen(
                                 crashLogText = viewModel.accountState.latestCrashLog,
                                 hasCrashLog = viewModel.accountState.hasCrashLog,
-                                onBack = backToAccountSettings,
+                                onBack = backToAccount,
                                 onRefreshCrashLog = viewModel::refreshCrashLog,
                                 onClearCrashLog = viewModel::clearCrashLog
                             )
