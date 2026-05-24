@@ -110,6 +110,20 @@ internal fun accountStateWithFindPasswordCodeCountdown(
     findPasswordCodeCountdown = seconds.coerceAtLeast(0)
 )
 
+internal fun accountStateWithRegisterCodeCountdown(
+    accountState: AccountUiState,
+    seconds: Int
+): AccountUiState = accountState.copy(
+    registerCodeCountdown = seconds.coerceAtLeast(0)
+)
+
+internal fun accountStateWithEmailBindCodeCountdown(
+    accountState: AccountUiState,
+    seconds: Int
+): AccountUiState = accountState.copy(
+    emailBindCodeCountdown = seconds.coerceAtLeast(0)
+)
+
 internal fun accountStateAfterProfileSaved(accountState: AccountUiState): AccountUiState =
     accountState.copy(
         profileEditor = accountState.profileEditor.copy(
@@ -133,7 +147,8 @@ internal fun accountStateAfterEmailBound(
             email = email,
             pendingEmail = "",
             emailCode = ""
-        )
+        ),
+        emailBindCodeCountdown = 0
     )
 }
 
@@ -145,7 +160,8 @@ internal fun accountStateAfterEmailUnbound(accountState: AccountUiState): Accoun
             email = "",
             pendingEmail = "",
             emailCode = ""
-        )
+        ),
+        emailBindCodeCountdown = 0
     )
 
 internal fun accountStateAfterRegisterSuccess(
@@ -157,7 +173,8 @@ internal fun accountStateAfterRegisterSuccess(
     password = "",
     error = null,
     message = "注册成功，请登录。",
-    registerEditor = RegisterEditor(channel = accountState.registerChannel)
+    registerEditor = RegisterEditor(channel = accountState.registerChannel),
+    registerCodeCountdown = 0
 )
 
 internal fun accountStateAfterFindPasswordSuccess(

@@ -7,6 +7,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+private const val EMAIL_CODE_INTERVAL_SECONDS = 60
+
 internal fun LegacyStateRuntimeViewModelCore.legacySendRegisterCode() {
     val editor = currentAccountState().registerEditor
     val contact = editor.contact.trim()
@@ -25,9 +27,14 @@ internal fun LegacyStateRuntimeViewModelCore.legacySendRegisterCode() {
         return
     }
 
+    if (currentAccountState().registerCodeCountdown > 0) return
+
     runtimeRunAccountAction(
         block = { sendRegisterCodeForApp(editor.channel, contact) },
-        onSuccess = { }
+        successMessage = "验证码已发送，请注意查收",
+        onSuccess = {
+            startRegisterCodeCountdown(editor.channel, contact)
+        }
     )
 }
 
@@ -143,10 +150,30 @@ internal fun LegacyStateRuntimeViewModelCore.legacyFindPassword() {
     )
 }
 
+private fun LegacyStateRuntimeViewModelCore.startRegisterCodeCountdown(
+    channel: String,
+    contact: String
+) {
+    viewModelScope.launch {
+        for (seconds in EMAIL_CODE_INTERVAL_SECONDS downTo 0) {
+            val state = currentAccountState()
+            if (state.authMode != AccountAuthMode.Register ||
+                state.registerChannel != channel ||
+                state.registerEditor.contact.trim() != contact
+            ) {
+                updateAccountState(accountStateWithRegisterCodeCountdown(state, 0))
+                break
+            }
+            updateAccountState(accountStateWithRegisterCodeCountdown(state, seconds))
+            if (seconds > 0) delay(1000L)
+        }
+    }
+}
+
 private fun LegacyStateRuntimeViewModelCore.startFindPasswordCodeCountdown() {
     viewModelScope.launch {
         val email = currentAccountState().findPasswordEditor.email.trim()
-        for (seconds in 60 downTo 0) {
+        for (seconds in EMAIL_CODE_INTERVAL_SECONDS downTo 0) {
             val state = currentAccountState()
             if (state.authMode != AccountAuthMode.FindPassword ||
                 state.findPasswordEditor.email.trim() != email

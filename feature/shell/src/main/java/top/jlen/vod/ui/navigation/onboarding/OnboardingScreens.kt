@@ -480,14 +480,22 @@ private fun FirstLoginRegisterPane(
             )
             OutlinedButton(
                 onClick = onSendCode,
-                enabled = !state.isActionLoading,
+                enabled = !state.isActionLoading && state.registerCodeCountdown <= 0,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = UiDimens.SecondaryButtonHeight),
                 shape = RoundedCornerShape(UiDimens.ControlRadius),
                 border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft)
             ) {
-                Text(if (state.isActionLoading) "发送中..." else "发送${state.registerCodeLabel}")
+                Text(
+                    if (state.registerCodeCountdown > 0) {
+                        "${state.registerCodeCountdown}s"
+                    } else if (state.isActionLoading) {
+                        "发送中..."
+                    } else {
+                        "发送${state.registerCodeLabel}"
+                    }
+                )
             }
         }
         if (state.registerRequiresVerify) {

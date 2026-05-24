@@ -404,6 +404,7 @@ internal fun LegacyAccountScreen(
                             editor = state.profileEditor,
                             isSaving = state.isActionLoading,
                             isEditTab = state.isProfileEditTab,
+                            emailBindCodeCountdown = state.emailBindCodeCountdown,
                             onTabChange = onProfileTabChange,
                             onEditorChange = onProfileEditorChange,
                             onSave = onSaveProfile,
@@ -967,11 +968,19 @@ internal fun LegacyAccountRegisterPane(
             )
             OutlinedButton(
                 onClick = onSendCode,
-                enabled = !state.isActionLoading,
+                enabled = !state.isActionLoading && state.registerCodeCountdown <= 0,
                 modifier = Modifier.fillMaxWidth(),
                 border = BorderStroke(1.dp, UiPalette.BorderSoft)
             ) {
-                Text(if (state.isActionLoading) "发送中..." else "发送${state.registerCodeLabel}")
+                Text(
+                    if (state.registerCodeCountdown > 0) {
+                        "${state.registerCodeCountdown}s"
+                    } else if (state.isActionLoading) {
+                        "发送中..."
+                    } else {
+                        "发送${state.registerCodeLabel}"
+                    }
+                )
             }
         }
 
@@ -1571,6 +1580,7 @@ internal fun LegacyAccountProfilePaneV2(
     editor: UserProfileEditor,
     isSaving: Boolean,
     isEditTab: Boolean,
+    emailBindCodeCountdown: Int,
     onTabChange: (Boolean) -> Unit,
     onEditorChange: ((UserProfileEditor) -> UserProfileEditor) -> Unit,
     onSave: () -> Unit,
@@ -1701,7 +1711,7 @@ internal fun LegacyAccountProfilePaneV2(
                                 ) {
                                     OutlinedButton(
                                         onClick = onSendEmailCode,
-                                        enabled = !isSaving,
+                                        enabled = !isSaving && emailBindCodeCountdown <= 0,
                                         modifier = Modifier
                                             .weight(1f)
                                             .height(46.dp),
@@ -1712,7 +1722,16 @@ internal fun LegacyAccountProfilePaneV2(
                                             contentColor = UiPalette.Accent
                                         )
                                     ) {
-                                        Text("发送验证码", fontWeight = FontWeight.Bold)
+                                        Text(
+                                            if (emailBindCodeCountdown > 0) {
+                                                "${emailBindCodeCountdown}s"
+                                            } else if (isSaving) {
+                                                "发送中..."
+                                            } else {
+                                                "发送验证码"
+                                            },
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     }
                                     Button(
                                         onClick = onBindEmail,

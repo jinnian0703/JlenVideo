@@ -4,6 +4,7 @@ import android.net.Uri
 import android.util.Patterns
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.jlen.vod.data.MembershipPlan
@@ -231,10 +232,13 @@ internal fun LegacyStateRuntimeViewModelCore.legacySendEmailBindCode() {
         updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入正确的邮箱地址"))
         return
     }
+    if (currentAccountState().emailBindCodeCountdown > 0) return
     runtimeRunAccountAction(
         block = { sendEmailBindCode(email) },
         successMessage = "验证码已发送，请注意查收",
-        onSuccess = { }
+        onSuccess = {
+            startEmailBindCodeCountdown(email)
+        }
     )
 }
 
@@ -270,4 +274,20 @@ internal fun LegacyStateRuntimeViewModelCore.legacyUnbindEmail() {
             updateAccountState(accountStateAfterEmailUnbound(currentAccountState()))
         }
     )
+}
+
+private fun LegacyStateRuntimeViewModelCore.startEmailBindCodeCountdown(email: String) {
+    viewModelScope.launch {
+        for (seconds in 60 downTo 0) {
+            val state = currentAccountState()
+            if (state.selectedSection != AccountSection.Profile ||
+                state.profileEditor.pendingEmail.trim() != email
+            ) {
+                updateAccountState(accountStateWithEmailBindCodeCountdown(state, 0))
+                break
+            }
+            updateAccountState(accountStateWithEmailBindCodeCountdown(state, seconds))
+            if (seconds > 0) delay(1000L)
+        }
+    }
 }
