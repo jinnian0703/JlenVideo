@@ -1,7 +1,6 @@
 package top.jlen.vod.ui
 
 import androidx.compose.runtime.Composable
-import top.jlen.vod.data.CacheRetentionOption
 import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.MembershipPlan
 import top.jlen.vod.data.RegisterEditor
@@ -14,7 +13,6 @@ fun AccountScreen(
     onPasswordChange: (String) -> Unit,
     onLogin: () -> Unit,
     onLogout: () -> Unit,
-    onCheckUpdate: () -> Unit,
     onSelectSection: (AccountSection) -> Unit,
     onRefreshSection: () -> Unit,
     onChangePortrait: () -> Unit,
@@ -38,21 +36,16 @@ fun AccountScreen(
     onFindPasswordEditorChange: ((FindPasswordEditor) -> FindPasswordEditor) -> Unit,
     onSendFindPasswordCode: () -> Unit,
     onFindPassword: () -> Unit,
+    onOpenSettings: () -> Unit,
     onSendEmailCode: () -> Unit,
     onBindEmail: () -> Unit,
     onUnbindEmail: () -> Unit,
-    onRefreshCrashLog: () -> Unit,
-    onClearCrashLog: () -> Unit,
-    onRefreshCacheSize: () -> Unit,
-    onSetCacheRetention: (CacheRetentionOption) -> Unit,
-    onClearAppCache: () -> Unit
 ) = LegacyAccountScreen(
     state = state,
     onUserNameChange = onUserNameChange,
     onPasswordChange = onPasswordChange,
     onLogin = onLogin,
     onLogout = onLogout,
-    onCheckUpdate = onCheckUpdate,
     onSelectSection = onSelectSection,
     onRefreshSection = onRefreshSection,
     onChangePortrait = onChangePortrait,
@@ -76,12 +69,8 @@ fun AccountScreen(
     onFindPasswordEditorChange = onFindPasswordEditorChange,
     onSendFindPasswordCode = onSendFindPasswordCode,
     onFindPassword = onFindPassword,
+    onOpenSettings = onOpenSettings,
     onSendEmailCode = onSendEmailCode,
     onBindEmail = onBindEmail,
-    onUnbindEmail = onUnbindEmail,
-    onRefreshCrashLog = onRefreshCrashLog,
-    onClearCrashLog = onClearCrashLog,
-    onRefreshCacheSize = onRefreshCacheSize,
-    onSetCacheRetention = onSetCacheRetention,
-    onClearAppCache = onClearAppCache
+    onUnbindEmail = onUnbindEmail
 )

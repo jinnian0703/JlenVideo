@@ -249,6 +249,25 @@ fun JlenVideoApp() {
             navController.navigate("search/results/${Uri.encode(normalized)}")
         }
     }
+    val openAccountSettings: () -> Unit = {
+        viewModel.refreshCacheSettings()
+        viewModel.refreshCrashLog()
+        navController.navigate("account/settings") {
+            launchSingleTop = true
+        }
+    }
+    val openAccountSettingsChild: (String) -> Unit = { route ->
+        navController.navigate(route) {
+            launchSingleTop = true
+        }
+    }
+    val backToAccountSettings: () -> Unit = {
+        if (!navController.popBackStack()) {
+            navController.navigate("account/settings") {
+                launchSingleTop = true
+            }
+        }
+    }
     LaunchedEffect(heartbeatRoute, heartbeatPlaybackKey, viewModel.accountState.session.userId) {
         viewModel.reportHeartbeat(heartbeatRoute)
         while (true) {
@@ -443,7 +462,6 @@ fun JlenVideoApp() {
                                 onPasswordChange = viewModel::updateLoginPassword,
                                 onLogin = viewModel::login,
                                 onLogout = viewModel::logout,
-                                onCheckUpdate = viewModel::checkAppUpdate,
                                 onSelectSection = viewModel::selectAccountSection,
                                 onRefreshSection = viewModel::refreshSelectedAccountSection,
                                 onChangePortrait = { portraitPicker.launch("image/*") },
@@ -470,14 +488,10 @@ fun JlenVideoApp() {
                                 onFindPasswordEditorChange = viewModel::updateFindPasswordEditor,
                                 onSendFindPasswordCode = viewModel::sendFindPasswordCode,
                                 onFindPassword = viewModel::findPassword,
+                                onOpenSettings = openAccountSettings,
                                 onSendEmailCode = viewModel::sendEmailBindCode,
                                 onBindEmail = viewModel::bindEmail,
-                                onUnbindEmail = viewModel::unbindEmail,
-                                onRefreshCrashLog = viewModel::refreshCrashLog,
-                                onClearCrashLog = viewModel::clearCrashLog,
-                                onRefreshCacheSize = viewModel::refreshCacheSize,
-                                onSetCacheRetention = viewModel::setCacheRetention,
-                                onClearAppCache = viewModel::clearAppCache
+                                onUnbindEmail = viewModel::unbindEmail
                             )
                         }
                         composable("announcements") {
@@ -498,6 +512,74 @@ fun JlenVideoApp() {
                             AccountPointLogScreen(
                                 pointLogs = viewModel.accountState.membershipPointLogs,
                                 onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable("account/settings") {
+                            LaunchedEffect(Unit) {
+                                viewModel.refreshCacheSettings()
+                                viewModel.refreshCrashLog()
+                            }
+                            AccountSettingsHomeScreen(
+                                currentVersion = viewModel.accountState.updateInfo?.currentVersion
+                                    ?.ifBlank { "--" }
+                                    ?: "--",
+                                latestVersion = viewModel.accountState.updateInfo?.latestVersion.orEmpty(),
+                                hasUpdate = viewModel.accountState.updateInfo?.hasUpdate == true,
+                                isUpdateLoading = viewModel.accountState.isUpdateLoading,
+                                cacheRetention = viewModel.accountState.cacheRetention,
+                                cacheSizeSummary = viewModel.accountState.cacheSizeSummary,
+                                isCacheSizeLoading = viewModel.accountState.isCacheSizeLoading,
+                                hasCrashLog = viewModel.accountState.hasCrashLog,
+                                onBack = { navController.popBackStack() },
+                                onOpenUpdate = { openAccountSettingsChild("account/settings/update") },
+                                onOpenCache = { openAccountSettingsChild("account/settings/cache") },
+                                onOpenAgreement = { openAccountSettingsChild("account/settings/agreement") },
+                                onOpenLogs = { openAccountSettingsChild("account/settings/logs") }
+                            )
+                        }
+                        composable("account/settings/update") {
+                            AccountUpdateSettingsScreen(
+                                currentVersion = viewModel.accountState.updateInfo?.currentVersion
+                                    ?.ifBlank { "--" }
+                                    ?: "--",
+                                latestVersion = viewModel.accountState.updateInfo?.latestVersion.orEmpty(),
+                                notes = viewModel.accountState.updateInfo?.notes.orEmpty(),
+                                hasUpdate = viewModel.accountState.updateInfo?.hasUpdate == true,
+                                isUpdateLoading = viewModel.accountState.isUpdateLoading,
+                                onBack = backToAccountSettings,
+                                onCheckUpdate = viewModel::checkAppUpdate,
+                                onOpenRelease = openReleaseLink,
+                                onDownloadUpdate = openUpdateLink
+                            )
+                        }
+                        composable("account/settings/cache") {
+                            LaunchedEffect(Unit) {
+                                viewModel.refreshCacheSettings()
+                            }
+                            AccountCacheSettingsScreen(
+                                cacheRetention = viewModel.accountState.cacheRetention,
+                                cacheSizeSummary = viewModel.accountState.cacheSizeSummary,
+                                isCacheSizeLoading = viewModel.accountState.isCacheSizeLoading,
+                                isCacheClearing = viewModel.accountState.isCacheClearing,
+                                onBack = backToAccountSettings,
+                                onRefreshCacheSize = viewModel::refreshCacheSize,
+                                onSetCacheRetention = viewModel::setCacheRetention,
+                                onClearAppCache = viewModel::clearAppCache
+                            )
+                        }
+                        composable("account/settings/agreement") {
+                            AccountAgreementSettingsScreen(onBack = backToAccountSettings)
+                        }
+                        composable("account/settings/logs") {
+                            LaunchedEffect(Unit) {
+                                viewModel.refreshCrashLog()
+                            }
+                            AccountCrashLogSettingsScreen(
+                                crashLogText = viewModel.accountState.latestCrashLog,
+                                hasCrashLog = viewModel.accountState.hasCrashLog,
+                                onBack = backToAccountSettings,
+                                onRefreshCrashLog = viewModel::refreshCrashLog,
+                                onClearCrashLog = viewModel::clearCrashLog
                             )
                         }
                         composable(

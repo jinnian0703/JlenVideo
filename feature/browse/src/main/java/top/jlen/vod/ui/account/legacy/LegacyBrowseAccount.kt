@@ -117,7 +117,6 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import top.jlen.vod.AppConfig
-import top.jlen.vod.AppRuntimeInfo
 import top.jlen.vod.PLAYER_DESKTOP_UA
 import top.jlen.vod.data.AppNotice
 import top.jlen.vod.data.AppleCmsCategory
@@ -144,7 +143,6 @@ internal fun LegacyAccountScreen(
     onPasswordChange: (String) -> Unit,
     onLogin: () -> Unit,
     onLogout: () -> Unit,
-    onCheckUpdate: () -> Unit,
     onSelectSection: (AccountSection) -> Unit,
     onRefreshSection: () -> Unit,
     onChangePortrait: () -> Unit,
@@ -168,16 +166,11 @@ internal fun LegacyAccountScreen(
     onFindPasswordEditorChange: ((FindPasswordEditor) -> FindPasswordEditor) -> Unit,
     onSendFindPasswordCode: () -> Unit,
     onFindPassword: () -> Unit,
+    onOpenSettings: () -> Unit,
     onSendEmailCode: () -> Unit,
     onBindEmail: () -> Unit,
-    onUnbindEmail: () -> Unit,
-    onRefreshCrashLog: () -> Unit,
-    onClearCrashLog: () -> Unit,
-    onRefreshCacheSize: () -> Unit,
-    onSetCacheRetention: (CacheRetentionOption) -> Unit,
-    onClearAppCache: () -> Unit
+    onUnbindEmail: () -> Unit
 ) {
-    val context = LocalContext.current
     val showLoggedInContent = state.session.isLoggedIn
     val noticeMessage = state.error?.takeIf { it.isNotBlank() } ?: state.message?.takeIf { it.isNotBlank() }
     val noticeTone = if (!state.error.isNullOrBlank()) {
@@ -196,8 +189,22 @@ internal fun LegacyAccountScreen(
     }
 
     LaunchedEffect(showLoggedInContent, state.selectedSection) {
-        if (showLoggedInContent && state.selectedSection == AccountSection.Favorites) {
-            onSelectSection(AccountSection.Overview)
+        if (showLoggedInContent) {
+            when (state.selectedSection) {
+                AccountSection.Favorites -> onSelectSection(AccountSection.Overview)
+                AccountSection.About -> {
+                    onSelectSection(AccountSection.Overview)
+                    onOpenSettings()
+                }
+                else -> Unit
+            }
+        }
+    }
+
+    LaunchedEffect(showLoggedInContent, state.authMode) {
+        if (!showLoggedInContent && state.authMode == AccountAuthMode.About) {
+            onAuthModeChange(AccountAuthMode.Login)
+            onOpenSettings()
         }
     }
 
@@ -349,7 +356,13 @@ internal fun LegacyAccountScreen(
                                 AccountSection.Favorites -> ""
                             },
                             selected = state.selectedSection == section,
-                            onClick = { onSelectSection(section) },
+                            onClick = {
+                                if (section == AccountSection.About) {
+                                    onOpenSettings()
+                                } else {
+                                    onSelectSection(section)
+                                }
+                            },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -399,10 +412,7 @@ internal fun LegacyAccountScreen(
                             onSignIn = onSignInMembership,
                             onOpenPointLogs = onOpenPointLogs,
                             onOpenFollow = onOpenFollow,
-                            onOpenLogs = {
-                                onSelectSection(AccountSection.About)
-                                onRefreshCrashLog()
-                            }
+                            onOpenLogs = onOpenSettings
                         )
                         AccountSection.Profile -> AccountProfilePaneV2(
                             isLoading = state.isContentLoading,
@@ -433,40 +443,7 @@ internal fun LegacyAccountScreen(
                             onSignIn = onSignInMembership,
                             onOpenPointLogs = onOpenPointLogs
                         )
-                        AccountSection.About -> AboutPane(
-                            currentVersion = state.updateInfo?.currentVersion?.ifBlank { AppRuntimeInfo.versionName }
-                                ?: AppRuntimeInfo.versionName,
-                            latestVersion = state.updateInfo?.latestVersion.orEmpty(),
-                            notes = state.updateInfo?.notes.orEmpty(),
-                            hasUpdate = state.updateInfo?.hasUpdate == true,
-                            isUpdateLoading = state.isUpdateLoading,
-                            cacheRetention = state.cacheRetention,
-                            cacheSizeSummary = state.cacheSizeSummary,
-                            isCacheSizeLoading = state.isCacheSizeLoading,
-                            isCacheClearing = state.isCacheClearing,
-                            crashLogText = state.latestCrashLog,
-                            hasCrashLog = state.hasCrashLog,
-                            onCheckUpdate = onCheckUpdate,
-                            onRefreshCacheSize = onRefreshCacheSize,
-                            onSetCacheRetention = onSetCacheRetention,
-                            onClearAppCache = onClearAppCache,
-                            onRefreshCrashLog = onRefreshCrashLog,
-                            onClearCrashLog = onClearCrashLog,
-                            onOpenRelease = {
-                                val targetUrl = state.updateInfo?.releasePageUrl
-                                    ?.takeIf { it.isNotBlank() }
-                                    ?: "https://github.com/jinnian0703/JlenVideo/releases"
-                                openExternalUrl(context, targetUrl)
-                            },
-                            onDownloadUpdate = {
-                                val targetUrl = state.updateInfo?.downloadUrl
-                                    ?.takeIf { it.isNotBlank() }
-                                    ?: state.updateInfo?.releasePageUrl
-                                    ?.takeIf { it.isNotBlank() }
-                                    ?: "https://github.com/jinnian0703/JlenVideo/releases"
-                                openExternalUrl(context, targetUrl)
-                            }
-                        )
+                        AccountSection.About -> Unit
                     }
                 }
             }
@@ -540,49 +517,7 @@ internal fun LegacyAccountScreen(
                         }
                     }
 
-                    AccountAuthMode.About -> {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            AccountGuestModeHeader(
-                                title = "设置与工具",
-                                description = "检查更新、查看协议说明和处理问题日志",
-                                onBack = { onAuthModeChange(AccountAuthMode.Login) }
-                            )
-                            AboutPane(
-                                currentVersion = state.updateInfo?.currentVersion?.ifBlank { AppRuntimeInfo.versionName }
-                                    ?: AppRuntimeInfo.versionName,
-                                latestVersion = state.updateInfo?.latestVersion.orEmpty(),
-                                notes = state.updateInfo?.notes.orEmpty(),
-                                hasUpdate = state.updateInfo?.hasUpdate == true,
-                                isUpdateLoading = state.isUpdateLoading,
-                                cacheRetention = state.cacheRetention,
-                                cacheSizeSummary = state.cacheSizeSummary,
-                                isCacheSizeLoading = state.isCacheSizeLoading,
-                                isCacheClearing = state.isCacheClearing,
-                                crashLogText = state.latestCrashLog,
-                                hasCrashLog = state.hasCrashLog,
-                                onCheckUpdate = onCheckUpdate,
-                                onRefreshCacheSize = onRefreshCacheSize,
-                                onSetCacheRetention = onSetCacheRetention,
-                                onClearAppCache = onClearAppCache,
-                                onRefreshCrashLog = onRefreshCrashLog,
-                                onClearCrashLog = onClearCrashLog,
-                                onOpenRelease = {
-                                    val targetUrl = state.updateInfo?.releasePageUrl
-                                        ?.takeIf { it.isNotBlank() }
-                                        ?: "https://github.com/jinnian0703/JlenVideo/releases"
-                                    openExternalUrl(context, targetUrl)
-                                },
-                                onDownloadUpdate = {
-                                    val targetUrl = state.updateInfo?.downloadUrl
-                                        ?.takeIf { it.isNotBlank() }
-                                        ?: state.updateInfo?.releasePageUrl
-                                        ?.takeIf { it.isNotBlank() }
-                                        ?: "https://github.com/jinnian0703/JlenVideo/releases"
-                                    openExternalUrl(context, targetUrl)
-                                }
-                            )
-                        }
-                    }
+                    AccountAuthMode.About -> Spacer(Modifier.height(1.dp))
 
                     AccountAuthMode.Login -> {
                         Card(
@@ -652,7 +587,7 @@ internal fun LegacyAccountScreen(
                                 AccountGuestAuxiliaryActions(
                                     onRegister = { onAuthModeChange(AccountAuthMode.Register) },
                                     onFindPassword = { onAuthModeChange(AccountAuthMode.FindPassword) },
-                                    onAbout = { onAuthModeChange(AccountAuthMode.About) }
+                                    onAbout = onOpenSettings
                                 )
                             }
                         }
