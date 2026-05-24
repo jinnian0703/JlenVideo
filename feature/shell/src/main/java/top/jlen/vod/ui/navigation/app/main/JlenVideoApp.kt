@@ -195,7 +195,9 @@ fun JlenVideoApp() {
     } else {
         heartbeatRoute
     }
-    val showBottomBar = currentTopLevelRoute != null && !isSearchResultsRoute(currentRoute)
+    val showBottomBar = currentTopLevelRoute != null &&
+        !isSearchResultsRoute(currentRoute) &&
+        !isAccountSettingsDetailRoute(currentRoute)
     val rootContentInsets = WindowInsets(0, 0, 0, 0)
     val updateInfo = viewModel.accountState.updateInfo
     val noticeDialog = viewModel.noticeState.dialogNotice
@@ -675,6 +677,9 @@ private fun normalizeTopLevelRoute(route: String?): String? = when {
 
 private fun isSearchResultsRoute(route: String?): Boolean =
     route?.startsWith("search/results/") == true || route == "search/results/{query}"
+
+private fun isAccountSettingsDetailRoute(route: String?): Boolean =
+    route?.startsWith("account/settings/") == true
 
 private fun normalizeHeartbeatRoute(route: String?): String = when {
     route.isNullOrBlank() -> "home"
