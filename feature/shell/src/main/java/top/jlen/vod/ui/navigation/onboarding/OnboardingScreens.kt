@@ -544,7 +544,10 @@ private fun FirstLoginFindPasswordPane(
             placeholder = "请输入绑定邮箱",
             keyboardType = KeyboardType.Email
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             OnboardingTextField(
                 value = state.findPasswordEditor.code,
                 onValueChange = { value -> onEditorChange { it.copy(code = value) } },
@@ -558,11 +561,17 @@ private fun FirstLoginFindPasswordPane(
                 onClick = onSendCode,
                 enabled = !state.isActionLoading && state.findPasswordCodeCountdown <= 0,
                 modifier = Modifier
-                    .width(122.dp)
-                    .height(56.dp),
-                shape = RoundedCornerShape(UiDimens.ControlRadius),
+                    .width(96.dp)
+                    .height(44.dp),
+                shape = RoundedCornerShape(UiDimens.PillRadius),
                 border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.72f),
+                    contentColor = UiPalette.Accent,
+                    disabledContainerColor = UiPalette.SurfaceSoft.copy(alpha = 0.56f),
+                    disabledContentColor = UiPalette.TextMuted
+                ),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp)
             ) {
                 Text(
                     text = if (state.findPasswordCodeCountdown > 0) {
@@ -572,7 +581,9 @@ private fun FirstLoginFindPasswordPane(
                     } else {
                         "获取验证码"
                     },
-                    maxLines = 1
+                    maxLines = 1,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }

@@ -1059,7 +1059,10 @@ internal fun LegacyAccountFindPasswordPane(
                 unfocusedContainerColor = UiPalette.Surface
             )
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             OutlinedTextField(
                 value = state.findPasswordEditor.code,
                 onValueChange = { value -> onEditorChange { it.copy(code = value) } },
@@ -1084,11 +1087,17 @@ internal fun LegacyAccountFindPasswordPane(
                 onClick = onSendCode,
                 enabled = !state.isActionLoading && state.findPasswordCodeCountdown <= 0,
                 modifier = Modifier
-                    .width(126.dp)
-                    .height(58.dp),
+                    .width(98.dp)
+                    .height(44.dp),
                 border = BorderStroke(1.dp, UiPalette.BorderSoft),
-                shape = RoundedCornerShape(18.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                shape = RoundedCornerShape(999.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.72f),
+                    contentColor = UiPalette.Accent,
+                    disabledContainerColor = UiPalette.SurfaceSoft.copy(alpha = 0.56f),
+                    disabledContentColor = UiPalette.TextMuted
+                ),
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
             ) {
                 Text(
                     text = if (state.findPasswordCodeCountdown > 0) {
@@ -1099,6 +1108,7 @@ internal fun LegacyAccountFindPasswordPane(
                         "获取验证码"
                     },
                     maxLines = 1,
+                    style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold
                 )
             }
