@@ -341,6 +341,9 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
 
     fun upgradeMembership(plan: MembershipPlan) = legacyUpgradeMembership(plan)
 
+    fun redeemMembershipCard(cardNo: String, cardPassword: String) =
+        legacyRedeemMembershipCard(cardNo, cardPassword)
+
     fun signInMembership() = legacySignInMembership()
 
     fun saveProfile() = legacySaveProfile()

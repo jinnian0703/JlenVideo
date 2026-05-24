@@ -151,6 +151,7 @@ internal fun LegacyAccountScreen(
     onDeleteHistory: (String) -> Unit,
     onClearHistory: () -> Unit,
     onUpgradeMembership: (MembershipPlan) -> Unit,
+    onRedeemMembershipCard: (String, String) -> Unit,
     onSignInMembership: () -> Unit,
     onOpenPointLogs: () -> Unit,
     onProfileEditorChange: ((UserProfileEditor) -> UserProfileEditor) -> Unit,
@@ -421,6 +422,7 @@ internal fun LegacyAccountScreen(
                             isActionLoading = state.isActionLoading,
                             message = state.message,
                             onUpgrade = onUpgradeMembership,
+                            onRedeemCard = onRedeemMembershipCard,
                             onSignIn = onSignInMembership,
                             onOpenPointLogs = onOpenPointLogs
                         )

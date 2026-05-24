@@ -88,6 +88,26 @@ internal fun LegacyStateRuntimeViewModelCore.legacyUpgradeMembership(plan: Membe
     )
 }
 
+internal fun LegacyStateRuntimeViewModelCore.legacyRedeemMembershipCard(
+    cardNo: String,
+    cardPassword: String
+) {
+    val normalizedCardNo = cardNo.trim()
+    val normalizedPassword = cardPassword.trim()
+    if (normalizedCardNo.isBlank()) {
+        updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入充值卡卡号"))
+        return
+    }
+    if (normalizedPassword.isBlank()) {
+        updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入充值卡密码"))
+        return
+    }
+    runtimeRunAccountAction(
+        block = { redeemMembershipCard(normalizedCardNo, normalizedPassword) },
+        onSuccess = { selectAccountSection(AccountSection.Member, forceRefresh = true) }
+    )
+}
+
 internal fun LegacyStateRuntimeViewModelCore.legacySignInMembership() {
     val cachedSignInInfo = currentAccountState().membershipSignInInfo
     val shouldRefreshMembershipFirst =

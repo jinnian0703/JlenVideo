@@ -456,6 +456,7 @@ fun JlenVideoApp() {
                                 onDeleteHistory = viewModel::deleteHistory,
                                 onClearHistory = viewModel::clearHistory,
                                 onUpgradeMembership = viewModel::upgradeMembership,
+                                onRedeemMembershipCard = viewModel::redeemMembershipCard,
                                 onSignInMembership = viewModel::signInMembership,
                                 onOpenPointLogs = { navController.navigate("account/points") },
                                 onProfileEditorChange = viewModel::updateProfileEditor,

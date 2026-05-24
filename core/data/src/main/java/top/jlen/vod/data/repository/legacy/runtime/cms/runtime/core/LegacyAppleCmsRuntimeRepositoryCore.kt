@@ -1856,6 +1856,9 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     suspend fun upgradeMembership(plan: MembershipPlan): String = legacyUpgradeMembership(plan)
 
+    suspend fun redeemMembershipCard(cardNo: String, cardPassword: String): String =
+        legacyRedeemMembershipCard(cardNo, cardPassword)
+
     suspend fun signInMembership(): String = legacySignInMembership()
 
     private suspend fun loadPointLogsForApp(page: Int = 1, limit: Int = 20): List<PointLogItem> {

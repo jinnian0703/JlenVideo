@@ -216,6 +216,22 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyUpgradeMembership
     )
 }
 
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyRedeemMembershipCard(
+    cardNo: String,
+    cardPassword: String
+): String {
+    val form = FormBody.Builder()
+        .add("flag", "card")
+        .add("card_no", cardNo.trim())
+        .add("card_pwd", cardPassword.trim())
+        .build()
+    return runtimeSubmitUserAction(
+        url = "${runtimeBaseUrl()}/index.php/user/buy",
+        referer = "${runtimeBaseUrl()}/index.php/user/buy.html",
+        formBody = form
+    )
+}
+
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacySignInMembership(): String {
     val json = runtimeRequestVideoApiJson(
         path = "api.php/video/signIn",

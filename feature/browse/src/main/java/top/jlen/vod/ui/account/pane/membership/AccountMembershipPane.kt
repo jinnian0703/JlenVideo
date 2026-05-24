@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,12 +23,15 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,7 +49,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -68,6 +77,7 @@ internal fun MembershipPaneV2(
     isActionLoading: Boolean,
     message: String? = null,
     onUpgrade: (MembershipPlan) -> Unit,
+    onRedeemCard: (String, String) -> Unit,
     onSignIn: () -> Unit,
     onOpenPointLogs: () -> Unit
 ) {
@@ -82,6 +92,7 @@ internal fun MembershipPaneV2(
         .orEmpty()
     val shouldHighlightPoints = signInSuccessMessage.isNotBlank() || signInInfo.rewardPoints.isNotBlank()
     val trendPoints = remember(pointLogs) { buildPointTrendPoints(pointLogs, days = 30) }
+    var showRechargeDialog by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (signInSuccessMessage.isNotBlank()) {
@@ -101,6 +112,11 @@ internal fun MembershipPaneV2(
             onSignIn = onSignIn
         )
 
+        MembershipRechargeCard(
+            isActionLoading = isActionLoading,
+            onOpen = { showRechargeDialog = true }
+        )
+
         MembershipTrendCard(points = trendPoints)
 
         if (plans.isEmpty()) {
@@ -118,6 +134,17 @@ internal fun MembershipPaneV2(
                 )
             }
         }
+    }
+
+    if (showRechargeDialog) {
+        MembershipCardRechargeDialog(
+            isActionLoading = isActionLoading,
+            onDismiss = { showRechargeDialog = false },
+            onConfirm = { cardNo, cardPassword ->
+                showRechargeDialog = false
+                onRedeemCard(cardNo, cardPassword)
+            }
+        )
     }
 }
 
@@ -357,6 +384,218 @@ private fun MembershipSignInCard(
             }
         }
     }
+}
+
+@Composable
+private fun MembershipRechargeCard(
+    isActionLoading: Boolean,
+    onOpen: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        shape = RoundedCornerShape(UiDimens.CardRadius),
+        border = BorderStroke(1.dp, UiPalette.Border)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(UiDimens.CardPadding),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .background(UiPalette.Accent.copy(alpha = 0.10f), RoundedCornerShape(UiDimens.ControlRadius)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Payments,
+                    contentDescription = null,
+                    tint = UiPalette.Accent,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "充值卡",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = UiPalette.Ink
+                )
+                Text(
+                    text = "输入卡号和密码兑换积分",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = UiPalette.TextSecondary
+                )
+            }
+
+            Button(
+                onClick = onOpen,
+                enabled = !isActionLoading,
+                modifier = Modifier.height(UiDimens.CompactButtonHeight),
+                shape = RoundedCornerShape(UiDimens.ControlRadius),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = UiPalette.Accent,
+                    contentColor = UiPalette.AccentText,
+                    disabledContainerColor = UiPalette.SurfaceSoft,
+                    disabledContentColor = UiPalette.TextMuted
+                )
+            ) {
+                Text(if (isActionLoading) "处理中..." else "立即充值")
+            }
+        }
+    }
+}
+
+@Composable
+private fun MembershipCardRechargeDialog(
+    isActionLoading: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String) -> Unit
+) {
+    var cardNo by remember { mutableStateOf("") }
+    var cardPassword by remember { mutableStateOf("") }
+    var localError by remember { mutableStateOf<String?>(null) }
+
+    Dialog(onDismissRequest = { if (!isActionLoading) onDismiss() }) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+            shape = RoundedCornerShape(UiDimens.LargeContainerRadius),
+            border = BorderStroke(1.dp, UiPalette.Border)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "充值卡兑换",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = UiPalette.Ink
+                    )
+                    Text(
+                        text = "输入充值卡信息后，积分会添加到当前账号。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = UiPalette.TextSecondary
+                    )
+                }
+
+                RechargeTextField(
+                    value = cardNo,
+                    onValueChange = {
+                        cardNo = it
+                        localError = null
+                    },
+                    label = "卡号",
+                    keyboardType = KeyboardType.Ascii,
+                    imeAction = ImeAction.Next
+                )
+                RechargeTextField(
+                    value = cardPassword,
+                    onValueChange = {
+                        cardPassword = it
+                        localError = null
+                    },
+                    label = "卡密密码",
+                    password = true,
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done
+                )
+
+                localError?.let { error ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(UiDimens.ControlRadius))
+                            .background(UiPalette.Accent.copy(alpha = 0.08f))
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                    ) {
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = UiPalette.Accent,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TextButton(
+                        onClick = onDismiss,
+                        enabled = !isActionLoading,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(UiDimens.SecondaryButtonHeight),
+                        shape = RoundedCornerShape(UiDimens.ControlRadius),
+                        colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.Accent)
+                    ) {
+                        Text("取消", fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = {
+                            when {
+                                cardNo.trim().isBlank() -> localError = "请输入充值卡卡号"
+                                cardPassword.trim().isBlank() -> localError = "请输入充值卡密码"
+                                else -> onConfirm(cardNo, cardPassword)
+                            }
+                        },
+                        enabled = !isActionLoading,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(UiDimens.SecondaryButtonHeight),
+                        shape = RoundedCornerShape(UiDimens.ControlRadius),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = UiPalette.Accent,
+                            contentColor = UiPalette.AccentText
+                        )
+                    ) {
+                        Text(if (isActionLoading) "处理中..." else "确认充值")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RechargeTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    password: Boolean = false,
+    keyboardType: KeyboardType,
+    imeAction: ImeAction
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(label) },
+        singleLine = true,
+        visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = keyboardType,
+            imeAction = imeAction
+        ),
+        shape = RoundedCornerShape(UiDimens.ControlRadius),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = UiPalette.Accent,
+            unfocusedBorderColor = UiPalette.BorderSoft,
+            focusedLabelColor = UiPalette.Accent,
+            cursorColor = UiPalette.Accent
+        )
+    )
 }
 
 @Composable
