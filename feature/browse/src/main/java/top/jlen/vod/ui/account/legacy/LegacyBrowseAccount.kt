@@ -1589,6 +1589,7 @@ internal fun LegacyAccountProfilePaneV2(
     onUnbindEmail: () -> Unit
 ) {
     val selectedTab = if (isEditTab) AccountProfileTab.Edit else AccountProfileTab.Overview
+    var showUnbindEmailConfirm by rememberSaveable { mutableStateOf(false) }
     val overviewFields = remember(fields, editor.email) {
         if (editor.email.isBlank() || fields.any { it.first == "邮箱" }) {
             fields
@@ -1604,6 +1605,17 @@ internal fun LegacyAccountProfilePaneV2(
                 fields + ("邮箱" to editor.email)
             }
         }
+    }
+
+    if (showUnbindEmailConfirm) {
+        UnbindEmailConfirmDialog(
+            email = editor.email,
+            onDismiss = { showUnbindEmailConfirm = false },
+            onConfirm = {
+                showUnbindEmailConfirm = false
+                onUnbindEmail()
+            }
+        )
     }
 
     when {
@@ -1758,7 +1770,7 @@ internal fun LegacyAccountProfilePaneV2(
                                     label = "邮箱",
                                     value = editor.email,
                                     actionText = if (isSaving) "解绑中..." else "解绑邮箱",
-                                    onAction = if (isSaving) null else onUnbindEmail
+                                    onAction = if (isSaving) null else ({ showUnbindEmailConfirm = true })
                                 )
                             }
                         }
