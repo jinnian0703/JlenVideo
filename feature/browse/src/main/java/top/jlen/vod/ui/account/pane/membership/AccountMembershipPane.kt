@@ -87,18 +87,18 @@ internal fun MembershipPaneV2(
         return
     }
 
-    val signInSuccessMessage = message
-        ?.takeIf { it.contains("签到成功") || (it.contains("获得") && it.contains("积分")) }
+    val membershipSuccessMessage = message
+        ?.takeIf { it.isMembershipSuccessMessage() }
         ?.trim()
         .orEmpty()
-    val shouldHighlightPoints = signInSuccessMessage.isNotBlank() || signInInfo.rewardPoints.isNotBlank()
+    val shouldHighlightPoints = membershipSuccessMessage.isNotBlank() || signInInfo.rewardPoints.isNotBlank()
     val trendPoints = remember(pointLogs) { buildPointTrendPoints(pointLogs, days = 30) }
     var showRechargeDialog by remember { mutableStateOf(false) }
     var plansExpanded by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        if (signInSuccessMessage.isNotBlank()) {
-            MembershipSuccessBanner(message = signInSuccessMessage)
+        if (membershipSuccessMessage.isNotBlank()) {
+            MembershipSuccessBanner(message = membershipSuccessMessage)
         }
 
         MembershipSummaryCard(
@@ -885,6 +885,14 @@ private fun signInRangeHint(signInInfo: MembershipSignInInfo): String? =
             "签到可得 ${signInInfo.rewardMinPoints} 积分起"
         else -> null
     }
+
+private fun String.isMembershipSuccessMessage(): Boolean =
+    contains("签到成功") ||
+        contains("充值成功") ||
+        contains("兑换成功") ||
+        contains("会员信息已更新") ||
+        (contains("获得") && contains("积分")) ||
+        (contains("增加") && contains("积分"))
 
 @Composable
 private fun MembershipPlanRow(

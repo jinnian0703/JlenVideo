@@ -104,7 +104,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRedeemMembershipCard(
     }
     runtimeRunAccountAction(
         block = { redeemMembershipCard(normalizedCardNo, normalizedPassword) },
-        onSuccess = { selectAccountSection(AccountSection.Member, forceRefresh = true) }
+        onSuccess = { runtimeLoadMembership() }
     )
 }
 
