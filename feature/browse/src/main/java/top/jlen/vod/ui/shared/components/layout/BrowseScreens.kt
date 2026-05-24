@@ -443,7 +443,7 @@ fun FeaturedCard(
     onClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val badgeText = posterBadgeText(item.resolvedBadgeText, compact = false)
+    val badgeText = rememberPosterBadgeText(item.resolvedBadgeText, compact = false)
     val subtitle = item.resolvedSubtitle.ifBlank { "精选推荐" }
 
     Card(
@@ -869,7 +869,7 @@ private fun CompactPosterCard(
     onClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val badgeText = posterBadgeText(item.resolvedBadgeText, compact = true)
+    val badgeText = rememberPosterBadgeText(item.resolvedBadgeText, compact = true)
 
     Column(modifier = modifier.clickable { onClick(item.vodId) }) {
         Box {
@@ -995,8 +995,11 @@ private fun String.isNeverExpireNoticeTime(): Boolean {
     return year != null && (year <= 1970 || year >= 2035)
 }
 
-private fun posterBadgeText(raw: String, compact: Boolean): String =
-    formatPosterBadge(raw = raw, compact = compact)
+@Composable
+private fun rememberPosterBadgeText(raw: String, compact: Boolean): String =
+    remember(raw, compact) {
+        formatPosterBadge(raw = raw, compact = compact)
+    }
 
 internal fun LazyListState.maxVisiblePosterRowIndex(rowKeyPrefix: String): Int =
     layoutInfo.visibleItemsInfo
@@ -1032,6 +1035,7 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                 it != item.resolvedBadgeText
         }
     val compactMeta = item.resolvedSubtitle.ifBlank { "站内资源" }
+    val badgeText = rememberPosterBadgeText(item.resolvedBadgeText, compact = false)
 
     Card(
         modifier = Modifier
@@ -1090,7 +1094,7 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    posterBadgeText(item.resolvedBadgeText, compact = false)
+                    badgeText
                         .takeIf { it.isNotBlank() }
                         ?.let { badge ->
                         Box(

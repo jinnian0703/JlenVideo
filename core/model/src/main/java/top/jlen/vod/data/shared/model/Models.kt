@@ -6,6 +6,33 @@ import com.google.gson.annotations.SerializedName
 import kotlin.LazyThreadSafetyMode
 import java.util.Locale
 
+private val modelWhitespaceRegex = Regex("\\s+")
+private val normalizedEpisodeBadgePatterns = listOf(
+    Regex("""^更新至第?\d{1,4}集?$"""),
+    Regex("""^更新至第?\d{1,8}期$"""),
+    Regex("""^第\d{1,4}集$"""),
+    Regex("""^\d{1,4}集$"""),
+    Regex("""^第\d{1,8}期$"""),
+    Regex("""^\d{1,8}期$"""),
+    Regex("""^全\d{1,4}集$"""),
+    Regex("""^共\d{1,4}集$"""),
+    Regex("""^\d{1,4}集全$""")
+)
+private val normalizedPlainNumberRegex = Regex("""^\d{1,4}$""")
+private val normalizedDateEpisodeRegex = Regex("""^\d{8}$""")
+private const val modelLocalizedStatusSuffix = "(国语|粤语|英语|日语|韩语|法语|德语|俄语|泰语|中字|双字|中字版|双语版|国语版|粤语版)?"
+private val normalizedPreviewBadgeRegex = Regex("""^(正片|抢先版?|抢先看|预告)$modelLocalizedStatusSuffix$""")
+private val normalizedQualityBadgeRegex = Regex("""^(更新)?(HD|BD|TC|TS|CAM|DVD|4K|720P|1080P|2160P|蓝光|超清|高清|标清|SP|OVA|PV)$modelLocalizedStatusSuffix$""")
+private val episodeNumberPatterns = listOf(
+    Regex("""更新至第?(\d{1,8})[集期]?$"""),
+    Regex("""第(\d{1,8})[集期]$"""),
+    Regex("""^(\d{1,8})[集期]$"""),
+    Regex("""^全(\d{1,8})集$"""),
+    Regex("""^共(\d{1,8})集$"""),
+    Regex("""^(\d{1,8})集全$"""),
+    Regex("""^(\d{1,8})$""")
+)
+
 data class AppleCmsResponse(
     @SerializedName("code") val code: Int = 0,
     @SerializedName("msg") val message: String = "",
@@ -198,7 +225,7 @@ data class VodItem(
         HtmlCompat.fromHtml(value.orEmpty(), HtmlCompat.FROM_HTML_MODE_LEGACY)
             .toString()
             .replace('\u00A0', ' ')
-            .replace(Regex("\\s+"), " ")
+            .replace(modelWhitespaceRegex, " ")
             .trim()
 
     private fun parseLatestEpisodeNumberFromPlayUrl(playUrl: String?): Int? =
@@ -238,41 +265,23 @@ data class VodItem(
             .orEmpty()
 
     private fun normalizeEpisodeBadge(raw: String): String {
-        val normalized = sanitizeDisplayValue(raw).replace(Regex("\\s+"), "")
+        val normalized = sanitizeDisplayValue(raw).replace(modelWhitespaceRegex, "")
         if (normalized.isBlank()) return ""
-        val localizedStatusSuffix = "(国语|粤语|英语|日语|韩语|法语|德语|俄语|泰语|中字|双字|中字版|双语版|国语版|粤语版)?"
         return when {
-            normalized.matches(Regex("""^更新至第?\d{1,4}集?$""")) -> normalized
-            normalized.matches(Regex("""^更新至第?\d{1,8}期$""")) -> normalized
-            normalized.matches(Regex("""^第\d{1,4}集$""")) -> normalized
-            normalized.matches(Regex("""^\d{1,4}集$""")) -> normalized
-            normalized.matches(Regex("""^第\d{1,8}期$""")) -> normalized
-            normalized.matches(Regex("""^\d{1,8}期$""")) -> normalized
-            normalized.matches(Regex("""^全\d{1,4}集$""")) -> normalized
-            normalized.matches(Regex("""^共\d{1,4}集$""")) -> normalized
-            normalized.matches(Regex("""^\d{1,4}集全$""")) -> normalized
-            normalized.matches(Regex("""^\d{1,4}$""")) -> "第${normalized}集"
-            normalized.matches(Regex("""^\d{8}$""")) -> "${normalized}期"
+            normalizedEpisodeBadgePatterns.any { it.matches(normalized) } -> normalized
+            normalizedPlainNumberRegex.matches(normalized) -> "第${normalized}集"
+            normalizedDateEpisodeRegex.matches(normalized) -> "${normalized}期"
             normalized in setOf("完结", "已完结", "完結", "全集") -> normalized
-            normalized.matches(Regex("""^(正片|抢先版?|抢先看|预告)$localizedStatusSuffix$""")) -> normalized
-            normalized.matches(Regex("""^(更新)?(HD|BD|TC|TS|CAM|DVD|4K|720P|1080P|2160P|蓝光|超清|高清|标清|SP|OVA|PV)$localizedStatusSuffix$""")) -> normalized
+            normalizedPreviewBadgeRegex.matches(normalized) -> normalized
+            normalizedQualityBadgeRegex.matches(normalized) -> normalized
             else -> ""
         }
     }
 
     private fun extractEpisodeNumber(text: String): Int? {
         if (text.isBlank()) return null
-        val normalized = text.replace(Regex("\\s+"), "")
-        val patterns = listOf(
-            Regex("""更新至第?(\d{1,8})[集期]?$"""),
-            Regex("""第(\d{1,8})[集期]$"""),
-            Regex("""^(\d{1,8})[集期]$"""),
-            Regex("""^全(\d{1,8})集$"""),
-            Regex("""^共(\d{1,8})集$"""),
-            Regex("""^(\d{1,8})集全$"""),
-            Regex("""^(\d{1,8})$""")
-        )
-        return patterns.firstNotNullOfOrNull { pattern ->
+        val normalized = text.replace(modelWhitespaceRegex, "")
+        return episodeNumberPatterns.firstNotNullOfOrNull { pattern ->
             pattern.find(normalized)?.groupValues?.getOrNull(1)?.toIntOrNull()
         }
     }
