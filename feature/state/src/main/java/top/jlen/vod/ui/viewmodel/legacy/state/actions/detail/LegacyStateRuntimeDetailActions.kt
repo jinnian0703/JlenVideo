@@ -119,7 +119,13 @@ internal fun LegacyStateRuntimeViewModelCore.legacyOpenHistoryRecord(item: UserC
                     PlayerUiState(
                         title = item.title,
                         isResolving = false,
-                        resolveError = "未找到影片详情"
+                        resolveError = "未找到影片详情",
+                        diagnostic = PlaybackDiagnostic(
+                            type = "详情缺失",
+                            title = "未找到影片详情",
+                            message = "当前播放记录关联的影片详情已失效或无法读取。",
+                            suggestion = "请返回详情页重新选择影片。"
+                        )
                     )
                 )
                 return@onSuccess

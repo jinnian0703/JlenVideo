@@ -48,7 +48,9 @@ internal fun updatePlayerEpisodeSelection(
     if (currentEpisodes.isEmpty()) return null
     return playerState.copy(
         selectedEpisodeIndex = index.coerceIn(0, currentEpisodes.lastIndex),
-        playbackSnapshot = PlaybackSnapshot()
+        playbackSnapshot = PlaybackSnapshot(),
+        resolveError = null,
+        diagnostic = null
     )
 }
 
@@ -67,7 +69,9 @@ internal fun updatePlayerSourceSelection(
     return playerState.copy(
         selectedSourceIndex = safeIndex,
         selectedEpisodeIndex = resumedEpisodeIndex,
-        playbackSnapshot = resumeRecord.toPlaybackSnapshot()
+        playbackSnapshot = resumeRecord.toPlaybackSnapshot(),
+        resolveError = null,
+        diagnostic = null
     )
 }
 

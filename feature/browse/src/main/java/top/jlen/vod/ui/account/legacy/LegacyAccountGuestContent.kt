@@ -179,7 +179,7 @@ internal fun AccountGuestAuxiliaryActions(
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.TextSecondary)
         ) {
-            Text("关于与日志", fontWeight = FontWeight.Bold)
+            Text("设置与工具", fontWeight = FontWeight.Bold)
         }
     }
 }

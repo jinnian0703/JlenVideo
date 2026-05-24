@@ -46,7 +46,17 @@ internal fun playerStateWithRefreshedSources(
             selectedSourceIndex = resolvedSourceIndex,
             selectedEpisodeIndex = resolvedEpisodeIndex,
             playbackSnapshot = if (episodeChanged) PlaybackSnapshot() else playerState.playbackSnapshot,
-            resolveError = if (refreshedSources.isEmpty()) "暂无可播放线路" else null
+            resolveError = if (refreshedSources.isEmpty()) "暂无可播放线路" else null,
+            diagnostic = if (refreshedSources.isEmpty()) {
+                playerState.playbackDiagnostic(
+                    type = "无可用线路",
+                    title = "暂无可播放线路",
+                    message = "刷新后仍未发现可用播放线路。",
+                    suggestion = "可以稍后重试，或返回详情页查看其他内容。"
+                )
+            } else {
+                null
+            }
         ),
         sourcesChanged = sourcesChanged,
         episodeChanged = episodeChanged

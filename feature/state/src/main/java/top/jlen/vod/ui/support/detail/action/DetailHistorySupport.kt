@@ -8,7 +8,8 @@ internal fun resolvingHistoryPlayerState(title: String): PlayerUiState =
     PlayerUiState(
         title = title,
         isResolving = true,
-        resolveError = null
+        resolveError = null,
+        diagnostic = null
     )
 
 internal fun failedHistoryPlayerState(
@@ -17,7 +18,13 @@ internal fun failedHistoryPlayerState(
 ): PlayerUiState = PlayerUiState(
     title = title,
     isResolving = false,
-    resolveError = message
+    resolveError = message,
+    diagnostic = PlaybackDiagnostic(
+        type = "播放记录",
+        title = message.ifBlank { "无法恢复播放记录" },
+        message = "当前播放记录无法恢复到可播放状态。",
+        suggestion = "请返回影片详情页重新选择线路和选集。"
+    )
 )
 
 internal fun resolveHistoryVodId(item: UserCenterItem): String =

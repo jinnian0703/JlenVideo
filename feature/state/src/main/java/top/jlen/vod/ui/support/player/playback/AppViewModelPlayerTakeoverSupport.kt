@@ -11,7 +11,8 @@ internal fun applyDetectedStream(
         resolvedUrl = streamUrl,
         isResolving = false,
         useWebPlayer = false,
-        resolveError = null
+        resolveError = null,
+        diagnostic = null
     )
 }
 
@@ -21,7 +22,13 @@ internal fun applyTakeoverFailure(
 ): PlayerUiState = playerState.copy(
     isResolving = false,
     useWebPlayer = false,
-    resolveError = message.ifBlank { "当前线路暂不支持，请切换其他线路试试" }
+    resolveError = message.ifBlank { "未检测到可播放视频" },
+    diagnostic = playerState.playbackDiagnostic(
+        type = "网页检测失败",
+        title = "未检测到可播放视频",
+        message = message.ifBlank { "当前网页线路没有检测到可接管播放的视频内容。" },
+        suggestion = "请刷新线路，或切换其他线路。"
+    )
 )
 
 internal fun hasMeaningfulPlaybackChange(

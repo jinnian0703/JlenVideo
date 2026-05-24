@@ -585,6 +585,7 @@ fun JlenVideoApp() {
                                 onBack = { navController.popBackStack() },
                                 onSelectEpisode = viewModel::selectPlayerEpisode,
                                 onSelectSource = viewModel::selectPlayerSource,
+                                onRefreshSources = viewModel::refreshPlayerSources,
                                 onPlayNext = viewModel::playNextEpisode,
                                 onPlaybackSnapshotChange = viewModel::updatePlaybackSnapshot,
                                 onDetectedStream = viewModel::adoptDetectedStream,

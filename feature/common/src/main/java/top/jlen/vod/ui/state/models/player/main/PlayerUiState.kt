@@ -14,6 +14,7 @@ data class PlayerUiState(
     val isResolving: Boolean = false,
     val useWebPlayer: Boolean = false,
     val resolveError: String? = null,
+    val diagnostic: PlaybackDiagnostic? = null,
     val playbackSnapshot: PlaybackSnapshot = PlaybackSnapshot()
 ) {
     val currentSource: PlaySource?
@@ -40,3 +41,12 @@ data class PlayerUiState(
     val hasNextEpisode: Boolean
         get() = selectedEpisodeIndex < episodes.lastIndex
 }
+
+data class PlaybackDiagnostic(
+    val type: String,
+    val title: String,
+    val message: String,
+    val suggestion: String,
+    val sourceName: String = "",
+    val episodeName: String = ""
+)

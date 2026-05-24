@@ -85,6 +85,7 @@ fun PlayerScreen(
     onBack: () -> Unit,
     onSelectEpisode: (Int) -> Unit,
     onSelectSource: (Int) -> Unit,
+    onRefreshSources: () -> Unit,
     onPlayNext: () -> Unit,
     onPlaybackSnapshotChange: (PlaybackSnapshot) -> Unit,
     onDetectedStream: (String) -> Unit,
@@ -301,7 +302,10 @@ fun PlayerScreen(
                             message = "正在尝试解析线路..."
                         )
                         resolveError != null && !isFullscreen -> ResolveUnavailableSurface(
-                            message = resolveError
+                            diagnostic = state.diagnostic,
+                            title = state.diagnostic?.title ?: "该线路暂不支持",
+                            message = state.diagnostic?.message ?: resolveError,
+                            onRefresh = onRefreshSources
                         )
                         directPlayable && !isFullscreen -> playerContent(false)
                         directPlayable -> Spacer(modifier = Modifier.height(0.dp))

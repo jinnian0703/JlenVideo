@@ -15,6 +15,7 @@ internal fun syncPlayerStateFromFullscreen(
         useWebPlayer = false,
         isResolving = false,
         resolveError = null,
+        diagnostic = null,
         playbackSnapshot = result.snapshot
     )
     return FullscreenSyncState(

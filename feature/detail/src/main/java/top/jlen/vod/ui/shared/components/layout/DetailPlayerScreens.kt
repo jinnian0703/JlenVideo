@@ -21,6 +21,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,11 +57,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -435,7 +436,9 @@ internal fun ResolveLoadingSurface(
 internal fun ResolveUnavailableSurface(
     fullscreenMode: Boolean = false,
     title: String = "该线路暂不支持",
-    message: String = "请换个线路试试"
+    message: String = "请换个线路试试",
+    diagnostic: PlaybackDiagnostic? = null,
+    onRefresh: (() -> Unit)? = null
 ) {
     if (fullscreenMode) {
         Box(
@@ -465,21 +468,98 @@ internal fun ResolveUnavailableSurface(
         return
     }
 
+    var expanded by remember(diagnostic) { mutableStateOf(false) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(248.dp)
+            .heightIn(min = 248.dp)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface)
     ) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 22.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Text(title, color = UiPalette.Ink, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(message, color = UiPalette.TextSecondary)
+                Text(
+                    text = message,
+                    color = UiPalette.TextSecondary,
+                    textAlign = TextAlign.Center
+                )
+                if (diagnostic != null) {
+                    TextButton(onClick = { expanded = !expanded }) {
+                        Text(
+                            text = if (expanded) "收起诊断" else "诊断详情",
+                            color = UiPalette.Accent,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    if (expanded) {
+                        PlaybackDiagnosticDetails(diagnostic)
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    onRefresh?.let {
+                        OutlinedButton(
+                            onClick = it,
+                            shape = RoundedCornerShape(UiDimens.ControlRadius),
+                            border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                        ) {
+                            Text("刷新线路", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Text(
+                        text = diagnostic?.suggestion ?: "可以尝试切换线路，或稍后再试。",
+                        color = UiPalette.TextMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun PlaybackDiagnosticDetails(diagnostic: PlaybackDiagnostic) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(UiPalette.SurfaceSoft)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        DiagnosticLine(label = "失败类型", value = diagnostic.type)
+        DiagnosticLine(label = "当前线路", value = diagnostic.sourceName.ifBlank { "未选择" })
+        DiagnosticLine(label = "当前选集", value = diagnostic.episodeName.ifBlank { "未选择" })
+        DiagnosticLine(label = "建议操作", value = diagnostic.suggestion)
+    }
+}
+
+@Composable
+private fun DiagnosticLine(label: String, value: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = label,
+            color = UiPalette.TextMuted,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.width(64.dp)
+        )
+        Text(
+            text = value,
+            color = UiPalette.TextPrimary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 

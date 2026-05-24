@@ -339,7 +339,7 @@ internal fun LegacyAccountScreen(
                                 AccountSection.Profile -> "资料"
                                 AccountSection.History -> "记录"
                                 AccountSection.Member -> "会员"
-                                AccountSection.About -> "关于"
+                                AccountSection.About -> "设置"
                                 AccountSection.Favorites -> ""
                             },
                             selected = state.selectedSection == section,
@@ -530,8 +530,8 @@ internal fun LegacyAccountScreen(
                     AccountAuthMode.About -> {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             AccountGuestModeHeader(
-                                title = "关于与日志",
-                                description = "检查更新、查看发布页或处理本机崩溃日志",
+                                title = "设置与工具",
+                                description = "检查更新、查看协议说明和处理问题日志",
                                 onBack = { onAuthModeChange(AccountAuthMode.Login) }
                             )
                             AboutPane(
@@ -740,7 +740,7 @@ internal fun LegacyAboutPane(
                     )
                 }
                 AccountToolSection(
-                    title = "崩溃日志",
+                    title = "问题日志",
                     description = if (hasCrashLog) "已有本机日志" else "暂无本机日志"
                 ) {
                     if (hasCrashLog) {
@@ -1386,8 +1386,8 @@ private fun AccountOverviewPane(
                     onClick = onOpenFollow
                 )
                 AccountOverviewLinkRow(
-                    title = "反馈与日志",
-                    description = if (state.hasCrashLog) "有崩溃日志可查看" else "检查更新、查看运行日志",
+                    title = "设置与工具",
+                    description = if (state.hasCrashLog) "有问题日志可查看" else "检查更新、查看协议和日志",
                     icon = Icons.Rounded.Info,
                     onClick = onOpenLogs
                 )
