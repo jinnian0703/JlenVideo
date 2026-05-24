@@ -1744,6 +1744,8 @@ internal fun LegacyAccountProfilePaneV2(
     onUnbindEmail: () -> Unit
 ) {
     val selectedTab = if (isEditTab) AccountProfileTab.Edit else AccountProfileTab.Overview
+    var showBindEmailDialog by rememberSaveable { mutableStateOf(false) }
+    var showChangePasswordDialog by rememberSaveable { mutableStateOf(false) }
     var showUnbindEmailConfirm by rememberSaveable { mutableStateOf(false) }
     val overviewFields = remember(fields, editor.email) {
         if (editor.email.isBlank() || fields.any { it.first == "邮箱" }) {
@@ -1769,6 +1771,35 @@ internal fun LegacyAccountProfilePaneV2(
             onConfirm = {
                 showUnbindEmailConfirm = false
                 onUnbindEmail()
+            }
+        )
+    }
+    if (showBindEmailDialog) {
+        BindEmailDialog(
+            editor = editor,
+            isSaving = isSaving,
+            emailBindCodeCountdown = emailBindCodeCountdown,
+            onEditorChange = onEditorChange,
+            onSendEmailCode = onSendEmailCode,
+            onBindEmail = onBindEmail,
+            onDismiss = { showBindEmailDialog = false }
+        )
+    }
+    if (showChangePasswordDialog) {
+        ChangePasswordDialog(
+            editor = editor,
+            isSaving = isSaving,
+            onEditorChange = onEditorChange,
+            onSave = onSave,
+            onDismiss = {
+                showChangePasswordDialog = false
+                onEditorChange {
+                    it.copy(
+                        currentPassword = "",
+                        newPassword = "",
+                        confirmPassword = ""
+                    )
+                }
             }
         )
     }
@@ -1860,61 +1891,13 @@ internal fun LegacyAccountProfilePaneV2(
                                 title = "邮箱绑定",
                                 description = "绑定后可用于找回账号和接收验证码"
                             ) {
-                                ProfileEditorField(
-                                    label = "邮箱",
-                                    value = editor.pendingEmail,
-                                    onValueChange = { value -> onEditorChange { it.copy(pendingEmail = value) } },
-                                    keyboardType = KeyboardType.Email,
-                                    imeAction = androidx.compose.ui.text.input.ImeAction.Next
+                                ProfileActionCard(
+                                    title = "未绑定邮箱",
+                                    description = "绑定邮箱后可用于找回账号和接收验证码。",
+                                    actionText = "绑定邮箱",
+                                    enabled = !isSaving,
+                                    onAction = { showBindEmailDialog = true }
                                 )
-                                ProfileEditorField(
-                                    label = "邮箱验证码",
-                                    value = editor.emailCode,
-                                    onValueChange = { value -> onEditorChange { it.copy(emailCode = value) } },
-                                    keyboardType = KeyboardType.Ascii
-                                )
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    OutlinedButton(
-                                        onClick = onSendEmailCode,
-                                        enabled = !isSaving && emailBindCodeCountdown <= 0,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(46.dp),
-                                        shape = RoundedCornerShape(18.dp),
-                                        border = BorderStroke(1.dp, UiPalette.BorderSoft),
-                                        colors = ButtonDefaults.outlinedButtonColors(
-                                            containerColor = UiPalette.Surface,
-                                            contentColor = UiPalette.Accent
-                                        )
-                                    ) {
-                                        Text(
-                                            if (emailBindCodeCountdown > 0) {
-                                                "${emailBindCodeCountdown}s"
-                                            } else if (isSaving) {
-                                                "发送中..."
-                                            } else {
-                                                "发送验证码"
-                                            },
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                    Button(
-                                        onClick = onBindEmail,
-                                        enabled = !isSaving,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(46.dp),
-                                        shape = RoundedCornerShape(18.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = UiPalette.Accent,
-                                            contentColor = UiPalette.AccentText
-                                        )
-                                    ) {
-                                        Text(if (isSaving) "绑定中..." else "确认绑定", fontWeight = FontWeight.Bold)
-                                    }
-                                }
                             }
                         } else {
                             AccountEditSectionCard(
@@ -1931,30 +1914,28 @@ internal fun LegacyAccountProfilePaneV2(
                         }
 
                         AccountEditSectionCard(
-                            title = "修改密码",
-                            description = "只在修改密码时填写原密码；不改密码就留空。"
+                            title = "密码设置",
+                            description = "点击后在弹窗中修改账号登录密码"
                         ) {
-                            ProfileEditorField(
-                                label = "原密码",
-                                value = editor.currentPassword,
-                                onValueChange = { value -> onEditorChange { it.copy(currentPassword = value) } },
-                                password = true
-                            )
-                            ProfileEditorField(
-                                label = "新密码",
-                                value = editor.newPassword,
-                                onValueChange = { value -> onEditorChange { it.copy(newPassword = value) } },
-                                password = true
-                            )
-                            ProfileEditorField(
-                                label = "确认新密码",
-                                value = editor.confirmPassword,
-                                onValueChange = { value -> onEditorChange { it.copy(confirmPassword = value) } },
-                                password = true
+                            ProfileActionCard(
+                                title = "登录密码",
+                                description = "需要原密码、新密码和确认密码。",
+                                actionText = "修改密码",
+                                enabled = !isSaving,
+                                onAction = { showChangePasswordDialog = true }
                             )
                         }
                         Button(
-                            onClick = onSave,
+                            onClick = {
+                                onEditorChange {
+                                    it.copy(
+                                        currentPassword = "",
+                                        newPassword = "",
+                                        confirmPassword = ""
+                                    )
+                                }
+                                onSave()
+                            },
                             enabled = !isSaving,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1965,10 +1946,68 @@ internal fun LegacyAccountProfilePaneV2(
                                 contentColor = UiPalette.AccentText
                             )
                         ) {
-                            Text(if (isSaving) "保存中..." else "保存修改", fontWeight = FontWeight.Bold)
+                            Text(if (isSaving) "保存中..." else "保存资料", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileActionCard(
+    title: String,
+    description: String,
+    actionText: String,
+    enabled: Boolean,
+    onAction: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.78f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Ink
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = UiPalette.TextSecondary
+                )
+            }
+            OutlinedButton(
+                onClick = onAction,
+                enabled = enabled,
+                shape = RoundedCornerShape(999.dp),
+                border = BorderStroke(1.dp, UiPalette.Accent.copy(alpha = 0.22f)),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = UiPalette.Accent.copy(alpha = 0.06f),
+                    contentColor = UiPalette.Accent
+                )
+            ) {
+                Text(
+                    text = actionText,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
     }
@@ -2022,6 +2061,26 @@ internal fun LegacyAccountProfilePane(
     onEditorChange: ((UserProfileEditor) -> UserProfileEditor) -> Unit,
     onSave: () -> Unit
 ) {
+    var showChangePasswordDialog by rememberSaveable { mutableStateOf(false) }
+    if (showChangePasswordDialog) {
+        ChangePasswordDialog(
+            editor = editor,
+            isSaving = isSaving,
+            onEditorChange = onEditorChange,
+            onSave = onSave,
+            onDismiss = {
+                showChangePasswordDialog = false
+                onEditorChange {
+                    it.copy(
+                        currentPassword = "",
+                        newPassword = "",
+                        confirmPassword = ""
+                    )
+                }
+            }
+        )
+    }
+
     when {
         isLoading -> LoadingPane("资料加载中...")
         fields.isEmpty() -> EmptyPane(
@@ -2077,26 +2136,24 @@ internal fun LegacyAccountProfilePane(
                     value = editor.phone,
                     onValueChange = { value -> onEditorChange { it.copy(phone = value) } }
                 )
-                ProfileEditorField(
-                    label = "当前密码",
-                    value = editor.currentPassword,
-                    onValueChange = { value -> onEditorChange { it.copy(currentPassword = value) } },
-                    password = true
-                )
-                ProfileEditorField(
-                    label = "新密码",
-                    value = editor.newPassword,
-                    onValueChange = { value -> onEditorChange { it.copy(newPassword = value) } },
-                    password = true
-                )
-                ProfileEditorField(
-                    label = "确认新密码",
-                    value = editor.confirmPassword,
-                    onValueChange = { value -> onEditorChange { it.copy(confirmPassword = value) } },
-                    password = true
+                ProfileActionCard(
+                    title = "登录密码",
+                    description = "点击后在弹窗中修改账号登录密码。",
+                    actionText = "修改密码",
+                    enabled = !isSaving,
+                    onAction = { showChangePasswordDialog = true }
                 )
                 Button(
-                    onClick = onSave,
+                    onClick = {
+                        onEditorChange {
+                            it.copy(
+                                currentPassword = "",
+                                newPassword = "",
+                                confirmPassword = ""
+                            )
+                        }
+                        onSave()
+                    },
                     enabled = !isSaving,
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -2104,7 +2161,7 @@ internal fun LegacyAccountProfilePane(
                         contentColor = UiPalette.AccentText
                     )
                 ) {
-                    Text(if (isSaving) "保存中..." else "保存修改", fontWeight = FontWeight.Bold)
+                    Text(if (isSaving) "保存中..." else "保存资料", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -2119,14 +2176,15 @@ internal fun LegacyProfileEditorField(
     onValueChange: (String) -> Unit,
     password: Boolean = false,
     keyboardType: KeyboardType? = null,
-    imeAction: androidx.compose.ui.text.input.ImeAction = androidx.compose.ui.text.input.ImeAction.Done
+    imeAction: androidx.compose.ui.text.input.ImeAction = androidx.compose.ui.text.input.ImeAction.Done,
+    modifier: Modifier = Modifier
 ) {
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     val resolvedKeyboardType = keyboardType ?: if (password) KeyboardType.Password else KeyboardType.Text
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         singleLine = true,
         label = { Text(label) },

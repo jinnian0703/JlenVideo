@@ -1,6 +1,7 @@
 package top.jlen.vod.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import top.jlen.vod.data.UserProfileEditor
@@ -58,14 +59,16 @@ internal fun ProfileEditorField(
     onValueChange: (String) -> Unit,
     password: Boolean = false,
     keyboardType: KeyboardType? = null,
-    imeAction: ImeAction = ImeAction.Done
+    imeAction: ImeAction = ImeAction.Done,
+    modifier: Modifier = Modifier
 ) = LegacyProfileEditorField(
     label = label,
     value = value,
     onValueChange = onValueChange,
     password = password,
     keyboardType = keyboardType,
-    imeAction = imeAction
+    imeAction = imeAction,
+    modifier = modifier
 )
 
 @Composable
