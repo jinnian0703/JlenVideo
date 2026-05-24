@@ -1811,8 +1811,10 @@ internal fun LegacyAccountProfilePaneV2(
                         Button(
                             onClick = onSave,
                             enabled = !isSaving,
-                            modifier = Modifier.padding(top = 4.dp),
-                            shape = RoundedCornerShape(18.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(UiDimens.PrimaryButtonHeight),
+                            shape = RoundedCornerShape(UiDimens.ControlRadius),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = UiPalette.Accent,
                                 contentColor = UiPalette.AccentText
