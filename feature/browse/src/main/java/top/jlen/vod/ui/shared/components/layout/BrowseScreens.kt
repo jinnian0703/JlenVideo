@@ -13,6 +13,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -79,6 +80,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -564,45 +566,134 @@ fun FeaturedCard(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 internal fun FeaturedCarouselSection(
     items: List<VodItem>,
     onOpenDetail: (String) -> Unit,
     pauseMotion: Boolean = false
 ) {
     if (items.isEmpty()) return
-    val rowState = rememberLazyListState()
+    val realCount = items.size
+    val itemSignature = remember(items) { items.joinToString(separator = "|") { it.stableKey() } }
+    var currentRealIndex by rememberSaveable { mutableStateOf(0) }
 
-    LaunchedEffect(items.map { it.stableKey() }, pauseMotion) {
-        if (items.size <= 1) return@LaunchedEffect
+    if (realCount == 1) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp)
+        ) {
+            FeaturedCard(
+                item = items.first(),
+                onClick = onOpenDetail,
+                modifier = Modifier.fillMaxWidth(),
+                lightweightImage = true,
+                decorativeImage = true
+            )
+        }
+        return
+    }
+
+    val virtualCycles = 201
+    val virtualCount = realCount * virtualCycles
+    val centerIndex = (virtualCycles / 2) * realCount
+    val rowState = rememberLazyListState(
+        initialFirstVisibleItemIndex = centerIndex + currentRealIndex.coerceIn(0, realCount - 1)
+    )
+    val flingBehavior = rememberSnapFlingBehavior(lazyListState = rowState)
+
+    LaunchedEffect(itemSignature, realCount) {
+        val safeRealIndex = currentRealIndex.coerceIn(0, realCount - 1)
+        rowState.scrollToItem(centerIndex + safeRealIndex)
+    }
+
+    LaunchedEffect(rowState, realCount, virtualCount, centerIndex) {
+        snapshotFlow { rowState.firstVisibleItemIndex to rowState.isScrollInProgress }
+            .collect { (virtualIndex, isScrolling) ->
+                val realIndex = virtualIndex.floorMod(realCount)
+                currentRealIndex = realIndex
+                if (!isScrolling) {
+                    val edgeWindow = realCount * 12
+                    val nearStart = virtualIndex < edgeWindow
+                    val nearEnd = virtualIndex > virtualCount - edgeWindow
+                    if (nearStart || nearEnd) {
+                        rowState.scrollToItem(centerIndex + realIndex)
+                    }
+                }
+            }
+    }
+
+    LaunchedEffect(itemSignature, pauseMotion) {
         while (true) {
             delay(3500)
             if (pauseMotion || rowState.isScrollInProgress) continue
-            val currentIndex = rowState.firstVisibleItemIndex.coerceIn(0, items.lastIndex)
-            if (currentIndex >= items.lastIndex) {
-                rowState.scrollToItem(0)
-            } else {
-                rowState.animateScrollToItem(currentIndex + 1)
-            }
+            rowState.animateScrollToItem(rowState.firstVisibleItemIndex + 1)
         }
     }
 
-    LazyRow(
-        state = rowState,
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = 18.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        LazyRow(
+            state = rowState,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            flingBehavior = flingBehavior
+        ) {
+            items(
+                count = virtualCount,
+                key = { virtualIndex -> "featured-$virtualIndex-${items[virtualIndex.floorMod(realCount)].stableKey()}" },
+                contentType = { "featured_card" }
+            ) { virtualIndex ->
+                FeaturedCard(
+                    item = items[virtualIndex.floorMod(realCount)],
+                    onClick = onOpenDetail,
+                    modifier = Modifier.width(318.dp),
+                    lightweightImage = true,
+                    decorativeImage = true
+                )
+            }
+        }
+        FeaturedCarouselIndicator(
+            count = realCount,
+            selectedIndex = currentRealIndex
+        )
+    }
+}
+
+@Composable
+private fun FeaturedCarouselIndicator(
+    count: Int,
+    selectedIndex: Int
+) {
+    if (count <= 1) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        items(
-            items = items,
-            key = { it.stableKey() },
-            contentType = { "featured_card" }
-        ) { item ->
-            FeaturedCard(
-                item = item,
-                onClick = onOpenDetail,
-                modifier = Modifier.width(318.dp),
-                lightweightImage = true,
-                decorativeImage = true
+        if (count <= 10) {
+            repeat(count) { index ->
+                val selected = index == selectedIndex
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 3.dp)
+                        .size(width = if (selected) 18.dp else 6.dp, height = 6.dp)
+                        .clip(RoundedCornerShape(UiDimens.PillRadius))
+                        .background(if (selected) UiPalette.Accent else UiPalette.BorderSoft)
+                )
+            }
+        } else {
+            Text(
+                text = "${selectedIndex + 1} / $count",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = UiPalette.TextMuted,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(UiDimens.PillRadius))
+                    .background(UiPalette.Surface.copy(alpha = 0.72f))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
             )
         }
     }
@@ -1104,4 +1195,6 @@ internal fun AuthenticatedAvatar(
 }
 
 internal fun VodItem.stableKey(): String = vodId.ifBlank { "$displayTitle|${vodPic.orEmpty()}" }
+
+private fun Int.floorMod(divisor: Int): Int = ((this % divisor) + divisor) % divisor
 
