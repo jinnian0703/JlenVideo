@@ -1450,13 +1450,11 @@ private fun AccountOverviewPane(
     onOpenFollow: () -> Unit,
     onOpenLogs: () -> Unit
 ) {
-    val membershipStatus = remember(
-        state.session.groupName,
-        state.membershipInfo.expiry,
-        state.membershipInfo.points,
-        state.membershipSignInInfo.signedToday
-    ) {
-        buildMembershipStatusText(state)
+    val membershipGroupName = remember(state.session.groupName, state.membershipInfo.groupName) {
+        state.session.groupName.ifBlank { state.membershipInfo.groupName }.ifBlank { "普通用户" }
+    }
+    val membershipExpiryDate = remember(state.membershipInfo.expiry) {
+        state.membershipInfo.expiry.toAccountDateOnly()
     }
     val email = state.profileEditor.email.trim()
     val hasEmail = email.isNotBlank()
@@ -1488,29 +1486,9 @@ private fun AccountOverviewPane(
                             color = UiPalette.Ink
                         )
                         Text(
-                            text = membershipStatus,
+                            text = membershipGroupName,
                             style = MaterialTheme.typography.bodyMedium,
                             color = UiPalette.TextSecondary
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .widthIn(min = 74.dp)
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(UiPalette.AccentGlow)
-                            .border(1.dp, UiPalette.BorderSoft, RoundedCornerShape(999.dp))
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (state.membershipSignInInfo.signedToday) "今日已签" else "待签到",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = if (state.membershipSignInInfo.signedToday) UiPalette.Accent else UiPalette.DangerText,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Clip,
-                            textAlign = TextAlign.Center
                         )
                     }
                 }
@@ -1530,7 +1508,7 @@ private fun AccountOverviewPane(
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     AccountOverviewMetric(
                         label = "到期时间",
-                        value = state.membershipInfo.expiry.ifBlank { "--" },
+                        value = membershipExpiryDate,
                         modifier = Modifier.weight(1f)
                     )
                     AccountOverviewMetric(
@@ -1784,18 +1762,6 @@ private fun signInRewardHint(signInInfo: MembershipSignInInfo): String = when {
     else -> "领取积分"
 }
 
-private fun buildMembershipStatusText(state: AccountUiState): String {
-    val groupName = state.session.groupName.ifBlank { state.membershipInfo.groupName }.ifBlank { "普通用户" }
-    val expiry = state.membershipInfo.expiry.trim()
-    val points = state.membershipInfo.points.trim()
-    return when {
-        expiry.isNotBlank() && expiry != "--" -> "$groupName 有效至 $expiry"
-        points.isNotBlank() && !state.membershipSignInInfo.signedToday -> "$groupName，签到可领取积分"
-        points.isNotBlank() -> "$groupName，剩余 $points 积分"
-        else -> groupName
-    }
-}
-
 private fun String.maskEmailForAccount(): String {
     val atIndex = indexOf('@')
     if (atIndex <= 0 || atIndex == lastIndex) return this
@@ -1803,6 +1769,17 @@ private fun String.maskEmailForAccount(): String {
     val domain = drop(atIndex)
     val visiblePrefix = name.take(2)
     return "$visiblePrefix***$domain"
+}
+
+private fun String.toAccountDateOnly(): String {
+    val value = trim()
+    if (value.isBlank() || value == "--") return "--"
+    Regex("""\d{4}-\d{2}-\d{2}""").find(value)?.let { return it.value }
+    Regex("""\d{4}/\d{1,2}/\d{1,2}""").find(value)?.let { match ->
+        val parts = match.value.split("/")
+        return "${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}"
+    }
+    return value.substringBefore(' ').substringBefore('T').ifBlank { "--" }
 }
 
 private enum class AccountProfileTab {
