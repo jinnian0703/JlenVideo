@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -105,9 +104,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
@@ -118,7 +115,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.absoluteValue
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -628,7 +624,7 @@ internal fun FeaturedCarouselSection(
 
     suspend fun settleCarousel() {
         if (pageStepPx <= 0f) return
-        val rawShift = (-animatedOffsetX.value / pageStepPx).toInt()
+        val rawShift = carouselWholePageShift(animatedOffsetX.value, pageStepPx)
         if (rawShift != 0) {
             shiftCarousel(rawShift)
             animatedOffsetX.snapTo(animatedOffsetX.value + rawShift * pageStepPx)
@@ -672,7 +668,7 @@ internal fun FeaturedCarouselSection(
                     orientation = Orientation.Horizontal,
                     state = rememberDraggableState { delta ->
                         dragOffsetX += delta
-                        val shift = (-dragOffsetX / pageStepPx).toInt()
+                        val shift = carouselWholePageShift(dragOffsetX, pageStepPx)
                         if (shift != 0) {
                             shiftCarousel(shift)
                             dragOffsetX += shift * pageStepPx
@@ -693,22 +689,13 @@ internal fun FeaturedCarouselSection(
         ) {
             for (relative in -1..1) {
                 val itemIndex = carouselRealIndex(currentIndex + relative, actualCount)
-                val pageOffset = (displayOffsetX / pageStepPx + relative).absoluteValue.coerceIn(0f, 1f)
                 FeaturedCard(
                     item = items[itemIndex],
                     onClick = onOpenDetail,
                     modifier = Modifier
                         .width(318.dp)
-                        .offset {
-                            IntOffset(
-                                x = (startPaddingPx + relative * pageStepPx + displayOffsetX).roundToInt(),
-                                y = 0
-                            )
-                        }
-                        .zIndex(1f - pageOffset)
                         .graphicsLayer {
-                            alpha = 1f - (pageOffset * 0.18f)
-                            translationX = pageOffset * 12f
+                            translationX = startPaddingPx + relative * pageStepPx + displayOffsetX
                         },
                     lightweightImage = true,
                     decorativeImage = true
@@ -745,6 +732,11 @@ private fun carouselRealIndex(page: Int, itemCount: Int): Int {
     if (itemCount <= 0) return 0
     val index = page % itemCount
     return if (index < 0) index + itemCount else index
+}
+
+private fun carouselWholePageShift(offsetX: Float, pageStepPx: Float): Int {
+    if (pageStepPx <= 0f) return 0
+    return (-offsetX / pageStepPx).toInt()
 }
 
 internal enum class AccountNoticeTone {
