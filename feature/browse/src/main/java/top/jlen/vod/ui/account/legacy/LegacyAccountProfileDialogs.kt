@@ -50,7 +50,10 @@ internal fun BindEmailDialog(
                 AccountDialogHeader(
                     label = "邮箱绑定",
                     title = "绑定邮箱",
-                    description = "绑定后可用于找回账号和接收验证码。"
+                    description = "通过邮箱验证码确认后完成绑定。"
+                )
+                AccountDialogInfoCard(
+                    text = "绑定成功后将关闭弹窗，并使用系统提示告知结果。该邮箱可用于找回账号和接收验证码。"
                 )
                 ProfileEditorField(
                     label = "邮箱",
@@ -105,6 +108,23 @@ internal fun BindEmailDialog(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun AccountDialogInfoCard(text: String) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.76f)),
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 13.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = UiPalette.TextPrimary
+        )
     }
 }
 

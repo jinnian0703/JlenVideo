@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
@@ -1382,10 +1383,13 @@ private fun AccountOverviewPane(
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         Text(
                             text = "账号总览",
                             style = MaterialTheme.typography.titleMedium,
@@ -1400,16 +1404,20 @@ private fun AccountOverviewPane(
                     }
                     Box(
                         modifier = Modifier
+                            .widthIn(min = 74.dp)
                             .clip(RoundedCornerShape(999.dp))
                             .background(UiPalette.AccentGlow)
                             .border(1.dp, UiPalette.BorderSoft, RoundedCornerShape(999.dp))
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text(
                             text = if (state.membershipSignInInfo.signedToday) "今日已签" else "待签到",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = if (state.membershipSignInInfo.signedToday) UiPalette.Accent else UiPalette.DangerText
+                            color = if (state.membershipSignInInfo.signedToday) UiPalette.Accent else UiPalette.DangerText,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Clip
                         )
                     }
                 }
