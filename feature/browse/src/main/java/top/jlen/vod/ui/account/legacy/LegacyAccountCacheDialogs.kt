@@ -134,7 +134,6 @@ internal fun CacheRetentionPickerDialog(
         title = "缓存保存时间",
         subtitle = "超过保存时间后，内容缓存和图片缓存会自动清理。",
         currentLabel = selectedRetention.label,
-        helperText = "手动刷新、清除缓存或内容更新时，仍会拉取最新数据。",
         onDismiss = onDismiss
     ) {
         CacheRetentionOption.entries.forEach { option ->
@@ -159,7 +158,6 @@ internal fun CacheSizeLimitPickerDialog(
         title = "缓存上限",
         subtitle = "超过上限后，会优先删除较旧的内容缓存和图片缓存。",
         currentLabel = selectedLimit.label,
-        helperText = "手动清除缓存仍会立即删除内容缓存和图片缓存。",
         onDismiss = onDismiss
     ) {
         CacheSizeLimitOption.entries.forEach { option ->
@@ -178,7 +176,6 @@ private fun CachePickerDialogFrame(
     title: String,
     subtitle: String,
     currentLabel: String,
-    helperText: String,
     onDismiss: () -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -269,7 +266,6 @@ private fun CachePickerDialogFrame(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         content()
-                        CachePickerHelperCard(helperText)
                     }
                 }
 
@@ -287,26 +283,6 @@ private fun CachePickerDialogFrame(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun CachePickerHelperCard(
-    text: String
-) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.76f)),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.72f))
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 11.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = UiPalette.TextSecondary
-        )
     }
 }
 
