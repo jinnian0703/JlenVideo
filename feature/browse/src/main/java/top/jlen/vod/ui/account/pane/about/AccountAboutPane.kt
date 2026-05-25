@@ -2,6 +2,7 @@ package top.jlen.vod.ui
 
 import androidx.compose.runtime.Composable
 import top.jlen.vod.data.CacheRetentionOption
+import top.jlen.vod.data.CacheSizeLimitOption
 import top.jlen.vod.data.CacheSizeSummary
 
 @Composable
@@ -12,6 +13,7 @@ internal fun AboutPane(
     hasUpdate: Boolean,
     isUpdateLoading: Boolean,
     cacheRetention: CacheRetentionOption,
+    cacheSizeLimit: CacheSizeLimitOption,
     cacheSizeSummary: CacheSizeSummary,
     isCacheSizeLoading: Boolean,
     isCacheClearing: Boolean,
@@ -20,6 +22,7 @@ internal fun AboutPane(
     onCheckUpdate: () -> Unit,
     onRefreshCacheSize: () -> Unit,
     onSetCacheRetention: (CacheRetentionOption) -> Unit,
+    onSetCacheSizeLimit: (CacheSizeLimitOption) -> Unit,
     onClearAppCache: () -> Unit,
     onRefreshCrashLog: () -> Unit,
     onClearCrashLog: () -> Unit,
@@ -32,6 +35,7 @@ internal fun AboutPane(
     hasUpdate = hasUpdate,
     isUpdateLoading = isUpdateLoading,
     cacheRetention = cacheRetention,
+    cacheSizeLimit = cacheSizeLimit,
     cacheSizeSummary = cacheSizeSummary,
     isCacheSizeLoading = isCacheSizeLoading,
     isCacheClearing = isCacheClearing,
@@ -40,6 +44,7 @@ internal fun AboutPane(
     onCheckUpdate = onCheckUpdate,
     onRefreshCacheSize = onRefreshCacheSize,
     onSetCacheRetention = onSetCacheRetention,
+    onSetCacheSizeLimit = onSetCacheSizeLimit,
     onClearAppCache = onClearAppCache,
     onRefreshCrashLog = onRefreshCrashLog,
     onClearCrashLog = onClearCrashLog,

@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.jlen.vod.data.CacheRetentionOption
+import top.jlen.vod.data.CacheSizeLimitOption
 import top.jlen.vod.data.CacheSizeSummary
 
 internal fun LegacyStateRuntimeViewModelCore.legacyRefreshCacheSettings() {
@@ -14,6 +15,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshCacheSettings() {
     updateAccountState(
         currentAccountState().copy(
             cacheRetention = settings.retention,
+            cacheSizeLimit = settings.sizeLimit,
             error = null
         )
     )
@@ -54,12 +56,41 @@ internal fun LegacyStateRuntimeViewModelCore.legacySetCacheRetention(option: Cac
         accountStateWithToast(
             currentAccountState().copy(
                 cacheRetention = settings.retention,
+                cacheSizeLimit = settings.sizeLimit,
                 message = "缓存保存时间已设为${settings.retention.label}",
                 error = null
             ),
             "缓存保存时间已设为${settings.retention.label}"
         )
     )
+    legacyEnforceCacheLimits()
+}
+
+internal fun LegacyStateRuntimeViewModelCore.legacySetCacheSizeLimit(option: CacheSizeLimitOption) {
+    val settings = legacyRepository().saveCacheSizeLimit(option)
+    updateAccountState(
+        accountStateWithToast(
+            currentAccountState().copy(
+                cacheRetention = settings.retention,
+                cacheSizeLimit = settings.sizeLimit,
+                message = "缓存上限已设为${settings.sizeLimit.label}",
+                error = null
+            ),
+            "缓存上限已设为${settings.sizeLimit.label}"
+        )
+    )
+    legacyEnforceCacheLimits()
+}
+
+private fun LegacyStateRuntimeViewModelCore.legacyEnforceCacheLimits() {
+    viewModelScope.launch {
+        runCatching {
+            withContext(Dispatchers.IO) {
+                legacyRepository().enforceAppCachePolicy()
+            }
+        }
+        legacyRefreshCacheSize()
+    }
 }
 
 @OptIn(ExperimentalCoilApi::class)

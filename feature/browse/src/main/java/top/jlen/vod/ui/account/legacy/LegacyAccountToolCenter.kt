@@ -59,6 +59,7 @@ import androidx.core.content.FileProvider
 import java.io.File
 import java.nio.charset.StandardCharsets
 import top.jlen.vod.data.CacheRetentionOption
+import top.jlen.vod.data.CacheSizeLimitOption
 import top.jlen.vod.data.CacheSizeSummary
 import top.jlen.vod.data.formatCacheSize
 
@@ -69,6 +70,7 @@ fun AccountSettingsHomePane(
     hasUpdate: Boolean,
     isUpdateLoading: Boolean,
     cacheRetention: CacheRetentionOption,
+    cacheSizeLimit: CacheSizeLimitOption,
     cacheSizeSummary: CacheSizeSummary,
     isCacheSizeLoading: Boolean,
     hasCrashLog: Boolean,
@@ -99,7 +101,7 @@ fun AccountSettingsHomePane(
         )
         AccountSettingsEntryCard(
             title = "缓存设置",
-            description = "保存时间：${cacheRetention.label}",
+            description = "保存时间：${cacheRetention.label} / 上限：${cacheSizeLimit.label}",
             meta = when {
                 isCacheSizeLoading -> "总缓存：统计中..."
                 !cacheSizeSummary.isAvailable -> "总缓存：无法统计"
@@ -206,12 +208,14 @@ fun AccountUpdateSettingsScreen(
 @Composable
 fun AccountCacheSettingsScreen(
     cacheRetention: CacheRetentionOption,
+    cacheSizeLimit: CacheSizeLimitOption,
     cacheSizeSummary: CacheSizeSummary,
     isCacheSizeLoading: Boolean,
     isCacheClearing: Boolean,
     onBack: () -> Unit,
     onRefreshCacheSize: () -> Unit,
     onSetCacheRetention: (CacheRetentionOption) -> Unit,
+    onSetCacheSizeLimit: (CacheSizeLimitOption) -> Unit,
     onClearAppCache: () -> Unit
 ) {
     AccountSettingsScaffold(
@@ -222,11 +226,13 @@ fun AccountCacheSettingsScreen(
         item {
             CacheSettingsSection(
                 retention = cacheRetention,
+                sizeLimit = cacheSizeLimit,
                 summary = cacheSizeSummary,
                 isLoading = isCacheSizeLoading,
                 isClearing = isCacheClearing,
                 onRefreshSize = onRefreshCacheSize,
                 onSetRetention = onSetCacheRetention,
+                onSetSizeLimit = onSetCacheSizeLimit,
                 onClearCache = onClearAppCache
             )
         }

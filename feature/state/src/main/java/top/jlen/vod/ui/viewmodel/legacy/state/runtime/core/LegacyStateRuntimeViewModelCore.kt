@@ -259,6 +259,8 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
 
     fun setCacheRetention(option: top.jlen.vod.data.CacheRetentionOption) = legacySetCacheRetention(option)
 
+    fun setCacheSizeLimit(option: top.jlen.vod.data.CacheSizeLimitOption) = legacySetCacheSizeLimit(option)
+
     fun clearAppCache() = legacyClearAppCache()
 
     fun checkAppUpdate() = legacyCheckAppUpdate()

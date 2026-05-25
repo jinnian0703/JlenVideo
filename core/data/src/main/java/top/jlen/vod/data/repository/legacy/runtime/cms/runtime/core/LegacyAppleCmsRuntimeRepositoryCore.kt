@@ -193,6 +193,9 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     internal fun runtimeSaveCacheRetention(option: CacheRetentionOption): CacheSettings =
         cacheSettingsStore.saveRetention(option)
 
+    internal fun runtimeSaveCacheSizeLimit(option: CacheSizeLimitOption): CacheSettings =
+        cacheSettingsStore.saveSizeLimit(option)
+
     internal fun runtimePeekHomeCacheEntry(): CachedValue<HomePayload>? = homeCache
 
     internal fun runtimeUpdateHomeCacheEntry(value: CachedValue<HomePayload>?) {
@@ -589,11 +592,18 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     fun saveCacheRetention(option: CacheRetentionOption): CacheSettings =
         runtimeSaveCacheRetention(option)
 
+    fun saveCacheSizeLimit(option: CacheSizeLimitOption): CacheSettings =
+        runtimeSaveCacheSizeLimit(option)
+
     fun loadCacheSizeSummary(): CacheSizeSummary =
         CacheSizeSummary(
             contentBytes = runtimeContentCacheSizeBytes(),
             imageBytes = runtimeImageCacheSizeBytes()
         )
+
+    fun enforceAppCachePolicy() {
+        cleanupCaches(force = true)
+    }
 
     fun clearAppContentAndImageCaches() {
         legacyClearAllAppCaches()
@@ -3138,17 +3148,23 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         }.getOrNull()
 
     private fun cleanupCachesIfNeeded() {
+        cleanupCaches(force = false)
+    }
+
+    private fun cleanupCaches(force: Boolean) {
         if (!isAppCacheEnabled()) {
             clearAllAppCaches()
             return
         }
         val now = System.currentTimeMillis()
-        if (now - lastMemoryCacheCleanupAt >= MEMORY_CACHE_CLEANUP_INTERVAL_MS) {
+        if (force || now - lastMemoryCacheCleanupAt >= MEMORY_CACHE_CLEANUP_INTERVAL_MS) {
             cleanupMemoryCaches(now)
             lastMemoryCacheCleanupAt = now
         }
-        if (now - lastDiskCacheCleanupAt >= DISK_CACHE_CLEANUP_INTERVAL_MS) {
+        if (force || now - lastDiskCacheCleanupAt >= DISK_CACHE_CLEANUP_INTERVAL_MS) {
             cleanupDiskPageCache(now)
+            cleanupTimedFileCache(now)
+            enforceSizeLimit()
             lastDiskCacheCleanupAt = now
         }
     }
@@ -3181,31 +3197,115 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     private fun cleanupDiskPageCache(now: Long) {
         val snapshot = pageCachePrefs.all
-        if (snapshot.isEmpty()) return
-
-        val survivors = ArrayList<Pair<String, Long>>(snapshot.size)
         val staleKeys = mutableListOf<String>()
-        snapshot.forEach { (key, value) ->
-            val raw = value as? String
-            val persisted = raw?.let(::parsePersistedPageCache)
-            when {
-                persisted == null -> staleKeys += key
-                !isCacheValid(persisted.timestampMs, runtimePageCacheTtlMs(allowStale = true), now) -> staleKeys += key
-                else -> survivors += key to persisted.timestampMs
+        val survivors = ArrayList<Pair<String, Long>>(snapshot.size)
+        if (snapshot.isNotEmpty()) {
+            snapshot.forEach { (key, value) ->
+                val raw = value as? String
+                val persisted = raw?.let(::parsePersistedPageCache)
+                when {
+                    persisted == null -> staleKeys += key
+                    !isCacheValid(persisted.timestampMs, runtimePageCacheTtlMs(allowStale = true), now) -> staleKeys += key
+                    else -> survivors += key to persisted.timestampMs
+                }
+            }
+
+            if (survivors.size > MAX_DISK_PAGE_CACHE_ENTRIES) {
+                survivors
+                    .sortedByDescending { it.second }
+                    .drop(MAX_DISK_PAGE_CACHE_ENTRIES)
+                    .mapTo(staleKeys) { it.first }
             }
         }
 
-        if (survivors.size > MAX_DISK_PAGE_CACHE_ENTRIES) {
-            survivors
-                .sortedByDescending { it.second }
-                .drop(MAX_DISK_PAGE_CACHE_ENTRIES)
-                .mapTo(staleKeys) { it.first }
+        val homeRaw = homeCachePrefs.getString(HOME_CACHE_PREF_KEY, null).orEmpty()
+        if (homeRaw.isNotBlank()) {
+            val persisted = runCatching {
+                gson.fromJson(homeRaw, PersistedHomeCache::class.java)
+            }.getOrNull()
+            if (persisted == null || !isCacheValid(persisted.timestampMs, runtimeHomeCacheTtlMs(allowStale = true), now)) {
+                homeCachePrefs.edit().remove(HOME_CACHE_PREF_KEY).apply()
+                homeCache = null
+            }
         }
 
-        if (staleKeys.isEmpty()) return
-        pageCachePrefs.edit().apply {
-            staleKeys.distinct().forEach(::remove)
-        }.apply()
+        hotSearchCacheStore.load()?.let { hotSnapshot ->
+            if (!isCacheValid(hotSnapshot.cachedAt, runtimeCacheRetentionMs(), now)) {
+                hotSearchCacheStore.clear()
+                hotSearchCache = null
+            }
+        }
+
+        if (staleKeys.isNotEmpty()) {
+            pageCachePrefs.edit().apply {
+                staleKeys.distinct().forEach(::remove)
+            }.apply()
+        }
+    }
+
+    private fun cleanupTimedFileCache(now: Long) {
+        val ttlMs = runtimeCacheRetentionMs()
+        if (ttlMs == Long.MAX_VALUE) return
+        deleteFilesOlderThan(appContext.cacheDir.resolve(IMAGE_CACHE_DIR_NAME), now - ttlMs)
+    }
+
+    private fun enforceSizeLimit() {
+        val limitBytes = cacheSettingsStore.load().sizeLimit.maxBytes ?: return
+        if (limitBytes <= 0L) return
+        var totalBytes = runtimeContentCacheSizeBytes() + runtimeImageCacheSizeBytes()
+        if (totalBytes <= limitBytes) return
+
+        trimPersistedPageCacheToSize(limitBytes)
+        totalBytes = runtimeContentCacheSizeBytes() + runtimeImageCacheSizeBytes()
+        if (totalBytes <= limitBytes) return
+
+        trimHomeCacheForSize()
+        totalBytes = runtimeContentCacheSizeBytes() + runtimeImageCacheSizeBytes()
+        if (totalBytes <= limitBytes) return
+
+        trimHotSearchCacheForSize()
+        totalBytes = runtimeContentCacheSizeBytes() + runtimeImageCacheSizeBytes()
+        if (totalBytes <= limitBytes) return
+
+        trimImageCacheToSize(limitBytes - runtimeContentCacheSizeBytes())
+    }
+
+    private fun trimPersistedPageCacheToSize(limitBytes: Long) {
+        val entries = pageCachePrefs.all.mapNotNull { (key, value) ->
+            val raw = value as? String ?: return@mapNotNull null
+            val persisted = parsePersistedPageCache(raw) ?: return@mapNotNull key to 0L
+            key to persisted.timestampMs
+        }.sortedBy { it.second }
+        if (entries.isEmpty()) return
+        entries.forEach { (key, _) ->
+            if (runtimeContentCacheSizeBytes() + runtimeImageCacheSizeBytes() <= limitBytes) return
+            pageCachePrefs.edit().remove(key).commit()
+        }
+    }
+
+    private fun trimHomeCacheForSize() {
+        homeCachePrefs.edit().remove(HOME_CACHE_PREF_KEY).apply()
+        homeCache = null
+    }
+
+    private fun trimHotSearchCacheForSize() {
+        hotSearchCacheStore.clear()
+        hotSearchCache = null
+    }
+
+    private fun trimImageCacheToSize(targetImageBytes: Long) {
+        val imageCacheDir = appContext.cacheDir.resolve(IMAGE_CACHE_DIR_NAME)
+        val target = targetImageBytes.coerceAtLeast(0L)
+        var imageBytes = directorySize(imageCacheDir)
+        if (imageBytes <= target) return
+        imageCacheDir.walkCacheFilesOldestFirst().forEach { file ->
+            if (imageBytes <= target) return
+            val size = file.length()
+            if (file.delete()) {
+                imageBytes -= size
+            }
+        }
+        pruneEmptyDirectories(imageCacheDir)
     }
 
     private fun <T> pruneExpiredEntries(
@@ -3396,6 +3496,34 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         return file.listFiles()
             ?.sumOf(::directorySize)
             ?: 0L
+    }
+
+    private fun deleteFilesOlderThan(root: java.io.File, cutoffMs: Long) {
+        if (!root.exists()) return
+        root.walkCacheFilesOldestFirst()
+            .filter { file -> file.lastModified().takeIf { it > 0L }?.let { it < cutoffMs } == true }
+            .forEach { it.delete() }
+        pruneEmptyDirectories(root)
+    }
+
+    private fun java.io.File.walkCacheFilesOldestFirst(): List<java.io.File> {
+        if (!exists()) return emptyList()
+        if (isFile) return listOf(this)
+        return walkTopDown()
+            .filter { it.isFile }
+            .sortedBy { it.lastModified().takeIf { modified -> modified > 0L } ?: Long.MAX_VALUE }
+            .toList()
+    }
+
+    private fun pruneEmptyDirectories(root: java.io.File) {
+        if (!root.exists() || root.isFile) return
+        root.walkBottomUp()
+            .filter { it.isDirectory && it != root }
+            .forEach { dir ->
+                if (dir.listFiles()?.isEmpty() == true) {
+                    dir.delete()
+                }
+            }
     }
 
     private fun java.io.File.lengthIfFile(): Long =

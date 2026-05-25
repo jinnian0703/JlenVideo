@@ -564,7 +564,6 @@ enum class CacheRetentionOption(
     val label: String,
     val durationMs: Long?
 ) {
-    OneDay("1d", "1天", 86_400_000L),
     ThreeDays("3d", "3天", 259_200_000L),
     SevenDays("7d", "7天", 604_800_000L),
     ThirtyDays("30d", "30天", 2_592_000_000L),
@@ -578,8 +577,28 @@ enum class CacheRetentionOption(
     }
 }
 
+enum class CacheSizeLimitOption(
+    val key: String,
+    val label: String,
+    val maxBytes: Long?
+) {
+    FiftyMb("50m", "50MB", 50L * 1024L * 1024L),
+    OneHundredMb("100m", "100MB", 100L * 1024L * 1024L),
+    ThreeHundredMb("300m", "300MB", 300L * 1024L * 1024L),
+    OneGb("1g", "1GB", 1024L * 1024L * 1024L),
+    Unlimited("unlimited", "无上限", null);
+
+    companion object {
+        val default: CacheSizeLimitOption = Unlimited
+
+        fun fromKey(key: String?): CacheSizeLimitOption =
+            entries.firstOrNull { it.key == key } ?: default
+    }
+}
+
 data class CacheSettings(
-    val retention: CacheRetentionOption = CacheRetentionOption.default
+    val retention: CacheRetentionOption = CacheRetentionOption.default,
+    val sizeLimit: CacheSizeLimitOption = CacheSizeLimitOption.default
 )
 
 data class CacheSizeSummary(

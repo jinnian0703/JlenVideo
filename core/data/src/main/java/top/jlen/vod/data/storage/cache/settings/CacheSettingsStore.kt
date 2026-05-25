@@ -8,16 +8,23 @@ class CacheSettingsStore(context: Context) {
 
     fun load(): CacheSettings =
         CacheSettings(
-            retention = CacheRetentionOption.fromKey(prefs.getString(KEY_RETENTION, null))
+            retention = CacheRetentionOption.fromKey(prefs.getString(KEY_RETENTION, null)),
+            sizeLimit = CacheSizeLimitOption.fromKey(prefs.getString(KEY_SIZE_LIMIT, null))
         )
 
     fun saveRetention(option: CacheRetentionOption): CacheSettings {
         prefs.edit { putString(KEY_RETENTION, option.key) }
-        return CacheSettings(retention = option)
+        return load()
+    }
+
+    fun saveSizeLimit(option: CacheSizeLimitOption): CacheSettings {
+        prefs.edit { putString(KEY_SIZE_LIMIT, option.key) }
+        return load()
     }
 
     companion object {
         private const val PREFS_NAME = "app_cache_settings"
         private const val KEY_RETENTION = "retention"
+        private const val KEY_SIZE_LIMIT = "size_limit"
     }
 }

@@ -3,6 +3,7 @@
 import top.jlen.vod.data.AppUpdateInfo
 import top.jlen.vod.data.AuthSession
 import top.jlen.vod.data.CacheRetentionOption
+import top.jlen.vod.data.CacheSizeLimitOption
 import top.jlen.vod.data.CacheSizeSummary
 import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.MembershipInfo
@@ -81,6 +82,7 @@ data class AccountUiState(
     val latestCrashLog: String = "",
     val issueLogEntries: List<AccountIssueLogEntry> = emptyList(),
     val cacheRetention: CacheRetentionOption = CacheRetentionOption.default,
+    val cacheSizeLimit: CacheSizeLimitOption = CacheSizeLimitOption.default,
     val cacheSizeSummary: CacheSizeSummary = CacheSizeSummary(),
     val isCacheSizeLoading: Boolean = false,
     val isCacheClearing: Boolean = false

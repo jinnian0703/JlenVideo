@@ -552,12 +552,14 @@ fun JlenVideoApp() {
                             }
                             AccountCacheSettingsScreen(
                                 cacheRetention = viewModel.accountState.cacheRetention,
+                                cacheSizeLimit = viewModel.accountState.cacheSizeLimit,
                                 cacheSizeSummary = viewModel.accountState.cacheSizeSummary,
                                 isCacheSizeLoading = viewModel.accountState.isCacheSizeLoading,
                                 isCacheClearing = viewModel.accountState.isCacheClearing,
                                 onBack = backToAccount,
                                 onRefreshCacheSize = viewModel::refreshCacheSize,
                                 onSetCacheRetention = viewModel::setCacheRetention,
+                                onSetCacheSizeLimit = viewModel::setCacheSizeLimit,
                                 onClearAppCache = viewModel::clearAppCache
                             )
                         }
