@@ -112,15 +112,15 @@ fun AccountSettingsHomePane(
         )
         AccountSettingsEntryCard(
             title = "用户协议与隐私说明",
-            description = "首次启动确认内容",
-            meta = "查看应用用途、账号数据和本地数据说明",
+            description = "服务条款与隐私政策",
+            meta = "应用用途、账号信息和本地数据说明",
             icon = Icons.AutoMirrored.Rounded.Article,
             onClick = onOpenAgreement
         )
         AccountSettingsEntryCard(
             title = "问题日志",
-            description = if (hasCrashLog) "已有本机日志" else "暂无本机日志",
-            meta = "刷新、复制或清空本机问题日志",
+            description = if (hasCrashLog) "发现本机日志" else "暂无本机日志",
+            meta = "查看、复制、分享或清空日志",
             icon = Icons.Rounded.BugReport,
             onClick = onOpenLogs
         )
