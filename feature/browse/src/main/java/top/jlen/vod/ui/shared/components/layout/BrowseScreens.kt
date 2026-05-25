@@ -13,6 +13,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +25,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -34,6 +38,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -74,6 +79,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -82,6 +89,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -89,13 +97,17 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
@@ -106,6 +118,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -440,7 +453,9 @@ private fun PosterImage(
 fun FeaturedCard(
     item: VodItem,
     onClick: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    lightweightImage: Boolean = false,
+    decorativeImage: Boolean = false
 ) {
     val badgeText = rememberPosterBadgeText(item.resolvedBadgeText, compact = false)
     val subtitle = item.resolvedSubtitle.ifBlank { "精选推荐" }
@@ -455,13 +470,15 @@ fun FeaturedCard(
         Box {
             PosterImage(
                 data = item.vodPic,
-                title = item.displayTitle,
+                title = if (decorativeImage) "" else item.displayTitle,
                 width = 720,
                 height = 432,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(196.dp),
-                contentScale = ContentScale.Crop
+                    .height(196.dp)
+                    .then(if (decorativeImage) Modifier.clearAndSetSemantics { } else Modifier),
+                contentScale = ContentScale.Crop,
+                lightweightPlaceholder = lightweightImage
             )
             Box(
                 modifier = Modifier
@@ -558,7 +575,6 @@ fun FeaturedCard(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun FeaturedCarouselSection(
     items: List<VodItem>,
@@ -580,73 +596,124 @@ internal fun FeaturedCarouselSection(
                 FeaturedCard(
                     item = items.first(),
                     onClick = onOpenDetail,
-                    modifier = Modifier.width(318.dp)
+                    modifier = Modifier.width(318.dp),
+                    lightweightImage = true,
+                    decorativeImage = true
                 )
             }
         }
         return
     }
 
-    val virtualPageCount = remember(actualCount) {
-        carouselVirtualPageCount(actualCount)
-    }
-    val centeredInitialPage = remember(actualCount, virtualPageCount) {
-        centeredCarouselPage(actualCount, virtualPageCount)
-    }
-    val pagerState = rememberPagerState(
-        initialPage = centeredInitialPage,
-        pageCount = { virtualPageCount }
-    )
+    var currentIndex by remember(items.map { it.vodId }) { mutableIntStateOf(0) }
+    var isDragging by remember { mutableStateOf(false) }
+    var dragOffsetX by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    val cardWidthPx = with(density) { 318.dp.toPx() }
+    val pageSpacingPx = with(density) { 10.dp.toPx() }
+    val pageStepPx = cardWidthPx + pageSpacingPx
+    val startPaddingPx = with(density) { 18.dp.toPx() }
+    val animatedOffsetX = remember { Animatable(0f) }
 
-    LaunchedEffect(actualCount, virtualPageCount) {
-        val currentRealIndex = carouselRealIndex(pagerState.currentPage, actualCount)
-        val targetPage = centeredCarouselPage(actualCount, virtualPageCount) + currentRealIndex
-        if (pagerState.currentPage != targetPage && !pagerState.isScrollInProgress) {
-            pagerState.scrollToPage(targetPage)
+    fun shiftCarousel(delta: Int) {
+        if (delta == 0 || actualCount <= 1) return
+        currentIndex = carouselRealIndex(currentIndex + delta, actualCount)
+    }
+
+    LaunchedEffect(actualCount) {
+        if (currentIndex >= actualCount) {
+            currentIndex = 0
         }
     }
-    val currentIndex = carouselRealIndex(pagerState.currentPage, actualCount)
-    val settledIndex = carouselRealIndex(pagerState.settledPage, actualCount)
+
+    suspend fun settleCarousel() {
+        if (pageStepPx <= 0f) return
+        val rawShift = (-animatedOffsetX.value / pageStepPx).toInt()
+        if (rawShift != 0) {
+            shiftCarousel(rawShift)
+            animatedOffsetX.snapTo(animatedOffsetX.value + rawShift * pageStepPx)
+        }
+        val targetShift = when {
+            animatedOffsetX.value <= -pageStepPx * 0.22f -> 1
+            animatedOffsetX.value >= pageStepPx * 0.22f -> -1
+            else -> 0
+        }
+        if (targetShift != 0) {
+            animatedOffsetX.animateTo(-targetShift * pageStepPx, animationSpec = tween(UiMotion.CarouselSlideMillis))
+            shiftCarousel(targetShift)
+            animatedOffsetX.snapTo(0f)
+        } else {
+            animatedOffsetX.animateTo(0f, animationSpec = tween(UiMotion.CarouselSlideMillis))
+        }
+    }
 
     LaunchedEffect(actualCount, pauseMotion) {
         while (true) {
             delay(UiMotion.CarouselAutoScrollMillis)
-            if (!pauseMotion && !pagerState.isScrollInProgress) {
-                pagerState.animateScrollToPage(
-                    page = pagerState.currentPage + 1,
-                    animationSpec = tween(UiMotion.CarouselSlideMillis)
-                )
+            if (!pauseMotion && !isDragging && animatedOffsetX.value.absoluteValue < 0.5f) {
+                animatedOffsetX.animateTo(-pageStepPx, animationSpec = tween(UiMotion.CarouselSlideMillis))
+                shiftCarousel(1)
+                animatedOffsetX.snapTo(0f)
             }
         }
     }
+    val displayOffsetX = if (isDragging) dragOffsetX else animatedOffsetX.value
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 18.dp),
-            pageSpacing = 10.dp,
-            userScrollEnabled = true
-        ) { page ->
-            val item = items[carouselRealIndex(page, actualCount)]
-            val pageOffset = (
-                (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
-            ).absoluteValue.coerceIn(0f, 1f)
-            val alpha = 1f - (pageOffset * 0.18f)
-            val translationX = pageOffset * 12f
-            FeaturedCard(
-                item = item,
-                onClick = onOpenDetail,
-                modifier = Modifier
-                    .width(318.dp)
-                    .graphicsLayer {
-                        this.alpha = alpha
-                        this.translationX = translationX
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(196.dp)
+                .clipToBounds()
+                .draggable(
+                    orientation = Orientation.Horizontal,
+                    state = rememberDraggableState { delta ->
+                        dragOffsetX += delta
+                        val shift = (-dragOffsetX / pageStepPx).toInt()
+                        if (shift != 0) {
+                            shiftCarousel(shift)
+                            dragOffsetX += shift * pageStepPx
+                        }
+                    },
+                    onDragStarted = {
+                        isDragging = true
+                        animatedOffsetX.stop()
+                        dragOffsetX = animatedOffsetX.value
+                    },
+                    onDragStopped = {
+                        animatedOffsetX.snapTo(dragOffsetX)
+                        dragOffsetX = 0f
+                        isDragging = false
+                        settleCarousel()
                     }
-            )
+                )
+        ) {
+            for (relative in -1..1) {
+                val itemIndex = carouselRealIndex(currentIndex + relative, actualCount)
+                val pageOffset = (displayOffsetX / pageStepPx + relative).absoluteValue.coerceIn(0f, 1f)
+                FeaturedCard(
+                    item = items[itemIndex],
+                    onClick = onOpenDetail,
+                    modifier = Modifier
+                        .width(318.dp)
+                        .offset {
+                            IntOffset(
+                                x = (startPaddingPx + relative * pageStepPx + displayOffsetX).roundToInt(),
+                                y = 0
+                            )
+                        }
+                        .zIndex(1f - pageOffset)
+                        .graphicsLayer {
+                            alpha = 1f - (pageOffset * 0.18f)
+                            translationX = pageOffset * 12f
+                        },
+                    lightweightImage = true,
+                    decorativeImage = true
+                )
+            }
         }
 
         if (actualCount > 1) {
@@ -664,7 +731,7 @@ internal fun FeaturedCarouselSection(
                             .size(if (index == currentIndex) 20.dp else 6.dp, 6.dp)
                             .clip(RoundedCornerShape(999.dp))
                             .background(
-                                if (index == settledIndex || index == currentIndex) UiPalette.Accent
+                                if (index == currentIndex) UiPalette.Accent
                                 else UiPalette.BorderSoft.copy(alpha = 0.72f)
                             )
                     )
@@ -672,17 +739,6 @@ internal fun FeaturedCarouselSection(
             }
         }
     }
-}
-
-private fun carouselVirtualPageCount(itemCount: Int): Int {
-    if (itemCount <= 0) return 0
-    return Int.MAX_VALUE - (Int.MAX_VALUE % itemCount)
-}
-
-private fun centeredCarouselPage(itemCount: Int, pageCount: Int): Int {
-    if (itemCount <= 0 || pageCount <= 0) return 0
-    val center = pageCount / 2
-    return center - (center % itemCount)
 }
 
 private fun carouselRealIndex(page: Int, itemCount: Int): Int {
