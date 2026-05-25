@@ -3,18 +3,22 @@ package top.jlen.vod.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Cached
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -27,6 +31,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -124,74 +130,23 @@ internal fun CacheRetentionPickerDialog(
     onDismiss: () -> Unit,
     onSelect: (CacheRetentionOption) -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = UiPalette.Surface,
-        shape = RoundedCornerShape(26.dp),
-        title = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(
-                    modifier = Modifier
-                        .background(UiPalette.AccentSoft.copy(alpha = 0.18f), RoundedCornerShape(999.dp))
-                        .border(1.dp, UiPalette.Accent.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Text(
-                        text = "缓存设置",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = UiPalette.Accent
-                    )
-                }
-                Text(
-                    text = "缓存保存时间",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = UiPalette.Ink
-                )
-                Text(
-                    text = "超过保存时间后，内容缓存会重新请求；图片缓存仍可手动清除。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = UiPalette.TextSecondary
-                )
-            }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                CacheRetentionOption.entries.forEach { option ->
-                    val selected = option == selectedRetention
-                    CachePickerOptionCard(
-                        title = option.label,
-                        description = option.cacheRetentionDescription(),
-                        selected = selected,
-                        onClick = { onSelect(option) }
-                    )
-                }
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.72f))
-                ) {
-                    Text(
-                        text = "手动刷新、清除缓存或内容更新时，仍会拉取最新数据。",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 11.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = UiPalette.TextSecondary
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = onDismiss,
-                colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.TextSecondary)
-            ) {
-                Text("取消", fontWeight = FontWeight.Bold)
-            }
+    CachePickerDialogFrame(
+        title = "缓存保存时间",
+        subtitle = "超过保存时间后，内容缓存和图片缓存会自动清理。",
+        currentLabel = selectedRetention.label,
+        helperText = "手动刷新、清除缓存或内容更新时，仍会拉取最新数据。",
+        onDismiss = onDismiss
+    ) {
+        CacheRetentionOption.entries.forEach { option ->
+            val selected = option == selectedRetention
+            CachePickerOptionCard(
+                title = option.label,
+                description = option.cacheRetentionDescription(),
+                selected = selected,
+                onClick = { onSelect(option) }
+            )
         }
-    )
+    }
 }
 
 @Composable
@@ -200,73 +155,159 @@ internal fun CacheSizeLimitPickerDialog(
     onDismiss: () -> Unit,
     onSelect: (CacheSizeLimitOption) -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = UiPalette.Surface,
-        shape = RoundedCornerShape(26.dp),
-        title = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(
-                    modifier = Modifier
-                        .background(UiPalette.AccentSoft.copy(alpha = 0.18f), RoundedCornerShape(999.dp))
-                        .border(1.dp, UiPalette.Accent.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Text(
-                        text = "缓存设置",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = UiPalette.Accent
-                    )
+    CachePickerDialogFrame(
+        title = "缓存上限",
+        subtitle = "超过上限后，会优先删除较旧的内容缓存和图片缓存。",
+        currentLabel = selectedLimit.label,
+        helperText = "手动清除缓存仍会立即删除内容缓存和图片缓存。",
+        onDismiss = onDismiss
+    ) {
+        CacheSizeLimitOption.entries.forEach { option ->
+            CachePickerOptionCard(
+                title = option.label,
+                description = option.cacheSizeLimitDescription(),
+                selected = option == selectedLimit,
+                onClick = { onSelect(option) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun CachePickerDialogFrame(
+    title: String,
+    subtitle: String,
+    currentLabel: String,
+    helperText: String,
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val configuration = LocalConfiguration.current
+    val dialogMaxHeight = (configuration.screenHeightDp.dp * 0.86f).coerceAtLeast(420.dp)
+    val contentMaxHeight = (configuration.screenHeightDp.dp * 0.52f).coerceIn(260.dp, 430.dp)
+    val scrollState = rememberScrollState()
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = dialogMaxHeight),
+            shape = RoundedCornerShape(30.dp),
+            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(UiPalette.Accent, UiPalette.AccentSoft)
+                                ),
+                                shape = RoundedCornerShape(18.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Cached,
+                            contentDescription = null,
+                            tint = UiPalette.AccentText
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = title,
+                                modifier = Modifier.weight(1f, fill = false),
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = UiPalette.Ink
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .background(UiPalette.AccentSoft.copy(alpha = 0.24f), RoundedCornerShape(999.dp))
+                                    .border(1.dp, UiPalette.Accent.copy(alpha = 0.28f), RoundedCornerShape(999.dp))
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = currentLabel,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = UiPalette.Accent
+                                )
+                            }
+                        }
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = UiPalette.TextSecondary
+                        )
+                    }
                 }
-                Text(
-                    text = "缓存上限",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = UiPalette.Ink
-                )
-                Text(
-                    text = "当内容缓存和图片缓存超过上限时，会优先删除较旧缓存。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = UiPalette.TextSecondary
-                )
-            }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                CacheSizeLimitOption.entries.forEach { option ->
-                    CachePickerOptionCard(
-                        title = option.label,
-                        description = option.cacheSizeLimitDescription(),
-                        selected = option == selectedLimit,
-                        onClick = { onSelect(option) }
-                    )
-                }
+
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.72f))
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = contentMaxHeight),
+                    colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
+                    shape = RoundedCornerShape(22.dp)
                 ) {
-                    Text(
-                        text = "手动清除缓存仍会立即删除内容缓存和图片缓存。",
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 11.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = UiPalette.TextSecondary
-                    )
+                            .verticalScroll(scrollState)
+                            .padding(horizontal = 14.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        content()
+                        CachePickerHelperCard(helperText)
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(
+                            text = "取消",
+                            fontWeight = FontWeight.Bold,
+                            color = UiPalette.TextSecondary
+                        )
+                    }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = onDismiss,
-                colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.TextSecondary)
-            ) {
-                Text("取消", fontWeight = FontWeight.Bold)
-            }
         }
-    )
+    }
+}
+
+@Composable
+private fun CachePickerHelperCard(
+    text: String
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.76f)),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.72f))
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 11.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = UiPalette.TextSecondary
+        )
+    }
 }
 
 @Composable
