@@ -455,6 +455,8 @@ fun FeaturedCard(
 ) {
     val badgeText = rememberPosterBadgeText(item.resolvedBadgeText, compact = false)
     val subtitle = item.resolvedSubtitle.ifBlank { "精选推荐" }
+    val imageWidth = if (lightweightImage) 540 else 720
+    val imageHeight = if (lightweightImage) 324 else 432
 
     Card(
         modifier = modifier
@@ -467,8 +469,8 @@ fun FeaturedCard(
             PosterImage(
                 data = item.vodPic,
                 title = if (decorativeImage) "" else item.displayTitle,
-                width = 720,
-                height = 432,
+                width = imageWidth,
+                height = imageHeight,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(196.dp)
@@ -653,12 +655,21 @@ internal fun FeaturedCarouselSection(
             }
         }
     }
-    val displayOffsetX = if (isDragging) dragOffsetX else animatedOffsetX.value
+
+    LaunchedEffect(pauseMotion) {
+        if (pauseMotion) {
+            animatedOffsetX.stop()
+            animatedOffsetX.snapTo(0f)
+            dragOffsetX = 0f
+            isDragging = false
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        val renderedPages = if (pauseMotion) 0..0 else -1..1
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -674,6 +685,7 @@ internal fun FeaturedCarouselSection(
                             dragOffsetX += shift * pageStepPx
                         }
                     },
+                    enabled = !pauseMotion,
                     onDragStarted = {
                         isDragging = true
                         animatedOffsetX.stop()
@@ -687,7 +699,7 @@ internal fun FeaturedCarouselSection(
                     }
                 )
         ) {
-            for (relative in -1..1) {
+            for (relative in renderedPages) {
                 val itemIndex = carouselRealIndex(currentIndex + relative, actualCount)
                 FeaturedCard(
                     item = items[itemIndex],
@@ -695,7 +707,12 @@ internal fun FeaturedCarouselSection(
                     modifier = Modifier
                         .width(318.dp)
                         .graphicsLayer {
-                            translationX = startPaddingPx + relative * pageStepPx + displayOffsetX
+                            val layerOffsetX = when {
+                                pauseMotion -> 0f
+                                isDragging -> dragOffsetX
+                                else -> animatedOffsetX.value
+                            }
+                            translationX = startPaddingPx + relative * pageStepPx + layerOffsetX
                         },
                     lightweightImage = true,
                     decorativeImage = true

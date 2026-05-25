@@ -69,6 +69,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -161,7 +162,9 @@ fun HomeScreen(
             listState.animateScrollToItem(0)
         }
     }
-    val pauseHomeMotion = listState.isScrollInProgress
+    val pauseHomeMotion by remember {
+        derivedStateOf { listState.isScrollInProgress }
+    }
     val hotRows = remember(state.hot) { state.hot.chunked(POSTER_GRID_COLUMNS) }
     val latestRows = remember(state.visibleLatest) { state.visibleLatest.chunked(POSTER_GRID_COLUMNS) }
 
@@ -171,7 +174,7 @@ fun HomeScreen(
     ) {
         val imageLoader = context.imageLoader
         state.featured.take(2).forEach { item ->
-            imageLoader.enqueue(buildPosterRequest(context, item.vodPic, 720, 432))
+            imageLoader.enqueue(buildPosterRequest(context, item.vodPic, 540, 324))
         }
         state.visibleLatest.take(6).forEach { item ->
             imageLoader.enqueue(buildPosterRequest(context, item.vodPic, 360, 520))
