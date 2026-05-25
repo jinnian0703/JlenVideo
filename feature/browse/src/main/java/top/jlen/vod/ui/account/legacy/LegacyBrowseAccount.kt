@@ -847,6 +847,7 @@ internal fun CacheSettingsSection(
     onClearCache: () -> Unit
 ) {
     var showClearConfirm by rememberSaveable { mutableStateOf(false) }
+    var showRetentionPicker by rememberSaveable { mutableStateOf(false) }
     if (showClearConfirm) {
         ClearCacheConfirmDialog(
             totalSize = if (summary.isAvailable) formatCacheSize(summary.totalBytes) else "无法统计",
@@ -854,6 +855,16 @@ internal fun CacheSettingsSection(
             onConfirm = {
                 showClearConfirm = false
                 onClearCache()
+            }
+        )
+    }
+    if (showRetentionPicker) {
+        CacheRetentionPickerDialog(
+            selectedRetention = retention,
+            onDismiss = { showRetentionPicker = false },
+            onSelect = { option ->
+                showRetentionPicker = false
+                onSetRetention(option)
             }
         )
     }
@@ -892,30 +903,47 @@ internal fun CacheSettingsSection(
                 )
             }
         }
-        Text(
-            text = "缓存保存时间",
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            color = UiPalette.Ink
-        )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(CacheRetentionOption.entries, key = { it.key }) { option ->
-                val selected = option == retention
-                OutlinedButton(
-                    onClick = { onSetRetention(option) },
-                    modifier = Modifier.height(40.dp),
-                    border = BorderStroke(
-                        1.dp,
-                        if (selected) UiPalette.Accent else UiPalette.BorderSoft
-                    ),
-                    shape = RoundedCornerShape(999.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = if (selected) UiPalette.AccentSoft else UiPalette.Surface,
-                        contentColor = if (selected) UiPalette.Accent else UiPalette.TextPrimary
-                    )
+        Card(
+            onClick = { showRetentionPicker = true },
+            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.74f)),
+            shape = RoundedCornerShape(18.dp),
+            border = BorderStroke(1.dp, UiPalette.Border)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 13.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    Text(option.label, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "缓存保存时间",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = UiPalette.Ink
+                    )
+                    Text(
+                        text = "超过保存时间后重新请求内容",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = UiPalette.TextSecondary
+                    )
                 }
+                Text(
+                    text = retention.label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Accent
+                )
+                Text(
+                    text = ">",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = UiPalette.TextSecondary
+                )
             }
         }
         Row(
