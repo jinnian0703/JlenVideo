@@ -79,7 +79,6 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -589,7 +588,7 @@ internal fun FeaturedCarouselSection(
     }
 
     val virtualPageCount = remember(actualCount) {
-        carouselWindowPageCount(actualCount)
+        carouselVirtualPageCount(actualCount)
     }
     val centeredInitialPage = remember(actualCount, virtualPageCount) {
         centeredCarouselPage(actualCount, virtualPageCount)
@@ -609,28 +608,12 @@ internal fun FeaturedCarouselSection(
     val currentIndex = carouselRealIndex(pagerState.currentPage, actualCount)
     val settledIndex = carouselRealIndex(pagerState.settledPage, actualCount)
 
-    LaunchedEffect(actualCount, virtualPageCount) {
-        snapshotFlow { pagerState.isScrollInProgress to pagerState.settledPage }
-            .collect { (isScrolling, settledPage) ->
-                if (!isScrolling && (settledPage < actualCount || settledPage > virtualPageCount - actualCount - 1)) {
-                    val resetPage = centeredCarouselPage(actualCount, virtualPageCount) +
-                        carouselRealIndex(settledPage, actualCount)
-                    pagerState.scrollToPage(resetPage.coerceIn(0, virtualPageCount - 1))
-                }
-            }
-    }
-
     LaunchedEffect(actualCount, pauseMotion) {
         while (true) {
             delay(UiMotion.CarouselAutoScrollMillis)
             if (!pauseMotion && !pagerState.isScrollInProgress) {
-                if (pagerState.currentPage >= virtualPageCount - actualCount) {
-                    val resetPage = centeredCarouselPage(actualCount, virtualPageCount) +
-                        carouselRealIndex(pagerState.currentPage, actualCount)
-                    pagerState.scrollToPage(resetPage.coerceIn(0, virtualPageCount - 1))
-                }
                 pagerState.animateScrollToPage(
-                    page = (pagerState.currentPage + 1).coerceAtMost(virtualPageCount - 1),
+                    page = pagerState.currentPage + 1,
                     animationSpec = tween(UiMotion.CarouselSlideMillis)
                 )
             }
@@ -691,9 +674,9 @@ internal fun FeaturedCarouselSection(
     }
 }
 
-private fun carouselWindowPageCount(itemCount: Int): Int {
+private fun carouselVirtualPageCount(itemCount: Int): Int {
     if (itemCount <= 0) return 0
-    return itemCount * 12
+    return Int.MAX_VALUE - (Int.MAX_VALUE % itemCount)
 }
 
 private fun centeredCarouselPage(itemCount: Int, pageCount: Int): Int {
