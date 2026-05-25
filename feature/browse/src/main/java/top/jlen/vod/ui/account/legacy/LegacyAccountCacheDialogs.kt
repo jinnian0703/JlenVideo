@@ -1,21 +1,25 @@
 package top.jlen.vod.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -124,57 +128,148 @@ internal fun CacheRetentionPickerDialog(
         containerColor = UiPalette.Surface,
         shape = RoundedCornerShape(26.dp),
         title = {
-            Text(
-                text = "缓存保存时间",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = UiPalette.Ink
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    modifier = Modifier
+                        .background(UiPalette.AccentSoft.copy(alpha = 0.18f), RoundedCornerShape(999.dp))
+                        .border(1.dp, UiPalette.Accent.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = "缓存设置",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = UiPalette.Accent
+                    )
+                }
+                Text(
+                    text = "缓存保存时间",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Ink
+                )
+                Text(
+                    text = "超过保存时间后，内容缓存会重新请求；图片缓存仍可手动清除。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = UiPalette.TextSecondary
+                )
+            }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 CacheRetentionOption.entries.forEach { option ->
                     val selected = option == selectedRetention
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                if (selected) UiPalette.AccentSoft else UiPalette.SurfaceSoft.copy(alpha = 0.46f),
-                                RoundedCornerShape(16.dp)
-                            )
-                            .border(
-                                1.dp,
-                                if (selected) UiPalette.Accent else UiPalette.Border,
-                                RoundedCornerShape(16.dp)
-                            )
-                            .clickable { onSelect(option) }
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = option.label,
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = if (selected) UiPalette.Accent else UiPalette.TextPrimary
+                    Card(
+                        onClick = { onSelect(option) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (selected) {
+                                UiPalette.AccentSoft.copy(alpha = 0.34f)
+                            } else {
+                                UiPalette.SurfaceSoft.copy(alpha = 0.72f)
+                            }
+                        ),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = if (selected) UiPalette.Accent.copy(alpha = 0.7f) else UiPalette.BorderSoft
                         )
-                        if (selected) {
-                            Text(
-                                text = "当前",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = UiPalette.Accent
-                            )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 13.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Text(
+                                    text = option.label,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = if (selected) UiPalette.Accent else UiPalette.TextPrimary
+                                )
+                                Text(
+                                    text = option.cacheRetentionDescription(),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = UiPalette.TextSecondary
+                                )
+                            }
+                            if (selected) {
+                                Row(
+                                    modifier = Modifier
+                                        .background(UiPalette.Surface.copy(alpha = 0.86f), RoundedCornerShape(999.dp))
+                                        .border(
+                                            1.dp,
+                                            UiPalette.Accent.copy(alpha = 0.2f),
+                                            RoundedCornerShape(999.dp)
+                                        )
+                                        .padding(horizontal = 9.dp, vertical = 5.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.CheckCircle,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(15.dp),
+                                        tint = UiPalette.Accent
+                                    )
+                                    Text(
+                                        text = "当前",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = UiPalette.Accent
+                                    )
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .border(
+                                            1.dp,
+                                            UiPalette.BorderSoft,
+                                            RoundedCornerShape(999.dp)
+                                        )
+                                )
+                            }
                         }
                     }
+                }
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.72f))
+                ) {
+                    Text(
+                        text = "手动刷新、清除缓存或内容更新时，仍会拉取最新数据。",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 11.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = UiPalette.TextSecondary
+                    )
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.TextSecondary)
+            ) {
                 Text("取消", fontWeight = FontWeight.Bold)
             }
         }
     )
 }
+
+private fun CacheRetentionOption.cacheRetentionDescription(): String =
+    when (this) {
+        CacheRetentionOption.OneDay -> "适合经常刷新内容，缓存保留较短。"
+        CacheRetentionOption.ThreeDays -> "默认选项，兼顾新鲜度和加载速度。"
+        CacheRetentionOption.SevenDays -> "减少重复请求，适合常用内容。"
+        CacheRetentionOption.ThirtyDays -> "长时间保留内容缓存，减少网络加载。"
+        CacheRetentionOption.Forever -> "不按时间自动过期，只能手动清除或刷新覆盖。"
+    }
