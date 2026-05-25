@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -57,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -158,14 +160,15 @@ fun AccountAboutSettingsScreen(
                     modifier = Modifier
                         .size(86.dp)
                         .clip(RoundedCornerShape(28.dp))
-                        .background(UiPalette.Accent),
+                        .background(UiPalette.Surface),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "J",
-                        style = MaterialTheme.typography.displaySmall,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = UiPalette.AccentText
+                    Image(
+                        painter = painterResource(id = top.jlen.vod.feature.browse.R.drawable.ic_app_icon),
+                        contentDescription = "Jlen 影视",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(6.dp)
                     )
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
