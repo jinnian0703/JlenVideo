@@ -224,7 +224,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             ?.rows
             .orEmpty()
             .distinctBy { it.vodId }
-        return filterPlayablePreviewItems(rawItems)
+        return rawItems.also(::rememberPreviewItems)
     }
 
     internal suspend fun runtimeLoadBrowsableCategories(
@@ -706,18 +706,16 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 )
             )
         }.toCursorPagedVodItems()
-        val playableItems = filterPlayablePreviewItems(payload.items)
-        return payload.copy(items = playableItems).also { filtered ->
-            rememberPreviewItems(filtered.items)
+        return payload.also { latestPage ->
+            rememberPreviewItems(latestPage.items)
         }
     }
 
     suspend fun loadLatestPage(page: Int): PagedVodItems {
         val payload = requestApi { getLatest(page = page.coerceAtLeast(1)) }
             .toPagedVodItems()
-        val playableItems = filterPlayablePreviewItems(payload.items)
-        return payload.copy(items = playableItems).also { filtered ->
-            rememberPreviewItems(filtered.items)
+        return payload.also { latestPage ->
+            rememberPreviewItems(latestPage.items)
         }
     }
 
