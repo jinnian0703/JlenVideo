@@ -594,40 +594,15 @@ private fun AccountSettingsEntryCard(
 
 @Composable
 internal fun UpdateNotesSection(notes: String) {
-    var expanded by remember(notes) { mutableStateOf(false) }
     AccountToolSection(
         title = "更新说明",
         description = "最近版本变更"
     ) {
-        Box(
-            modifier = if (expanded) {
-                Modifier.fillMaxWidth()
-            } else {
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 184.dp)
-                    .clip(RoundedCornerShape(12.dp))
-            }
-        ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
             AnnouncementRichHtmlContent(
                 htmlContent = notes,
                 fallbackContent = notes
             )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            TextButton(
-                onClick = { expanded = !expanded },
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-            ) {
-                Text(
-                    text = if (expanded) "收起" else "展开",
-                    fontWeight = FontWeight.Bold,
-                    color = UiPalette.Accent
-                )
-            }
         }
     }
 }
