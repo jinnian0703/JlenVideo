@@ -179,6 +179,10 @@ fun JlenVideoApp() {
     var homeScrollToTopSignal by rememberSaveable { mutableStateOf(0) }
     var categoryScrollToTopSignal by rememberSaveable { mutableStateOf(0) }
     var searchScrollToTopSignal by rememberSaveable { mutableStateOf(0) }
+    var homeScrollIndex by rememberSaveable { mutableStateOf(0) }
+    var homeScrollOffset by rememberSaveable { mutableStateOf(0) }
+    var categoryScrollIndex by rememberSaveable { mutableStateOf(0) }
+    var categoryScrollOffset by rememberSaveable { mutableStateOf(0) }
     val scrollTopSignals = mapOf(
         "home" to homeScrollToTopSignal,
         "categories" to categoryScrollToTopSignal,
@@ -377,6 +381,12 @@ fun JlenVideoApp() {
                                 state = viewModel.homeState,
                                 noticeState = viewModel.noticeState,
                                 scrollToTopSignal = homeScrollToTopSignal,
+                                initialScrollIndex = homeScrollIndex,
+                                initialScrollOffset = homeScrollOffset,
+                                onScrollPositionChange = { index, offset ->
+                                    homeScrollIndex = index
+                                    homeScrollOffset = offset
+                                },
                                 onRefresh = viewModel::refreshHomeAndClearCaches,
                                 onRefreshAnnouncements = { viewModel.refreshNotices(forceRefresh = true) },
                                 onLoadMore = viewModel::loadMoreHome,
@@ -394,6 +404,12 @@ fun JlenVideoApp() {
                             CategoryScreen(
                                 state = viewModel.homeState,
                                 scrollToTopSignal = categoryScrollToTopSignal,
+                                initialScrollIndex = categoryScrollIndex,
+                                initialScrollOffset = categoryScrollOffset,
+                                onScrollPositionChange = { index, offset ->
+                                    categoryScrollIndex = index
+                                    categoryScrollOffset = offset
+                                },
                                 onSelectCategory = viewModel::selectCategory,
                                 onSelectFilter = viewModel::updateCategoryFilter,
                                 onRetryCategory = { viewModel.refreshCategoryTab(forceRefresh = true) },

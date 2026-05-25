@@ -194,8 +194,10 @@ private fun SearchLandingContent(
     val listState = rememberSaveable(saver = LazyListState.Saver) {
         LazyListState()
     }
+    var handledScrollToTopSignal by rememberSaveable { mutableStateOf(scrollToTopSignal) }
     LaunchedEffect(scrollToTopSignal) {
-        if (scrollToTopSignal > 0) {
+        if (scrollToTopSignal > 0 && scrollToTopSignal != handledScrollToTopSignal) {
+            handledScrollToTopSignal = scrollToTopSignal
             listState.animateScrollToItem(0)
         }
     }
@@ -322,6 +324,7 @@ fun SearchResultsScreen(
             firstVisibleItemScrollOffset = initialScrollOffset
         )
     }
+    var handledScrollToTopSignal by rememberSaveable(resultKey) { mutableStateOf(scrollToTopSignal) }
     LaunchedEffect(resultKey, listState) {
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .distinctUntilChanged()
@@ -330,7 +333,8 @@ fun SearchResultsScreen(
             }
     }
     LaunchedEffect(scrollToTopSignal) {
-        if (scrollToTopSignal > 0) {
+        if (scrollToTopSignal > 0 && scrollToTopSignal != handledScrollToTopSignal) {
+            handledScrollToTopSignal = scrollToTopSignal
             listState.animateScrollToItem(0)
         }
     }

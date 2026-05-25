@@ -139,6 +139,9 @@ fun HomeScreen(
     state: HomeUiState,
     noticeState: NoticeUiState,
     scrollToTopSignal: Int = 0,
+    initialScrollIndex: Int = 0,
+    initialScrollOffset: Int = 0,
+    onScrollPositionChange: (Int, Int) -> Unit = { _, _ -> },
     onRefresh: () -> Unit,
     onRefreshAnnouncements: () -> Unit,
     onLoadMore: () -> Unit,
@@ -155,10 +158,22 @@ fun HomeScreen(
 
     val context = LocalContext.current
     val listState = rememberSaveable(saver = LazyListState.Saver) {
-        LazyListState()
+        LazyListState(
+            firstVisibleItemIndex = initialScrollIndex,
+            firstVisibleItemScrollOffset = initialScrollOffset
+        )
+    }
+    var handledScrollToTopSignal by rememberSaveable { mutableStateOf(scrollToTopSignal) }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .distinctUntilChanged()
+            .collect { (index, offset) ->
+                onScrollPositionChange(index, offset)
+            }
     }
     LaunchedEffect(scrollToTopSignal) {
-        if (scrollToTopSignal > 0) {
+        if (scrollToTopSignal > 0 && scrollToTopSignal != handledScrollToTopSignal) {
+            handledScrollToTopSignal = scrollToTopSignal
             listState.animateScrollToItem(0)
         }
     }
@@ -328,6 +343,9 @@ fun HomeScreen(
 fun CategoryScreen(
     state: HomeUiState,
     scrollToTopSignal: Int = 0,
+    initialScrollIndex: Int = 0,
+    initialScrollOffset: Int = 0,
+    onScrollPositionChange: (Int, Int) -> Unit = { _, _ -> },
     onSelectCategory: (AppleCmsCategory) -> Unit,
     onSelectFilter: (String, String) -> Unit,
     onRetryCategory: () -> Unit,
@@ -335,10 +353,22 @@ fun CategoryScreen(
     onOpenDetail: (String) -> Unit
 ) {
     val listState = rememberSaveable(saver = LazyListState.Saver) {
-        LazyListState()
+        LazyListState(
+            firstVisibleItemIndex = initialScrollIndex,
+            firstVisibleItemScrollOffset = initialScrollOffset
+        )
+    }
+    var handledScrollToTopSignal by rememberSaveable { mutableStateOf(scrollToTopSignal) }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .distinctUntilChanged()
+            .collect { (index, offset) ->
+                onScrollPositionChange(index, offset)
+            }
     }
     LaunchedEffect(scrollToTopSignal) {
-        if (scrollToTopSignal > 0) {
+        if (scrollToTopSignal > 0 && scrollToTopSignal != handledScrollToTopSignal) {
+            handledScrollToTopSignal = scrollToTopSignal
             listState.animateScrollToItem(0)
         }
     }
