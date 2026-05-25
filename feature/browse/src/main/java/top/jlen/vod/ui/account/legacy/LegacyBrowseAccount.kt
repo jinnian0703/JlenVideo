@@ -1408,7 +1408,8 @@ private fun AccountOverviewPane(
                             .clip(RoundedCornerShape(999.dp))
                             .background(UiPalette.AccentGlow)
                             .border(1.dp, UiPalette.BorderSoft, RoundedCornerShape(999.dp))
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = if (state.membershipSignInInfo.signedToday) "今日已签" else "待签到",
@@ -1417,7 +1418,8 @@ private fun AccountOverviewPane(
                             color = if (state.membershipSignInInfo.signedToday) UiPalette.Accent else UiPalette.DangerText,
                             maxLines = 1,
                             softWrap = false,
-                            overflow = TextOverflow.Clip
+                            overflow = TextOverflow.Clip,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
