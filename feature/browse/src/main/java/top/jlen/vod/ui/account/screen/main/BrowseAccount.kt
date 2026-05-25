@@ -39,6 +39,7 @@ fun AccountScreen(
     onOpenSettingsCache: () -> Unit,
     onOpenSettingsAgreement: () -> Unit,
     onOpenSettingsLogs: () -> Unit,
+    onOpenSettingsAbout: () -> Unit,
     onSendEmailCode: () -> Unit,
     onBindEmail: () -> Unit,
     onUnbindEmail: () -> Unit,
@@ -74,6 +75,7 @@ fun AccountScreen(
     onOpenSettingsCache = onOpenSettingsCache,
     onOpenSettingsAgreement = onOpenSettingsAgreement,
     onOpenSettingsLogs = onOpenSettingsLogs,
+    onOpenSettingsAbout = onOpenSettingsAbout,
     onSendEmailCode = onSendEmailCode,
     onBindEmail = onBindEmail,
     onUnbindEmail = onUnbindEmail

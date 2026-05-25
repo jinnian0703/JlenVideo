@@ -522,6 +522,7 @@ fun JlenVideoApp() {
                                 onOpenSettingsCache = { openAccountSettingsChild("account/settings/cache") },
                                 onOpenSettingsAgreement = { openAccountSettingsChild("account/settings/agreement") },
                                 onOpenSettingsLogs = { openAccountSettingsChild("account/settings/logs") },
+                                onOpenSettingsAbout = { openAccountSettingsChild("account/settings/about") },
                                 onSendEmailCode = viewModel::sendEmailBindCode,
                                 onBindEmail = viewModel::bindEmail,
                                 onUnbindEmail = viewModel::unbindEmail
@@ -581,6 +582,15 @@ fun JlenVideoApp() {
                         }
                         composable("account/settings/agreement") {
                             AccountAgreementSettingsScreen(onBack = backToAccount)
+                        }
+                        composable("account/settings/about") {
+                            AccountAboutSettingsScreen(
+                                currentVersion = viewModel.accountState.updateInfo?.currentVersion?.ifBlank { "--" } ?: "--",
+                                onBack = backToAccount,
+                                onOpenUpdate = { openAccountSettingsChild("account/settings/update") },
+                                onOpenLogs = { openAccountSettingsChild("account/settings/logs") },
+                                onOpenUrl = { url -> openExternalUrl(context, url) }
+                            )
                         }
                         composable("account/settings/logs") {
                             LaunchedEffect(Unit) {

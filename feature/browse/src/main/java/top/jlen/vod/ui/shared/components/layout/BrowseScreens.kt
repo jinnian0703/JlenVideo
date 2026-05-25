@@ -13,9 +13,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,7 +34,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -78,8 +74,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -88,15 +82,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -114,7 +105,6 @@ import coil.size.Scale
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.absoluteValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -579,181 +569,43 @@ internal fun FeaturedCarouselSection(
     onOpenDetail: (String) -> Unit,
     pauseMotion: Boolean = false
 ) {
-    val actualCount = items.size
-    if (actualCount <= 0) return
-    if (actualCount == 1) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp)
-            ) {
-                FeaturedCard(
-                    item = items.first(),
-                    onClick = onOpenDetail,
-                    modifier = Modifier.width(318.dp),
-                    lightweightImage = true,
-                    decorativeImage = true
-                )
-            }
-        }
-        return
-    }
+    if (items.isEmpty()) return
+    val rowState = rememberLazyListState()
 
-    var currentIndex by remember(items.map { it.vodId }) { mutableIntStateOf(0) }
-    var isDragging by remember { mutableStateOf(false) }
-    var dragOffsetX by remember { mutableFloatStateOf(0f) }
-    val density = LocalDensity.current
-    val cardWidthPx = with(density) { 318.dp.toPx() }
-    val pageSpacingPx = with(density) { 10.dp.toPx() }
-    val pageStepPx = cardWidthPx + pageSpacingPx
-    val startPaddingPx = with(density) { 18.dp.toPx() }
-    val animatedOffsetX = remember { Animatable(0f) }
-
-    fun shiftCarousel(delta: Int) {
-        if (delta == 0 || actualCount <= 1) return
-        currentIndex = carouselRealIndex(currentIndex + delta, actualCount)
-    }
-
-    LaunchedEffect(actualCount) {
-        if (currentIndex >= actualCount) {
-            currentIndex = 0
-        }
-    }
-
-    suspend fun settleCarousel() {
-        if (pageStepPx <= 0f) return
-        val rawShift = carouselWholePageShift(animatedOffsetX.value, pageStepPx)
-        if (rawShift != 0) {
-            shiftCarousel(rawShift)
-            animatedOffsetX.snapTo(animatedOffsetX.value + rawShift * pageStepPx)
-        }
-        val targetShift = when {
-            animatedOffsetX.value <= -pageStepPx * 0.22f -> 1
-            animatedOffsetX.value >= pageStepPx * 0.22f -> -1
-            else -> 0
-        }
-        if (targetShift != 0) {
-            animatedOffsetX.animateTo(-targetShift * pageStepPx, animationSpec = tween(UiMotion.CarouselSlideMillis))
-            shiftCarousel(targetShift)
-            animatedOffsetX.snapTo(0f)
-        } else {
-            animatedOffsetX.animateTo(0f, animationSpec = tween(UiMotion.CarouselSlideMillis))
-        }
-    }
-
-    LaunchedEffect(actualCount, pauseMotion) {
+    LaunchedEffect(items.map { it.stableKey() }, pauseMotion) {
+        if (items.size <= 1) return@LaunchedEffect
         while (true) {
-            delay(UiMotion.CarouselAutoScrollMillis)
-            if (!pauseMotion && !isDragging && animatedOffsetX.value.absoluteValue < 0.5f) {
-                animatedOffsetX.animateTo(-pageStepPx, animationSpec = tween(UiMotion.CarouselSlideMillis))
-                shiftCarousel(1)
-                animatedOffsetX.snapTo(0f)
+            delay(3500)
+            if (pauseMotion || rowState.isScrollInProgress) continue
+            val currentIndex = rowState.firstVisibleItemIndex.coerceIn(0, items.lastIndex)
+            if (currentIndex >= items.lastIndex) {
+                rowState.scrollToItem(0)
+            } else {
+                rowState.animateScrollToItem(currentIndex + 1)
             }
         }
     }
 
-    LaunchedEffect(pauseMotion) {
-        if (pauseMotion) {
-            animatedOffsetX.stop()
-            animatedOffsetX.snapTo(0f)
-            dragOffsetX = 0f
-            isDragging = false
-        }
-    }
-
-    Column(
+    LazyRow(
+        state = rowState,
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        contentPadding = PaddingValues(horizontal = 18.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        val renderedPages = if (pauseMotion) 0..0 else -1..1
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(196.dp)
-                .clipToBounds()
-                .draggable(
-                    orientation = Orientation.Horizontal,
-                    state = rememberDraggableState { delta ->
-                        dragOffsetX += delta
-                        val shift = carouselWholePageShift(dragOffsetX, pageStepPx)
-                        if (shift != 0) {
-                            shiftCarousel(shift)
-                            dragOffsetX += shift * pageStepPx
-                        }
-                    },
-                    enabled = !pauseMotion,
-                    onDragStarted = {
-                        isDragging = true
-                        animatedOffsetX.stop()
-                        dragOffsetX = animatedOffsetX.value
-                    },
-                    onDragStopped = {
-                        animatedOffsetX.snapTo(dragOffsetX)
-                        dragOffsetX = 0f
-                        isDragging = false
-                        settleCarousel()
-                    }
-                )
-        ) {
-            for (relative in renderedPages) {
-                val itemIndex = carouselRealIndex(currentIndex + relative, actualCount)
-                FeaturedCard(
-                    item = items[itemIndex],
-                    onClick = onOpenDetail,
-                    modifier = Modifier
-                        .width(318.dp)
-                        .graphicsLayer {
-                            val layerOffsetX = when {
-                                pauseMotion -> 0f
-                                isDragging -> dragOffsetX
-                                else -> animatedOffsetX.value
-                            }
-                            translationX = startPaddingPx + relative * pageStepPx + layerOffsetX
-                        },
-                    lightweightImage = true,
-                    decorativeImage = true
-                )
-            }
-        }
-
-        if (actualCount > 1) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                repeat(actualCount) { index ->
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 3.dp)
-                            .size(if (index == currentIndex) 20.dp else 6.dp, 6.dp)
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(
-                                if (index == currentIndex) UiPalette.Accent
-                                else UiPalette.BorderSoft.copy(alpha = 0.72f)
-                            )
-                    )
-                }
-            }
+        items(
+            items = items,
+            key = { it.stableKey() },
+            contentType = { "featured_card" }
+        ) { item ->
+            FeaturedCard(
+                item = item,
+                onClick = onOpenDetail,
+                modifier = Modifier.width(318.dp),
+                lightweightImage = true,
+                decorativeImage = true
+            )
         }
     }
-}
-
-private fun carouselRealIndex(page: Int, itemCount: Int): Int {
-    if (itemCount <= 0) return 0
-    val index = page % itemCount
-    return if (index < 0) index + itemCount else index
-}
-
-private fun carouselWholePageShift(offsetX: Float, pageStepPx: Float): Int {
-    if (pageStepPx <= 0f) return 0
-    return (-offsetX / pageStepPx).toInt()
 }
 
 internal enum class AccountNoticeTone {

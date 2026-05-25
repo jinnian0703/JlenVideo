@@ -32,7 +32,10 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Cached
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.NewReleases
+import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -77,9 +80,17 @@ fun AccountSettingsHomePane(
     onOpenUpdate: () -> Unit,
     onOpenCache: () -> Unit,
     onOpenAgreement: () -> Unit,
-    onOpenLogs: () -> Unit
+    onOpenLogs: () -> Unit,
+    onOpenAbout: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        AccountSettingsEntryCard(
+            title = "关于",
+            description = "Jlen 影视",
+            meta = "版本、源码和相关项目",
+            icon = Icons.Rounded.Info,
+            onClick = onOpenAbout
+        )
         AccountSettingsEntryCard(
             title = "版本更新",
             description = when {
@@ -124,6 +135,107 @@ fun AccountSettingsHomePane(
             icon = Icons.Rounded.BugReport,
             onClick = onOpenLogs
         )
+    }
+}
+
+@Composable
+fun AccountAboutSettingsScreen(
+    currentVersion: String,
+    onBack: () -> Unit,
+    onOpenUpdate: () -> Unit,
+    onOpenLogs: () -> Unit,
+    onOpenUrl: (String) -> Unit
+) {
+    AccountSettingsScaffold(
+        title = "关于",
+        subtitle = "应用信息和相关项目",
+        onBack = onBack
+    ) {
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp, bottom = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(86.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(UiPalette.Accent),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "J",
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = UiPalette.AccentText
+                    )
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Jlen 影视",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = UiPalette.Ink
+                    )
+                    Text(
+                        text = "Version $currentVersion",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = UiPalette.TextSecondary
+                    )
+                }
+            }
+        }
+        item {
+            AccountAboutGroup(title = "信息") {
+                AccountAboutRow(
+                    title = "版本更新",
+                    subtitle = "检查更新和查看发布说明",
+                    icon = Icons.Rounded.NewReleases,
+                    onClick = onOpenUpdate
+                )
+                AccountAboutRow(
+                    title = "问题反馈",
+                    subtitle = "本机问题日志与排查信息",
+                    icon = Icons.Rounded.BugReport,
+                    onClick = onOpenLogs
+                )
+            }
+        }
+        item {
+            AccountAboutGroup(title = "开源") {
+                AccountAboutRow(
+                    title = "项目源码",
+                    subtitle = "GitHub / JlenVideo",
+                    icon = Icons.Rounded.Code,
+                    onClick = { onOpenUrl(JLEN_VIDEO_REPOSITORY_URL) }
+                )
+                AccountAboutRow(
+                    title = "数据 API",
+                    subtitle = "maccms-pure-video-api",
+                    icon = Icons.Rounded.Storage,
+                    onClick = { onOpenUrl(JLEN_VIDEO_API_REPOSITORY_URL) }
+                )
+                AccountAboutRow(
+                    title = "管理后台",
+                    subtitle = "appcenter-standalone-admin",
+                    icon = Icons.AutoMirrored.Rounded.Article,
+                    onClick = { onOpenUrl(JLEN_VIDEO_ADMIN_REPOSITORY_URL) }
+                )
+            }
+        }
+        item {
+            Text(
+                text = "Built with Kotlin & Jetpack Compose",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 18.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = UiPalette.TextMuted
+            )
+        }
     }
 }
 
@@ -475,6 +587,86 @@ private fun shareIssueLog(context: Context, entry: AccountIssueLogEntry, logText
 }
 
 @Composable
+private fun AccountAboutGroup(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.ExtraBold,
+            color = UiPalette.Ink,
+            modifier = Modifier.padding(horizontal = 6.dp)
+        )
+        Card(
+            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+            shape = RoundedCornerShape(24.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.Border)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) {
+                content()
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountAboutRow(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = UiPalette.TextPrimary,
+            modifier = Modifier.size(24.dp)
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                color = UiPalette.Ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (subtitle.isNotBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = UiPalette.TextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+            contentDescription = null,
+            tint = UiPalette.TextMuted
+        )
+    }
+}
+
+@Composable
 internal fun AccountSettingsScaffold(
     title: String,
     subtitle: String,
@@ -521,6 +713,10 @@ internal fun AccountSettingsScaffold(
         content()
     }
 }
+
+private const val JLEN_VIDEO_REPOSITORY_URL = "https://github.com/jinnian0703/JlenVideo"
+private const val JLEN_VIDEO_API_REPOSITORY_URL = "https://github.com/jinnian0703/maccms-pure-video-api"
+private const val JLEN_VIDEO_ADMIN_REPOSITORY_URL = "https://github.com/jinnian0703/appcenter-standalone-admin"
 
 @Composable
 private fun AccountSettingsEntryCard(

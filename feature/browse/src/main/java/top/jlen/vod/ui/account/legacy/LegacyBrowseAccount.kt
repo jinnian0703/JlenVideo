@@ -173,6 +173,7 @@ internal fun LegacyAccountScreen(
     onOpenSettingsCache: () -> Unit,
     onOpenSettingsAgreement: () -> Unit,
     onOpenSettingsLogs: () -> Unit,
+    onOpenSettingsAbout: () -> Unit,
     onSendEmailCode: () -> Unit,
     onBindEmail: () -> Unit,
     onUnbindEmail: () -> Unit
@@ -428,7 +429,8 @@ internal fun LegacyAccountScreen(
                             onOpenUpdate = onOpenSettingsUpdate,
                             onOpenCache = onOpenSettingsCache,
                             onOpenAgreement = onOpenSettingsAgreement,
-                            onOpenLogs = onOpenSettingsLogs
+                            onOpenLogs = onOpenSettingsLogs,
+                            onOpenAbout = onOpenSettingsAbout
                         )
                     }
                 }
@@ -518,7 +520,8 @@ internal fun LegacyAccountScreen(
                                         onOpenUpdate = onOpenSettingsUpdate,
                                         onOpenCache = onOpenSettingsCache,
                                         onOpenAgreement = onOpenSettingsAgreement,
-                                        onOpenLogs = onOpenSettingsLogs
+                                        onOpenLogs = onOpenSettingsLogs,
+                                        onOpenAbout = onOpenSettingsAbout
                                     )
                                 }
                             }
