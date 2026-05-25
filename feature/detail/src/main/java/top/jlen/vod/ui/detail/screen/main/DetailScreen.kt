@@ -41,7 +41,7 @@ fun DetailScreen(
     val detailItem = state.item
 
     when {
-        state.isLoading -> LoadingPane("正在加载详情...")
+        state.isLoading && detailItem == null -> LoadingPane("正在加载详情...")
         !errorMessage.isNullOrBlank() -> ErrorBanner(message = errorMessage, onRetry = onBack, actionLabel = "返回")
         detailItem == null -> EmptyPane(
             message = "没有找到影片详情",

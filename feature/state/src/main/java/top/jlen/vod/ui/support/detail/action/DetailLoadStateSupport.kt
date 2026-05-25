@@ -41,3 +41,12 @@ internal fun detailStateWithLoadError(message: String): DetailUiState =
         isLoading = false,
         error = message
     )
+
+internal fun detailStateWithResumeBucket(
+    detailState: DetailUiState,
+    playbackResumeBucket: PlaybackResumeBucket?,
+    pendingResumePlayback: PlaybackResumeRecord?
+): DetailUiState = detailState.copy(
+    playbackResumeBucket = playbackResumeBucket,
+    pendingResumePlayback = pendingResumePlayback
+)

@@ -195,14 +195,47 @@ internal fun LegacyStateRuntimeViewModelCore.legacyOpenHistoryRecordDirectly(ite
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyLoadDetail(vodId: String) {
+    val currentState = currentDetailState()
+    val currentItem = currentState.item
+    if (currentItem != null && currentItem.matchesDetailRoute(vodId) && currentState.sources.isNotEmpty()) {
+        val resumeBucket = resolvePlaybackResumeBucket(currentItem, vodId)
+        val resumeRecord = resolvePlaybackResumeRecordForSources(resumeBucket, currentState.sources)
+        updateDetailState(detailStateWithResumeBucket(currentState, resumeBucket, resumeRecord))
+        return
+    }
+
     viewModelScope.launch {
-        val keepCurrentContent = currentDetailState().item?.vodId == vodId
-        updateDetailState(beginDetailLoad(currentDetailState(), keepCurrentContent))
+        val existingState = currentDetailState()
+        val currentRouteItem = existingState.item?.takeIf { it.matchesDetailRoute(vodId) }
+        val cachedItem = currentRouteItem ?: legacyRepository().peekDetailForApp(vodId)
+        val keepCurrentContent = cachedItem != null
+        if (cachedItem != null && currentRouteItem == null) {
+            val cachedSources = legacyRepository().parseSources(cachedItem)
+            val resumeBucket = resolvePlaybackResumeBucket(cachedItem, vodId)
+            val resumeRecord = resolvePlaybackResumeRecordForSources(resumeBucket, cachedSources)
+            updateDetailState(
+                loadedDetailState(
+                    item = cachedItem,
+                    sources = cachedSources,
+                    isFavorited = currentAccountState().favoriteItems.any { favorite -> favorite.vodId == cachedItem.vodId },
+                    selectedSourceIndex = resumeRecord?.sourceIndex?.coerceIn(0, (cachedSources.lastIndex).coerceAtLeast(0)) ?: 0,
+                    playbackResumeBucket = resumeBucket,
+                    pendingResumePlayback = resumeRecord
+                ).copy(isLoading = true)
+            )
+        } else {
+            updateDetailState(beginDetailLoad(existingState, keepCurrentContent && currentRouteItem != null))
+        }
         runCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadDetail(vodId) }
         }.onSuccess { item ->
             if (item == null) {
-                updateDetailState(missingDetailState())
+                val fallbackState = currentDetailState()
+                if (fallbackState.item?.matchesDetailRoute(vodId) == true) {
+                    updateDetailState(fallbackState.copy(isLoading = false, error = null))
+                } else {
+                    updateDetailState(missingDetailState())
+                }
             } else {
                 val sources = legacyRepository().parseSources(item)
                 val resumeBucket = resolvePlaybackResumeBucket(item, vodId)
@@ -224,9 +257,25 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadDetail(vodId: String) {
                 )
             }
         }.onFailure { error ->
-            updateDetailState(detailStateWithLoadError(toUserFacingMessage(error, "详情加载失败")))
+            val fallbackState = currentDetailState()
+            if (fallbackState.item?.matchesDetailRoute(vodId) == true) {
+                updateDetailState(fallbackState.copy(isLoading = false, error = null))
+            } else {
+                updateDetailState(detailStateWithLoadError(toUserFacingMessage(error, "详情加载失败")))
+            }
         }
     }
+}
+
+private fun VodItem.matchesDetailRoute(vodId: String): Boolean {
+    val normalizedId = vodId.trim()
+    if (normalizedId.isBlank()) return false
+    return linkedSetOf(
+        this.vodId.trim(),
+        this.siteVodId.trim(),
+        Regex("""/voddetail/([^/.]+)""").find(detailUrl)?.groupValues?.getOrNull(1).orEmpty(),
+        Regex("""/vodplay/([^/-?.]+)""").find(detailUrl)?.groupValues?.getOrNull(1).orEmpty()
+    ).any { it.isNotBlank() && it == normalizedId }
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacySelectSource(index: Int) {
