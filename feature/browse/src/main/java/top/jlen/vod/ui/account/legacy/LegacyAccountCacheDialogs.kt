@@ -75,7 +75,7 @@ internal fun ClearCacheConfirmDialog(
                     color = UiPalette.Ink
                 )
                 Text(
-                    text = "确认清除当前内容缓存和图片缓存吗？",
+                    text = "确认清除内容缓存和图片缓存？",
                     style = MaterialTheme.typography.bodyMedium,
                     color = UiPalette.TextSecondary
                 )
@@ -84,7 +84,7 @@ internal fun ClearCacheConfirmDialog(
                     shape = RoundedCornerShape(18.dp)
                 ) {
                     Text(
-                        text = "预计清除 $totalSize。不会删除登录状态、追剧、播放记录、搜索历史和问题日志。",
+                        text = "预计清除 $totalSize。账号、追剧、播放记录和日志会保留。",
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 13.dp),
@@ -132,7 +132,7 @@ internal fun CacheRetentionPickerDialog(
 ) {
     CachePickerDialogFrame(
         title = "缓存保存时间",
-        subtitle = "超过保存时间后，内容缓存和图片缓存会自动清理。",
+        subtitle = "超过保存时间后自动清理。",
         currentLabel = selectedRetention.label,
         onDismiss = onDismiss
     ) {
@@ -156,7 +156,7 @@ internal fun CacheSizeLimitPickerDialog(
 ) {
     CachePickerDialogFrame(
         title = "缓存上限",
-        subtitle = "超过上限后，会优先删除较旧的内容缓存和图片缓存。",
+        subtitle = "超过上限后优先清理旧缓存。",
         currentLabel = selectedLimit.label,
         onDismiss = onDismiss
     ) {
@@ -375,17 +375,17 @@ private fun CachePickerOptionCard(
 
 private fun CacheRetentionOption.cacheRetentionDescription(): String =
     when (this) {
-        CacheRetentionOption.ThreeDays -> "默认选项，兼顾新鲜度和加载速度。"
-        CacheRetentionOption.SevenDays -> "减少重复请求，适合常用内容。"
-        CacheRetentionOption.ThirtyDays -> "长时间保留内容缓存，减少网络加载。"
-        CacheRetentionOption.Forever -> "不按时间自动过期，只能手动清除或刷新覆盖。"
+        CacheRetentionOption.ThreeDays -> "常规缓存周期。"
+        CacheRetentionOption.SevenDays -> "保留一周。"
+        CacheRetentionOption.ThirtyDays -> "保留一个月。"
+        CacheRetentionOption.Forever -> "不按时间清理。"
     }
 
 private fun CacheSizeLimitOption.cacheSizeLimitDescription(): String =
     when (this) {
-        CacheSizeLimitOption.FiftyMb -> "占用更克制，适合存储空间紧张时使用。"
-        CacheSizeLimitOption.OneHundredMb -> "保留常用内容和少量图片缓存。"
-        CacheSizeLimitOption.ThreeHundredMb -> "默认选项，适合日常浏览和加载速度。"
-        CacheSizeLimitOption.OneGb -> "保留更多图片和内容缓存。"
-        CacheSizeLimitOption.Unlimited -> "不按大小自动清理，只按时间或手动清理。"
+        CacheSizeLimitOption.FiftyMb -> "低占用。"
+        CacheSizeLimitOption.OneHundredMb -> "轻量缓存。"
+        CacheSizeLimitOption.ThreeHundredMb -> "常规缓存。"
+        CacheSizeLimitOption.OneGb -> "较大缓存。"
+        CacheSizeLimitOption.Unlimited -> "不按大小清理。"
     }

@@ -475,7 +475,7 @@ internal fun LegacyAccountScreen(
                             Column {
                                 AccountGuestModeHeader(
                                     title = "找回密码",
-                                    description = "通过邮箱验证码重置登录密码。",
+                                    description = "使用邮箱验证码重置密码。",
                                     onBack = { onAuthModeChange(AccountAuthMode.Login) }
                                 )
                                 AccountFindPasswordPane(
@@ -497,7 +497,7 @@ internal fun LegacyAccountScreen(
                             Column {
                                 AccountGuestModeHeader(
                                     title = "设置与工具",
-                                    description = "查看版本、缓存、协议和问题日志。",
+                                    description = "版本、缓存、协议、日志。",
                                     onBack = { onAuthModeChange(AccountAuthMode.Login) }
                                 )
                                 Column(
@@ -1569,7 +1569,7 @@ private fun AccountOverviewPane(
                     )
                     AccountOverviewActionButton(
                         title = if (hasEmail) "管理邮箱" else "绑定邮箱",
-                        subtitle = email.takeIf { hasEmail }?.maskEmailForAccount() ?: "保护账号安全",
+                        subtitle = email.takeIf { hasEmail }?.maskEmailForAccount() ?: "未绑定",
                         icon = Icons.Rounded.CheckCircle,
                         onClick = onBindEmail,
                         modifier = Modifier.weight(1f)
@@ -1608,13 +1608,13 @@ private fun AccountOverviewPane(
             ) {
                 AccountOverviewLinkRow(
                     title = "去追剧",
-                    description = "查看已加入追剧的更新和续播",
+                    description = "更新与续播",
                     icon = Icons.Rounded.GridView,
                     onClick = onOpenFollow
                 )
                 AccountOverviewLinkRow(
                     title = "设置与工具",
-                    description = if (state.hasCrashLog) "有问题日志可查看" else "检查更新、查看协议和日志",
+                    description = if (state.hasCrashLog) "有问题日志" else "版本、缓存、协议、日志",
                     icon = Icons.Rounded.Info,
                     onClick = onOpenLogs
                 )
@@ -1958,7 +1958,7 @@ internal fun LegacyAccountProfilePaneV2(
                                 color = UiPalette.Ink
                             )
                             Text(
-                                text = "管理账号资料、邮箱绑定和密码设置",
+                                text = "资料、邮箱、密码",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = UiPalette.TextSecondary
                             )
@@ -1976,11 +1976,11 @@ internal fun LegacyAccountProfilePaneV2(
                         if (!hasBoundEmail) {
                             AccountEditSectionCard(
                                 title = "邮箱绑定",
-                                description = "绑定后可用于找回账号和接收验证码"
+                                description = "找回账号和接收验证码"
                             ) {
                                 ProfileActionCard(
                                     title = "未绑定邮箱",
-                                    description = "绑定邮箱后可用于找回账号和接收验证码。",
+                                    description = "用于找回账号和接收验证码",
                                     actionText = "绑定邮箱",
                                     enabled = !isSaving,
                                     onAction = { showBindEmailDialog = true }
@@ -1989,7 +1989,7 @@ internal fun LegacyAccountProfilePaneV2(
                         } else {
                             AccountEditSectionCard(
                                 title = "邮箱绑定",
-                                description = "当前账号邮箱已绑定，可按需解绑后重新绑定"
+                                description = "当前邮箱已绑定"
                             ) {
                                 ReadonlyBindingField(
                                     label = "邮箱",
@@ -2002,11 +2002,11 @@ internal fun LegacyAccountProfilePaneV2(
 
                         AccountEditSectionCard(
                             title = "密码设置",
-                            description = "点击后在弹窗中修改账号登录密码"
+                            description = "修改登录密码"
                         ) {
                             ProfileActionCard(
                                 title = "登录密码",
-                                description = "需要原密码、新密码和确认密码。",
+                                description = "原密码与新密码",
                                 actionText = "修改密码",
                                 enabled = !isSaving,
                                 onAction = { showChangePasswordDialog = true }
@@ -2172,7 +2172,7 @@ internal fun LegacyAccountProfilePane(
         isLoading -> LoadingPane("资料加载中...")
         fields.isEmpty() -> EmptyPane(
             message = "暂无资料",
-            description = "当前账号资料还没有可展示的信息",
+            description = "暂无可展示信息",
             style = FeedbackPaneStyle.Card
         )
         else -> Card(
@@ -2225,7 +2225,7 @@ internal fun LegacyAccountProfilePane(
                 )
                 ProfileActionCard(
                     title = "登录密码",
-                    description = "点击后在弹窗中修改账号登录密码。",
+                    description = "修改登录密码",
                     actionText = "修改密码",
                     enabled = !isSaving,
                     onAction = { showChangePasswordDialog = true }

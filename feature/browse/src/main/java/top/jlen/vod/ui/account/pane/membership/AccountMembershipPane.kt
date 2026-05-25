@@ -546,7 +546,7 @@ private fun MembershipCardRechargeDialog(
                         color = UiPalette.Ink
                     )
                     Text(
-                        text = "输入充值卡信息后，积分会添加到当前账号。",
+                        text = "输入卡号和密码完成兑换。",
                         style = MaterialTheme.typography.bodyMedium,
                         color = UiPalette.TextSecondary
                     )

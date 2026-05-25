@@ -59,7 +59,7 @@ internal fun ClearHistoryConfirmDialog(
                     color = UiPalette.Ink
                 )
                 Text(
-                    text = "确认清空当前账号的全部播放记录吗？",
+                    text = "确认清空播放记录？",
                     style = MaterialTheme.typography.bodyMedium,
                     color = UiPalette.TextSecondary
                 )
@@ -68,7 +68,7 @@ internal fun ClearHistoryConfirmDialog(
                     shape = RoundedCornerShape(18.dp)
                 ) {
                     Text(
-                        text = "将删除已加载的 $count 条记录，并同步执行清空操作。该操作完成后无法从本页恢复。",
+                        text = "将删除 $count 条已加载记录，清空后不可恢复。",
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 13.dp),

@@ -50,10 +50,10 @@ internal fun BindEmailDialog(
                 AccountDialogHeader(
                     label = "邮箱绑定",
                     title = "绑定邮箱",
-                    description = "通过邮箱验证码确认后完成绑定。"
+                    description = "输入邮箱和验证码。"
                 )
                 AccountDialogInfoCard(
-                    text = "绑定成功后将关闭弹窗，并使用系统提示告知结果。该邮箱可用于找回账号和接收验证码。"
+                    text = "用于找回账号和接收验证码。"
                 )
                 ProfileEditorField(
                     label = "邮箱",
@@ -219,7 +219,7 @@ internal fun UnbindEmailConfirmDialog(
                     color = UiPalette.Ink
                 )
                 Text(
-                    text = "确认解绑当前账号邮箱吗？",
+                    text = "确认解绑邮箱？",
                     style = MaterialTheme.typography.bodyMedium,
                     color = UiPalette.TextSecondary
                 )
@@ -228,7 +228,7 @@ internal fun UnbindEmailConfirmDialog(
                     shape = RoundedCornerShape(18.dp)
                 ) {
                     Text(
-                        text = "解绑后，$email 将不再用于找回账号和接收验证码。后续可以重新绑定邮箱。",
+                        text = "$email 将不再用于找回账号和接收验证码。",
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 13.dp),

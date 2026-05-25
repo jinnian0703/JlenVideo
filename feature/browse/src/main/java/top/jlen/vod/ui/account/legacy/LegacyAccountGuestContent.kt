@@ -71,7 +71,7 @@ internal fun AccountGuestIntroCard(
                         color = UiPalette.Ink
                     )
                     Text(
-                        text = "登录后可同步追剧、播放记录、会员积分和个人资料。",
+                        text = "同步追剧、播放记录、积分和资料。",
                         style = MaterialTheme.typography.bodyMedium,
                         color = UiPalette.TextSecondary
                     )
