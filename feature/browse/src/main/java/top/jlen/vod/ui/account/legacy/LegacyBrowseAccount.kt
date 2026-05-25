@@ -171,7 +171,6 @@ internal fun LegacyAccountScreen(
     onFindPassword: () -> Unit,
     onOpenSettingsUpdate: () -> Unit,
     onOpenSettingsCache: () -> Unit,
-    onOpenSettingsAgreement: () -> Unit,
     onOpenSettingsLogs: () -> Unit,
     onOpenSettingsAbout: () -> Unit,
     onSendEmailCode: () -> Unit,
@@ -428,7 +427,6 @@ internal fun LegacyAccountScreen(
                             hasCrashLog = state.hasCrashLog,
                             onOpenUpdate = onOpenSettingsUpdate,
                             onOpenCache = onOpenSettingsCache,
-                            onOpenAgreement = onOpenSettingsAgreement,
                             onOpenLogs = onOpenSettingsLogs,
                             onOpenAbout = onOpenSettingsAbout
                         )
@@ -519,7 +517,6 @@ internal fun LegacyAccountScreen(
                                         hasCrashLog = state.hasCrashLog,
                                         onOpenUpdate = onOpenSettingsUpdate,
                                         onOpenCache = onOpenSettingsCache,
-                                        onOpenAgreement = onOpenSettingsAgreement,
                                         onOpenLogs = onOpenSettingsLogs,
                                         onOpenAbout = onOpenSettingsAbout
                                     )

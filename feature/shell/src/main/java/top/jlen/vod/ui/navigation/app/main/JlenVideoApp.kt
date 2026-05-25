@@ -62,6 +62,7 @@ import kotlinx.coroutines.delay
 import java.io.File
 import java.nio.charset.StandardCharsets
 import top.jlen.vod.data.AppUpdateInfo
+import top.jlen.vod.data.VodItem
 
 private const val ONBOARDING_PREFS = "jlen_video_onboarding"
 private const val KEY_ACCEPTED_USER_AGREEMENT = "accepted_user_agreement"
@@ -520,7 +521,6 @@ fun JlenVideoApp() {
                                 onFindPassword = viewModel::findPassword,
                                 onOpenSettingsUpdate = { openAccountSettingsChild("account/settings/update") },
                                 onOpenSettingsCache = { openAccountSettingsChild("account/settings/cache") },
-                                onOpenSettingsAgreement = { openAccountSettingsChild("account/settings/agreement") },
                                 onOpenSettingsLogs = { openAccountSettingsChild("account/settings/logs") },
                                 onOpenSettingsAbout = { openAccountSettingsChild("account/settings/about") },
                                 onSendEmailCode = viewModel::sendEmailBindCode,
@@ -589,6 +589,7 @@ fun JlenVideoApp() {
                                 onBack = backToAccount,
                                 onOpenUpdate = { openAccountSettingsChild("account/settings/update") },
                                 onOpenLogs = { openAccountSettingsChild("account/settings/logs") },
+                                onOpenAgreement = { openAccountSettingsChild("account/settings/agreement") },
                                 onOpenUrl = { url -> openExternalUrl(context, url) }
                             )
                         }
@@ -669,24 +670,27 @@ fun JlenVideoApp() {
                             LaunchedEffect(vodId) {
                                 viewModel.loadDetail(vodId)
                             }
+                            val routeDetailState = viewModel.detailState.takeIf { state ->
+                                state.item?.matchesDetailRoute(vodId) == true
+                            } ?: DetailUiState(isLoading = true)
                             DetailScreen(
-                                state = viewModel.detailState,
+                                state = routeDetailState,
                                 isLoggedIn = viewModel.accountState.session.isLoggedIn,
                                 onBack = { navController.popBackStack() },
                                 onSelectSource = viewModel::selectSource,
                                 onFavorite = {
                                     if (
                                         viewModel.accountState.session.isLoggedIn &&
-                                        viewModel.detailState.isFavorited
+                                        routeDetailState.isFavorited
                                     ) {
                                         showRemoveFavoriteDialog = true
-                                    } else {
+                                    } else if (routeDetailState.item != null) {
                                         viewModel.addCurrentDetailFavorite()
                                     }
                                 },
                                 onDismissActionMessage = viewModel::dismissDetailActionMessage,
                                 onPlay = { title, sourceIndex, episodeIndex ->
-                                    val pendingResume = viewModel.detailState.pendingResumePlayback
+                                    val pendingResume = routeDetailState.pendingResumePlayback
                                     val resumeSnapshot = if (
                                         pendingResume != null &&
                                         pendingResume.sourceIndex == sourceIndex &&
@@ -701,8 +705,8 @@ fun JlenVideoApp() {
                                     }
                                     viewModel.openPlayer(
                                         title = title,
-                                        item = viewModel.detailState.item,
-                                        sources = viewModel.detailState.sources,
+                                        item = routeDetailState.item,
+                                        sources = routeDetailState.sources,
                                         sourceIndex = sourceIndex,
                                         episodeIndex = episodeIndex,
                                         snapshot = resumeSnapshot
@@ -774,6 +778,17 @@ private fun normalizeHeartbeatRoute(route: String?): String = when {
     route.startsWith("detail/") || route == "detail/{vodId}" -> "detail"
     route.startsWith("announcement/") || route == "announcement/{noticeId}" -> "announcement_detail"
     else -> route
+}
+
+private fun VodItem.matchesDetailRoute(vodId: String): Boolean {
+    val normalizedId = vodId.trim()
+    if (normalizedId.isBlank()) return false
+    return linkedSetOf(
+        this.vodId.trim(),
+        this.siteVodId.trim(),
+        Regex("""/voddetail/([^/.]+)""").find(detailUrl)?.groupValues?.getOrNull(1).orEmpty(),
+        Regex("""/vodplay/([^/-?.]+)""").find(detailUrl)?.groupValues?.getOrNull(1).orEmpty()
+    ).any { it.isNotBlank() && it == normalizedId }
 }
 
 private fun copyTextToClipboard(context: Context, label: String, text: String, toast: String) {

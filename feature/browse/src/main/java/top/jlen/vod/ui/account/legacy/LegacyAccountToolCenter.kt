@@ -33,8 +33,10 @@ import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Cached
 import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.NewReleases
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -79,18 +81,10 @@ fun AccountSettingsHomePane(
     hasCrashLog: Boolean,
     onOpenUpdate: () -> Unit,
     onOpenCache: () -> Unit,
-    onOpenAgreement: () -> Unit,
     onOpenLogs: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        AccountSettingsEntryCard(
-            title = "关于",
-            description = "Jlen 影视",
-            meta = "版本、源码和相关项目",
-            icon = Icons.Rounded.Info,
-            onClick = onOpenAbout
-        )
         AccountSettingsEntryCard(
             title = "版本更新",
             description = when {
@@ -122,18 +116,18 @@ fun AccountSettingsHomePane(
             onClick = onOpenCache
         )
         AccountSettingsEntryCard(
-            title = "用户协议与隐私说明",
-            description = "服务条款与隐私政策",
-            meta = "应用用途、账号信息和本地数据说明",
-            icon = Icons.AutoMirrored.Rounded.Article,
-            onClick = onOpenAgreement
-        )
-        AccountSettingsEntryCard(
             title = "问题日志",
             description = if (hasCrashLog) "发现本机日志" else "暂无本机日志",
             meta = "查看、复制、分享或清空日志",
             icon = Icons.Rounded.BugReport,
             onClick = onOpenLogs
+        )
+        AccountSettingsEntryCard(
+            title = "关于",
+            description = "Jlen 影视",
+            meta = "作者、反馈群、发布页和协议说明",
+            icon = Icons.Rounded.Info,
+            onClick = onOpenAbout
         )
     }
 }
@@ -144,6 +138,7 @@ fun AccountAboutSettingsScreen(
     onBack: () -> Unit,
     onOpenUpdate: () -> Unit,
     onOpenLogs: () -> Unit,
+    onOpenAgreement: () -> Unit,
     onOpenUrl: (String) -> Unit
 ) {
     AccountSettingsScaffold(
@@ -191,10 +186,33 @@ fun AccountAboutSettingsScreen(
         item {
             AccountAboutGroup(title = "信息") {
                 AccountAboutRow(
+                    title = "作者",
+                    subtitle = "堇年",
+                    icon = Icons.Rounded.Person
+                )
+                AccountAboutRow(
+                    title = "QQ群 / 反馈群",
+                    subtitle = "点击链接加入群聊",
+                    icon = Icons.Rounded.Groups,
+                    onClick = { onOpenUrl(JLEN_VIDEO_FEEDBACK_GROUP_URL) }
+                )
+                AccountAboutRow(
                     title = "版本更新",
                     subtitle = "检查更新和查看发布说明",
                     icon = Icons.Rounded.NewReleases,
                     onClick = onOpenUpdate
+                )
+                AccountAboutRow(
+                    title = "官网 / 发布页",
+                    subtitle = "GitHub Releases",
+                    icon = Icons.AutoMirrored.Rounded.Article,
+                    onClick = { onOpenUrl(JLEN_VIDEO_RELEASES_URL) }
+                )
+                AccountAboutRow(
+                    title = "用户协议与免责声明",
+                    subtitle = "服务条款、隐私说明和使用边界",
+                    icon = Icons.AutoMirrored.Rounded.Article,
+                    onClick = onOpenAgreement
                 )
                 AccountAboutRow(
                     title = "问题反馈",
@@ -211,6 +229,12 @@ fun AccountAboutSettingsScreen(
                     subtitle = "GitHub / JlenVideo",
                     icon = Icons.Rounded.Code,
                     onClick = { onOpenUrl(JLEN_VIDEO_REPOSITORY_URL) }
+                )
+                AccountAboutRow(
+                    title = "开源许可证",
+                    subtitle = "MIT License",
+                    icon = Icons.AutoMirrored.Rounded.Article,
+                    onClick = { onOpenUrl(JLEN_VIDEO_LICENSE_URL) }
                 )
                 AccountAboutRow(
                     title = "数据 API",
@@ -620,12 +644,12 @@ private fun AccountAboutRow(
     title: String,
     subtitle: String,
     icon: ImageVector,
-    onClick: () -> Unit
+    onClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -658,11 +682,13 @@ private fun AccountAboutRow(
                 )
             }
         }
-        Icon(
-            imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-            contentDescription = null,
-            tint = UiPalette.TextMuted
-        )
+        if (onClick != null) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                contentDescription = null,
+                tint = UiPalette.TextMuted
+            )
+        }
     }
 }
 
@@ -715,6 +741,9 @@ internal fun AccountSettingsScaffold(
 }
 
 private const val JLEN_VIDEO_REPOSITORY_URL = "https://github.com/jinnian0703/JlenVideo"
+private const val JLEN_VIDEO_FEEDBACK_GROUP_URL = "https://qm.qq.com/q/m8obKclNzG"
+private const val JLEN_VIDEO_RELEASES_URL = "https://github.com/jinnian0703/JlenVideo/releases"
+private const val JLEN_VIDEO_LICENSE_URL = "https://github.com/jinnian0703/JlenVideo/blob/main/LICENSE"
 private const val JLEN_VIDEO_API_REPOSITORY_URL = "https://github.com/jinnian0703/maccms-pure-video-api"
 private const val JLEN_VIDEO_ADMIN_REPOSITORY_URL = "https://github.com/jinnian0703/appcenter-standalone-admin"
 
