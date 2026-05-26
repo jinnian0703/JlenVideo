@@ -63,8 +63,8 @@ ANDROID_COMPILE_SDK=34
 ANDROID_MIN_SDK=24
 ANDROID_TARGET_SDK=34
 APP_APPLICATION_ID=top.jlen.vod
-APP_VERSION_CODE=32
-APP_VERSION_NAME=2.1.1.6
+APP_VERSION_CODE=33
+APP_VERSION_NAME=2.1.1.7
 APPLE_CMS_BASE_URL=https://cms.jlen.top/
 ```
 
@@ -289,8 +289,8 @@ app/build/outputs/apk/debug/JlenVideo-版本号-debug.apk
 版本信息在 `gradle.properties`：
 
 ```properties
-APP_VERSION_CODE=32
-APP_VERSION_NAME=2.1.1.6
+APP_VERSION_CODE=33
+APP_VERSION_NAME=2.1.1.7
 ```
 
 发布新版本时通常需要：
