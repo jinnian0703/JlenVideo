@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
 
@@ -18,12 +19,14 @@
             android:exported="false"
             android:screenOrientation="fullSensor"
             android:windowLayoutInDisplayCutoutMode="shortEdges"
-            android:theme="@style/Theme.JlenVideo" />
+            android:theme="@style/Theme.JlenVideo"
+            tools:ignore="DiscouragedApi,UnusedAttribute" />
         <activity
             android:name=".MainActivity"
             android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize"
             android:exported="true"
-            android:windowLayoutInDisplayCutoutMode="shortEdges">
+            android:windowLayoutInDisplayCutoutMode="shortEdges"
+            tools:ignore="UnusedAttribute">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
