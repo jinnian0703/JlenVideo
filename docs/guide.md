@@ -63,8 +63,8 @@ ANDROID_COMPILE_SDK=34
 ANDROID_MIN_SDK=24
 ANDROID_TARGET_SDK=34
 APP_APPLICATION_ID=top.jlen.vod
-APP_VERSION_CODE=33
-APP_VERSION_NAME=2.1.1.7
+APP_VERSION_CODE=34
+APP_VERSION_NAME=2.1.1.8
 APPLE_CMS_BASE_URL=https://cms.jlen.top/
 ```
 
@@ -76,20 +76,20 @@ APPLE_CMS_BASE_URL=https://cms.jlen.top/
 
 ```powershell
 .\gradlew.bat :app:compileDebugKotlin
-.\gradlew.bat :app:assembleDebug
+.\gradlew.bat :app:assembleRelease
 .\gradlew.bat :app:lintDebug
 ```
 
 推荐使用顺序：
 
 1. 普通 Kotlin 或 Compose 改动，先运行 `:app:compileDebugKotlin`。
-2. 涉及资源、Manifest、版本号、打包配置或需要交付 APK 时，运行 `:app:assembleDebug`。
+2. 涉及资源、Manifest、版本号、打包配置或需要交付 APK 时，运行 `:app:assembleRelease`。
 3. 需要检查静态问题时，运行 `:app:lintDebug`。
 
-Debug APK 会按版本名生成在：
+Release APK 会按版本名生成在：
 
 ```text
-app/build/outputs/apk/debug/JlenVideo-版本号-debug.apk
+app/build/outputs/apk/release/JlenVideo-版本号-release.apk
 ```
 
 如果只改文档，通常不需要运行 Android 编译。
@@ -289,8 +289,8 @@ app/build/outputs/apk/debug/JlenVideo-版本号-debug.apk
 版本信息在 `gradle.properties`：
 
 ```properties
-APP_VERSION_CODE=33
-APP_VERSION_NAME=2.1.1.7
+APP_VERSION_CODE=34
+APP_VERSION_NAME=2.1.1.8
 ```
 
 发布新版本时通常需要：
@@ -298,10 +298,10 @@ APP_VERSION_NAME=2.1.1.7
 1. 更新 `APP_VERSION_NAME`。
 2. 递增 `APP_VERSION_CODE`。
 3. 更新 README 中的当前版本信息。
-4. 运行 `:app:compileDebugKotlin` 和 `:app:assembleDebug`。
+4. 运行 `:app:compileDebugKotlin` 和 `:app:assembleRelease`。
 5. 提交并推送源码。
 6. 创建 GitHub Release。
-7. 上传 `JlenVideo-版本号-debug.apk`。
+7. 上传 `JlenVideo-版本号-release.apk`。
 8. 验证 Release 中文说明和 APK 附件显示正常。
 
 发布说明建议单独使用 UTF-8 Markdown 文件传给 GitHub CLI，避免 PowerShell 中直接内联中文导致编码问题。
@@ -313,7 +313,7 @@ APP_VERSION_NAME=2.1.1.7
 - 先看失败模块名称，是 `app`、`core:*` 还是 `feature:*`。
 - 如果是 import 或依赖方向问题，检查模块间依赖是否合理。
 - 如果是 Compose 参数签名问题，检查调用方是否都同步更新。
-- 如果是资源或 Manifest 问题，运行完整 `:app:assembleDebug` 更容易暴露。
+- 如果是资源或 Manifest 问题，运行完整 `:app:assembleRelease` 更容易暴露。
 
 ### 页面卡顿
 
