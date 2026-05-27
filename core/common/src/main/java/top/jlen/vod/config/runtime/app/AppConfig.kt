@@ -2,7 +2,7 @@ package top.jlen.vod
 
 object AppConfig {
     val appleCmsBaseUrl: String
-        get() = top.jlen.vod.core.common.BuildConfig.APPLE_CMS_BASE_URL
+        get() = RuntimeEndpoints.appleCmsBaseUrl
 }
 
 object AppRuntimeInfo {

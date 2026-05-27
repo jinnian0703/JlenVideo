@@ -52,6 +52,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.HttpException
 import top.jlen.vod.AppConfig
 import top.jlen.vod.AppRuntimeInfo
+import top.jlen.vod.RuntimeEndpoints
 import top.jlen.vod.PLAYER_DESKTOP_UA
 import javax.net.ssl.SSLException
 
@@ -2533,7 +2534,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     }
 
     private fun loadTencentHotSearchGroup(limit: Int): HotSearchGroup {
-        val sourceUrl = "https://v.qq.com/biu/ranks/?t=hotsearch"
+        val sourceUrl = RuntimeEndpoints.tencentHotSearchUrl
         val document = fetchDocument(sourceUrl)
         val items = document.select(".mod_rank_search_list .hotlist li a")
             .mapIndexedNotNull { index, anchor ->
@@ -2561,7 +2562,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     }
 
     private fun loadIqiyiHotSearchGroup(limit: Int): HotSearchGroup {
-        val sourceUrl = "https://www.iqiyi.com/ranks1PCW/home"
+        val sourceUrl = RuntimeEndpoints.iqiyiHotSearchUrl
         val document = fetchDocument(sourceUrl)
         val items = document.select("a.rvi__box")
             .mapIndexedNotNull { index, anchor ->
@@ -2589,7 +2590,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     }
 
     private fun loadYoukuHotSearchGroup(limit: Int): HotSearchGroup {
-        val sourceUrl = "https://m.youku.com/"
+        val sourceUrl = RuntimeEndpoints.youkuHotSearchUrl
         val html = fetchHtml(
             url = sourceUrl,
             referer = sourceUrl,
@@ -2670,7 +2671,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     }
 
     private fun loadMgtvHotSearchGroup(limit: Int): HotSearchGroup {
-        val sourceUrl = "https://www.mgtv.com/"
+        val sourceUrl = RuntimeEndpoints.mgtvHotSearchUrl
         val document = fetchDocument(sourceUrl)
         val section = document.select(".m-list-single")
             .firstOrNull { element ->
@@ -4861,9 +4862,12 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         get() = siteVodId.ifBlank { vodId.takeIf { it.all(Char::isDigit) }.orEmpty() }
 
     companion object {
-        private const val APP_CENTER_API_URL = "https://user.jlen.top/api.php"
-        private const val GITHUB_RELEASE_API_URL = "https://api.github.com/repos/jinnian0703/JlenVideo/releases/latest"
-        private const val GITHUB_RELEASE_LATEST_URL = "https://github.com/jinnian0703/JlenVideo/releases/latest"
+        private val APP_CENTER_API_URL: String
+            get() = RuntimeEndpoints.appCenterApiUrl
+        private val GITHUB_RELEASE_API_URL: String
+            get() = RuntimeEndpoints.githubReleaseApiUrl
+        private val GITHUB_RELEASE_LATEST_URL: String
+            get() = RuntimeEndpoints.githubLatestReleaseUrl
         private const val HOME_CACHE_PREF_KEY = "home_payload"
         private val SUPPORTED_MEMBERSHIP_DURATIONS = listOf("day", "week", "month", "year")
         private const val DISABLE_APP_CACHE = false

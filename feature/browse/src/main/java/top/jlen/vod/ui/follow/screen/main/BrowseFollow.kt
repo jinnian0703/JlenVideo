@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bookmark
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material3.Button
@@ -72,7 +71,6 @@ fun FollowScreen(
                         color = UiPalette.Ink
                     )
                 }
-                CircleActionButton(icon = Icons.Rounded.Refresh, onClick = onRefresh)
             }
         }
 

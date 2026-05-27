@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import java.io.File
 import java.nio.charset.StandardCharsets
+import top.jlen.vod.RuntimeEndpoints
 import top.jlen.vod.data.CacheRetentionOption
 import top.jlen.vod.data.CacheSizeLimitOption
 import top.jlen.vod.data.CacheSizeSummary
@@ -743,12 +744,18 @@ internal fun AccountSettingsScaffold(
     }
 }
 
-private const val JLEN_VIDEO_REPOSITORY_URL = "https://github.com/jinnian0703/JlenVideo"
-private const val JLEN_VIDEO_FEEDBACK_GROUP_URL = "https://qm.qq.com/q/m8obKclNzG"
-private const val JLEN_VIDEO_RELEASES_URL = "https://github.com/jinnian0703/JlenVideo/releases"
-private const val JLEN_VIDEO_LICENSE_URL = "https://github.com/jinnian0703/JlenVideo/blob/main/LICENSE"
-private const val JLEN_VIDEO_API_REPOSITORY_URL = "https://github.com/jinnian0703/maccms-pure-video-api"
-private const val JLEN_VIDEO_ADMIN_REPOSITORY_URL = "https://github.com/jinnian0703/appcenter-standalone-admin"
+private val JLEN_VIDEO_REPOSITORY_URL: String
+    get() = RuntimeEndpoints.projectRepositoryUrl
+private val JLEN_VIDEO_FEEDBACK_GROUP_URL: String
+    get() = RuntimeEndpoints.feedbackGroupUrl
+private val JLEN_VIDEO_RELEASES_URL: String
+    get() = RuntimeEndpoints.githubReleasesUrl
+private val JLEN_VIDEO_LICENSE_URL: String
+    get() = RuntimeEndpoints.projectLicenseUrl
+private val JLEN_VIDEO_API_REPOSITORY_URL: String
+    get() = RuntimeEndpoints.apiRepositoryUrl
+private val JLEN_VIDEO_ADMIN_REPOSITORY_URL: String
+    get() = RuntimeEndpoints.adminRepositoryUrl
 
 @Composable
 private fun AccountSettingsEntryCard(

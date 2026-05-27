@@ -61,6 +61,7 @@ import androidx.navigation.navArgument
 import kotlinx.coroutines.delay
 import java.io.File
 import java.nio.charset.StandardCharsets
+import top.jlen.vod.RuntimeEndpoints
 import top.jlen.vod.data.AppUpdateInfo
 import top.jlen.vod.data.VodItem
 
@@ -236,7 +237,7 @@ fun JlenVideoApp() {
     val openReleaseLink: () -> Unit = {
         val targetUrl = updateInfo?.releasePageUrl
             ?.takeIf { it.isNotBlank() }
-            ?: "https://github.com/jinnian0703/JlenVideo/releases"
+            ?: RuntimeEndpoints.githubReleasesUrl
         openExternalUrl(context, targetUrl)
     }
     val openUpdateLink: () -> Unit = {
@@ -244,7 +245,7 @@ fun JlenVideoApp() {
             ?.takeIf { it.isNotBlank() }
             ?: updateInfo?.releasePageUrl
             ?.takeIf { it.isNotBlank() }
-            ?: "https://github.com/jinnian0703/JlenVideo/releases"
+            ?: RuntimeEndpoints.githubReleasesUrl
         openExternalUrl(context, targetUrl)
     }
     val openAnnouncementLink: (String) -> Unit = { url ->
