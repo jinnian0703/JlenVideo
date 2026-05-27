@@ -4,8 +4,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
@@ -76,7 +74,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -86,7 +83,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -98,23 +94,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Precision
 import coil.size.Scale
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import top.jlen.vod.AppConfig
 import top.jlen.vod.AppRuntimeInfo
-import top.jlen.vod.PLAYER_DESKTOP_UA
 import top.jlen.vod.data.AppNotice
 import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.CategoryFilterGroup
@@ -1145,50 +1139,40 @@ internal fun AuthenticatedAvatar(
 ) {
     val context = LocalContext.current
     val cookieJar = remember(context) { PersistentCookieJar(context.applicationContext) }
-    val imageClient = remember(context, cookieJar) {
-        OkHttpClient.Builder()
-            .cookieJar(cookieJar)
+    val imageLoader = remember(context, cookieJar) {
+        ImageLoader.Builder(context)
+            .okHttpClient {
+                OkHttpClient.Builder()
+                    .cookieJar(cookieJar)
+                    .build()
+            }
             .build()
     }
-    val imageBytes by produceState<ByteArray?>(initialValue = null, context, imageUrl) {
-        value = withContext(Dispatchers.IO) {
-            runCatching {
-                val request = Request.Builder()
-                    .url(imageUrl)
-                    .header("Referer", AppConfig.appleCmsBaseUrl)
-                    .header("Origin", AppConfig.appleCmsBaseUrl.trimEnd('/'))
-                    .header("User-Agent", PLAYER_DESKTOP_UA)
-                    .build()
-                imageClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) return@use null
-                    response.body?.bytes()
-                }
-            }.getOrNull()
-        }
+    val request = remember(context, imageUrl) {
+        ImageRequest.Builder(context)
+            .data(imageUrl)
+            .size(160, 160)
+            .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+            .precision(Precision.INEXACT)
+            .scale(Scale.FILL)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .networkCachePolicy(CachePolicy.ENABLED)
+            .allowHardware(true)
+            .crossfade(false)
+            .addHeader("Referer", AppConfig.appleCmsBaseUrl)
+            .addHeader("Origin", AppConfig.appleCmsBaseUrl.trimEnd('/'))
+            .memoryCacheKey("avatar::$imageUrl@160")
+            .diskCacheKey("avatar::$imageUrl")
+            .build()
     }
-    val bitmap = remember(imageBytes) {
-        imageBytes?.let { bytes ->
-            runCatching {
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-            }.getOrNull()
-        }
-    }
-
-    if (bitmap != null) {
-        Image(
-            bitmap = bitmap,
-            contentDescription = contentDescription,
-            modifier = modifier,
-            contentScale = contentScale
-        )
-    } else {
-        AsyncImage(
-            model = imageUrl,
-            contentDescription = contentDescription,
-            modifier = modifier,
-            contentScale = contentScale
-        )
-    }
+    AsyncImage(
+        model = request,
+        imageLoader = imageLoader,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        contentScale = contentScale
+    )
 }
 
 internal fun VodItem.stableKey(): String = vodId.ifBlank { "$displayTitle|${vodPic.orEmpty()}" }
