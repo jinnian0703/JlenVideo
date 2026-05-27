@@ -355,7 +355,7 @@ internal fun LegacyAccountScreen(
             when (state.selectedSection) {
                 AccountSection.History -> accountRecordPaneItems(
                     title = "播放记录",
-                    emptyMessage = "还没有播放记录",
+                    emptyMessage = "暂无播放记录",
                     isLoading = state.isContentLoading,
                     items = state.historyItems,
                     hasMore = !state.historyNextPageUrl.isNullOrBlank(),
@@ -2362,7 +2362,7 @@ internal fun LegacyAccountRecordPane(
         isLoading && items.isEmpty() -> LoadingPane("$title 加载中...", style = FeedbackPaneStyle.Card)
         items.isEmpty() -> EmptyPane(
             message = emptyMessage,
-            description = "这里会展示你最近关注和操作过的内容",
+            description = "",
             style = FeedbackPaneStyle.Card
         )
         else -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -2446,7 +2446,7 @@ private fun LazyListScope.accountRecordPaneItems(
         items.isEmpty() -> item(key = "account_record_empty") {
             EmptyPane(
                 message = emptyMessage,
-                description = "这里会展示你最近关注和操作过的内容",
+                description = "",
                 style = FeedbackPaneStyle.Card
             )
         }
