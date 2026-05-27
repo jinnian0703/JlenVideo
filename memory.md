@@ -13,3 +13,5 @@
 - Use the APK naming format `JlenVideo-版本号-debug.apk`.
 - Publish GitHub Release notes with a UTF-8 file via `--notes-file`; do not inline Chinese release notes directly in a PowerShell command.
 - After publishing, verify that the Chinese text on the GitHub Release displays correctly.
+- For future version releases, the in-app download link should point to the optimized release APK instead of the debug APK.
+- Only build/output the release APK when updating a version or when the user explicitly asks for a release package; otherwise keep routine builds to debug/verification as needed.
