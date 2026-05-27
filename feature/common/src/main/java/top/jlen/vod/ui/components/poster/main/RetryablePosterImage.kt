@@ -35,9 +35,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImagePainter
@@ -57,7 +54,6 @@ fun RetryablePosterImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
     retryLabel: String = "重试",
-    showFallbackTitle: Boolean = true,
     fallbackStyle: PosterFallbackStyle = PosterFallbackStyle.Default,
     fallbackBottomInset: Dp = 0.dp,
     lightweightPlaceholder: Boolean = true
@@ -84,19 +80,17 @@ fun RetryablePosterImage(
 
             is AsyncImagePainter.State.Loading -> {
                 if (lightweightPlaceholder) {
-                    StaticPosterPlaceholder(title = title)
+                    StaticPosterPlaceholder()
                 } else {
-                    PosterSkeletonPlaceholder(title = title)
+                    PosterSkeletonPlaceholder()
                 }
             }
 
             is AsyncImagePainter.State.Error,
             is AsyncImagePainter.State.Empty -> {
                 PosterRetryFallback(
-                    title = title,
                     retryLabel = retryLabel,
                     onRetry = { retryToken += 1 },
-                    showTitle = showFallbackTitle,
                     style = fallbackStyle,
                     bottomInset = fallbackBottomInset
                 )
@@ -107,10 +101,8 @@ fun RetryablePosterImage(
 
 @Composable
 private fun PosterRetryFallback(
-    title: String,
     retryLabel: String,
     onRetry: () -> Unit,
-    showTitle: Boolean,
     style: PosterFallbackStyle,
     bottomInset: Dp
 ) {
@@ -130,17 +122,13 @@ private fun PosterRetryFallback(
     ) {
         when (style) {
             PosterFallbackStyle.Default -> DefaultPosterRetryFallback(
-                title = title,
                 retryLabel = retryLabel,
-                onRetry = onRetry,
-                showTitle = showTitle
+                onRetry = onRetry
             )
 
             PosterFallbackStyle.CompactTitle -> CompactTitlePosterRetryFallback(
-                title = title,
                 retryLabel = retryLabel,
-                onRetry = onRetry,
-                showTitle = showTitle
+                onRetry = onRetry
             )
         }
     }
@@ -148,10 +136,8 @@ private fun PosterRetryFallback(
 
 @Composable
 private fun DefaultPosterRetryFallback(
-    title: String,
     retryLabel: String,
-    onRetry: () -> Unit,
-    showTitle: Boolean
+    onRetry: () -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -173,17 +159,6 @@ private fun DefaultPosterRetryFallback(
                 modifier = Modifier.size(20.dp)
             )
         }
-        if (showTitle) {
-            Text(
-                text = title.ifBlank { "暂无海报" },
-                color = UiPalette.Ink,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
         OutlinedButton(
             onClick = onRetry,
             shape = RoundedCornerShape(16.dp),
@@ -195,14 +170,8 @@ private fun DefaultPosterRetryFallback(
         ) {
             Icon(
                 imageVector = Icons.Rounded.Refresh,
-                contentDescription = null,
+                contentDescription = retryLabel,
                 modifier = Modifier.size(14.dp)
-            )
-            Text(
-                text = retryLabel,
-                modifier = Modifier.padding(start = 4.dp),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold
             )
         }
     }
@@ -210,10 +179,8 @@ private fun DefaultPosterRetryFallback(
 
 @Composable
 private fun CompactTitlePosterRetryFallback(
-    title: String,
     retryLabel: String,
-    onRetry: () -> Unit,
-    showTitle: Boolean
+    onRetry: () -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -231,33 +198,15 @@ private fun CompactTitlePosterRetryFallback(
         ) {
             Icon(
                 imageVector = Icons.Rounded.Refresh,
-                contentDescription = null,
+                contentDescription = retryLabel,
                 modifier = Modifier.size(14.dp)
-            )
-            Text(
-                text = retryLabel,
-                modifier = Modifier.padding(start = 4.dp),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        if (showTitle) {
-            Text(
-                text = title.ifBlank { "暂无海报" },
-                color = UiPalette.TextSecondary,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
             )
         }
     }
 }
 
 @Composable
-private fun PosterSkeletonPlaceholder(title: String) {
+private fun PosterSkeletonPlaceholder() {
     val shimmer = rememberInfiniteTransition(label = "posterSkeleton")
     val shift by shimmer.animateFloat(
         initialValue = -1f,
@@ -282,36 +231,14 @@ private fun PosterSkeletonPlaceholder(title: String) {
                     end = Offset(620f * (shift + 1.2f), 620f * (shift + 1.2f))
                 )
             )
-            .padding(12.dp),
-        contentAlignment = Alignment.BottomStart
-    ) {
-        Text(
-            text = title.ifBlank { "加载中" },
-            color = UiPalette.TextMuted,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
+    )
 }
 
 @Composable
-private fun StaticPosterPlaceholder(title: String) {
+private fun StaticPosterPlaceholder() {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(UiPalette.SurfaceSoft)
-            .padding(12.dp),
-        contentAlignment = Alignment.BottomStart
-    ) {
-        Text(
-            text = title.ifBlank { "加载中" },
-            color = UiPalette.TextMuted,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
+    )
 }

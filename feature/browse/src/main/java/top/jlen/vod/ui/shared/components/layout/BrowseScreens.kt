@@ -417,7 +417,6 @@ private fun PosterImage(
     height: Int,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
-    showFallbackTitle: Boolean = true,
     fallbackStyle: PosterFallbackStyle = PosterFallbackStyle.Default,
     fallbackBottomInset: Dp = 0.dp,
     lightweightPlaceholder: Boolean = true
@@ -429,7 +428,6 @@ private fun PosterImage(
         height = height,
         modifier = modifier,
         contentScale = contentScale,
-        showFallbackTitle = showFallbackTitle,
         fallbackStyle = fallbackStyle,
         fallbackBottomInset = fallbackBottomInset,
         lightweightPlaceholder = lightweightPlaceholder
@@ -893,7 +891,6 @@ private fun CompactPosterCard(
                     .height(154.dp)
                     .clip(RoundedCornerShape(18.dp)),
                 contentScale = ContentScale.Crop,
-                showFallbackTitle = true,
                 fallbackStyle = PosterFallbackStyle.CompactTitle,
                 fallbackBottomInset = 30.dp,
                 lightweightPlaceholder = true
