@@ -9,11 +9,14 @@ import top.jlen.vod.data.UserProfileEditor
 internal fun accountStateWithValidationError(
     accountState: AccountUiState,
     message: String
-): AccountUiState =
-    accountStateWithToast(
-        accountState.copy(error = message, message = null),
-        message
+): AccountUiState {
+    val normalized = message.trim()
+    return accountState.copy(
+        error = normalized,
+        message = null,
+        toastMessage = null
     )
+}
 
 internal fun accountStateWithUserName(
     accountState: AccountUiState,
