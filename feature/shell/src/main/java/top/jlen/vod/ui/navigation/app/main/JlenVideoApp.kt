@@ -419,6 +419,9 @@ fun JlenVideoApp() {
                             )
                         }
                         composable("search") {
+                            LaunchedEffect(Unit) {
+                                viewModel.refreshHotSearches()
+                            }
                             SearchScreen(
                                 state = viewModel.searchState,
                                 scrollToTopSignal = searchScrollToTopSignal,

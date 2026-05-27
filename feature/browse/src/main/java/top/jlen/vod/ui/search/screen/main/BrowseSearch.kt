@@ -144,9 +144,6 @@ fun SearchScreen(
     onClearHistory: () -> Unit,
     onLoadHotSearches: () -> Unit
 ) {
-    LaunchedEffect(Unit) {
-        onLoadHotSearches()
-    }
     SearchLandingContent(
         state = state,
         scrollToTopSignal = scrollToTopSignal,
