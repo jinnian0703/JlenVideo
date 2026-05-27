@@ -138,19 +138,12 @@ internal fun HomeTopBlock(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    text = "精选片库",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = UiPalette.TextSecondary
-                )
-                Text(
-                    text = "Jlen 影视",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = UiPalette.Ink
-                )
-            }
+            Text(
+                text = "Jlen 影视",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = UiPalette.Ink
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 CircleActionButton(icon = Icons.Rounded.NewReleases, onClick = onOpenAnnouncementList)
                 CircleActionButton(icon = Icons.Rounded.Refresh, onClick = onRefresh)
@@ -934,8 +927,11 @@ private val noticeDisplayFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale
 
 internal val AppNotice.formattedActiveTime: String
     get() {
-        val start = startAt.formatNoticeTime()
-        val end = if (endAt.isNeverExpireNoticeTime()) "永不过期" else endAt.formatNoticeTime()
+        val startIsPlaceholder = startAt.isNeverExpireNoticeTime()
+        val endIsPlaceholder = endAt.isNeverExpireNoticeTime()
+        if (startIsPlaceholder && endIsPlaceholder) return "永不过期"
+        val start = if (startIsPlaceholder) currentNoticeTime() else startAt.formatNoticeTime()
+        val end = if (endIsPlaceholder) "永不过期" else endAt.formatNoticeTime()
         return when {
             start.isNotBlank() && end.isNotBlank() -> "$start - $end"
             start.isNotBlank() -> start
@@ -957,6 +953,8 @@ private fun String.formatNoticeTime(): String {
         noticeDisplayFormatter.format(Date(timeMillis))
     }.getOrDefault(raw)
 }
+
+private fun currentNoticeTime(): String = noticeDisplayFormatter.format(Date(System.currentTimeMillis()))
 
 private fun String.isNeverExpireNoticeTime(): Boolean {
     val raw = trim()
