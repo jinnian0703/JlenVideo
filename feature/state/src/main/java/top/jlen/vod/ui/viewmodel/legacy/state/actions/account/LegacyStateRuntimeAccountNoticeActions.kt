@@ -10,6 +10,9 @@ import top.jlen.vod.CrashLogger
 internal fun LegacyStateRuntimeViewModelCore.legacyRefreshAccount() {
     val session = legacyRepository().currentSession()
     updateAccountState(refreshedAccountState(currentAccountState(), session))
+    if (session.isLoggedIn) {
+        legacyShowCachedFollowContent()
+    }
     if (session.isLoggedIn && hasEnteredAccountScreenFlag()) {
         legacyHydrateAccountSession()
         selectAccountSection(currentAccountState().selectedSection, forceRefresh = true)

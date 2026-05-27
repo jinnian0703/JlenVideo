@@ -29,6 +29,18 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRef
         return
     }
 
+    val cachedItems = followCacheStore().load(currentFollowOwnerKey())
+    if (cachedItems.isNotEmpty() && currentFollowState().items.isEmpty()) {
+        updateFollowState(
+            FollowUiState(
+                isLoading = false,
+                isRefreshing = true,
+                isLoggedIn = true,
+                items = cachedItems
+            )
+        )
+    }
+
     val requestVersion = nextFollowRefreshVersion()
     val hasExistingItems = currentFollowState().items.isNotEmpty()
     updateFollowState(
@@ -56,25 +68,26 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRef
                     currentAccountState().historyItems
                 }
             }
+            val enrichedHistoryItems = withContext(Dispatchers.IO) {
+                legacyRepository().enrichHistoryItems(historyItems)
+            }
+            val items = withContext(Dispatchers.IO) {
+                buildFollowItems(
+                    favoriteItems = favoriteItems,
+                    historyItems = enrichedHistoryItems,
+                    resolveDetails = true
+                )
+            }
             if (requestVersion != currentFollowRefreshVersion()) return@followRefresh
 
             updateAccountState(
                 currentAccountState().copy(
                     favoriteItems = favoriteItems,
                     favoriteNextPageUrl = null,
-                    historyItems = historyItems,
+                    historyItems = enrichedHistoryItems,
                     historyNextPageUrl = null
                 )
             )
-
-            val items = withContext(Dispatchers.IO) {
-                buildFollowItems(
-                    favoriteItems = favoriteItems,
-                    historyItems = historyItems,
-                    resolveDetails = false
-                )
-            }
-            if (requestVersion != currentFollowRefreshVersion()) return@followRefresh
             updateFollowState(
                 FollowUiState(
                     isLoading = false,
@@ -83,37 +96,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRef
                     items = items
                 )
             )
-            try {
-                val enrichedHistoryItems = withContext(Dispatchers.IO) {
-                    legacyRepository().enrichHistoryItems(historyItems)
-                }
-                val enrichedItems = withContext(Dispatchers.IO) {
-                    buildFollowItems(
-                        favoriteItems = favoriteItems,
-                        historyItems = enrichedHistoryItems,
-                        resolveDetails = true
-                    )
-                }
-                if (requestVersion != currentFollowRefreshVersion()) return@followRefresh
-                updateAccountState(
-                    currentAccountState().copy(
-                        historyItems = enrichedHistoryItems,
-                        historyNextPageUrl = null
-                    )
-                )
-                updateFollowState(
-                    FollowUiState(
-                        isLoading = false,
-                        isRefreshing = false,
-                        isLoggedIn = true,
-                        items = enrichedItems
-                    )
-                )
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                // The basic follow list is already visible; detail enrichment is best-effort.
-            }
+            followCacheStore().save(currentFollowOwnerKey(), items)
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -130,13 +113,27 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRef
     })
 }
 
-internal fun LegacyStateRuntimeViewModelCore.legacyRebuildFollowContent() {
+internal fun LegacyStateRuntimeViewModelCore.legacyShowCachedFollowContent() {
+    if (!currentAccountState().session.isLoggedIn || currentFollowState().items.isNotEmpty()) return
+    val cachedItems = followCacheStore().load(currentFollowOwnerKey())
+    if (cachedItems.isEmpty()) return
+    updateFollowState(
+        FollowUiState(
+            isLoading = false,
+            isRefreshing = false,
+            isLoggedIn = true,
+            items = cachedItems
+        )
+    )
+}
+
+internal fun LegacyStateRuntimeViewModelCore.legacyRebuildFollowContent(forceUpdate: Boolean = false) {
     if (!currentAccountState().session.isLoggedIn) {
         updateFollowState(FollowUiState(isLoggedIn = false))
         return
     }
     val current = currentFollowState()
-    if (current.isLoading || current.isRefreshing) return
+    if (!forceUpdate && (current.isLoading || current.isRefreshing)) return
 
     val favorites = currentAccountState().favoriteItems
     if (favorites.isEmpty() && current.items.isEmpty()) {
@@ -149,6 +146,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRebuildFollowContent() {
                 items = emptyList()
             )
         )
+        followCacheStore().clear(currentFollowOwnerKey())
         return
     }
 
@@ -169,8 +167,57 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRebuildFollowContent() {
                 items = items
             )
         )
+        followCacheStore().save(currentFollowOwnerKey(), items)
     }
 }
+
+internal fun LegacyStateRuntimeViewModelCore.legacyUpsertFollowContentFromDetail(item: VodItem) {
+    if (!currentAccountState().session.isLoggedIn) return
+    val vodId = resolveFollowVodId(item)
+    if (vodId.isBlank()) return
+
+    val baseItems = currentFollowState().items.ifEmpty { followCacheStore().load(currentFollowOwnerKey()) }
+    val followItem = buildFollowItemFromDetail(vodId, item, baseItems.firstOrNull { it.vodId == vodId })
+    val items = (listOf(followItem) + baseItems.filterNot { it.vodId == vodId })
+        .sortedWith(followItemComparator)
+    updateFollowState(
+        currentFollowState().copy(
+            isLoading = false,
+            isRefreshing = false,
+            isLoggedIn = true,
+            error = null,
+            items = items
+        )
+    )
+    followCacheStore().save(currentFollowOwnerKey(), items)
+}
+
+internal fun LegacyStateRuntimeViewModelCore.legacyRemoveFollowContentByVodId(vodId: String) {
+    if (!currentAccountState().session.isLoggedIn) return
+    val normalizedVodId = vodId.trim()
+    if (normalizedVodId.isBlank()) return
+    val baseItems = currentFollowState().items.ifEmpty { followCacheStore().load(currentFollowOwnerKey()) }
+    val items = baseItems.filterNot { item -> item.vodId == normalizedVodId }
+    updateFollowState(
+        currentFollowState().copy(
+            isLoading = false,
+            isRefreshing = false,
+            isLoggedIn = true,
+            error = null,
+            items = items
+        )
+    )
+    if (items.isEmpty()) {
+        followCacheStore().clear(currentFollowOwnerKey())
+    } else {
+        followCacheStore().save(currentFollowOwnerKey(), items)
+    }
+}
+
+private fun LegacyStateRuntimeViewModelCore.currentFollowOwnerKey(): String =
+    currentAccountState().session.userId
+        .trim()
+        .ifBlank { currentAccountState().session.userName.trim() }
 
 private suspend fun LegacyStateRuntimeViewModelCore.loadAllFavoriteItems(): List<UserCenterItem> {
     val items = mutableListOf<UserCenterItem>()
@@ -229,11 +276,7 @@ private suspend fun LegacyStateRuntimeViewModelCore.buildFollowItems(
         }
         .awaitAll()
         .filterNotNull()
-        .sortedWith(
-            compareByDescending<FollowUpItem> { it.hasUpdate }
-                .thenByDescending { it.lastWatchedAtMillis ?: 0L }
-                .thenBy { it.title }
-        )
+        .sortedWith(followItemComparator)
 }
 
 private suspend fun LegacyStateRuntimeViewModelCore.buildFollowItem(
@@ -323,6 +366,72 @@ private suspend fun LegacyStateRuntimeViewModelCore.buildFollowItem(
     )
 }
 
+private fun LegacyStateRuntimeViewModelCore.buildFollowItemFromDetail(
+    vodId: String,
+    item: VodItem,
+    cached: FollowUpItem?
+): FollowUpItem {
+    val localResume = legacyRepository().loadPlaybackResumeForApp(vodId)
+    val watchedEpisodeIndex = localResume?.episodeIndex ?: cached?.watchedEpisodeIndex ?: -1
+    val lastWatchedAtMillis = localResume
+        ?.updatedAt
+        ?.takeIf { it > 0L }
+        ?: cached?.lastWatchedAtMillis
+    val sourceName = localResume?.sourceName
+        ?.takeIf { it.isNotBlank() }
+        ?: cached?.sourceName.orEmpty()
+    val latestEpisode = parseLatestEpisodeInfo(
+        listOf(
+            item.resolvedUpdateLabel,
+            item.resolvedSubtitle,
+            item.resolvedBadgeText,
+            cached?.latestEpisodeLabel.orEmpty()
+        )
+    )
+    val hasUpdate = latestEpisode?.index != null &&
+        watchedEpisodeIndex >= 0 &&
+        latestEpisode.index > watchedEpisodeIndex
+
+    return FollowUpItem(
+        vodId = vodId,
+        title = item.displayTitle.takeIf { it.isNotBlank() } ?: cached?.title.orEmpty(),
+        poster = item.vodPic ?: cached?.poster,
+        subtitle = item.resolvedSubtitle.takeIf { it.isNotBlank() } ?: cached?.subtitle.orEmpty(),
+        latestEpisodeLabel = latestEpisode?.label.orEmpty(),
+        latestEpisodeIndex = latestEpisode?.index,
+        watchedEpisodeIndex = watchedEpisodeIndex,
+        watchedEpisodeLabel = buildFollowWatchedEpisodeLabel(
+            watchedEpisodeIndex = watchedEpisodeIndex,
+            sourceName = sourceName,
+            hasResumeTime = lastWatchedAtMillis != null,
+            hasHistory = cached?.watchedEpisodeIndex != null && cached.watchedEpisodeIndex >= 0
+        ),
+        lastWatchedAtMillis = lastWatchedAtMillis,
+        lastWatchedAtText = buildFollowWatchTimeText(lastWatchedAtMillis, cached?.watchedEpisodeIndex != null && cached.watchedEpisodeIndex >= 0),
+        hasUpdate = hasUpdate,
+        updateLabel = if (hasUpdate && latestEpisode != null) "更新至第${latestEpisode.index + 1}集" else "",
+        sourceName = sourceName
+    )
+}
+
+private fun resolveFollowVodId(item: VodItem): String =
+    item.vodId.trim()
+        .ifBlank { item.siteVodId.trim() }
+        .ifBlank {
+            Regex("""/voddetail/([^/.?]+)""")
+                .find(item.detailUrl)
+                ?.groupValues
+                ?.getOrNull(1)
+                .orEmpty()
+        }
+        .ifBlank {
+            Regex("""/vodplay/([^/-?.]+)""")
+                .find(item.detailUrl)
+                ?.groupValues
+                ?.getOrNull(1)
+                .orEmpty()
+        }
+
 private fun resolveFollowVodId(item: UserCenterItem): String =
     item.vodId.trim()
         .ifBlank {
@@ -403,5 +512,9 @@ private fun parseEpisodeIndex(text: String, regex: Regex): Int? =
         ?.toIntOrNull()
         ?.takeIf { it > 0 }
         ?.minus(1)
+
+private val followItemComparator = compareByDescending<FollowUpItem> { it.hasUpdate }
+    .thenByDescending { it.lastWatchedAtMillis ?: 0L }
+    .thenBy { it.title }
 
 private val followDisplayTimeFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())

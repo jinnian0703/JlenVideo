@@ -34,6 +34,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.2")
     implementation("androidx.compose.runtime:runtime:1.6.8")
+    implementation("com.google.code.gson:gson:2.11.0")
     implementation("io.coil-kt:coil:2.7.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }

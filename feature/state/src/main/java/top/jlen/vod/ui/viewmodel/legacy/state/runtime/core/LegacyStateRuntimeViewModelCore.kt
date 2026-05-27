@@ -35,6 +35,7 @@ import top.jlen.vod.data.VodItem
 open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidViewModel(application) {
     private val repository = AppleCmsRepository(application)
     private val searchHistoryStore = SearchHistoryStore(application)
+    private val followCacheStore = FollowCacheStore(application)
     private val searchResultScrollPositions = mutableMapOf<String, SearchResultScrollPosition>()
     private var hasEnteredAccountScreen = false
     private var searchJob: Job? = null
@@ -164,6 +165,8 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
         handleAccountSessionExpired(error)
 
     internal fun searchHistoryStore(): SearchHistoryStore = searchHistoryStore
+
+    internal fun followCacheStore(): FollowCacheStore = followCacheStore
 
     internal fun getSearchResultScrollPosition(query: String): SearchResultScrollPosition? =
         searchResultScrollPositions[query]
@@ -450,6 +453,8 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
     fun refreshPlayerSources() = legacyRefreshPlayerSources()
 
     fun refreshFollowContent(forceRefresh: Boolean = false) = legacyRefreshFollowContent(forceRefresh)
+
+    fun showCachedFollowContent() = legacyShowCachedFollowContent()
 
     fun rebuildFollowContent() = legacyRebuildFollowContent()
 

@@ -431,6 +431,7 @@ fun JlenVideoApp() {
                         }
                         composable("follow") {
                             LaunchedEffect(Unit) {
+                                viewModel.showCachedFollowContent()
                                 viewModel.refreshFollowContent()
                             }
                             LaunchedEffect(
