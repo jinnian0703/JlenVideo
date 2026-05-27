@@ -43,9 +43,11 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
     private var homePreviewEnrichJob: Job? = null
     private var categoryPreviewEnrichJob: Job? = null
     private var historyEnrichJob: Job? = null
+    private var followRefreshJob: Job? = null
     private var searchRequestVersion: Long = 0L
     private var searchSuggestRequestVersion: Long = 0L
     private var historyEnrichVersion: Long = 0L
+    private var followRefreshVersion: Long = 0L
 
     var homeState by mutableStateOf(HomeUiState())
         private set
@@ -226,6 +228,19 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
     }
 
     internal fun currentHistoryEnrichVersion(): Long = historyEnrichVersion
+
+    internal fun currentFollowRefreshJob(): Job? = followRefreshJob
+
+    internal fun replaceFollowRefreshJob(value: Job?) {
+        followRefreshJob = value
+    }
+
+    internal fun nextFollowRefreshVersion(): Long {
+        followRefreshVersion += 1L
+        return followRefreshVersion
+    }
+
+    internal fun currentFollowRefreshVersion(): Long = followRefreshVersion
 
     init {
         searchState = searchStateWithHistory(searchState, searchHistoryStore.load())

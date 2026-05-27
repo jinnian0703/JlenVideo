@@ -7,6 +7,7 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -16,12 +17,16 @@ import top.jlen.vod.data.VodItem
 import top.jlen.vod.data.sanitizeUserFacingComposite
 
 internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRefresh: Boolean = false) {
-    if (currentFollowState().isLoading || currentFollowState().isRefreshing) return
+    if (currentFollowState().isLoading || currentFollowState().isRefreshing) {
+        if (!forceRefresh) return
+        currentFollowRefreshJob()?.cancel()
+    }
     if (!currentAccountState().session.isLoggedIn) {
         updateFollowState(FollowUiState(isLoggedIn = false))
         return
     }
 
+    val requestVersion = nextFollowRefreshVersion()
     val hasExistingItems = currentFollowState().items.isNotEmpty()
     updateFollowState(
         currentFollowState().copy(
@@ -32,8 +37,8 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRef
         )
     )
 
-    viewModelScope.launch {
-        runCatching {
+    replaceFollowRefreshJob(viewModelScope.launch followRefresh@{
+        try {
             val favoriteItems = withContext(Dispatchers.IO) {
                 if (forceRefresh || currentAccountState().favoriteItems.isEmpty()) {
                     loadAllFavoriteItems()
@@ -49,6 +54,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRef
                 }
                 legacyRepository().enrichHistoryItems(rawHistory)
             }
+            if (requestVersion != currentFollowRefreshVersion()) return@followRefresh
 
             updateAccountState(
                 currentAccountState().copy(
@@ -59,14 +65,14 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRef
                 )
             )
 
-            withContext(Dispatchers.IO) {
+            val items = withContext(Dispatchers.IO) {
                 buildFollowItems(
                     favoriteItems = favoriteItems,
                     historyItems = historyItems,
                     resolveDetails = true
                 )
             }
-        }.onSuccess { items ->
+            if (requestVersion != currentFollowRefreshVersion()) return@followRefresh
             updateFollowState(
                 FollowUiState(
                     isLoading = false,
@@ -75,7 +81,10 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRef
                     items = items
                 )
             )
-        }.onFailure { error ->
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            if (requestVersion != currentFollowRefreshVersion()) return@followRefresh
             updateFollowState(
                 currentFollowState().copy(
                     isLoading = false,
@@ -85,7 +94,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRef
                 )
             )
         }
-    }
+    })
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyRebuildFollowContent() {
