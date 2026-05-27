@@ -17,9 +17,12 @@ import top.jlen.vod.data.VodItem
 import top.jlen.vod.data.sanitizeUserFacingComposite
 
 internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRefresh: Boolean = false) {
-    if (currentFollowState().isLoading || currentFollowState().isRefreshing) {
+    val runningRefresh = currentFollowRefreshJob()
+    if (runningRefresh?.isActive == true) {
         if (!forceRefresh) return
-        currentFollowRefreshJob()?.cancel()
+        runningRefresh.cancel()
+    } else if (currentFollowState().isLoading || currentFollowState().isRefreshing) {
+        if (!forceRefresh) return
     }
     if (!currentAccountState().session.isLoggedIn) {
         updateFollowState(FollowUiState(isLoggedIn = false))
@@ -47,12 +50,11 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRef
                 }
             }
             val historyItems = withContext(Dispatchers.IO) {
-                val rawHistory = if (forceRefresh || currentAccountState().historyItems.isEmpty()) {
+                if (forceRefresh || currentAccountState().historyItems.isEmpty()) {
                     loadAllHistoryItems()
                 } else {
                     currentAccountState().historyItems
                 }
-                legacyRepository().enrichHistoryItems(rawHistory)
             }
             if (requestVersion != currentFollowRefreshVersion()) return@followRefresh
 
@@ -69,7 +71,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRef
                 buildFollowItems(
                     favoriteItems = favoriteItems,
                     historyItems = historyItems,
-                    resolveDetails = true
+                    resolveDetails = false
                 )
             }
             if (requestVersion != currentFollowRefreshVersion()) return@followRefresh
@@ -81,6 +83,37 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRef
                     items = items
                 )
             )
+            try {
+                val enrichedHistoryItems = withContext(Dispatchers.IO) {
+                    legacyRepository().enrichHistoryItems(historyItems)
+                }
+                val enrichedItems = withContext(Dispatchers.IO) {
+                    buildFollowItems(
+                        favoriteItems = favoriteItems,
+                        historyItems = enrichedHistoryItems,
+                        resolveDetails = true
+                    )
+                }
+                if (requestVersion != currentFollowRefreshVersion()) return@followRefresh
+                updateAccountState(
+                    currentAccountState().copy(
+                        historyItems = enrichedHistoryItems,
+                        historyNextPageUrl = null
+                    )
+                )
+                updateFollowState(
+                    FollowUiState(
+                        isLoading = false,
+                        isRefreshing = false,
+                        isLoggedIn = true,
+                        items = enrichedItems
+                    )
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                // The basic follow list is already visible; detail enrichment is best-effort.
+            }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -215,7 +248,7 @@ private suspend fun LegacyStateRuntimeViewModelCore.buildFollowItem(
         compareBy<UserCenterItem> { it.episodeIndex }
             .thenBy { if (it.sourceName.isNotBlank()) 1 else 0 }
     )
-    val detailItem = if (resolveDetails || cached == null) {
+    val detailItem = if (resolveDetails) {
         runCatching { legacyRepository().loadDetail(vodId) }.getOrNull()
     } else {
         null
