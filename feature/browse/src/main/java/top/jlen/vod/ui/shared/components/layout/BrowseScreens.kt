@@ -420,7 +420,7 @@ private fun PosterImage(
     showFallbackTitle: Boolean = true,
     fallbackStyle: PosterFallbackStyle = PosterFallbackStyle.Default,
     fallbackBottomInset: Dp = 0.dp,
-    lightweightPlaceholder: Boolean = false
+    lightweightPlaceholder: Boolean = true
 ) {
     RetryablePosterImage(
         data = data,

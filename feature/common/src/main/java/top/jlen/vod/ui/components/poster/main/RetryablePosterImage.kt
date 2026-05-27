@@ -60,7 +60,7 @@ fun RetryablePosterImage(
     showFallbackTitle: Boolean = true,
     fallbackStyle: PosterFallbackStyle = PosterFallbackStyle.Default,
     fallbackBottomInset: Dp = 0.dp,
-    lightweightPlaceholder: Boolean = false
+    lightweightPlaceholder: Boolean = true
 ) {
     var retryToken by remember(data, title, width, height) { mutableIntStateOf(0) }
     val request = rememberPosterRequest(

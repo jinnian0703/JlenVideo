@@ -103,7 +103,8 @@ private fun DetailPosterImage(
         width = width,
         height = height,
         modifier = modifier,
-        contentScale = contentScale
+        contentScale = contentScale,
+        lightweightPlaceholder = false
     )
 }
 
