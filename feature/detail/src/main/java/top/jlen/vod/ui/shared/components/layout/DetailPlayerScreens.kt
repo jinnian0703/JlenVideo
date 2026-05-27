@@ -47,6 +47,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material3.Icon
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -478,52 +479,92 @@ internal fun ResolveUnavailableSurface(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface)
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 22.dp),
-            contentAlignment = Alignment.Center
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(UiPalette.DangerSurface.copy(alpha = 0.38f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.ErrorOutline,
+                    contentDescription = null,
+                    tint = UiPalette.DangerText,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(title, color = UiPalette.Ink, fontWeight = FontWeight.Bold)
+                Text(
+                    text = title,
+                    color = UiPalette.Ink,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
                 Text(
                     text = message,
                     color = UiPalette.TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center
                 )
+                Text(
+                    text = diagnostic?.suggestion ?: "请刷新线路，或切换其他线路。",
+                    color = UiPalette.TextMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                onRefresh?.let {
+                    OutlinedButton(
+                        onClick = it,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(UiDimens.SecondaryButtonHeight),
+                        shape = RoundedCornerShape(UiDimens.ControlRadius),
+                        border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = null,
+                            tint = UiPalette.Accent,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("刷新线路", color = UiPalette.Accent, fontWeight = FontWeight.Bold)
+                    }
+                }
                 if (diagnostic != null) {
-                    TextButton(onClick = { expanded = !expanded }) {
+                    TextButton(
+                        onClick = { expanded = !expanded },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(UiDimens.SecondaryButtonHeight)
+                    ) {
                         Text(
-                            text = if (expanded) "收起诊断" else "诊断详情",
+                            text = if (expanded) "收起详情" else "诊断详情",
                             color = UiPalette.Accent,
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    if (expanded) {
-                        PlaybackDiagnosticDetails(diagnostic)
-                    }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    onRefresh?.let {
-                        OutlinedButton(
-                            onClick = it,
-                            shape = RoundedCornerShape(UiDimens.ControlRadius),
-                            border = BorderStroke(1.dp, UiPalette.BorderSoft)
-                        ) {
-                            Text("刷新线路", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    Text(
-                        text = diagnostic?.suggestion ?: "可以尝试切换线路，或稍后再试。",
-                        color = UiPalette.TextMuted,
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                }
+            }
+            if (diagnostic != null && expanded) {
+                PlaybackDiagnosticDetails(diagnostic)
             }
         }
     }
