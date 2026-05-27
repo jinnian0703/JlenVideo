@@ -98,7 +98,17 @@ internal fun accountStateWithUpdatedHistoryResume(
     )
 }
 
-private fun resolveHistoryItemVodId(item: UserCenterItem): String =
+internal fun accountStateWithCachedHistory(
+    accountState: AccountUiState,
+    items: List<UserCenterItem>
+): AccountUiState = accountState.copy(
+    isContentLoading = false,
+    error = null,
+    historyItems = items,
+    historyNextPageUrl = null
+)
+
+internal fun resolveHistoryItemVodId(item: UserCenterItem): String =
     item.vodId.trim()
         .ifBlank {
             Regex("""/vodplay/([^/-?.]+)""")

@@ -52,7 +52,9 @@ internal fun LegacyStateRuntimeViewModelCore.legacyDeleteHistory(recordId: Strin
         block = { deleteUserRecordForApp(recordIds = listOf(recordId), type = 4, clearAll = false) },
         successMessage = "已删除播放记录",
         onSuccess = {
-            updateAccountState(accountStateRemovingHistory(currentAccountState(), recordId))
+            val nextState = accountStateRemovingHistory(currentAccountState(), recordId)
+            updateAccountState(nextState)
+            legacySaveHistoryCache(nextState.historyItems)
             legacyRebuildFollowContent()
             selectAccountSection(AccountSection.History, forceRefresh = true)
         }
@@ -65,6 +67,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyClearHistory() {
         successMessage = "已清空播放记录",
         onSuccess = {
             updateAccountState(accountStateClearingHistory(currentAccountState()))
+            legacyClearHistoryCache()
             legacyRebuildFollowContent()
             selectAccountSection(AccountSection.History, forceRefresh = true)
         }

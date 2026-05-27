@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import top.jlen.vod.data.normalizePlaybackSourceKey
 import top.jlen.vod.data.PlaybackResumeRecord
 import top.jlen.vod.data.PlaySource
+import top.jlen.vod.data.UserCenterItem
 import top.jlen.vod.data.VodItem
 
 internal fun LegacyStateRuntimeViewModelCore.legacyRefreshPlayerSources() {
@@ -140,16 +141,74 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRecordCurrentPlayback() {
     persistCurrentPlaybackResume()
     if (!currentAccountState().session.isLoggedIn || episodePageUrl.isBlank()) return
 
+    buildOptimisticHistoryRecord(item, episodePageUrl)?.let { record ->
+        legacyUpsertCachedHistoryRecord(record)
+    }
+
     viewModelScope.launch {
         runCatching {
             withContext(Dispatchers.IO) { legacyRepository().addPlayRecordForApp(item, episodePageUrl) }
         }.onSuccess {
-            if (currentAccountState().selectedSection == AccountSection.History) {
-                selectAccountSection(AccountSection.History, forceRefresh = true)
+            if (currentAccountState().historyItems.any { it.recordId.startsWith("local:") }) {
+                runtimeLoadHistoryRecords()
             }
         }
     }
 }
+
+private fun LegacyStateRuntimeViewModelCore.buildOptimisticHistoryRecord(
+    item: VodItem,
+    episodePageUrl: String
+): UserCenterItem? {
+    val playerState = currentPlayerState()
+    val resolvedVodId = resolvePlaybackResumeVodId(item, episodePageUrl)
+    val title = item.displayTitle.ifBlank { playerState.title }
+    if (title.isBlank() || (resolvedVodId.isBlank() && episodePageUrl.isBlank())) return null
+
+    val sourceName = playerState.currentSource?.name.orEmpty()
+    val episodeName = playerState.currentEpisode?.name.orEmpty()
+    val subtitle = listOf(sourceName, episodeName, item.resolvedSubtitle)
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .distinct()
+        .joinToString(" | ")
+    return UserCenterItem(
+        recordId = localHistoryRecordId(
+            vodId = resolvedVodId,
+            playUrl = episodePageUrl,
+            sourceIndex = playerState.selectedSourceIndex,
+            episodeIndex = playerState.selectedEpisodeIndex
+        ),
+        vodId = resolvedVodId,
+        title = title,
+        subtitle = subtitle,
+        actionLabel = "继续观看",
+        actionUrl = buildOptimisticDetailUrl(item, resolvedVodId),
+        playUrl = episodePageUrl,
+        sourceName = sourceName,
+        sourceIndex = playerState.selectedSourceIndex,
+        episodeIndex = playerState.selectedEpisodeIndex
+    )
+}
+
+private fun localHistoryRecordId(
+    vodId: String,
+    playUrl: String,
+    sourceIndex: Int,
+    episodeIndex: Int
+): String =
+    "local:" + listOf(vodId, playUrl, sourceIndex.toString(), episodeIndex.toString())
+        .joinToString(":")
+        .hashCode()
+        .let(java.lang.Integer::toHexString)
+
+private fun buildOptimisticDetailUrl(item: VodItem, vodId: String): String =
+    item.detailUrl.trim()
+        .ifBlank {
+            vodId.takeIf(String::isNotBlank)
+                ?.let { "/index.php/voddetail/$it.html" }
+                .orEmpty()
+        }
 
 private fun LegacyStateRuntimeViewModelCore.persistCurrentPlaybackResume() {
     val playerState = currentPlayerState()

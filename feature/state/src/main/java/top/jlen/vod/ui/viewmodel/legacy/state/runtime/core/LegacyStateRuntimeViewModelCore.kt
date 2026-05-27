@@ -36,6 +36,7 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
     private val repository = AppleCmsRepository(application)
     private val searchHistoryStore = SearchHistoryStore(application)
     private val followCacheStore = FollowCacheStore(application)
+    private val historyCacheStore = HistoryCacheStore(application)
     private val searchResultScrollPositions = mutableMapOf<String, SearchResultScrollPosition>()
     private var hasEnteredAccountScreen = false
     private var searchJob: Job? = null
@@ -167,6 +168,8 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
     internal fun searchHistoryStore(): SearchHistoryStore = searchHistoryStore
 
     internal fun followCacheStore(): FollowCacheStore = followCacheStore
+
+    internal fun historyCacheStore(): HistoryCacheStore = historyCacheStore
 
     internal fun getSearchResultScrollPosition(query: String): SearchResultScrollPosition? =
         searchResultScrollPositions[query]

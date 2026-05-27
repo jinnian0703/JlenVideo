@@ -114,7 +114,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyOpenHistoryRecord(item: UserC
     updatePlayerState(resolvingHistoryPlayerState(item.title))
     viewModelScope.launch {
         runCatching {
-            withContext(Dispatchers.IO) { legacyRepository().loadDetail(item.vodId) }
+            withContext(Dispatchers.IO) { legacyRepository().loadDetail(resolvedVodId) }
         }.onSuccess { detailItem ->
             if (detailItem == null) {
                 updatePlayerState(

@@ -141,22 +141,36 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadFavoriteRecords(pageUrl: 
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyLoadHistoryRecords(pageUrl: String? = null, append: Boolean = false) {
+    val canUseCache = !append && pageUrl.isNullOrBlank()
+    if (canUseCache) {
+        legacyShowCachedHistoryRecords()
+    }
     viewModelScope.launch {
-        updateAccountState(beginAccountContentLoad(currentAccountState()))
+        val hasVisibleItems = currentAccountState().historyItems.isNotEmpty()
+        if (append || !hasVisibleItems) {
+            updateAccountState(beginAccountContentLoad(currentAccountState()))
+        } else {
+            updateAccountState(currentAccountState().copy(error = null))
+        }
         runCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadHistoryPageForApp(pageUrl) }
         }.onSuccess { page ->
             val historyPageState = accountStateWithHistoryPage(currentAccountState(), page, append)
             updateAccountState(historyPageState.accountState)
+            legacySaveHistoryCache(historyPageState.mergedItems)
             legacyEnrichHistoryRecords(historyPageState.mergedItems)
         }.onFailure { error ->
             if (runtimeHandleAccountSessionExpired(error)) return@onFailure
-            updateAccountState(
-                accountStateWithContentError(
-                    currentAccountState(),
-                    toUserFacingMessage(error, "加载播放记录失败")
+            if (canUseCache && currentAccountState().historyItems.isNotEmpty()) {
+                updateAccountState(currentAccountState().copy(isContentLoading = false))
+            } else {
+                updateAccountState(
+                    accountStateWithContentError(
+                        currentAccountState(),
+                        toUserFacingMessage(error, "加载播放记录失败")
+                    )
                 )
-            )
+            }
         }
     }
 }
@@ -181,7 +195,9 @@ internal fun LegacyStateRuntimeViewModelCore.legacyEnrichHistoryRecords(items: L
         if (requestVersion != currentHistoryEnrichVersion()) return@launch
 
         val enrichedByKey = enrichedItems.associateBy(::historyRecordKey)
-        updateAccountState(accountStateWithEnrichedHistoryItems(currentAccountState(), enrichedByKey))
+        val updatedState = accountStateWithEnrichedHistoryItems(currentAccountState(), enrichedByKey)
+        updateAccountState(updatedState)
+        legacySaveHistoryCache(updatedState.historyItems)
     })
 }
 
