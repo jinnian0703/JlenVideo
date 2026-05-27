@@ -93,10 +93,13 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRebuildFollowContent() {
         updateFollowState(FollowUiState(isLoggedIn = false))
         return
     }
+    val current = currentFollowState()
+    if (current.isLoading || current.isRefreshing) return
+
     val favorites = currentAccountState().favoriteItems
-    if (favorites.isEmpty() && currentFollowState().items.isEmpty()) {
+    if (favorites.isEmpty() && current.items.isEmpty()) {
         updateFollowState(
-            currentFollowState().copy(
+            current.copy(
                 isLoading = false,
                 isRefreshing = false,
                 isLoggedIn = true,

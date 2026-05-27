@@ -433,13 +433,6 @@ fun JlenVideoApp() {
                             LaunchedEffect(Unit) {
                                 viewModel.refreshFollowContent()
                             }
-                            LaunchedEffect(
-                                viewModel.accountState.session.isLoggedIn,
-                                viewModel.accountState.favoriteItems,
-                                viewModel.accountState.historyItems
-                            ) {
-                                viewModel.rebuildFollowContent()
-                            }
                             FollowScreen(
                                 state = viewModel.followState,
                                 onRefresh = { viewModel.refreshFollowContent(forceRefresh = true) },
