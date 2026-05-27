@@ -180,18 +180,20 @@ fun HomeScreen(
     val pauseHomeMotion by remember {
         derivedStateOf { listState.isScrollInProgress }
     }
+    val visibleLatest = remember(state.latest, state.homeVisibleCount) { state.visibleLatest }
     val hotRows = remember(state.hot) { state.hot.chunked(POSTER_GRID_COLUMNS) }
-    val latestRows = remember(state.visibleLatest) { state.visibleLatest.chunked(POSTER_GRID_COLUMNS) }
+    val latestRows = remember(visibleLatest) { visibleLatest.chunked(POSTER_GRID_COLUMNS) }
+    val featuredPrefetchItems = remember(state.featured) { state.featured.take(2) }
+    val latestPrefetchItems = remember(visibleLatest) { visibleLatest.take(6) }
+    val featuredPrefetchKeys = remember(featuredPrefetchItems) { featuredPrefetchItems.map(VodItem::stableKey) }
+    val latestPrefetchKeys = remember(latestPrefetchItems) { latestPrefetchItems.map(VodItem::stableKey) }
 
-    LaunchedEffect(
-        state.featured.map(VodItem::stableKey),
-        state.visibleLatest.take(6).map(VodItem::stableKey)
-    ) {
+    LaunchedEffect(featuredPrefetchKeys, latestPrefetchKeys) {
         val imageLoader = context.imageLoader
-        state.featured.take(2).forEach { item ->
+        featuredPrefetchItems.forEach { item ->
             imageLoader.enqueue(buildPosterRequest(context, item.vodPic, 540, 324))
         }
-        state.visibleLatest.take(6).forEach { item ->
+        latestPrefetchItems.forEach { item ->
             imageLoader.enqueue(buildPosterRequest(context, item.vodPic, 360, 520))
         }
     }
@@ -222,7 +224,7 @@ fun HomeScreen(
         contentPadding = PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        item {
+        item(key = "home_top", contentType = "home_top") {
             HomeTopBlock(
                 onRefresh = onRefresh,
                 noticeState = noticeState,
@@ -234,10 +236,10 @@ fun HomeScreen(
             )
         }
         state.error?.let { message ->
-            item { ErrorBanner(message = message, onRetry = onRefresh) }
+            item(key = "home_error", contentType = "error") { ErrorBanner(message = message, onRetry = onRefresh) }
         }
         if (state.slides.isNotEmpty()) {
-            item {
+            item(key = "home_slides_title", contentType = "section_title") {
                 SectionTitle(
                     title = "轮播推荐",
                     action = null,
@@ -252,7 +254,7 @@ fun HomeScreen(
                     onAction = {}
                 )
             }
-            item {
+            item(key = "home_slides", contentType = "featured_carousel") {
                 FeaturedCarouselSection(
                     items = state.slides,
                     onOpenDetail = onOpenDetail,
@@ -261,7 +263,7 @@ fun HomeScreen(
             }
         }
         if (state.hot.isNotEmpty()) {
-            item {
+            item(key = "home_hot_title", contentType = "section_title") {
                 SectionTitle(
                     title = "正在热播",
                     action = null,
@@ -283,7 +285,7 @@ fun HomeScreen(
             )
         }
         if (state.featured.isNotEmpty()) {
-            item {
+            item(key = "home_featured_title", contentType = "section_title") {
                 SectionTitle(
                     title = "推荐",
                     action = null,
@@ -298,7 +300,7 @@ fun HomeScreen(
                     onAction = {}
                 )
             }
-            item {
+            item(key = "home_featured", contentType = "featured_carousel") {
                 FeaturedCarouselSection(
                     items = state.featured,
                     onOpenDetail = onOpenDetail,
@@ -306,7 +308,7 @@ fun HomeScreen(
                 )
             }
         }
-        item {
+        item(key = "home_latest_title", contentType = "section_title") {
             SectionTitle(
                 title = "最近更新",
                 action = "进入片库",
@@ -314,7 +316,7 @@ fun HomeScreen(
             )
         }
         if (state.latest.isEmpty()) {
-            item {
+            item(key = "home_latest_empty", contentType = "empty") {
                 InlineEmptyStateCard(
                     message = "暂无内容",
                     actionLabel = "\u5237\u65b0",
@@ -327,7 +329,7 @@ fun HomeScreen(
                 rowKeyPrefix = "home_latest",
                 onOpenDetail = onOpenDetail
             )
-            item {
+            item(key = "home_latest_footer", contentType = "footer") {
                 LoadMoreFooter(
                     hasMore = state.hasMoreLatest,
                     isLoading = state.isHomeAppending,

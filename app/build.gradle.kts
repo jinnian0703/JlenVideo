@@ -112,6 +112,7 @@ dependencies {
     implementation("io.coil-kt:coil:2.7.0")
 
     implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.profileinstaller:profileinstaller:1.3.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.activity:activity-compose:1.9.0")
 

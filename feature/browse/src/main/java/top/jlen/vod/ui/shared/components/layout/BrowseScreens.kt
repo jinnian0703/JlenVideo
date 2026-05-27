@@ -586,7 +586,7 @@ internal fun FeaturedCarouselSection(
         return
     }
 
-    val virtualCycles = 201
+    val virtualCycles = 31
     val virtualCount = realCount * virtualCycles
     val centerIndex = (virtualCycles / 2) * realCount
     val rowState = rememberLazyListState(

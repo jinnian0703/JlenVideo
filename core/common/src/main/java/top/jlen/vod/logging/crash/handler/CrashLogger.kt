@@ -39,6 +39,10 @@ object CrashLogger {
     @Volatile
     private var currentSessionId: String = ""
 
+    private val traceLock = Any()
+    private val pendingTraceLines = ArrayDeque<String>()
+    private const val FLUSH_TRACE_LINES = 12
+
     fun install(context: Context) {
         val appContext = context.applicationContext
         if (installed) return
@@ -128,6 +132,7 @@ object CrashLogger {
     }.getOrDefault("")
 
     fun readIssueLogEntries(context: Context): List<IssueLogEntry> = runCatching {
+        flushTrace(context.applicationContext)
         issueLogFiles(context).map { file ->
             val text = file.readText(StandardCharsets.UTF_8)
             IssueLogEntry(
@@ -144,6 +149,7 @@ object CrashLogger {
     }.getOrDefault(emptyList())
 
     fun readIssueLog(context: Context, id: String): String = runCatching {
+        flushTrace(context.applicationContext)
         issueLogFile(context, id)?.readText(StandardCharsets.UTF_8).orEmpty()
     }.getOrDefault("")
 
@@ -284,6 +290,7 @@ object CrashLogger {
         body: String,
         context: Context
     ): String {
+        flushTrace(context.applicationContext)
         val session = readSession(context)
         val trace = readTrace(context)
         return buildString {
@@ -347,12 +354,30 @@ object CrashLogger {
         ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
 
     private fun appendTrace(context: Context, message: String) {
+        val line = "${displayNow()} ${sanitize(message)}"
+        val shouldFlush = synchronized(traceLock) {
+            pendingTraceLines.addLast(line)
+            while (pendingTraceLines.size > MAX_TRACE_LINES) {
+                pendingTraceLines.removeFirst()
+            }
+            pendingTraceLines.size >= FLUSH_TRACE_LINES
+        }
+        if (shouldFlush) {
+            flushTrace(context)
+        }
+    }
+
+    private fun flushTrace(context: Context) {
         runCatching {
-            val file = traceFile(context)
+            val pending = synchronized(traceLock) {
+                if (pendingTraceLines.isEmpty()) return
+                pendingTraceLines.toList().also { pendingTraceLines.clear() }
+            }
+            val file = traceFile(context.applicationContext)
             val existing = file.takeIf(File::exists)
                 ?.readLines(StandardCharsets.UTF_8)
                 .orEmpty()
-            val next = (existing + "${displayNow()} ${sanitize(message)}")
+            val next = (existing + pending)
                 .takeLast(MAX_TRACE_LINES)
             file.parentFile?.mkdirs()
             file.writeText(next.joinToString("\n").takeLast(MAX_TRACE_CHARS), StandardCharsets.UTF_8)
