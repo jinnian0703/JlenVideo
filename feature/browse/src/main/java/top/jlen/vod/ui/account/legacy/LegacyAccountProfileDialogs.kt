@@ -107,6 +107,7 @@ internal fun BindEmailDialog(
                     dismissText = "取消",
                     confirmText = if (isSaving) "绑定中..." else "确认绑定",
                     confirmEnabled = !isSaving,
+                    dismissEnabled = !isSaving,
                     onDismiss = onDismiss,
                     onConfirm = onBindEmail
                 )
@@ -123,6 +124,11 @@ internal fun ChangePasswordDialog(
     onSave: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val canSavePassword = editor.currentPassword.isNotBlank() &&
+        editor.newPassword.isNotBlank() &&
+        editor.confirmPassword.isNotBlank() &&
+        editor.newPassword == editor.confirmPassword
+
     Dialog(onDismissRequest = { if (!isSaving) onDismiss() }) {
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -160,7 +166,8 @@ internal fun ChangePasswordDialog(
                 AccountDialogActions(
                     dismissText = "取消",
                     confirmText = if (isSaving) "保存中..." else "保存密码",
-                    confirmEnabled = !isSaving,
+                    confirmEnabled = !isSaving && canSavePassword,
+                    dismissEnabled = !isSaving,
                     onDismiss = onDismiss,
                     onConfirm = onSave
                 )
@@ -277,6 +284,7 @@ private fun AccountDialogActions(
     dismissText: String,
     confirmText: String,
     confirmEnabled: Boolean,
+    dismissEnabled: Boolean = true,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -287,7 +295,7 @@ private fun AccountDialogActions(
         OutlinedButton(
             onClick = onDismiss,
             modifier = Modifier.weight(1f),
-            enabled = confirmEnabled,
+            enabled = dismissEnabled,
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.outlinedButtonColors(
                 containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.36f),

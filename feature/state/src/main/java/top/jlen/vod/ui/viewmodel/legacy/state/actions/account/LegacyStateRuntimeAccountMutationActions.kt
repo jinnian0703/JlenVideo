@@ -201,6 +201,23 @@ private fun LegacyStateRuntimeViewModelCore.refreshAfterMembershipSignIn() {
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacySaveProfile() {
+    val editor = currentAccountState().profileEditor
+    val hasPasswordInput = editor.currentPassword.isNotBlank() ||
+        editor.newPassword.isNotBlank() ||
+        editor.confirmPassword.isNotBlank()
+    if (hasPasswordInput) {
+        val validationError = when {
+            editor.currentPassword.isBlank() -> "请输入原密码"
+            editor.newPassword.isBlank() -> "请输入新密码"
+            editor.confirmPassword.isBlank() -> "请确认新密码"
+            editor.newPassword != editor.confirmPassword -> "两次输入的新密码不一致"
+            else -> null
+        }
+        if (validationError != null) {
+            updateAccountState(accountStateWithValidationError(currentAccountState(), validationError))
+            return
+        }
+    }
     runtimeRunAccountAction(
         block = { saveUserProfile(currentAccountState().profileEditor) },
         successMessage = "资料已保存",

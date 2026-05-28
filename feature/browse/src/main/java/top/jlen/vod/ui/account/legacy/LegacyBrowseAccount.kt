@@ -1808,10 +1808,31 @@ internal fun LegacyAccountProfilePaneV2(
     val selectedTab = if (isEditTab) AccountProfileTab.Edit else AccountProfileTab.Overview
     var showBindEmailDialog by rememberSaveable { mutableStateOf(false) }
     var showChangePasswordDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingPasswordSave by rememberSaveable { mutableStateOf(false) }
     var showUnbindEmailConfirm by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(showBindEmailDialog, editor.email) {
         if (showBindEmailDialog && editor.email.contains("@") && editor.email.contains(".")) {
             showBindEmailDialog = false
+        }
+    }
+    LaunchedEffect(
+        showChangePasswordDialog,
+        pendingPasswordSave,
+        isSaving,
+        editor.currentPassword,
+        editor.newPassword,
+        editor.confirmPassword
+    ) {
+        if (
+            showChangePasswordDialog &&
+            pendingPasswordSave &&
+            !isSaving &&
+            editor.currentPassword.isBlank() &&
+            editor.newPassword.isBlank() &&
+            editor.confirmPassword.isBlank()
+        ) {
+            pendingPasswordSave = false
+            showChangePasswordDialog = false
         }
     }
     val overviewFields = remember(fields, editor.email) {
@@ -1857,8 +1878,12 @@ internal fun LegacyAccountProfilePaneV2(
             editor = editor,
             isSaving = isSaving,
             onEditorChange = onEditorChange,
-            onSave = onSave,
+            onSave = {
+                pendingPasswordSave = true
+                onSave()
+            },
             onDismiss = {
+                pendingPasswordSave = false
                 showChangePasswordDialog = false
                 onEditorChange {
                     it.copy(
@@ -2129,13 +2154,38 @@ internal fun LegacyAccountProfilePane(
     onSave: () -> Unit
 ) {
     var showChangePasswordDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingPasswordSave by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(
+        showChangePasswordDialog,
+        pendingPasswordSave,
+        isSaving,
+        editor.currentPassword,
+        editor.newPassword,
+        editor.confirmPassword
+    ) {
+        if (
+            showChangePasswordDialog &&
+            pendingPasswordSave &&
+            !isSaving &&
+            editor.currentPassword.isBlank() &&
+            editor.newPassword.isBlank() &&
+            editor.confirmPassword.isBlank()
+        ) {
+            pendingPasswordSave = false
+            showChangePasswordDialog = false
+        }
+    }
     if (showChangePasswordDialog) {
         ChangePasswordDialog(
             editor = editor,
             isSaving = isSaving,
             onEditorChange = onEditorChange,
-            onSave = onSave,
+            onSave = {
+                pendingPasswordSave = true
+                onSave()
+            },
             onDismiss = {
+                pendingPasswordSave = false
                 showChangePasswordDialog = false
                 onEditorChange {
                     it.copy(
