@@ -9,18 +9,26 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AlternateEmail
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.MarkEmailRead
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -48,12 +56,8 @@ internal fun BindEmailDialog(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 AccountDialogHeader(
-                    label = "邮箱绑定",
                     title = "绑定邮箱",
-                    description = "输入邮箱和验证码。"
-                )
-                AccountDialogInfoCard(
-                    text = "用于找回账号和接收验证码。"
+                    icon = Icons.Rounded.AlternateEmail
                 )
                 ProfileEditorField(
                     label = "邮箱",
@@ -77,8 +81,8 @@ internal fun BindEmailDialog(
                         onClick = onSendEmailCode,
                         enabled = !isSaving && emailBindCodeCountdown <= 0,
                         modifier = Modifier
-                            .width(112.dp)
-                            .height(52.dp),
+                            .width(118.dp)
+                            .height(56.dp),
                         shape = RoundedCornerShape(18.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft),
                         colors = ButtonDefaults.outlinedButtonColors(
@@ -112,23 +116,6 @@ internal fun BindEmailDialog(
 }
 
 @Composable
-private fun AccountDialogInfoCard(text: String) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.76f)),
-        shape = RoundedCornerShape(18.dp)
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 13.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = UiPalette.TextPrimary
-        )
-    }
-}
-
-@Composable
 internal fun ChangePasswordDialog(
     editor: UserProfileEditor,
     isSaving: Boolean,
@@ -147,9 +134,8 @@ internal fun ChangePasswordDialog(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 AccountDialogHeader(
-                    label = "密码设置",
                     title = "修改密码",
-                    description = "填写原密码和新密码后保存。"
+                    icon = Icons.Rounded.Lock
                 )
                 ProfileEditorField(
                     label = "原密码",
@@ -199,43 +185,22 @@ internal fun UnbindEmailConfirmDialog(
                 modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .background(UiPalette.DangerSurface.copy(alpha = 0.68f), RoundedCornerShape(999.dp))
-                        .border(1.dp, UiPalette.DangerBorder.copy(alpha = 0.5f), RoundedCornerShape(999.dp))
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Text(
-                        text = "邮箱绑定",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = UiPalette.DangerText
-                    )
-                }
+                AccountDialogHeader(
+                    title = "解绑邮箱",
+                    icon = Icons.Rounded.MarkEmailRead,
+                    danger = true
+                )
                 Text(
-                    text = "解绑邮箱",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.ExtraBold,
+                    text = email,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
                     color = UiPalette.Ink
                 )
                 Text(
-                    text = "确认解绑邮箱？",
+                    text = "解绑后将不能通过该邮箱找回账号。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = UiPalette.TextSecondary
                 )
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.76f)),
-                    shape = RoundedCornerShape(18.dp)
-                ) {
-                    Text(
-                        text = "$email 将不再用于找回账号和接收验证码。",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 13.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = UiPalette.TextPrimary
-                    )
-                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)
@@ -270,22 +235,32 @@ internal fun UnbindEmailConfirmDialog(
 
 @Composable
 private fun AccountDialogHeader(
-    label: String,
     title: String,
-    description: String
+    icon: ImageVector,
+    danger: Boolean = false
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Box(
             modifier = Modifier
-                .background(UiPalette.Accent.copy(alpha = 0.1f), RoundedCornerShape(999.dp))
-                .border(1.dp, UiPalette.Accent.copy(alpha = 0.18f), RoundedCornerShape(999.dp))
-                .padding(horizontal = 10.dp, vertical = 5.dp)
+                .size(50.dp)
+                .background(
+                    if (danger) UiPalette.DangerSurface else UiPalette.Accent.copy(alpha = 0.1f),
+                    RoundedCornerShape(18.dp)
+                )
+                .border(
+                    1.dp,
+                    if (danger) UiPalette.DangerBorder.copy(alpha = 0.6f) else UiPalette.Accent.copy(alpha = 0.18f),
+                    RoundedCornerShape(18.dp)
+                ),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = UiPalette.Accent
+            Icon(
+                imageVector = if (danger) Icons.Rounded.Warning else icon,
+                contentDescription = null,
+                tint = if (danger) UiPalette.DangerText else UiPalette.Accent
             )
         }
         Text(
@@ -293,11 +268,6 @@ private fun AccountDialogHeader(
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.ExtraBold,
             color = UiPalette.Ink
-        )
-        Text(
-            text = description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = UiPalette.TextSecondary
         )
     }
 }

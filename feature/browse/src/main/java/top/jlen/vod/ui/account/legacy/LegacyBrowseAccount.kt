@@ -496,8 +496,8 @@ internal fun LegacyAccountScreen(
                         ) {
                             Column {
                                 AccountGuestModeHeader(
-                                    title = "设置与工具",
-                                    description = "版本、缓存、协议、日志。",
+                                    title = "设置",
+                                    description = "版本、缓存、协议、日志",
                                     onBack = { onAuthModeChange(AccountAuthMode.Login) }
                                 )
                                 Column(
@@ -1187,8 +1187,11 @@ internal fun LegacyAccountRegisterPane(
             OutlinedButton(
                 onClick = onSendCode,
                 enabled = !state.isActionLoading && state.registerCodeCountdown <= 0,
-                modifier = Modifier.fillMaxWidth(),
-                border = BorderStroke(1.dp, UiPalette.BorderSoft)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(UiDimens.SecondaryButtonHeight),
+                border = BorderStroke(1.dp, UiPalette.BorderSoft),
+                shape = RoundedCornerShape(UiDimens.ControlRadius)
             ) {
                 Text(
                     if (state.registerCodeCountdown > 0) {
@@ -1305,10 +1308,10 @@ internal fun LegacyAccountFindPasswordPane(
                 onClick = onSendCode,
                 enabled = !state.isActionLoading && state.findPasswordCodeCountdown <= 0,
                 modifier = Modifier
-                    .width(98.dp)
-                    .height(44.dp),
+                    .width(118.dp)
+                    .height(56.dp),
                 border = BorderStroke(1.dp, UiPalette.BorderSoft),
-                shape = RoundedCornerShape(999.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
                     containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.72f),
                     contentColor = UiPalette.Accent,
@@ -1591,7 +1594,7 @@ private fun AccountOverviewPane(
                     onClick = onOpenFollow
                 )
                 AccountOverviewLinkRow(
-                    title = "设置与工具",
+                    title = "设置",
                     description = if (state.hasCrashLog) "有问题日志" else "版本、缓存、协议、日志",
                     icon = Icons.Rounded.Info,
                     onClick = onOpenLogs
@@ -2149,7 +2152,7 @@ internal fun LegacyAccountProfilePane(
         isLoading -> LoadingPane("资料加载中...")
         fields.isEmpty() -> EmptyPane(
             message = "暂无资料",
-            description = "暂无可展示信息",
+            description = "",
             style = FeedbackPaneStyle.Card
         )
         else -> Card(
@@ -2322,11 +2325,7 @@ internal fun LegacyReadonlyBindingField(
             }
             Text(value, color = UiPalette.Ink, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
             if (!actionText.isNullOrBlank()) {
-                Text(
-                    text = "解绑后可重新绑定新的邮箱地址",
-                    color = UiPalette.TextMuted,
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Spacer(modifier = Modifier.height(2.dp))
             }
         }
     }
@@ -2797,7 +2796,7 @@ internal fun LegacyMembershipPaneV2(
             if (plans.isEmpty()) {
                 EmptyPane(
                     message = "暂无套餐",
-                    description = "当前没有可展示的会员方案",
+                    description = "",
                     style = FeedbackPaneStyle.Card
                 )
             } else {
@@ -2895,7 +2894,7 @@ fun AccountPointLogScreen(
             item {
                 EmptyPane(
                     message = "暂无积分日志",
-                    description = "签到、升级和积分变动记录会显示在这里",
+                    description = "",
                     style = FeedbackPaneStyle.Card
                 )
             }
@@ -3007,7 +3006,7 @@ internal fun LegacyMembershipPane(
             if (plans.isEmpty()) {
                 EmptyPane(
                     message = "暂无套餐",
-                    description = "当前没有可展示的会员方案",
+                    description = "",
                     style = FeedbackPaneStyle.Card
                 )
             } else {

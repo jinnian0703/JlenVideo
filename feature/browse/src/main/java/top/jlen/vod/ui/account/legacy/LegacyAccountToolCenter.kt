@@ -120,15 +120,15 @@ fun AccountSettingsHomePane(
         )
         AccountSettingsEntryCard(
             title = "问题日志",
-            description = if (hasCrashLog) "发现本机日志" else "暂无本机日志",
-            meta = "查看、复制、分享或清空日志",
+            description = if (hasCrashLog) "已有本机日志" else "暂无日志",
+            meta = "查看、复制、分享、清空",
             icon = Icons.Rounded.BugReport,
             onClick = onOpenLogs
         )
         AccountSettingsEntryCard(
             title = "关于",
             description = "Jlen 影视",
-            meta = "作者、反馈群、发布页和协议说明",
+            meta = "作者、反馈群、发布页",
             icon = Icons.Rounded.Info,
             onClick = onOpenAbout
         )
@@ -196,7 +196,7 @@ fun AccountAboutSettingsScreen(
                 )
                 AccountAboutRow(
                     title = "QQ群 / 反馈群",
-                    subtitle = "点击链接加入群聊",
+                    subtitle = "点击加入群聊",
                     icon = Icons.Rounded.Groups,
                     onClick = { onOpenUrl(JLEN_VIDEO_FEEDBACK_GROUP_URL) }
                 )
@@ -214,13 +214,13 @@ fun AccountAboutSettingsScreen(
                 )
                 AccountAboutRow(
                     title = "用户协议与免责声明",
-                    subtitle = "服务条款、隐私说明和使用边界",
+                    subtitle = "协议、隐私、免责说明",
                     icon = Icons.AutoMirrored.Rounded.Article,
                     onClick = onOpenAgreement
                 )
                 AccountAboutRow(
                     title = "问题反馈",
-                    subtitle = "本机问题日志与排查信息",
+                    subtitle = "问题日志",
                     icon = Icons.Rounded.BugReport,
                     onClick = onOpenLogs
                 )
@@ -256,7 +256,7 @@ fun AccountAboutSettingsScreen(
         }
         item {
             Text(
-                text = "Built with Kotlin & Jetpack Compose",
+                text = "Kotlin / Jetpack Compose",
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 18.dp),
@@ -435,7 +435,7 @@ fun AccountCrashLogSettingsScreen(
         item {
             AccountToolSection(
                 title = "问题日志",
-                description = if (hasCrashLog) "已有本机日志" else "暂无本机日志"
+                description = if (hasCrashLog) "已有日志" else "暂无日志"
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -468,11 +468,10 @@ fun AccountCrashLogSettingsScreen(
         }
         if (issueLogEntries.isEmpty()) {
             item {
-                Text(
-                    text = "当前没有本机问题日志。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = UiPalette.TextSecondary,
-                    modifier = Modifier.padding(horizontal = 8.dp)
+                EmptyPane(
+                    message = "暂无问题日志",
+                    description = "",
+                    style = FeedbackPaneStyle.Card
                 )
             }
         } else {

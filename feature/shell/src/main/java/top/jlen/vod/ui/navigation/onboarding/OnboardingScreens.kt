@@ -469,7 +469,7 @@ private fun FirstLoginRegisterPane(
                 enabled = !state.isActionLoading && state.registerCodeCountdown <= 0,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = UiDimens.SecondaryButtonHeight),
+                    .height(UiDimens.SecondaryButtonHeight),
                 shape = RoundedCornerShape(UiDimens.ControlRadius),
                 border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft)
             ) {
@@ -547,9 +547,9 @@ private fun FirstLoginFindPasswordPane(
                 onClick = onSendCode,
                 enabled = !state.isActionLoading && state.findPasswordCodeCountdown <= 0,
                 modifier = Modifier
-                    .width(96.dp)
-                    .height(44.dp),
-                shape = RoundedCornerShape(UiDimens.PillRadius),
+                    .width(118.dp)
+                    .height(56.dp),
+                shape = RoundedCornerShape(UiDimens.ControlRadius),
                 border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft),
                 colors = ButtonDefaults.outlinedButtonColors(
                     containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.72f),

@@ -71,7 +71,7 @@ internal fun AccountGuestIntroCard(
                         color = UiPalette.Ink
                     )
                     Text(
-                        text = "同步追剧、播放记录、积分和资料。",
+                        text = "追剧、记录、积分与资料同步。",
                         style = MaterialTheme.typography.bodyMedium,
                         color = UiPalette.TextSecondary
                     )
@@ -179,7 +179,7 @@ internal fun AccountGuestAuxiliaryActions(
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.textButtonColors(contentColor = UiPalette.TextSecondary)
         ) {
-            Text("设置与工具", fontWeight = FontWeight.Bold)
+            Text("设置", fontWeight = FontWeight.Bold)
         }
     }
 }
