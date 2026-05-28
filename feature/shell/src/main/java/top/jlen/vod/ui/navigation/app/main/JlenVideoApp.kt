@@ -76,6 +76,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import kotlinx.coroutines.delay
 import java.io.File
+import java.net.NetworkInterface
 import java.nio.charset.StandardCharsets
 import top.jlen.vod.RuntimeEndpoints
 import top.jlen.vod.data.AppUpdateInfo
@@ -808,8 +809,11 @@ private fun detectTrafficCaptureState(context: Context): TrafficCaptureState {
         if (hasSystemProxy(context) || hasJvmProxy()) {
             add("当前网络已启用代理")
         }
-        if (hasVpnNetwork(context)) {
+        if (hasVpnNetwork(context) || hasVpnInterface()) {
             add("当前网络存在 VPN 通道")
+        }
+        if (hasHookRuntime()) {
+            add("检测到运行环境异常")
         }
     }
     return TrafficCaptureState(
@@ -842,6 +846,84 @@ private fun hasVpnNetwork(context: Context): Boolean {
         connectivityManager.getNetworkCapabilities(network)
             ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
     }
+}
+
+private fun hasHookRuntime(): Boolean =
+    hasHookClass() || hasHookStackTrace() || hasHookRuntimeMap()
+
+private fun hasHookClass(): Boolean {
+    val classNames = arrayOf(
+        "de.robv.android.xposed.XposedBridge",
+        "de.robv.android.xposed.XposedHelpers",
+        "de.robv.android.xposed.IXposedHookLoadPackage",
+        "org.lsposed.lspd.impl.LSPosedBridge",
+        "org.lsposed.hiddenapibypass.HiddenApiBypass",
+        "com.elderdrivers.riru.edxp.core.Yahfa",
+        "com.swift.sandhook.SandHook",
+        "com.saurik.substrate.MS",
+        "re.frida.server.Frida",
+        "com.android.org.conscrypt.TrustManagerImpl"
+    )
+    val loader = Thread.currentThread().contextClassLoader
+    return classNames.any { className ->
+        runCatching { Class.forName(className, false, loader) }.isSuccess
+    }
+}
+
+private fun hasHookStackTrace(): Boolean {
+    val keywords = arrayOf(
+        "xposed",
+        "lsposed",
+        "edxp",
+        "riru",
+        "zygisk",
+        "frida",
+        "substrate",
+        "sandhook",
+        "justtrustme"
+    )
+    return Throwable().stackTrace.any { element ->
+        val text = "${element.className}.${element.methodName}".lowercase()
+        keywords.any(text::contains)
+    }
+}
+
+private fun hasHookRuntimeMap(): Boolean {
+    val keywords = arrayOf(
+        "xposed",
+        "lsposed",
+        "lspd",
+        "edxp",
+        "riru",
+        "zygisk",
+        "frida",
+        "substrate",
+        "sandhook",
+        "justtrustme",
+        "sslunpin",
+        "trustme"
+    )
+    return runCatching {
+        File("/proc/self/maps").useLines { lines ->
+            lines.take(3500).any { line ->
+                val lower = line.lowercase()
+                keywords.any(lower::contains)
+            }
+        }
+    }.getOrDefault(false)
+}
+
+private fun hasVpnInterface(): Boolean {
+    val vpnPrefixes = arrayOf("tun", "tap", "ppp", "wg", "utun", "ipsec")
+    return runCatching {
+        NetworkInterface.getNetworkInterfaces()
+            ?.asSequence()
+            ?.any { networkInterface ->
+                networkInterface.isUp && vpnPrefixes.any { prefix ->
+                    networkInterface.name.startsWith(prefix, ignoreCase = true)
+                }
+            } == true
+    }.getOrDefault(false)
 }
 
 @Composable
