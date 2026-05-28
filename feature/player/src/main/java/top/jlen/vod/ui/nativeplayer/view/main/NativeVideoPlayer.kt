@@ -16,6 +16,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -1415,11 +1417,13 @@ private fun SpeedSelectorOverlay(
                     start = 14.dp,
                     end = if (fullscreenMode) 22.dp else 14.dp,
                     top = 10.dp,
-                    bottom = 10.dp
+                    bottom = if (fullscreenMode) 92.dp else 10.dp
                 )
                 .width(if (fullscreenMode) 270.dp else 220.dp)
+                .heightIn(max = if (fullscreenMode) 330.dp else 330.dp)
+                .verticalScroll(rememberScrollState())
                 .clickableWithoutRipple { },
-            verticalArrangement = Arrangement.spacedBy(if (fullscreenMode) 10.dp else 8.dp)
+            verticalArrangement = Arrangement.spacedBy(if (fullscreenMode) 6.dp else 8.dp)
         ) {
             playbackSpeedOptions.forEach { option ->
                 SpeedOptionButton(
@@ -1443,7 +1447,7 @@ private fun SpeedOptionButton(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(if (fullscreenMode) 66.dp else 52.dp)
+            .height(if (fullscreenMode) 42.dp else 52.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(Color(0xFF202227).copy(alpha = if (selected) 0.92f else 0.86f))
             .border(
