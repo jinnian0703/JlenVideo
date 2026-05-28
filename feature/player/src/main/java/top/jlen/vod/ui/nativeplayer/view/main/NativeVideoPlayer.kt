@@ -1412,7 +1412,7 @@ private fun SpeedSelectorOverlay(
     Card(
         modifier = modifier
             .padding(horizontal = 24.dp)
-            .widthIn(max = if (fullscreenMode) 430.dp else 360.dp)
+            .widthIn(max = if (fullscreenMode) 320.dp else 300.dp)
             .clickableWithoutRipple { },
         colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.96f)),
         shape = RoundedCornerShape(28.dp),
@@ -1435,23 +1435,16 @@ private fun SpeedSelectorOverlay(
                     color = UiPalette.TextSecondary
                 )
             }
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                playbackSpeedOptions.chunked(3).forEach { columnOptions ->
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        columnOptions.forEach { option ->
-                            SpeedOptionButton(
-                                label = speedLabel(option),
-                                selected = kotlin.math.abs(currentSpeed - option) <= 0.01f,
-                                onClick = { onSelectSpeed(option) }
-                            )
-                        }
-                    }
+                playbackSpeedOptions.forEach { option ->
+                    SpeedOptionButton(
+                        label = speedLabel(option),
+                        selected = kotlin.math.abs(currentSpeed - option) <= 0.01f,
+                        onClick = { onSelectSpeed(option) }
+                    )
                 }
             }
         }
