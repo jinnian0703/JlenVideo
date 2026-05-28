@@ -13,7 +13,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,12 +36,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -50,14 +46,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -85,11 +76,9 @@ import androidx.core.view.WindowInsetsControllerCompat
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import top.jlen.vod.data.Episode
-import top.jlen.vod.data.PlaySource
 import top.jlen.vod.data.VodItem
 
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
     state: PlayerUiState,
@@ -121,10 +110,6 @@ fun PlayerScreen(
     var previousEpisodeName by remember(state.title) { mutableStateOf(state.episodeName) }
     var previousSourceName by remember(state.title) { mutableStateOf(state.sourceName) }
     var hasStartedFeedbackTracking by remember(state.title) { mutableStateOf(false) }
-    var showSourceSheet by remember { mutableStateOf(false) }
-    var showEpisodeSheet by remember { mutableStateOf(false) }
-    val sourceSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val episodeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var latestSnapshot by remember(state.title, state.episodeName, state.sourceName) {
         mutableStateOf(state.playbackSnapshot)
     }
@@ -368,25 +353,28 @@ fun PlayerScreen(
                 }
 
                 if (state.sources.isNotEmpty()) {
-                    item(key = "source_entry") {
-                        PlayerOptionEntryCard(
-                            title = "切换线路",
-                            value = state.sourceName.ifBlank { "线路 ${state.selectedSourceIndex + 1}" },
-                            subtitle = "${state.sources.size} 条线路",
-                            icon = Icons.Rounded.Tune,
-                            onClick = { showSourceSheet = true }
+                    item(key = "source_title") {
+                        SectionTitle(title = "切换线路", action = state.sourceName, onAction = {})
+                    }
+                    item(key = "source_row") {
+                        SourceRow(
+                            sourceNames = state.sources.map { it.name },
+                            selectedIndex = state.selectedSourceIndex,
+                            onSelectSource = onSelectSource
                         )
                     }
                 }
 
                 if (state.episodes.isNotEmpty()) {
-                    item(key = "episode_entry") {
-                        PlayerOptionEntryCard(
-                            title = "切换选集",
-                            value = state.episodeName.ifBlank { "第 ${state.selectedEpisodeIndex + 1} 集" },
-                            subtitle = "${state.episodes.size} 个选集",
-                            icon = Icons.AutoMirrored.Rounded.PlaylistPlay,
-                            onClick = { showEpisodeSheet = true }
+                    item(key = "episode_title") {
+                        SectionTitle(title = "切换选集", action = null, onAction = {})
+                    }
+                    item(key = "episode_panel") {
+                        EpisodePanel(
+                            episodes = state.episodes,
+                            selectedIndex = state.selectedEpisodeIndex,
+                            pauseMarquee = false,
+                            onEpisodeClick = onSelectEpisode
                         )
                     }
                 }
@@ -441,248 +429,6 @@ fun PlayerScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = if (isFullscreen) 30.dp else 18.dp)
-            )
-        }
-
-        if (showSourceSheet) {
-            PlayerSourceSheet(
-                sources = state.sources,
-                selectedIndex = state.selectedSourceIndex,
-                sheetState = sourceSheetState,
-                onDismiss = { showSourceSheet = false },
-                onSelect = { index ->
-                    showSourceSheet = false
-                    onSelectSource(index)
-                }
-            )
-        }
-
-        if (showEpisodeSheet) {
-            PlayerEpisodeSheet(
-                episodes = state.episodes,
-                selectedIndex = state.selectedEpisodeIndex,
-                sheetState = episodeSheetState,
-                onDismiss = { showEpisodeSheet = false },
-                onSelect = { index ->
-                    showEpisodeSheet = false
-                    onSelectEpisode(index)
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun PlayerOptionEntryCard(
-    title: String,
-    value: String,
-    subtitle: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = UiDimens.PagePadding)
-            .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
-        shape = RoundedCornerShape(UiDimens.LargeContainerRadius),
-        border = BorderStroke(1.dp, UiPalette.BorderSoft)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(UiPalette.Accent.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(imageVector = icon, contentDescription = null, tint = UiPalette.Accent)
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = UiPalette.Ink,
-                    fontWeight = FontWeight.ExtraBold
-                )
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = UiPalette.Ink,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = UiPalette.TextSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Icon(
-                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                contentDescription = null,
-                tint = UiPalette.TextMuted
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun PlayerSourceSheet(
-    sources: List<PlaySource>,
-    selectedIndex: Int,
-    sheetState: SheetState,
-    onDismiss: () -> Unit,
-    onSelect: (Int) -> Unit
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = UiPalette.Surface,
-        dragHandle = null
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            SheetHeader(title = "切换线路", subtitle = "${sources.size} 条线路")
-            sources.forEachIndexed { index, source ->
-                SheetOptionRow(
-                    title = source.name.ifBlank { "线路 ${index + 1}" },
-                    subtitle = "${source.episodes.size} 个选集",
-                    selected = index == selectedIndex,
-                    onClick = { onSelect(index) }
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun PlayerEpisodeSheet(
-    episodes: List<Episode>,
-    selectedIndex: Int,
-    sheetState: SheetState,
-    onDismiss: () -> Unit,
-    onSelect: (Int) -> Unit
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = UiPalette.Surface,
-        dragHandle = null
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 560.dp)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            SheetHeader(title = "切换选集", subtitle = "${episodes.size} 个选集")
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                itemsIndexed(
-                    items = episodes,
-                    key = { index, episode -> "${episode.name}-$index" },
-                    contentType = { _, _ -> "player_episode_option" }
-                ) { index, episode ->
-                    SheetOptionRow(
-                        title = episode.name.ifBlank { "第 ${index + 1} 集" },
-                        subtitle = if (index == selectedIndex) "正在播放" else null,
-                        selected = index == selectedIndex,
-                        onClick = { onSelect(index) }
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-    }
-}
-
-@Composable
-private fun SheetHeader(title: String, subtitle: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineSmall,
-            color = UiPalette.Ink,
-            fontWeight = FontWeight.ExtraBold
-        )
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodyMedium,
-            color = UiPalette.TextSecondary
-        )
-    }
-}
-
-@Composable
-private fun SheetOptionRow(
-    title: String,
-    subtitle: String?,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(UiDimens.CardRadius))
-            .background(if (selected) UiPalette.AccentGlow else UiPalette.SurfaceSoft)
-            .border(
-                width = 1.dp,
-                color = if (selected) UiPalette.Accent.copy(alpha = 0.36f) else UiPalette.BorderSoft,
-                shape = RoundedCornerShape(UiDimens.CardRadius)
-            )
-            .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 13.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (selected) UiPalette.Accent else UiPalette.Ink,
-                fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            subtitle?.takeIf(String::isNotBlank)?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = UiPalette.TextSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-        if (selected) {
-            Icon(
-                imageVector = Icons.Rounded.CheckCircle,
-                contentDescription = null,
-                tint = UiPalette.Accent,
-                modifier = Modifier.size(20.dp)
             )
         }
     }

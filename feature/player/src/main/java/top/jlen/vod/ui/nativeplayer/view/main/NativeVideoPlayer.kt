@@ -43,8 +43,6 @@ import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -1218,51 +1216,16 @@ fun NativeVideoPlayer(
                                     }
                                 )
                             }
-                            Box {
-                                ControlChip(
-                                    text = speedLabel(speed),
-                                    width = controlChipWidth,
-                                    height = controlChipHeight,
-                                    textStyle = controlPillTextStyle,
-                                    onClick = {
-                                        speedMenuExpanded = true
-                                        markInteraction()
-                                    }
-                                )
-                                DropdownMenu(
-                                    expanded = speedMenuExpanded,
-                                    onDismissRequest = {
-                                        speedMenuExpanded = false
-                                        markInteraction()
-                                    }
-                                ) {
-                                    playbackSpeedOptions.forEach { option ->
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    text = speedLabel(option),
-                                                    color = if (kotlin.math.abs(speed - option) <= 0.01f) {
-                                                        UiPalette.Accent
-                                                    } else {
-                                                        UiPalette.Ink
-                                                    },
-                                                    fontWeight = if (kotlin.math.abs(speed - option) <= 0.01f) {
-                                                        FontWeight.ExtraBold
-                                                    } else {
-                                                        FontWeight.Medium
-                                                    }
-                                                )
-                                            },
-                                            onClick = {
-                                                speed = option
-                                                player.playbackParameters = PlaybackParameters(option)
-                                                speedMenuExpanded = false
-                                                markInteraction()
-                                            }
-                                        )
-                                    }
+                            ControlChip(
+                                text = speedLabel(speed),
+                                width = controlChipWidth,
+                                height = controlChipHeight,
+                                textStyle = controlPillTextStyle,
+                                onClick = {
+                                    speedMenuExpanded = true
+                                    markInteraction()
                                 }
-                            }
+                            )
                             if (hasNextEpisode && onNextEpisode != null) {
                                 IconControlChip(
                                     icon = Icons.Rounded.SkipNext,
@@ -1345,6 +1308,24 @@ fun NativeVideoPlayer(
                     }
                 }
             }
+
+            if (speedMenuExpanded && !playerLocked) {
+                SpeedSelectorOverlay(
+                    currentSpeed = speed,
+                    fullscreenMode = fullscreenMode,
+                    onDismiss = {
+                        speedMenuExpanded = false
+                        markInteraction()
+                    },
+                    onSelectSpeed = { option ->
+                        speed = option
+                        player.playbackParameters = PlaybackParameters(option)
+                        speedMenuExpanded = false
+                        markInteraction()
+                    },
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
         }
     }
 }
@@ -1410,6 +1391,99 @@ private fun ControlChip(
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun SpeedSelectorOverlay(
+    currentSpeed: Float,
+    fullscreenMode: Boolean,
+    onDismiss: () -> Unit,
+    onSelectSpeed: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = if (fullscreenMode) 0.28f else 0.18f))
+            .clickableWithoutRipple(onDismiss)
+    )
+    Card(
+        modifier = modifier
+            .padding(horizontal = 24.dp)
+            .widthIn(max = if (fullscreenMode) 430.dp else 360.dp)
+            .clickableWithoutRipple { },
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.96f)),
+        shape = RoundedCornerShape(28.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.82f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "播放速度",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = UiPalette.Ink,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Text(
+                    text = "当前 ${speedLabel(currentSpeed)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = UiPalette.TextSecondary
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                playbackSpeedOptions.chunked(3).forEach { columnOptions ->
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        columnOptions.forEach { option ->
+                            SpeedOptionButton(
+                                label = speedLabel(option),
+                                selected = kotlin.math.abs(currentSpeed - option) <= 0.01f,
+                                onClick = { onSelectSpeed(option) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpeedOptionButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (selected) UiPalette.AccentGlow else UiPalette.SurfaceSoft)
+            .border(
+                width = 1.dp,
+                color = if (selected) UiPalette.Accent.copy(alpha = 0.45f) else UiPalette.BorderSoft,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .clickableWithoutRipple(onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleSmall,
+            color = if (selected) UiPalette.Accent else UiPalette.Ink,
+            fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
+            maxLines = 1
         )
     }
 }
