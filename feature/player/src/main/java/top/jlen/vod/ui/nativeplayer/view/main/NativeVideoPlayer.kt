@@ -1323,7 +1323,7 @@ fun NativeVideoPlayer(
                         speedMenuExpanded = false
                         markInteraction()
                     },
-                    modifier = Modifier.align(Alignment.Center)
+                    modifier = Modifier.align(Alignment.CenterEnd)
                 )
             }
         }
@@ -1406,46 +1406,28 @@ private fun SpeedSelectorOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = if (fullscreenMode) 0.28f else 0.18f))
+            .background(Color.Black.copy(alpha = if (fullscreenMode) 0.18f else 0.10f))
             .clickableWithoutRipple(onDismiss)
-    )
-    Card(
-        modifier = modifier
-            .padding(horizontal = 24.dp)
-            .widthIn(max = if (fullscreenMode) 320.dp else 300.dp)
-            .clickableWithoutRipple { },
-        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface.copy(alpha = 0.96f)),
-        shape = RoundedCornerShape(28.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft.copy(alpha = 0.82f))
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            modifier = modifier
+                .padding(
+                    start = 14.dp,
+                    end = if (fullscreenMode) 22.dp else 14.dp,
+                    top = 10.dp,
+                    bottom = 10.dp
+                )
+                .width(if (fullscreenMode) 270.dp else 220.dp)
+                .clickableWithoutRipple { },
+            verticalArrangement = Arrangement.spacedBy(if (fullscreenMode) 10.dp else 8.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "播放速度",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = UiPalette.Ink,
-                    fontWeight = FontWeight.ExtraBold
+            playbackSpeedOptions.forEach { option ->
+                SpeedOptionButton(
+                    label = speedOverlayLabel(option),
+                    selected = kotlin.math.abs(currentSpeed - option) <= 0.01f,
+                    fullscreenMode = fullscreenMode,
+                    onClick = { onSelectSpeed(option) }
                 )
-                Text(
-                    text = "当前 ${speedLabel(currentSpeed)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = UiPalette.TextSecondary
-                )
-            }
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                playbackSpeedOptions.forEach { option ->
-                    SpeedOptionButton(
-                        label = speedLabel(option),
-                        selected = kotlin.math.abs(currentSpeed - option) <= 0.01f,
-                        onClick = { onSelectSpeed(option) }
-                    )
-                }
             }
         }
     }
@@ -1455,28 +1437,30 @@ private fun SpeedSelectorOverlay(
 private fun SpeedOptionButton(
     label: String,
     selected: Boolean,
+    fullscreenMode: Boolean,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(48.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (selected) UiPalette.AccentGlow else UiPalette.SurfaceSoft)
+            .height(if (fullscreenMode) 66.dp else 52.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFF202227).copy(alpha = if (selected) 0.92f else 0.86f))
             .border(
                 width = 1.dp,
-                color = if (selected) UiPalette.Accent.copy(alpha = 0.45f) else UiPalette.BorderSoft,
-                shape = RoundedCornerShape(16.dp)
+                color = Color.White.copy(alpha = if (selected) 0.14f else 0.05f),
+                shape = RoundedCornerShape(10.dp)
             )
             .clickableWithoutRipple(onClick),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.CenterStart
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.titleSmall,
-            color = if (selected) UiPalette.Accent else UiPalette.Ink,
-            fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
-            maxLines = 1
+            style = if (fullscreenMode) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+            color = if (selected) Color(0xFFFF5C93) else Color.White,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            modifier = Modifier.padding(start = if (fullscreenMode) 46.dp else 32.dp)
         )
     }
 }
@@ -1549,9 +1533,10 @@ private fun resizeModeLabel(mode: Int): String = when (mode) {
     else -> "适应"
 }
 
-private val playbackSpeedOptions = listOf(0.75f, 1f, 1.25f, 1.5f, 2f, 3f)
+private val playbackSpeedOptions = listOf(3f, 2f, 1.5f, 1.25f, 1f, 0.75f, 0.5f)
 
 private fun speedLabel(speed: Float): String = when (speed) {
+    0.5f -> "0.5x"
     0.75f -> "0.75x"
     1f -> "1.0x"
     1.25f -> "1.25x"
@@ -1559,6 +1544,11 @@ private fun speedLabel(speed: Float): String = when (speed) {
     2f -> "2.0x"
     3f -> "3.0x"
     else -> "${speed}x"
+}
+
+private fun speedOverlayLabel(speed: Float): String = when (speed) {
+    1f -> "1.0X"
+    else -> speedLabel(speed).uppercase()
 }
 
 private data class PlayerGestureFeedback(
