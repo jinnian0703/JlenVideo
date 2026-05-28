@@ -22,7 +22,6 @@ import java.net.URI
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.net.URLDecoder
-import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -177,12 +176,12 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     }
 
     internal fun runtimeContentCacheSizeBytes(): Long =
-        sharedPrefsFileSize("library_page_cache") +
-            sharedPrefsFileSize("home_cache_store") +
-            sharedPrefsFileSize("hot_search_cache_store")
+        appContext.runtimeSharedPrefsFileSize("library_page_cache") +
+            appContext.runtimeSharedPrefsFileSize("home_cache_store") +
+            appContext.runtimeSharedPrefsFileSize("hot_search_cache_store")
 
     internal fun runtimeImageCacheSizeBytes(): Long =
-        directorySize(appContext.cacheDir.resolve(IMAGE_CACHE_DIR_NAME))
+        appContext.cacheDir.resolve(IMAGE_CACHE_DIR_NAME).runtimeDirectorySize()
 
     internal fun runtimeClearImageCacheFiles() {
         appContext.cacheDir.resolve(IMAGE_CACHE_DIR_NAME).deleteRecursively()
@@ -3203,7 +3202,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     private fun cleanupTimedFileCache(now: Long) {
         val ttlMs = runtimeCacheRetentionMs()
         if (ttlMs == Long.MAX_VALUE) return
-        deleteFilesOlderThan(appContext.cacheDir.resolve(IMAGE_CACHE_DIR_NAME), now - ttlMs)
+        appContext.cacheDir.resolve(IMAGE_CACHE_DIR_NAME).runtimeDeleteFilesOlderThan(now - ttlMs)
     }
 
     private fun enforceSizeLimit() {
@@ -3253,16 +3252,16 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     private fun trimImageCacheToSize(targetImageBytes: Long) {
         val imageCacheDir = appContext.cacheDir.resolve(IMAGE_CACHE_DIR_NAME)
         val target = targetImageBytes.coerceAtLeast(0L)
-        var imageBytes = directorySize(imageCacheDir)
+        var imageBytes = imageCacheDir.runtimeDirectorySize()
         if (imageBytes <= target) return
-        imageCacheDir.walkCacheFilesOldestFirst().forEach { file ->
+        imageCacheDir.runtimeWalkCacheFilesOldestFirst().forEach { file ->
             if (imageBytes <= target) return
             val size = file.length()
             if (file.delete()) {
                 imageBytes -= size
             }
         }
-        pruneEmptyDirectories(imageCacheDir)
+        imageCacheDir.runtimePruneEmptyDirectories()
     }
 
     private fun <T> pruneExpiredEntries(
@@ -3417,74 +3416,6 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     private fun runtimeCacheRetentionMs(): Long =
         cacheSettingsStore.load().retention.durationMs ?: Long.MAX_VALUE
-
-    private fun sharedPrefsFileSize(
-        prefsName: String,
-        excludedKeys: Set<String> = emptySet()
-    ): Long {
-        val prefs = appContext.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
-        val estimatedValuesBytes = if (excludedKeys.isEmpty()) {
-            0L
-        } else {
-            prefs.all
-                .filterKeys { it in excludedKeys }
-                .values
-                .sumOf(::estimatePreferenceValueSize)
-        }
-        val prefsDir = appContext.filesDir
-            .resolve("../shared_prefs")
-            .canonicalFile
-        val base = prefsDir.resolve("$prefsName.xml")
-        val backup = prefsDir.resolve("$prefsName.xml.bak")
-        return (base.lengthIfFile() + backup.lengthIfFile() - estimatedValuesBytes)
-            .coerceAtLeast(0L)
-    }
-
-    private fun estimatePreferenceValueSize(value: Any?): Long =
-        when (value) {
-            is String -> value.toByteArray(StandardCharsets.UTF_8).size.toLong()
-            is Set<*> -> value.sumOf { estimatePreferenceValueSize(it) }
-            else -> value?.toString()?.toByteArray(StandardCharsets.UTF_8)?.size?.toLong() ?: 0L
-        }
-
-    private fun directorySize(file: java.io.File): Long {
-        if (!file.exists()) return 0L
-        if (file.isFile) return file.length()
-        return file.listFiles()
-            ?.sumOf(::directorySize)
-            ?: 0L
-    }
-
-    private fun deleteFilesOlderThan(root: java.io.File, cutoffMs: Long) {
-        if (!root.exists()) return
-        root.walkCacheFilesOldestFirst()
-            .filter { file -> file.lastModified().takeIf { it > 0L }?.let { it < cutoffMs } == true }
-            .forEach { it.delete() }
-        pruneEmptyDirectories(root)
-    }
-
-    private fun java.io.File.walkCacheFilesOldestFirst(): List<java.io.File> {
-        if (!exists()) return emptyList()
-        if (isFile) return listOf(this)
-        return walkTopDown()
-            .filter { it.isFile }
-            .sortedBy { it.lastModified().takeIf { modified -> modified > 0L } ?: Long.MAX_VALUE }
-            .toList()
-    }
-
-    private fun pruneEmptyDirectories(root: java.io.File) {
-        if (!root.exists() || root.isFile) return
-        root.walkBottomUp()
-            .filter { it.isDirectory && it != root }
-            .forEach { dir ->
-                if (dir.listFiles()?.isEmpty() == true) {
-                    dir.delete()
-                }
-            }
-    }
-
-    private fun java.io.File.lengthIfFile(): Long =
-        if (isFile) length() else 0L
 
     private suspend fun loadCategoryPageFromWeb(typeId: String, page: Int): PagedVodItems {
         val safePage = page.coerceAtLeast(1)
