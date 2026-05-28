@@ -861,8 +861,7 @@ private fun hasHookClass(): Boolean {
         "com.elderdrivers.riru.edxp.core.Yahfa",
         "com.swift.sandhook.SandHook",
         "com.saurik.substrate.MS",
-        "re.frida.server.Frida",
-        "com.android.org.conscrypt.TrustManagerImpl"
+        "re.frida.server.Frida"
     )
     val loader = Thread.currentThread().contextClassLoader
     return classNames.any { className ->
