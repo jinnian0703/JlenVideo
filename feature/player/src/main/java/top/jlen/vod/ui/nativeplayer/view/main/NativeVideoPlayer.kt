@@ -43,6 +43,8 @@ import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -131,6 +133,7 @@ fun NativeVideoPlayer(
     var isDragging by remember(playbackIdentity) { mutableStateOf(false) }
     var sliderDragStartPositionMs by remember(playbackIdentity) { mutableLongStateOf(0L) }
     var speed by remember(playbackIdentity) { mutableFloatStateOf(initialSnapshot.speed) }
+    var speedMenuExpanded by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
     var shouldResumeOnStart by remember(playbackIdentity) { mutableStateOf(false) }
     var controlsVisible by remember(fullscreenMode, playbackIdentity) { mutableStateOf(true) }
     var controlsVersion by remember(fullscreenMode, playbackIdentity) { mutableLongStateOf(0L) }
@@ -1215,17 +1218,51 @@ fun NativeVideoPlayer(
                                     }
                                 )
                             }
-                            ControlChip(
-                                text = speedLabel(speed),
-                                width = controlChipWidth,
-                                height = controlChipHeight,
-                                textStyle = controlPillTextStyle,
-                                onClick = {
-                                    speed = nextSpeed(speed)
-                                    player.playbackParameters = PlaybackParameters(speed)
-                                    markInteraction()
+                            Box {
+                                ControlChip(
+                                    text = speedLabel(speed),
+                                    width = controlChipWidth,
+                                    height = controlChipHeight,
+                                    textStyle = controlPillTextStyle,
+                                    onClick = {
+                                        speedMenuExpanded = true
+                                        markInteraction()
+                                    }
+                                )
+                                DropdownMenu(
+                                    expanded = speedMenuExpanded,
+                                    onDismissRequest = {
+                                        speedMenuExpanded = false
+                                        markInteraction()
+                                    }
+                                ) {
+                                    playbackSpeedOptions.forEach { option ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = speedLabel(option),
+                                                    color = if (kotlin.math.abs(speed - option) <= 0.01f) {
+                                                        UiPalette.Accent
+                                                    } else {
+                                                        UiPalette.Ink
+                                                    },
+                                                    fontWeight = if (kotlin.math.abs(speed - option) <= 0.01f) {
+                                                        FontWeight.ExtraBold
+                                                    } else {
+                                                        FontWeight.Medium
+                                                    }
+                                                )
+                                            },
+                                            onClick = {
+                                                speed = option
+                                                player.playbackParameters = PlaybackParameters(option)
+                                                speedMenuExpanded = false
+                                                markInteraction()
+                                            }
+                                        )
+                                    }
                                 }
-                            )
+                            }
                             if (hasNextEpisode && onNextEpisode != null) {
                                 IconControlChip(
                                     icon = Icons.Rounded.SkipNext,
@@ -1432,13 +1469,6 @@ private fun formatMillis(value: Long): String {
     }
 }
 
-private fun nextSpeed(current: Float): Float = when (current) {
-    1f -> 1.25f
-    1.25f -> 1.5f
-    1.5f -> 2f
-    else -> 1f
-}
-
 private fun nextResizeMode(current: Int): Int = when (current) {
     AspectRatioFrameLayout.RESIZE_MODE_FIT -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_FILL
@@ -1452,11 +1482,15 @@ private fun resizeModeLabel(mode: Int): String = when (mode) {
     else -> "适应"
 }
 
+private val playbackSpeedOptions = listOf(0.75f, 1f, 1.25f, 1.5f, 2f, 3f)
+
 private fun speedLabel(speed: Float): String = when (speed) {
+    0.75f -> "0.75x"
     1f -> "1.0x"
     1.25f -> "1.25x"
     1.5f -> "1.5x"
     2f -> "2.0x"
+    3f -> "3.0x"
     else -> "${speed}x"
 }
 
