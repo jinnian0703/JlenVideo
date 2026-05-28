@@ -1850,7 +1850,9 @@ internal fun LegacyAccountProfilePaneV2(
     val selectedTab = if (isEditTab) AccountProfileTab.Edit else AccountProfileTab.Overview
     var showBindEmailDialog by rememberSaveable { mutableStateOf(false) }
     var showChangePasswordDialog by rememberSaveable { mutableStateOf(false) }
+    var showSaveProfileDialog by rememberSaveable { mutableStateOf(false) }
     var pendingPasswordSave by rememberSaveable { mutableStateOf(false) }
+    var pendingProfileSave by rememberSaveable { mutableStateOf(false) }
     var showUnbindEmailConfirm by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(showBindEmailDialog, editor.email) {
         if (showBindEmailDialog && editor.email.contains("@") && editor.email.contains(".")) {
@@ -1875,6 +1877,22 @@ internal fun LegacyAccountProfilePaneV2(
         ) {
             pendingPasswordSave = false
             showChangePasswordDialog = false
+        }
+    }
+    LaunchedEffect(
+        showSaveProfileDialog,
+        pendingProfileSave,
+        isSaving,
+        editor.currentPassword
+    ) {
+        if (
+            showSaveProfileDialog &&
+            pendingProfileSave &&
+            !isSaving &&
+            editor.currentPassword.isBlank()
+        ) {
+            pendingProfileSave = false
+            showSaveProfileDialog = false
         }
     }
     val overviewFields = remember(fields, editor.email) {
@@ -1927,6 +1945,28 @@ internal fun LegacyAccountProfilePaneV2(
             onDismiss = {
                 pendingPasswordSave = false
                 showChangePasswordDialog = false
+                onEditorChange {
+                    it.copy(
+                        currentPassword = "",
+                        newPassword = "",
+                        confirmPassword = ""
+                    )
+                }
+            }
+        )
+    }
+    if (showSaveProfileDialog) {
+        SaveProfileDialog(
+            editor = editor,
+            isSaving = isSaving,
+            onEditorChange = onEditorChange,
+            onSave = {
+                pendingProfileSave = true
+                onSave()
+            },
+            onDismiss = {
+                pendingProfileSave = false
+                showSaveProfileDialog = false
                 onEditorChange {
                     it.copy(
                         currentPassword = "",
@@ -2060,16 +2100,7 @@ internal fun LegacyAccountProfilePaneV2(
                             )
                         }
                         Button(
-                            onClick = {
-                                onEditorChange {
-                                    it.copy(
-                                        currentPassword = "",
-                                        newPassword = "",
-                                        confirmPassword = ""
-                                    )
-                                }
-                                onSave()
-                            },
+                            onClick = { showSaveProfileDialog = true },
                             enabled = !isSaving,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -2196,7 +2227,9 @@ internal fun LegacyAccountProfilePane(
     onSave: () -> Unit
 ) {
     var showChangePasswordDialog by rememberSaveable { mutableStateOf(false) }
+    var showSaveProfileDialog by rememberSaveable { mutableStateOf(false) }
     var pendingPasswordSave by rememberSaveable { mutableStateOf(false) }
+    var pendingProfileSave by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(
         showChangePasswordDialog,
         pendingPasswordSave,
@@ -2217,6 +2250,22 @@ internal fun LegacyAccountProfilePane(
             showChangePasswordDialog = false
         }
     }
+    LaunchedEffect(
+        showSaveProfileDialog,
+        pendingProfileSave,
+        isSaving,
+        editor.currentPassword
+    ) {
+        if (
+            showSaveProfileDialog &&
+            pendingProfileSave &&
+            !isSaving &&
+            editor.currentPassword.isBlank()
+        ) {
+            pendingProfileSave = false
+            showSaveProfileDialog = false
+        }
+    }
     if (showChangePasswordDialog) {
         ChangePasswordDialog(
             editor = editor,
@@ -2229,6 +2278,28 @@ internal fun LegacyAccountProfilePane(
             onDismiss = {
                 pendingPasswordSave = false
                 showChangePasswordDialog = false
+                onEditorChange {
+                    it.copy(
+                        currentPassword = "",
+                        newPassword = "",
+                        confirmPassword = ""
+                    )
+                }
+            }
+        )
+    }
+    if (showSaveProfileDialog) {
+        SaveProfileDialog(
+            editor = editor,
+            isSaving = isSaving,
+            onEditorChange = onEditorChange,
+            onSave = {
+                pendingProfileSave = true
+                onSave()
+            },
+            onDismiss = {
+                pendingProfileSave = false
+                showSaveProfileDialog = false
                 onEditorChange {
                     it.copy(
                         currentPassword = "",
@@ -2303,16 +2374,7 @@ internal fun LegacyAccountProfilePane(
                     onAction = { showChangePasswordDialog = true }
                 )
                 Button(
-                    onClick = {
-                        onEditorChange {
-                            it.copy(
-                                currentPassword = "",
-                                newPassword = "",
-                                confirmPassword = ""
-                            )
-                        }
-                        onSave()
-                    },
+                    onClick = { showSaveProfileDialog = true },
                     enabled = !isSaving,
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(

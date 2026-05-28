@@ -62,10 +62,6 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadMembershipPag
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacySaveUserProfile(
     editor: UserProfileEditor
 ): String {
-    runCatching { runtimeSubmitUserProfileToAppCenter(editor) }
-        .getOrNull()
-        ?.let { return it }
-
     val form = FormBody.Builder()
         .add("user_pwd", editor.currentPassword)
         .add("user_pwd1", editor.newPassword)

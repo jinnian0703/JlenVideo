@@ -426,12 +426,6 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     internal suspend fun runtimeLoadMembershipPageFromHtml(): MembershipPage =
         loadMembershipPageFromHtml()
 
-    internal suspend fun runtimeSubmitUserProfileToAppCenter(editor: UserProfileEditor): String =
-        submitUserProfileToAppCenter(editor)
-
-    internal suspend fun runtimeSubmitAppCenterUserProfileMutation(formBody: FormBody): String =
-        submitAppCenterUserProfileMutation(formBody)
-
     internal suspend fun runtimeRequestVideoApiJson(
         path: String,
         queryParameters: Map<String, String> = emptyMap(),
@@ -1788,42 +1782,6 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             plans = snapshot.membershipPlans,
             signInInfo = snapshot.membershipSignInInfo
         )
-    }
-
-    private suspend fun submitUserProfileToAppCenter(editor: UserProfileEditor): String {
-        return submitAppCenterUserProfileMutation(
-            FormBody.Builder()
-            .add("user_pwd", editor.currentPassword)
-            .add("user_pwd1", editor.newPassword)
-            .add("user_pwd2", editor.confirmPassword)
-            .add("user_qq", editor.qq)
-            .add("user_email", editor.email)
-            .add("user_phone", editor.phone)
-            .add("user_question", editor.question)
-            .add("user_answer", editor.answer)
-            .add("current_password", editor.currentPassword)
-            .add("new_password", editor.newPassword)
-            .add("confirm_password", editor.confirmPassword)
-            .add("qq", editor.qq)
-            .add("email", editor.email)
-            .add("phone", editor.phone)
-            .add("question", editor.question)
-            .add("answer", editor.answer)
-            .build()
-        )
-    }
-
-    private suspend fun submitAppCenterUserProfileMutation(formBody: FormBody): String {
-        val json = requestAppCenterJson(action = "user_profile", formBody = formBody)
-        val code = json.firstInt("code", "status")
-        val message = json.firstString("msg", "message")
-        if (code != null && code !in setOf(1, 200)) {
-            throw IOException(message.ifBlank { "操作失败" })
-        }
-        if (message.contains("fail", ignoreCase = true) || message.contains("error", ignoreCase = true)) {
-            throw IOException(message)
-        }
-        return message.ifBlank { "操作成功" }
     }
 
     private suspend fun loadAppCenterUserSnapshot(): AppCenterUserSnapshot {

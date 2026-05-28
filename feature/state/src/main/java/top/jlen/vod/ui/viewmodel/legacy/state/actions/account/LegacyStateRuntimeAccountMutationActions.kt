@@ -220,7 +220,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacySaveProfile() {
     }
     runtimeRunAccountAction(
         block = { saveUserProfile(currentAccountState().profileEditor) },
-        successMessage = "资料已保存",
+        successMessage = if (hasPasswordInput) "密码已修改" else "资料已保存",
         onSuccess = {
             updateAccountState(accountStateAfterProfileSaved(currentAccountState()))
             selectAccountSection(AccountSection.Profile, forceRefresh = true)

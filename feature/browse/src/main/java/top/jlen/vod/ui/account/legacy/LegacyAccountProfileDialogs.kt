@@ -177,6 +177,54 @@ internal fun ChangePasswordDialog(
 }
 
 @Composable
+internal fun SaveProfileDialog(
+    editor: UserProfileEditor,
+    isSaving: Boolean,
+    onEditorChange: ((UserProfileEditor) -> UserProfileEditor) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val canSaveProfile = editor.currentPassword.isNotBlank()
+
+    Dialog(onDismissRequest = { if (!isSaving) onDismiss() }) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(26.dp),
+            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                AccountDialogHeader(
+                    title = "保存资料",
+                    icon = Icons.Rounded.Lock
+                )
+                Text(
+                    text = "需要验证当前密码。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = UiPalette.TextSecondary
+                )
+                ProfileEditorField(
+                    label = "原密码",
+                    value = editor.currentPassword,
+                    onValueChange = { value -> onEditorChange { it.copy(currentPassword = value) } },
+                    password = true
+                )
+                AccountDialogActions(
+                    dismissText = "取消",
+                    confirmText = if (isSaving) "保存中..." else "保存资料",
+                    confirmEnabled = !isSaving && canSaveProfile,
+                    dismissEnabled = !isSaving,
+                    onDismiss = onDismiss,
+                    onConfirm = onSave
+                )
+            }
+        }
+    }
+}
+
+@Composable
 internal fun UnbindEmailConfirmDialog(
     email: String,
     onDismiss: () -> Unit,
