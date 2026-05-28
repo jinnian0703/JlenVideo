@@ -1419,7 +1419,7 @@ private fun SpeedSelectorOverlay(
                     top = 10.dp,
                     bottom = if (fullscreenMode) 92.dp else 10.dp
                 )
-                .width(if (fullscreenMode) 190.dp else 200.dp)
+                .width(if (fullscreenMode) 160.dp else 180.dp)
                 .heightIn(max = if (fullscreenMode) 330.dp else 330.dp)
                 .verticalScroll(rememberScrollState())
                 .clickableWithoutRipple { },
@@ -1464,7 +1464,7 @@ private fun SpeedOptionButton(
             color = if (selected) Color(0xFFFF5C93) else Color.White,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
-            modifier = Modifier.padding(start = if (fullscreenMode) 32.dp else 28.dp)
+            modifier = Modifier.padding(start = if (fullscreenMode) 24.dp else 24.dp)
         )
     }
 }
