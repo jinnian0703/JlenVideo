@@ -1218,16 +1218,18 @@ fun NativeVideoPlayer(
                                     }
                                 )
                             }
-                            ControlChip(
-                                text = speedLabel(speed),
-                                width = controlChipWidth,
-                                height = controlChipHeight,
-                                textStyle = controlPillTextStyle,
-                                onClick = {
-                                    speedMenuExpanded = true
-                                    markInteraction()
-                                }
-                            )
+                            if (fullscreenMode) {
+                                ControlChip(
+                                    text = speedLabel(speed),
+                                    width = controlChipWidth,
+                                    height = controlChipHeight,
+                                    textStyle = controlPillTextStyle,
+                                    onClick = {
+                                        speedMenuExpanded = true
+                                        markInteraction()
+                                    }
+                                )
+                            }
                             if (hasNextEpisode && onNextEpisode != null) {
                                 IconControlChip(
                                     icon = Icons.Rounded.SkipNext,
