@@ -6,7 +6,10 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
+import android.provider.Settings
 import android.os.SystemClock
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -18,13 +21,22 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Category
+import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -44,9 +56,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
@@ -71,6 +87,7 @@ private const val KEY_COMPLETED_FIRST_LOGIN_PROMPT = "completed_first_login_prom
 
 private const val ROUTE_ONBOARDING_AGREEMENT = "onboarding/agreement"
 private const val ROUTE_ONBOARDING_LOGIN = "onboarding/login"
+private const val TRAFFIC_CAPTURE_CHECK_MS = 2_000L
 
 private val topLevelRoutes = setOf("home", "categories", "follow", "search", "account")
 
@@ -85,7 +102,8 @@ private val bottomBarItems = listOf(
 @Composable
 fun JlenVideoApp() {
     val isDarkTheme = isSystemInDarkTheme()
-    val activity = LocalContext.current.findActivity()
+    val context = LocalContext.current
+    val activity = context.findActivity()
     SideEffect {
         UiPalette.syncWithSystem(isDarkTheme)
         activity?.window?.let { window ->
@@ -130,9 +148,31 @@ fun JlenVideoApp() {
             )
         }
     }
+    var trafficCaptureState by remember(context) {
+        mutableStateOf(detectTrafficCaptureState(context))
+    }
+    LaunchedEffect(context) {
+        while (true) {
+            delay(TRAFFIC_CAPTURE_CHECK_MS)
+            trafficCaptureState = detectTrafficCaptureState(context)
+        }
+    }
+    if (trafficCaptureState.blocked) {
+        MaterialTheme(colorScheme = appColors) {
+            Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
+                Box(modifier = Modifier.fillMaxSize().background(appBackground)) {
+                    TrafficCaptureBlockedScreen(
+                        state = trafficCaptureState,
+                        onRetry = { trafficCaptureState = detectTrafficCaptureState(context) },
+                        onExit = { activity?.finish() }
+                    )
+                }
+            }
+        }
+        return
+    }
     val viewModel: AppViewModel = viewModel()
     val navController = rememberNavController()
-    val context = LocalContext.current
     val onboardingPrefs = remember(context) {
         context.getSharedPreferences(ONBOARDING_PREFS, Context.MODE_PRIVATE)
     }
@@ -756,6 +796,132 @@ private tailrec fun android.content.Context.findActivity(): Activity? = when (th
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+private data class TrafficCaptureState(
+    val blocked: Boolean,
+    val reason: String
+)
+
+private fun detectTrafficCaptureState(context: Context): TrafficCaptureState {
+    val reasons = buildList {
+        if (hasSystemProxy(context) || hasJvmProxy()) {
+            add("当前网络已启用代理")
+        }
+        if (hasVpnNetwork(context)) {
+            add("当前网络存在 VPN 通道")
+        }
+    }
+    return TrafficCaptureState(
+        blocked = reasons.isNotEmpty(),
+        reason = reasons.joinToString("、")
+    )
+}
+
+private fun hasSystemProxy(context: Context): Boolean {
+    val resolver = context.contentResolver
+    val proxy = Settings.Global.getString(resolver, Settings.Global.HTTP_PROXY)
+        ?.trim()
+        .orEmpty()
+    return proxy.isNotBlank()
+}
+
+private fun hasJvmProxy(): Boolean {
+    val proxyKeys = arrayOf(
+        "http.proxyHost",
+        "https.proxyHost",
+        "socksProxyHost"
+    )
+    return proxyKeys.any { key -> !System.getProperty(key).isNullOrBlank() }
+}
+
+private fun hasVpnNetwork(context: Context): Boolean {
+    val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        ?: return false
+    return connectivityManager.allNetworks.any { network ->
+        connectivityManager.getNetworkCapabilities(network)
+            ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+    }
+}
+
+@Composable
+private fun TrafficCaptureBlockedScreen(
+    state: TrafficCaptureState,
+    onRetry: () -> Unit,
+    onExit: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface)
+        ) {
+            androidx.compose.foundation.layout.Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(UiPalette.DangerSurface),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Security,
+                        contentDescription = null,
+                        tint = UiPalette.DangerText,
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+                Text(
+                    text = "网络环境不可用",
+                    color = UiPalette.Ink,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "请关闭代理、VPN 或抓包工具后继续使用。",
+                    color = UiPalette.TextSecondary,
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center
+                )
+                if (state.reason.isNotBlank()) {
+                    Text(
+                        text = state.reason,
+                        color = UiPalette.TextMuted,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                Button(
+                    onClick = onRetry,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = UiPalette.Accent,
+                        contentColor = UiPalette.AccentText
+                    )
+                ) {
+                    Text("重新检测", fontWeight = FontWeight.Bold)
+                }
+                androidx.compose.material3.TextButton(onClick = onExit) {
+                    Text("退出应用", color = UiPalette.TextSecondary, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
 }
 
 private fun normalizeTopLevelRoute(route: String?): String? = when {
