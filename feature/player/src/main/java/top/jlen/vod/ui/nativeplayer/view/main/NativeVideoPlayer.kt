@@ -550,6 +550,7 @@ fun NativeVideoPlayer(
 
     LaunchedEffect(fullscreenMode, controlsVisible, playerLocked) {
         if (!fullscreenMode) {
+            speedMenuExpanded = false
             autoHideJob?.cancel()
             autoHideJob = null
             if (playerLocked) {
@@ -1313,7 +1314,7 @@ fun NativeVideoPlayer(
                 }
             }
 
-            if (speedMenuExpanded && !playerLocked) {
+            if (fullscreenMode && speedMenuExpanded && !playerLocked) {
                 SpeedSelectorOverlay(
                     currentSpeed = speed,
                     fullscreenMode = fullscreenMode,
