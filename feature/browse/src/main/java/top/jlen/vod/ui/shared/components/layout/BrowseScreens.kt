@@ -427,7 +427,7 @@ fun FeaturedCard(
     item: VodItem,
     onClick: (String) -> Unit,
     modifier: Modifier = Modifier,
-    lightweightImage: Boolean = false,
+    lightweightImage: Boolean = true,
     decorativeImage: Boolean = false
 ) {
     val badgeText = rememberPosterBadgeText(item.resolvedBadgeText, compact = false)
