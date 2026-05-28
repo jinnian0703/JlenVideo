@@ -10,30 +10,31 @@ import kotlinx.coroutines.withContext
 private const val EMAIL_CODE_INTERVAL_SECONDS = 60
 
 internal fun LegacyStateRuntimeViewModelCore.legacySendRegisterCode() {
-    val editor = currentAccountState().registerEditor
+    val state = currentAccountState()
+    val editor = state.registerEditor
     val contact = editor.contact.trim()
     if (contact.isBlank()) {
         updateAccountState(
             accountStateWithValidationError(
-                currentAccountState(),
-                "请输入${currentAccountState().registerContactLabel}"
+                state,
+                "请输入${state.registerContactLabel}"
             )
         )
         return
     }
 
-    if (editor.channel == "email" && !contact.contains("@")) {
-        updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入正确的邮箱地址"))
+    if (state.registerChannel == "email" && !Patterns.EMAIL_ADDRESS.matcher(contact).matches()) {
+        updateAccountState(accountStateWithValidationError(state, "请输入正确的邮箱地址"))
         return
     }
 
-    if (currentAccountState().registerCodeCountdown > 0) return
+    if (state.registerCodeCountdown > 0) return
 
     runtimeRunAccountAction(
-        block = { sendRegisterCodeForApp(editor.channel, contact) },
+        block = { sendRegisterCodeForApp(state.registerChannel, contact) },
         successMessage = "验证码已发送，请注意查收",
         onSuccess = {
-            startRegisterCodeCountdown(editor.channel, contact)
+            startRegisterCodeCountdown(state.registerChannel, contact)
         }
     )
 }
@@ -61,48 +62,53 @@ internal fun LegacyStateRuntimeViewModelCore.legacySendFindPasswordCode() {
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyRegister() {
-    val editor = currentAccountState().registerEditor
+    val state = currentAccountState()
+    val editor = state.registerEditor
     if (editor.userName.isBlank()) {
-        updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入用户名"))
+        updateAccountState(accountStateWithValidationError(state, "请输入用户名"))
         return
     }
     if (editor.password.isBlank()) {
-        updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入密码"))
+        updateAccountState(accountStateWithValidationError(state, "请输入密码"))
         return
     }
     if (editor.confirmPassword.isBlank()) {
-        updateAccountState(accountStateWithValidationError(currentAccountState(), "请确认密码"))
+        updateAccountState(accountStateWithValidationError(state, "请确认密码"))
         return
     }
     if (editor.password != editor.confirmPassword) {
-        updateAccountState(accountStateWithValidationError(currentAccountState(), "两次输入的密码不一致"))
+        updateAccountState(accountStateWithValidationError(state, "两次输入的密码不一致"))
         return
     }
     if (editor.contact.isBlank()) {
         updateAccountState(
             accountStateWithValidationError(
-                currentAccountState(),
-                "请输入${currentAccountState().registerContactLabel}"
+                state,
+                "请输入${state.registerContactLabel}"
             )
         )
         return
     }
-    if (currentAccountState().registerRequiresCode && editor.code.isBlank()) {
+    if (state.registerChannel == "email" && !Patterns.EMAIL_ADDRESS.matcher(editor.contact.trim()).matches()) {
+        updateAccountState(accountStateWithValidationError(state, "请输入正确的邮箱地址"))
+        return
+    }
+    if (state.registerRequiresCode && editor.code.isBlank()) {
         updateAccountState(
             accountStateWithValidationError(
-                currentAccountState(),
-                "请输入${currentAccountState().registerCodeLabel}"
+                state,
+                "请输入${state.registerCodeLabel}"
             )
         )
         return
     }
-    if (currentAccountState().registerRequiresVerify && editor.verify.isBlank()) {
-        updateAccountState(accountStateWithValidationError(currentAccountState(), "请输入图片验证码"))
+    if (state.registerRequiresVerify && editor.verify.isBlank()) {
+        updateAccountState(accountStateWithValidationError(state, "请输入图片验证码"))
         return
     }
 
     runtimeRunAccountAction(
-        block = { registerForApp(editor.copy(channel = currentAccountState().registerChannel)) },
+        block = { registerForApp(editor.copy(channel = state.registerChannel)) },
         onSuccess = {
             updateAccountState(accountStateAfterRegisterSuccess(currentAccountState(), editor.userName))
         }

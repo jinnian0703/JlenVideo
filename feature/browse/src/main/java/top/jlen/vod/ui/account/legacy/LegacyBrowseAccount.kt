@@ -49,6 +49,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
@@ -457,6 +458,7 @@ internal fun LegacyAccountScreen(
                                 )
                                 AccountRegisterPane(
                                     state = state,
+                                    error = state.error,
                                     onEditorChange = onRegisterEditorChange,
                                     onRefreshCaptcha = onRefreshRegisterCaptcha,
                                     onSendCode = onSendRegisterCode,
@@ -480,6 +482,7 @@ internal fun LegacyAccountScreen(
                                 )
                                 AccountFindPasswordPane(
                                     state = state,
+                                    error = state.error,
                                     onEditorChange = onFindPasswordEditorChange,
                                     onSendCode = onSendFindPasswordCode,
                                     onSubmit = onFindPassword
@@ -537,6 +540,7 @@ internal fun LegacyAccountScreen(
                                     .padding(horizontal = 20.dp, vertical = 22.dp),
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
+                                AccountInlineErrorNotice(state.error)
                                 OutlinedTextField(
                                     value = state.userName,
                                     onValueChange = onUserNameChange,
@@ -1069,8 +1073,43 @@ private fun CacheSizeLine(
 }
 
 @Composable
+private fun AccountInlineErrorNotice(message: String?) {
+    val text = message?.trim().orEmpty()
+    if (text.isBlank()) return
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = UiPalette.DangerSurface.copy(alpha = 0.42f)),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, UiPalette.DangerBorder.copy(alpha = 0.52f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.ErrorOutline,
+                contentDescription = null,
+                tint = UiPalette.DangerText,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                text = text,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = UiPalette.DangerText
+            )
+        }
+    }
+}
+
+@Composable
 internal fun LegacyAccountRegisterPane(
     state: AccountUiState,
+    error: String? = null,
     onEditorChange: ((RegisterEditor) -> RegisterEditor) -> Unit,
     onRefreshCaptcha: () -> Unit,
     onSendCode: () -> Unit,
@@ -1082,6 +1121,7 @@ internal fun LegacyAccountRegisterPane(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        AccountInlineErrorNotice(error)
         OutlinedTextField(
             value = state.registerEditor.userName,
             onValueChange = { value -> onEditorChange { it.copy(userName = value) } },
@@ -1249,6 +1289,7 @@ internal fun LegacyAccountRegisterPane(
 @Composable
 internal fun LegacyAccountFindPasswordPane(
     state: AccountUiState,
+    error: String? = null,
     onEditorChange: ((FindPasswordEditor) -> FindPasswordEditor) -> Unit,
     onSendCode: () -> Unit,
     onSubmit: () -> Unit
@@ -1259,6 +1300,7 @@ internal fun LegacyAccountFindPasswordPane(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        AccountInlineErrorNotice(error)
         OutlinedTextField(
             value = state.findPasswordEditor.email,
             onValueChange = { value -> onEditorChange { it.copy(email = value) } },

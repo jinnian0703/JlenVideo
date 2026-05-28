@@ -18,10 +18,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -291,22 +294,7 @@ fun FirstLoginOnboardingScreen(
                     .padding(horizontal = 20.dp, vertical = 22.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                state.error?.takeIf { it.isNotBlank() }?.let { error ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = UiPalette.DangerSurface),
-                        shape = RoundedCornerShape(UiDimens.ControlRadius),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.DangerBorder)
-                    ) {
-                        Text(
-                            text = error,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = UiPalette.DangerText
-                        )
-                    }
-                }
+                OnboardingInlineErrorNotice(state.error)
 
                 when (state.authMode) {
                     AccountAuthMode.Register -> FirstLoginRegisterPane(
@@ -417,6 +405,40 @@ private fun FirstLoginLoginPane(
             )
         ) {
             Text(if (state.isLoading) "正在登录..." else "立即登录", fontWeight = FontWeight.ExtraBold)
+        }
+    }
+}
+
+@Composable
+private fun OnboardingInlineErrorNotice(message: String?) {
+    val text = message?.trim().orEmpty()
+    if (text.isBlank()) return
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = UiPalette.DangerSurface.copy(alpha = 0.42f)),
+        shape = RoundedCornerShape(18.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.DangerBorder.copy(alpha = 0.52f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.ErrorOutline,
+                contentDescription = null,
+                tint = UiPalette.DangerText,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                text = text,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = UiPalette.DangerText
+            )
         }
     }
 }
