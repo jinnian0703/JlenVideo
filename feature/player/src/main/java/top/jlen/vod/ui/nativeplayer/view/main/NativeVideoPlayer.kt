@@ -1415,15 +1415,15 @@ private fun SpeedSelectorOverlay(
             modifier = modifier
                 .padding(
                     start = 14.dp,
-                    end = if (fullscreenMode) 22.dp else 14.dp,
+                    end = if (fullscreenMode) 18.dp else 14.dp,
                     top = 10.dp,
                     bottom = if (fullscreenMode) 92.dp else 10.dp
                 )
-                .width(if (fullscreenMode) 270.dp else 220.dp)
+                .width(if (fullscreenMode) 190.dp else 200.dp)
                 .heightIn(max = if (fullscreenMode) 330.dp else 330.dp)
                 .verticalScroll(rememberScrollState())
                 .clickableWithoutRipple { },
-            verticalArrangement = Arrangement.spacedBy(if (fullscreenMode) 6.dp else 8.dp)
+            verticalArrangement = Arrangement.spacedBy(if (fullscreenMode) 5.dp else 8.dp)
         ) {
             playbackSpeedOptions.forEach { option ->
                 SpeedOptionButton(
@@ -1447,24 +1447,24 @@ private fun SpeedOptionButton(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(if (fullscreenMode) 42.dp else 52.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .height(if (fullscreenMode) 36.dp else 48.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(Color(0xFF202227).copy(alpha = if (selected) 0.92f else 0.86f))
             .border(
                 width = 1.dp,
                 color = Color.White.copy(alpha = if (selected) 0.14f else 0.05f),
-                shape = RoundedCornerShape(10.dp)
+                shape = RoundedCornerShape(8.dp)
             )
             .clickableWithoutRipple(onClick),
         contentAlignment = Alignment.CenterStart
     ) {
         Text(
             text = label,
-            style = if (fullscreenMode) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+            style = if (fullscreenMode) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
             color = if (selected) Color(0xFFFF5C93) else Color.White,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
-            modifier = Modifier.padding(start = if (fullscreenMode) 46.dp else 32.dp)
+            modifier = Modifier.padding(start = if (fullscreenMode) 32.dp else 28.dp)
         )
     }
 }
