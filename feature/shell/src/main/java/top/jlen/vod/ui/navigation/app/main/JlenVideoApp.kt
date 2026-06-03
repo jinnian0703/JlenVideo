@@ -774,6 +774,10 @@ fun JlenVideoApp() {
                             LaunchedEffect(viewModel.playerState.item?.vodId) {
                                 viewModel.refreshPlayerSources()
                             }
+                            val snapshotVodId = viewModel.playerState.item?.vodId
+                            val snapshotSourceIndex = viewModel.playerState.selectedSourceIndex
+                            val snapshotEpisodeIndex = viewModel.playerState.selectedEpisodeIndex
+                            val snapshotEpisodePageUrl = viewModel.playerState.episodePageUrl
                             PlayerScreen(
                                 state = viewModel.playerState,
                                 onBack = { navController.popBackStack() },
@@ -781,7 +785,17 @@ fun JlenVideoApp() {
                                 onSelectSource = viewModel::selectPlayerSource,
                                 onRefreshSources = viewModel::refreshPlayerSources,
                                 onPlayNext = viewModel::playNextEpisode,
-                                onPlaybackSnapshotChange = viewModel::updatePlaybackSnapshot,
+                                onPlaybackSnapshotChange = { snapshot ->
+                                    val currentPlayerState = viewModel.playerState
+                                    val matchesCurrentEpisode =
+                                        currentPlayerState.item?.vodId == snapshotVodId &&
+                                            currentPlayerState.selectedSourceIndex == snapshotSourceIndex &&
+                                            currentPlayerState.selectedEpisodeIndex == snapshotEpisodeIndex &&
+                                            currentPlayerState.episodePageUrl == snapshotEpisodePageUrl
+                                    if (matchesCurrentEpisode) {
+                                        viewModel.updatePlaybackSnapshot(snapshot)
+                                    }
+                                },
                                 onDetectedStream = viewModel::adoptDetectedStream,
                                 onResolveFallbackFailed = viewModel::reportTakeoverFailure
                             )

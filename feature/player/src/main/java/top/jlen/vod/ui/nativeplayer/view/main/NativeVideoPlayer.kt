@@ -124,7 +124,8 @@ fun NativeVideoPlayer(
         runCatching { createNativePlayer(context, url, initialSnapshot) }.getOrNull()
     }
     val latestOrientationCallback = rememberUpdatedState(onVideoOrientationDetected)
-    val latestSnapshotCallback = rememberUpdatedState(onPlaybackSnapshotChanged)
+    val snapshotCallbackForPlayback = remember(playbackIdentity) { onPlaybackSnapshotChanged }
+    val activePlaybackIdentity = rememberUpdatedState(playbackIdentity)
     val latestFullscreenToggleCallback = rememberUpdatedState(onToggleFullscreen)
     var isPlaying by remember(player) { mutableStateOf(player?.isPlaying == true) }
     var currentPosition by remember(player) { mutableLongStateOf(0L) }
@@ -204,10 +205,10 @@ fun NativeVideoPlayer(
                         snapshot.playWhenReady != previous.playWhenReady
                     )
             )
-        if (shouldDispatch) {
+        if (shouldDispatch && activePlaybackIdentity.value == playbackIdentity) {
             lastReportedSnapshot = snapshot
             lastSnapshotDispatchAt = now
-            latestSnapshotCallback.value?.invoke(snapshot)
+            snapshotCallbackForPlayback?.invoke(snapshot)
         }
         return snapshot
     }
