@@ -333,7 +333,8 @@ fun NativeVideoPlayer(
         longPressJob?.cancel()
         longPressJob = null
 
-        if (longPressBoostActive) {
+        val finishedLongPressBoost = longPressBoostActive
+        if (finishedLongPressBoost) {
             player?.playbackParameters = PlaybackParameters(speed)
             longPressBoostActive = false
         } else if (!cancelled && gestureMode == PlayerGestureMode.Seek) {
@@ -346,7 +347,10 @@ fun NativeVideoPlayer(
             dispatchSnapshot(force = true)
         }
 
-        val isSimpleTap = !cancelled && !gestureMoved && gestureMode == PlayerGestureMode.None
+        val isSimpleTap = !cancelled &&
+            !finishedLongPressBoost &&
+            !gestureMoved &&
+            gestureMode == PlayerGestureMode.None
         if (playerLocked) {
             if (isSimpleTap && !lockActionPressed) {
                 if (unlockHintVisible) {
