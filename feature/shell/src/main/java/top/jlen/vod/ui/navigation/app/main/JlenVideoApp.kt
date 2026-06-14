@@ -115,39 +115,35 @@ fun JlenVideoApp() {
             controller.isAppearanceLightNavigationBars = !isDarkTheme
         }
     }
-    val appBackground = remember(isDarkTheme) {
-        Brush.verticalGradient(
-            colors = listOf(UiPalette.HeroEnd, UiPalette.BackgroundTop, UiPalette.BackgroundBottom)
+    val appBackground = Brush.verticalGradient(
+        colors = listOf(UiPalette.HeroEnd, UiPalette.BackgroundTop, UiPalette.BackgroundBottom)
+    )
+    val appColors = if (isDarkTheme) {
+        darkColorScheme(
+            primary = UiPalette.Accent,
+            onPrimary = UiPalette.AccentText,
+            secondary = UiPalette.AccentSoft,
+            onSecondary = UiPalette.AccentText,
+            background = UiPalette.BackgroundTop,
+            onBackground = UiPalette.TextPrimary,
+            surface = UiPalette.Surface,
+            onSurface = UiPalette.TextPrimary,
+            surfaceVariant = UiPalette.SurfaceStrong,
+            onSurfaceVariant = UiPalette.TextSecondary
         )
-    }
-    val appColors = remember(isDarkTheme) {
-        if (isDarkTheme) {
-            darkColorScheme(
-                primary = UiPalette.Accent,
-                onPrimary = UiPalette.AccentText,
-                secondary = UiPalette.AccentSoft,
-                onSecondary = UiPalette.AccentText,
-                background = UiPalette.BackgroundTop,
-                onBackground = UiPalette.TextPrimary,
-                surface = UiPalette.Surface,
-                onSurface = UiPalette.TextPrimary,
-                surfaceVariant = UiPalette.SurfaceStrong,
-                onSurfaceVariant = UiPalette.TextSecondary
-            )
-        } else {
-            lightColorScheme(
-                primary = UiPalette.Accent,
-                onPrimary = UiPalette.AccentText,
-                secondary = UiPalette.AccentSoft,
-                onSecondary = UiPalette.AccentText,
-                background = UiPalette.BackgroundTop,
-                onBackground = UiPalette.TextPrimary,
-                surface = UiPalette.Surface,
-                onSurface = UiPalette.TextPrimary,
-                surfaceVariant = UiPalette.SurfaceStrong,
-                onSurfaceVariant = UiPalette.TextSecondary
-            )
-        }
+    } else {
+        lightColorScheme(
+            primary = UiPalette.Accent,
+            onPrimary = UiPalette.AccentText,
+            secondary = UiPalette.AccentSoft,
+            onSecondary = UiPalette.AccentText,
+            background = UiPalette.BackgroundTop,
+            onBackground = UiPalette.TextPrimary,
+            surface = UiPalette.Surface,
+            onSurface = UiPalette.TextPrimary,
+            surfaceVariant = UiPalette.SurfaceStrong,
+            onSurfaceVariant = UiPalette.TextSecondary
+        )
     }
     var trafficCaptureState by remember(context) {
         mutableStateOf(detectTrafficCaptureState(context))
