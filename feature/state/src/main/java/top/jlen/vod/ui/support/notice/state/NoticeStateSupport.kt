@@ -9,16 +9,21 @@ internal fun noticeStateWithLoadedNotices(
     noticeState: NoticeUiState,
     notices: List<AppNotice>,
     unreadNoticeIds: Set<String>,
-    pendingNotice: AppNotice?
+    pendingDialogNotices: List<AppNotice>
 ): NoticeUiState {
     val currentDialogId = noticeState.dialogNotice?.id.orEmpty()
-    val preservedDialog = notices.firstOrNull { it.id == currentDialogId }
+    val normalizedPendingDialogs = pendingDialogNotices
+        .filter { it.id.isNotBlank() }
+        .distinctBy { it.id }
+    val preservedDialog = normalizedPendingDialogs.firstOrNull { it.id == currentDialogId }
+    val activeDialog = preservedDialog ?: normalizedPendingDialogs.firstOrNull()
     return noticeState.copy(
         isLoading = false,
         error = null,
         notices = notices,
         unreadNoticeIds = unreadNoticeIds,
-        dialogNotice = preservedDialog ?: pendingNotice
+        dialogNotice = activeDialog,
+        pendingDialogNotices = normalizedPendingDialogs.filterNot { it.id == activeDialog?.id }
     )
 }
 
@@ -33,16 +38,39 @@ internal fun noticeStateWithRefreshError(
 internal fun noticeStateAfterDialogDismiss(
     noticeState: NoticeUiState,
     unreadNoticeIds: Set<String>
-): NoticeUiState = noticeState.copy(
-    dialogNotice = null,
-    unreadNoticeIds = unreadNoticeIds
-)
+): NoticeUiState {
+    val nextDialog = noticeState.pendingDialogNotices.firstOrNull()
+    return noticeState.copy(
+        dialogNotice = nextDialog,
+        pendingDialogNotices = noticeState.pendingDialogNotices.drop(1),
+        unreadNoticeIds = unreadNoticeIds
+    )
+}
 
 internal fun noticeStateAfterNoticeOpened(
     noticeState: NoticeUiState,
     noticeId: String,
     unreadNoticeIds: Set<String>
-): NoticeUiState = noticeState.copy(
-    dialogNotice = noticeState.dialogNotice?.takeUnless { it.id == noticeId },
-    unreadNoticeIds = unreadNoticeIds
-)
+): NoticeUiState {
+    val normalized = noticeId.trim()
+    val remainingDialogs = noticeState.pendingDialogNotices.filterNot { it.id == normalized }
+    if (noticeState.dialogNotice?.id != normalized) {
+        return noticeState.copy(
+            pendingDialogNotices = remainingDialogs,
+            unreadNoticeIds = unreadNoticeIds
+        )
+    }
+    val nextDialog = remainingDialogs.firstOrNull()
+    return noticeState.copy(
+        dialogNotice = nextDialog,
+        pendingDialogNotices = remainingDialogs.drop(1),
+        unreadNoticeIds = unreadNoticeIds
+    )
+}
+
+internal fun pendingNoticeDialogs(
+    notices: List<AppNotice>,
+    unreadNoticeIds: Set<String>
+): List<AppNotice> = notices.filter { notice ->
+    notice.id.isNotBlank() && notice.id in unreadNoticeIds
+}

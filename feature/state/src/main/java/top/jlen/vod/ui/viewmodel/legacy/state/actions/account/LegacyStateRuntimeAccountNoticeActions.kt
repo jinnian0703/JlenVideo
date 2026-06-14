@@ -102,7 +102,10 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshNotices(forceRefresh: 
                     noticeState = currentNoticeState(),
                     notices = notices,
                     unreadNoticeIds = unreadNoticeIds,
-                    pendingNotice = legacyRepository().pickPendingNotice(notices)
+                    pendingDialogNotices = pendingNoticeDialogs(
+                        notices = notices,
+                        unreadNoticeIds = unreadNoticeIds
+                    )
                 )
             )
         }.onFailure { error ->

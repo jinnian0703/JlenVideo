@@ -7,7 +7,8 @@ data class NoticeUiState(
     val error: String? = null,
     val notices: List<AppNotice> = emptyList(),
     val unreadNoticeIds: Set<String> = emptySet(),
-    val dialogNotice: AppNotice? = null
+    val dialogNotice: AppNotice? = null,
+    val pendingDialogNotices: List<AppNotice> = emptyList()
 ) {
     val activeNotices: List<AppNotice>
         get() = notices.filter { it.isActive }
