@@ -8,8 +8,8 @@ import android.os.Bundle
 import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.jlen.vod.data.AppleCmsRepository
 
-class FullscreenPlayerActivity : ComponentActivity() {
+class FullscreenPlayerActivity : AppCompatActivity() {
     private val repository by lazy { AppleCmsRepository(applicationContext) }
     private var latestSnapshot: PlaybackSnapshot = PlaybackSnapshot()
     private var currentEpisodeIndex by mutableIntStateOf(0)

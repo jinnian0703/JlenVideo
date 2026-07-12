@@ -177,7 +177,10 @@ internal fun CastPlaybackButton(
                 if (castContext == null || button == null) {
                     Toast.makeText(context, "当前设备不支持投屏", Toast.LENGTH_SHORT).show()
                 } else {
-                    button.performClick()
+                    val opened = runCatching { button.performClick() }.getOrDefault(false)
+                    if (!opened) {
+                        Toast.makeText(context, "无法打开投屏设备列表", Toast.LENGTH_SHORT).show()
+                    }
                 }
             },
             modifier = Modifier.fillMaxSize()
