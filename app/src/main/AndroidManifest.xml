@@ -17,9 +17,10 @@
         android:usesCleartextTraffic="true">
         <activity
             android:name="top.jlen.vod.ui.FullscreenPlayerActivity"
-            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize"
             android:exported="false"
             android:screenOrientation="fullSensor"
+            android:supportsPictureInPicture="true"
             android:windowLayoutInDisplayCutoutMode="shortEdges"
             android:theme="@style/Theme.JlenVideo"
             tools:ignore="DiscouragedApi,UnusedAttribute" />
@@ -27,6 +28,7 @@
             android:name=".MainActivity"
             android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize"
             android:exported="true"
+            android:supportsPictureInPicture="true"
             android:windowLayoutInDisplayCutoutMode="shortEdges"
             tools:ignore="UnusedAttribute">
             <intent-filter>

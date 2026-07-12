@@ -1,10 +1,13 @@
 ﻿package top.jlen.vod.ui
 
 import android.app.Activity
+import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.ContextWrapper
 import android.media.AudioManager
+import android.os.Build
 import android.provider.Settings
+import android.util.Rational
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.ViewGroup
@@ -41,6 +44,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -212,6 +216,22 @@ fun NativeVideoPlayer(
             snapshotCallbackForPlayback?.invoke(snapshot)
         }
         return snapshot
+    }
+
+    fun enterPictureInPicture() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val activity = hostActivity ?: return
+        controlsVisible = false
+        speedMenuExpanded = false
+        dispatchSnapshot(force = true)
+        val aspectRatio = if (lastReportedLandscape == false) Rational(9, 16) else Rational(16, 9)
+        runCatching {
+            activity.enterPictureInPictureMode(
+                PictureInPictureParams.Builder()
+                    .setAspectRatio(aspectRatio)
+                    .build()
+            )
+        }
     }
 
     fun markInteraction(forceControlsVisible: Boolean = fullscreenMode && !playerLocked) {
@@ -1160,6 +1180,29 @@ fun NativeVideoPlayer(
                         )
                         .size(48.dp)
                 )
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    IconButton(
+                        onClick = {
+                            markInteraction()
+                            enterPictureInPicture()
+                        },
+                        modifier = Modifier
+                            .align(if (fullscreenMode) Alignment.TopEnd else Alignment.TopStart)
+                            .padding(
+                                top = if (fullscreenMode) 16.dp else 8.dp,
+                                end = if (fullscreenMode) 64.dp else 0.dp,
+                                start = if (fullscreenMode) 0.dp else 8.dp
+                            )
+                            .size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.PictureInPictureAlt,
+                            contentDescription = "画中画",
+                            tint = Color.White
+                        )
+                    }
+                }
 
                 Column(
                     modifier = Modifier
