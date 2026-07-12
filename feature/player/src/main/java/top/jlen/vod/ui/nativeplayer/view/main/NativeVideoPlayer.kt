@@ -135,6 +135,7 @@ fun NativeVideoPlayer(
     var sliderDragStartPositionMs by remember(playbackIdentity) { mutableLongStateOf(0L) }
     var speed by remember(playbackIdentity) { mutableFloatStateOf(initialSnapshot.speed) }
     var speedMenuExpanded by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
+    var isCasting by remember(playbackIdentity) { mutableStateOf(false) }
     var shouldResumeOnStart by remember(playbackIdentity) { mutableStateOf(false) }
     var controlsVisible by remember(fullscreenMode, playbackIdentity) { mutableStateOf(true) }
     var controlsVersion by remember(fullscreenMode, playbackIdentity) { mutableLongStateOf(0L) }
@@ -466,7 +467,7 @@ fun NativeVideoPlayer(
                     }
 
                     Lifecycle.Event.ON_START -> {
-                        if (shouldResumeOnStart) {
+                        if (shouldResumeOnStart && !isCasting) {
                             player.play()
                             isPlaying = true
                             showPausedOverlay = false
@@ -539,6 +540,7 @@ fun NativeVideoPlayer(
         if (
             player != null &&
             initialSnapshot.playWhenReady &&
+            !isCasting &&
             !hasStartedPlaybackOnce &&
             playbackState != Player.STATE_ENDED
         ) {
@@ -1126,6 +1128,38 @@ fun NativeVideoPlayer(
                     }
                     }
                 }
+
+                CastPlaybackButton(
+                    url = url,
+                    title = title,
+                    subtitle = listOf(sourceName, episodeName)
+                        .filter(String::isNotBlank)
+                        .joinToString(" · "),
+                    positionMs = currentPosition,
+                    playWhenReady = isPlaying,
+                    onConnectionChanged = { connected ->
+                        isCasting = connected
+                        if (connected) {
+                            shouldResumeOnStart = false
+                        }
+                    },
+                    onCastPlaybackStarted = {
+                        player.pause()
+                        isPlaying = false
+                        isUserPaused = false
+                        showPausedOverlay = false
+                        shouldResumeOnStart = false
+                        dispatchSnapshot(force = true)
+                    },
+                    onInteraction = { markInteraction() },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(
+                            top = if (fullscreenMode) 16.dp else 8.dp,
+                            end = if (fullscreenMode) 16.dp else 8.dp
+                        )
+                        .size(48.dp)
+                )
 
                 Column(
                     modifier = Modifier
