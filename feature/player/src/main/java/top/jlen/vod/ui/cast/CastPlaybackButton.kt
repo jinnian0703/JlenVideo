@@ -45,10 +45,11 @@ internal fun CastPlaybackButton(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val castContext = remember(context) {
+    val preferSystemCast = remember { prefersSystemCast() }
+    val castContext = remember(context, preferSystemCast) {
         val playServicesAvailable = GoogleApiAvailability.getInstance()
             .isGooglePlayServicesAvailable(context.applicationContext) == ConnectionResult.SUCCESS
-        if (playServicesAvailable) {
+        if (!preferSystemCast && playServicesAvailable) {
             runCatching { CastContext.getSharedInstance(context.applicationContext) }.getOrNull()
         } else {
             null
@@ -173,14 +174,18 @@ internal fun CastPlaybackButton(
         IconButton(
             onClick = {
                 onInteraction()
+                if (preferSystemCast && launchSystemCast(context)) {
+                    return@IconButton
+                }
                 val button = routeButton
-                if (castContext == null || button == null) {
-                    Toast.makeText(context, "当前设备不支持投屏", Toast.LENGTH_SHORT).show()
+                val googleCastOpened = if (castContext != null && button != null) {
+                    runCatching { button.performClick() }.getOrDefault(false)
                 } else {
-                    val opened = runCatching { button.performClick() }.getOrDefault(false)
-                    if (!opened) {
-                        Toast.makeText(context, "无法打开投屏设备列表", Toast.LENGTH_SHORT).show()
-                    }
+                    false
+                }
+                val systemCastOpened = !googleCastOpened && launchSystemCast(context)
+                if (!googleCastOpened && !systemCastOpened) {
+                    Toast.makeText(context, "当前设备没有可用的投屏入口", Toast.LENGTH_SHORT).show()
                 }
             },
             modifier = Modifier.fillMaxSize()
@@ -191,7 +196,7 @@ internal fun CastPlaybackButton(
                 } else {
                     Icons.Rounded.Cast
                 },
-                contentDescription = "投屏",
+                contentDescription = if (preferSystemCast) "系统投屏" else "投屏",
                 tint = Color.White
             )
         }
