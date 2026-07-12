@@ -2,6 +2,7 @@ package top.jlen.vod
 
 import android.app.Activity
 import android.app.ActivityManager
+import android.annotation.TargetApi
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
@@ -10,8 +11,9 @@ import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.nio.charset.StandardCharsets
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.system.exitProcess
 
 data class IssueLogEntry(
@@ -171,8 +173,7 @@ object CrashLogger {
     }
 
     private fun beginSession(context: Context) {
-        val now = LocalDateTime.now()
-        currentSessionId = now.format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + "_${Process.myPid()}"
+        currentSessionId = formatTime(System.currentTimeMillis(), "yyyyMMdd_HHmmss") + "_${Process.myPid()}"
         val previous = readSession(context)
         if (previous["status"] == "foreground") {
             writeSuspiciousExitLog(context, previous)
@@ -274,6 +275,7 @@ object CrashLogger {
         writeIssueLog(context, EXIT_FILE_PREFIX, content)
     }
 
+    @TargetApi(Build.VERSION_CODES.R)
     private fun android.app.ApplicationExitInfo.isProblemExit(): Boolean = when (reason) {
         android.app.ApplicationExitInfo.REASON_ANR,
         android.app.ApplicationExitInfo.REASON_CRASH,
@@ -319,7 +321,7 @@ object CrashLogger {
 
     private fun writeIssueLog(context: Context, prefix: String, content: String) {
         val dir = crashDir(context).apply { mkdirs() }
-        val fileTimestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+        val fileTimestamp = formatTime(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
         latestCrashFile(context).writeText(content, StandardCharsets.UTF_8)
         File(dir, "$prefix$fileTimestamp.txt").writeText(content, StandardCharsets.UTF_8)
 
@@ -348,10 +350,7 @@ object CrashLogger {
             .orEmpty()
 
     private fun formatFileTime(file: File): String =
-        LocalDateTime.ofInstant(
-            java.time.Instant.ofEpochMilli(file.lastModified()),
-            java.time.ZoneId.systemDefault()
-        ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+        formatTime(file.lastModified(), "yyyy-MM-dd HH:mm:ss")
 
     private fun appendTrace(context: Context, message: String) {
         val line = "${displayNow()} ${sanitize(message)}"
@@ -446,7 +445,10 @@ object CrashLogger {
             .take(500)
 
     private fun displayNow(): String =
-        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+        formatTime(System.currentTimeMillis(), "yyyy-MM-dd HH:mm:ss")
+
+    private fun formatTime(timestamp: Long, pattern: String): String =
+        SimpleDateFormat(pattern, Locale.getDefault()).format(Date(timestamp))
 
     private fun latestCrashFile(context: Context): File = File(crashDir(context), LATEST_CRASH_FILE)
 

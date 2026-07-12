@@ -56,10 +56,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 import top.jlen.vod.data.MembershipInfo
@@ -901,41 +901,56 @@ private fun buildPointTrendPoints(
     days: Int
 ): List<PointTrendPoint> {
     if (days <= 0) return emptyList()
-    val today = LocalDate.now()
-    val startDate = today.minusDays((days - 1).toLong())
-    val pointsByDate = pointLogs.fold(linkedMapOf<LocalDate, Int>()) { acc, log ->
+    val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).apply { isLenient = false }
+    val labelFormatter = SimpleDateFormat("MM-dd", Locale.getDefault())
+    val startDate = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+        add(Calendar.DAY_OF_YEAR, -(days - 1))
+    }
+    val endDateMillis = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 23)
+        set(Calendar.MINUTE, 59)
+        set(Calendar.SECOND, 59)
+        set(Calendar.MILLISECOND, 999)
+    }.timeInMillis
+    val pointsByDate = pointLogs.fold(linkedMapOf<String, Int>()) { acc, log ->
         val date = parsePointLogDate(log)
         val delta = parsePointLogDelta(log)
-        if (date != null && !date.isBefore(startDate) && !date.isAfter(today) && delta != null) {
-            acc[date] = (acc[date] ?: 0) + delta
+        if (date != null && date.time >= startDate.timeInMillis && date.time <= endDateMillis && delta != null) {
+            val dateKey = dateFormatter.format(date)
+            acc[dateKey] = (acc[dateKey] ?: 0) + delta
         }
         acc
     }
-    val labelFormatter = DateTimeFormatter.ofPattern("MM-dd")
+    val currentDate = startDate.clone() as Calendar
     return (0 until days).map { offset ->
-        val date = startDate.plusDays(offset.toLong())
+        if (offset > 0) currentDate.add(Calendar.DAY_OF_YEAR, 1)
+        val date = currentDate.time
+        val dateKey = dateFormatter.format(date)
         PointTrendPoint(
-            date = date.toString(),
-            delta = pointsByDate[date] ?: 0,
-            label = date.format(labelFormatter)
+            date = dateKey,
+            delta = pointsByDate[dateKey] ?: 0,
+            label = labelFormatter.format(date)
         )
     }
 }
 
-private fun parsePointLogDate(log: PointLogItem): LocalDate? {
+private fun parsePointLogDate(log: PointLogItem): Date? {
     val candidates = listOf(log.timeText, log.time)
     val dateRegex = Regex("""\d{4}-\d{2}-\d{2}""")
+    val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).apply { isLenient = false }
     candidates.forEach { raw ->
         val text = raw.trim()
         if (text.isBlank()) return@forEach
         dateRegex.find(text)?.value?.let { value ->
-            return runCatching { LocalDate.parse(value) }.getOrNull()
+            return runCatching { dateFormatter.parse(value) }.getOrNull()
         }
         text.toLongOrNull()?.let { epoch ->
             val millis = if (text.length <= 10) epoch * 1000 else epoch
-            return runCatching {
-                Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
-            }.getOrNull()
+            return Date(millis)
         }
     }
     return null

@@ -181,6 +181,8 @@ fun NativeVideoPlayer(
     var pendingSingleTapJob by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Job?>(null) }
     var lastSimpleTapAt by remember(playbackIdentity, fullscreenMode) { mutableLongStateOf(0L) }
     var autoHideJob by remember(playbackIdentity, fullscreenMode) { mutableStateOf<Job?>(null) }
+    var pictureInPictureJob by remember(playbackIdentity) { mutableStateOf<Job?>(null) }
+    var restoreInlineAfterPictureInPicture by remember(playbackIdentity) { mutableStateOf(false) }
     var lockActionPressed by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
     val longPressTimeoutMs = remember { ViewConfiguration.getLongPressTimeout().toLong() }
     val doubleTapTimeoutMs = remember { ViewConfiguration.getDoubleTapTimeout().toLong() }
@@ -221,28 +223,38 @@ fun NativeVideoPlayer(
     fun enterPictureInPicture() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val activity = hostActivity ?: return
+        pictureInPictureJob?.cancel()
         controlsVisible = false
         speedMenuExpanded = false
         val snapshot = dispatchSnapshot(force = true)
 
-        fun enterSystemPictureInPicture() {
+        fun enterSystemPictureInPicture(): Boolean {
+            if (activity.isFinishing || activity.isDestroyed) return false
+            if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return false
             val aspectRatio = if (lastReportedLandscape == false) Rational(9, 16) else Rational(16, 9)
-            runCatching {
+            return runCatching {
                 activity.enterPictureInPictureMode(
                     PictureInPictureParams.Builder()
                         .setAspectRatio(aspectRatio)
                         .build()
                 )
-            }
+            }.getOrDefault(false)
         }
 
         if (fullscreenMode) {
-            enterSystemPictureInPicture()
+            if (!enterSystemPictureInPicture()) {
+                controlsVisible = true
+            }
         } else {
             latestFullscreenToggleCallback.value?.invoke(snapshot, lastReportedLandscape)
-            scope.launch {
+            pictureInPictureJob = scope.launch {
                 delay(500L)
-                enterSystemPictureInPicture()
+                val entered = enterSystemPictureInPicture()
+                restoreInlineAfterPictureInPicture = entered
+                if (!entered) {
+                    latestFullscreenToggleCallback.value?.invoke(snapshot, lastReportedLandscape)
+                }
+                pictureInPictureJob = null
             }
         }
     }
@@ -433,6 +445,7 @@ fun NativeVideoPlayer(
 
     DisposableEffect(player) {
         onDispose {
+            pictureInPictureJob?.cancel()
             pendingSingleTapJob?.cancel()
             unlockHintAutoHideJob?.cancel()
             dispatchSnapshot(force = true)
@@ -505,6 +518,20 @@ fun NativeVideoPlayer(
                             isPlaying = true
                             showPausedOverlay = false
                             isUserPaused = false
+                        }
+                    }
+
+                    Lifecycle.Event.ON_RESUME -> {
+                        if (
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                            restoreInlineAfterPictureInPicture &&
+                            hostActivity?.isInPictureInPictureMode == false
+                        ) {
+                            restoreInlineAfterPictureInPicture = false
+                            latestFullscreenToggleCallback.value?.invoke(
+                                dispatchSnapshot(force = true),
+                                lastReportedLandscape
+                            )
                         }
                     }
 
