@@ -223,14 +223,27 @@ fun NativeVideoPlayer(
         val activity = hostActivity ?: return
         controlsVisible = false
         speedMenuExpanded = false
-        dispatchSnapshot(force = true)
-        val aspectRatio = if (lastReportedLandscape == false) Rational(9, 16) else Rational(16, 9)
-        runCatching {
-            activity.enterPictureInPictureMode(
-                PictureInPictureParams.Builder()
-                    .setAspectRatio(aspectRatio)
-                    .build()
-            )
+        val snapshot = dispatchSnapshot(force = true)
+
+        fun enterSystemPictureInPicture() {
+            val aspectRatio = if (lastReportedLandscape == false) Rational(9, 16) else Rational(16, 9)
+            runCatching {
+                activity.enterPictureInPictureMode(
+                    PictureInPictureParams.Builder()
+                        .setAspectRatio(aspectRatio)
+                        .build()
+                )
+            }
+        }
+
+        if (fullscreenMode) {
+            enterSystemPictureInPicture()
+        } else {
+            latestFullscreenToggleCallback.value?.invoke(snapshot, lastReportedLandscape)
+            scope.launch {
+                delay(500L)
+                enterSystemPictureInPicture()
+            }
         }
     }
 
