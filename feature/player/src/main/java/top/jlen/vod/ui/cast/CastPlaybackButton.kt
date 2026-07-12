@@ -29,6 +29,8 @@ import com.google.android.gms.cast.framework.CastButtonFactory
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.SessionManagerListener
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
 
 @Composable
 internal fun CastPlaybackButton(
@@ -44,11 +46,19 @@ internal fun CastPlaybackButton(
 ) {
     val context = LocalContext.current
     val castContext = remember(context) {
-        runCatching { CastContext.getSharedInstance(context.applicationContext) }.getOrNull()
+        val playServicesAvailable = GoogleApiAvailability.getInstance()
+            .isGooglePlayServicesAvailable(context.applicationContext) == ConnectionResult.SUCCESS
+        if (playServicesAvailable) {
+            runCatching { CastContext.getSharedInstance(context.applicationContext) }.getOrNull()
+        } else {
+            null
+        }
     }
     var routeButton by remember { mutableStateOf<MediaRouteButton?>(null) }
     var castSession by remember(castContext) {
-        mutableStateOf(castContext?.sessionManager?.currentCastSession)
+        mutableStateOf(
+            runCatching { castContext?.sessionManager?.currentCastSession }.getOrNull()
+        )
     }
     val latestPosition by rememberUpdatedState(positionMs.coerceAtLeast(0L))
     val latestPlayWhenReady by rememberUpdatedState(playWhenReady)
@@ -56,8 +66,10 @@ internal fun CastPlaybackButton(
     val latestPlaybackStartedCallback by rememberUpdatedState(onCastPlaybackStarted)
 
     DisposableEffect(castContext) {
-        val sessionManager = castContext?.sessionManager
+        val sessionManager = runCatching { castContext?.sessionManager }.getOrNull()
         if (sessionManager == null) {
+            castSession = null
+            latestConnectionCallback(false)
             onDispose { }
         } else {
             val listener = object : SessionManagerListener<CastSession> {
@@ -97,12 +109,23 @@ internal fun CastPlaybackButton(
                     latestConnectionCallback(true)
                 }
             }
-            sessionManager.addSessionManagerListener(listener, CastSession::class.java)
-            val currentSession = sessionManager.currentCastSession
-            castSession = currentSession
-            latestConnectionCallback(currentSession?.isConnected == true)
+            val listenerRegistered = runCatching {
+                sessionManager.addSessionManagerListener(listener, CastSession::class.java)
+            }.isSuccess
+            if (listenerRegistered) {
+                val currentSession = runCatching { sessionManager.currentCastSession }.getOrNull()
+                castSession = currentSession
+                latestConnectionCallback(currentSession?.isConnected == true)
+            } else {
+                castSession = null
+                latestConnectionCallback(false)
+            }
             onDispose {
-                sessionManager.removeSessionManagerListener(listener, CastSession::class.java)
+                if (listenerRegistered) {
+                    runCatching {
+                        sessionManager.removeSessionManagerListener(listener, CastSession::class.java)
+                    }
+                }
             }
         }
     }
@@ -122,18 +145,31 @@ internal fun CastPlaybackButton(
     }
 
     Box(modifier = modifier) {
-        AndroidView(
-            factory = { viewContext ->
-                MediaRouteButton(viewContext).also { button ->
-                    CastButtonFactory.setUpMediaRouteButton(viewContext, button)
-                    routeButton = button
+        if (castContext != null) {
+            AndroidView(
+                factory = { viewContext ->
+                    MediaRouteButton(viewContext).also { button ->
+                        routeButton = if (
+                            runCatching {
+                                CastButtonFactory.setUpMediaRouteButton(viewContext, button)
+                            }.isSuccess
+                        ) {
+                            button
+                        } else {
+                            null
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(0f),
+                update = { button ->
+                    if (routeButton != null) {
+                        routeButton = button
+                    }
                 }
-            },
-            modifier = Modifier
-                .fillMaxSize()
-                .alpha(0f),
-            update = { routeButton = it }
-        )
+            )
+        }
         IconButton(
             onClick = {
                 onInteraction()
@@ -168,28 +204,30 @@ private fun loadCastMedia(
     playWhenReady: Boolean,
     onSuccess: () -> Unit
 ) {
-    val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
-        putString(MediaMetadata.KEY_TITLE, title.ifBlank { "JlenVideo" })
-        subtitle.takeIf(String::isNotBlank)?.let { putString(MediaMetadata.KEY_SUBTITLE, it) }
-    }
-    val mediaInfo = MediaInfo.Builder(url)
-        .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-        .setContentType(castContentType(url))
-        .setMetadata(metadata)
-        .build()
-    val request = MediaLoadRequestData.Builder()
-        .setMediaInfo(mediaInfo)
-        .setAutoplay(playWhenReady)
-        .setCurrentTime(positionMs.coerceAtLeast(0L))
-        .build()
-
-    session.remoteMediaClient
-        ?.load(request)
-        ?.setResultCallback { result ->
-            if (result.status.isSuccess) {
-                onSuccess()
-            }
+    runCatching {
+        val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
+            putString(MediaMetadata.KEY_TITLE, title.ifBlank { "JlenVideo" })
+            subtitle.takeIf(String::isNotBlank)?.let { putString(MediaMetadata.KEY_SUBTITLE, it) }
         }
+        val mediaInfo = MediaInfo.Builder(url)
+            .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+            .setContentType(castContentType(url))
+            .setMetadata(metadata)
+            .build()
+        val request = MediaLoadRequestData.Builder()
+            .setMediaInfo(mediaInfo)
+            .setAutoplay(playWhenReady)
+            .setCurrentTime(positionMs.coerceAtLeast(0L))
+            .build()
+
+        session.remoteMediaClient
+            ?.load(request)
+            ?.setResultCallback { result ->
+                if (result.status.isSuccess) {
+                    onSuccess()
+                }
+            }
+    }
 }
 
 private fun castContentType(url: String): String {
