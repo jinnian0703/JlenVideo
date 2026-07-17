@@ -23,6 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,6 +37,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -80,6 +86,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.IntSize
@@ -118,12 +125,14 @@ fun NativeVideoPlayer(
     onClose: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val hostActivity = remember(context) { context.findActivity() }
     val audioManager = remember(context) { context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager }
     val playbackIdentity = remember(url, episodeName) { "$url|$episodeName" }
+    val isPortraitWindow = configuration.screenHeightDp > configuration.screenWidthDp
     val player = remember(playbackIdentity) {
         runCatching { createNativePlayer(context, url, initialSnapshot) }.getOrNull()
     }
@@ -146,9 +155,9 @@ fun NativeVideoPlayer(
     var hasHandledEnded by remember(playbackIdentity) { mutableStateOf(false) }
     var playbackState by remember(player) { mutableStateOf(player?.playbackState ?: Player.STATE_IDLE) }
     var lastReportedLandscape by remember(playbackIdentity) { mutableStateOf<Boolean?>(null) }
-    var fullscreenResizeMode by remember(playbackIdentity) {
+    var fullscreenResizeMode by remember(playbackIdentity, fullscreenMode, isPortraitWindow) {
         mutableIntStateOf(
-            if (fullscreenMode) {
+            if (fullscreenMode && !isPortraitWindow) {
                 AspectRatioFrameLayout.RESIZE_MODE_ZOOM
             } else {
                 AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -703,7 +712,7 @@ fun NativeVideoPlayer(
             containerColor = if (fullscreenMode) Color.Black else UiPalette.BackgroundBottom
         )
     ) {
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .then(
@@ -713,6 +722,9 @@ fun NativeVideoPlayer(
                 .background(if (fullscreenMode) Color.Black else UiPalette.BackgroundBottom)
                 .onSizeChanged { contentSize = it }
         ) {
+            val useStackedFullscreenControls = fullscreenMode && (
+                maxHeight > maxWidth || maxWidth < 560.dp
+            )
             key(playbackIdentity) {
                 AndroidView(
                     factory = { viewContext ->
@@ -1009,6 +1021,9 @@ fun NativeVideoPlayer(
                     IconButton(
                         modifier = Modifier
                             .align(Alignment.CenterStart)
+                            .windowInsetsPadding(
+                                WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
+                            )
                             .padding(start = 18.dp)
                             .size(52.dp),
                         onClick = { setPlayerLocked(!playerLocked) }
@@ -1023,6 +1038,9 @@ fun NativeVideoPlayer(
                     IconButton(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
+                            .windowInsetsPadding(
+                                WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
+                            )
                             .padding(end = 18.dp)
                             .size(52.dp),
                         onClick = { setPlayerLocked(!playerLocked) }
@@ -1061,131 +1079,93 @@ fun NativeVideoPlayer(
                     style = if (fullscreenMode) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelSmall,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = if (fullscreenMode) 60.dp else 24.dp)
+                        .then(
+                            if (fullscreenMode) {
+                                Modifier.windowInsetsPadding(
+                                    WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
+                                )
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .padding(
+                            top = when {
+                                !fullscreenMode -> 24.dp
+                                useStackedFullscreenControls -> 112.dp
+                                else -> 60.dp
+                            }
+                        )
                         .background(Color.Black.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
                         .padding(horizontal = if (fullscreenMode) 12.dp else 10.dp, vertical = if (fullscreenMode) 6.dp else 4.dp)
                 )
 
                 if (fullscreenMode) {
                     Column(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = 16.dp, top = 16.dp, end = 16.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .fillMaxWidth()
+                            .windowInsetsPadding(
+                                WindowInsets.safeDrawing.only(
+                                    WindowInsetsSides.Horizontal + WindowInsetsSides.Top
+                                )
+                            )
+                            .padding(start = 16.dp, top = 16.dp, end = 136.dp)
                     ) {
-                        if (onClose != null) {
-                            IconButton(
-                                onClick = {
-                                    dispatchSnapshot(force = true)
-                                    onClose()
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (onClose != null) {
+                                IconButton(
+                                    onClick = {
+                                        dispatchSnapshot(force = true)
+                                        onClose()
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Close,
+                                        contentDescription = "退出全屏",
+                                        tint = Color.White
+                                    )
                                 }
+                            }
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Close,
-                                    contentDescription = null,
-                                    tint = Color.White
-                                )
-                            }
-                        }
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            if (fullscreenMode) {
                                 Text(
-                                text = title.ifBlank { "视频播放" },
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White
+                                    text = title.ifBlank { "视频播放" },
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                            }
-                            Text(
-                                text = buildString {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     if (sourceName.isNotBlank()) {
-                                        append(sourceName)
+                                        Text(
+                                            text = sourceName,
+                                            color = Color.White.copy(alpha = 0.92f),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                     }
                                     if (episodeName.isNotBlank()) {
-                                        if (isNotEmpty()) append(" · ")
-                                        append(episodeName)
+                                        Text(
+                                            text = episodeName,
+                                            color = Color.White.copy(alpha = 0.92f),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                     }
-                                    if (isNotEmpty()) append("\n")
-                                    append("${formatMillis(currentPosition)} / ${formatMillis(duration)}")
-                                },
-                                color = Color.Transparent,
-                                modifier = Modifier.height(0.dp)
-                            )
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (sourceName.isNotBlank()) {
-                                    Text(
-                                        text = sourceName,
-                                        color = Color.White.copy(alpha = 0.92f),
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
                                 }
-                                if (episodeName.isNotBlank()) {
-                                    Text(
-                                        text = episodeName,
-                                        color = Color.White.copy(alpha = 0.92f),
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-                                }
-                            }
-                            if (false) {
-                                Text(
-                                    text = "全屏",
-                                    color = Color.White,
-                                    style = controlPillTextStyle,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(999.dp))
-                                        .background(Color.Black.copy(alpha = 0.28f))
-                                        .border(
-                                            width = 1.dp,
-                                            color = Color.White.copy(alpha = 0.14f),
-                                            shape = RoundedCornerShape(999.dp)
-                                        )
-                                        .clickableWithoutRipple {
-                                            val snapshot = dispatchSnapshot(force = true)
-                                            latestFullscreenToggleCallback.value?.invoke(snapshot, lastReportedLandscape)
-                                            controlsVersion++
-                                        }
-                                        .width(controlChipWidth)
-                                        .height(controlChipHeight)
-                                )
-                            }
-                            if (false && !fullscreenMode && onToggleFullscreen != null) {
-                                Text(
-                                    text = "全屏",
-                                    color = Color.White,
-                                    style = controlPillTextStyle,
-                                    fontWeight = FontWeight.Medium,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(999.dp))
-                                        .background(Color.Black.copy(alpha = 0.28f))
-                                        .border(
-                                            width = 1.dp,
-                                            color = Color.White.copy(alpha = 0.14f),
-                                            shape = RoundedCornerShape(999.dp)
-                                        )
-                                        .clickableWithoutRipple {
-                                            val snapshot = dispatchSnapshot(force = true)
-                                            latestFullscreenToggleCallback.value?.invoke(snapshot, lastReportedLandscape)
-                                            controlsVersion++
-                                        }
-                                        .width(controlChipWidth)
-                                        .height(controlChipHeight)
-                                )
                             }
                         }
-                    }
                     }
                 }
 
@@ -1214,6 +1194,17 @@ fun NativeVideoPlayer(
                     onInteraction = { markInteraction() },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
+                        .then(
+                            if (fullscreenMode) {
+                                Modifier.windowInsetsPadding(
+                                    WindowInsets.safeDrawing.only(
+                                        WindowInsetsSides.Horizontal + WindowInsetsSides.Top
+                                    )
+                                )
+                            } else {
+                                Modifier
+                            }
+                        )
                         .padding(
                             top = if (fullscreenMode) 16.dp else 8.dp,
                             end = if (fullscreenMode) 16.dp else 8.dp
@@ -1229,6 +1220,17 @@ fun NativeVideoPlayer(
                         },
                         modifier = Modifier
                             .align(if (fullscreenMode) Alignment.TopEnd else Alignment.TopStart)
+                            .then(
+                                if (fullscreenMode) {
+                                    Modifier.windowInsetsPadding(
+                                        WindowInsets.safeDrawing.only(
+                                            WindowInsetsSides.Horizontal + WindowInsetsSides.Top
+                                        )
+                                    )
+                                } else {
+                                    Modifier
+                                }
+                            )
                             .padding(
                                 top = if (fullscreenMode) 16.dp else 8.dp,
                                 end = if (fullscreenMode) 64.dp else 0.dp,
@@ -1248,6 +1250,17 @@ fun NativeVideoPlayer(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
+                        .then(
+                            if (fullscreenMode) {
+                                Modifier.windowInsetsPadding(
+                                    WindowInsets.safeDrawing.only(
+                                        WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
+                                    )
+                                )
+                            } else {
+                                Modifier
+                            }
+                        )
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Spacer(modifier = Modifier.height(4.dp))
@@ -1292,11 +1305,7 @@ fun NativeVideoPlayer(
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    val playbackStatusControls: @Composable () -> Unit = {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -1313,18 +1322,24 @@ fun NativeVideoPlayer(
                             ) {
                                 Icon(
                                     imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                    contentDescription = null,
+                                    contentDescription = if (isPlaying) "暂停" else "播放",
                                     tint = Color.White
                                 )
                             }
                             Text(
                                 text = "${formatMillis(currentPosition)}/${formatMillis(duration)}",
                                 color = Color.White,
-                                style = if (fullscreenMode) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodySmall,
+                                style = if (fullscreenMode) {
+                                    MaterialTheme.typography.bodyLarge
+                                } else {
+                                    MaterialTheme.typography.bodySmall
+                                },
                                 maxLines = 1,
                                 overflow = TextOverflow.Clip
                             )
                         }
+                    }
+                    val playbackActionControls: @Composable () -> Unit = {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1340,8 +1355,6 @@ fun NativeVideoPlayer(
                                         markInteraction()
                                     }
                                 )
-                            }
-                            if (fullscreenMode) {
                                 ControlChip(
                                     text = speedLabel(speed),
                                     width = controlChipWidth,
@@ -1365,32 +1378,6 @@ fun NativeVideoPlayer(
                                     }
                                 )
                             }
-                            if (false && hasNextEpisode && onNextEpisode != null) {
-                                Text(
-                                    text = "下一集",
-                                    color = Color.White,
-                                    style = controlPillTextStyle,
-                                    fontWeight = FontWeight.Medium,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(999.dp))
-                                        .background(Color.Black.copy(alpha = 0.28f))
-                                        .border(
-                                            width = 1.dp,
-                                            color = Color.White.copy(alpha = 0.14f),
-                                            shape = RoundedCornerShape(999.dp)
-                                        )
-                                        .width(controlChipWidth)
-                                        .height(controlChipHeight)
-                                        .wrapContentHeight(Alignment.CenterVertically)
-                                        .clickableWithoutRipple {
-                                            controlsVersion++
-                                            onNextEpisode()
-                                        }
-                                )
-                            }
                             if (!fullscreenMode && onToggleFullscreen != null) {
                                 IconControlChip(
                                     icon = Icons.Rounded.Fullscreen,
@@ -1404,33 +1391,31 @@ fun NativeVideoPlayer(
                                     }
                                 )
                             }
-                            if (false && !fullscreenMode && onToggleFullscreen != null) {
-                                Text(
-                                    text = "全屏",
-                                    color = Color.White,
-                                    style = controlPillTextStyle,
-                                    fontWeight = FontWeight.Medium,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(999.dp))
-                                        .background(Color.Black.copy(alpha = 0.28f))
-                                        .border(
-                                            width = 1.dp,
-                                            color = Color.White.copy(alpha = 0.14f),
-                                            shape = RoundedCornerShape(999.dp)
-                                        )
-                                        .width(controlChipWidth)
-                                        .height(controlChipHeight)
-                                        .wrapContentHeight(Alignment.CenterVertically)
-                                        .clickableWithoutRipple {
-                                            val snapshot = dispatchSnapshot(force = true)
-                                            latestFullscreenToggleCallback.value?.invoke(snapshot, lastReportedLandscape)
-                                            controlsVersion++
-                                        }
-                                )
-                            }
+                        }
+                    }
+
+                    if (useStackedFullscreenControls) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            playbackStatusControls()
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            playbackActionControls()
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            playbackStatusControls()
+                            playbackActionControls()
                         }
                     }
                 }
@@ -1450,7 +1435,11 @@ fun NativeVideoPlayer(
                         speedMenuExpanded = false
                         markInteraction()
                     },
-                    modifier = Modifier.align(Alignment.CenterEnd)
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
+                        )
                 )
             }
         }

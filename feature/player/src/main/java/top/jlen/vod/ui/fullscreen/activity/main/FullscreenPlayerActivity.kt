@@ -3,6 +3,7 @@ package top.jlen.vod.ui
 import android.content.pm.ActivityInfo
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
@@ -40,10 +41,9 @@ class FullscreenPlayerActivity : AppCompatActivity() {
     private var currentEpisodeName by mutableStateOf("")
     private var episodeNames: List<String> = emptyList()
     private var episodePageUrls: List<String> = emptyList()
-    private var lastAppliedOrientation: Int? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        intent.initialVideoOrientation()?.let(::applyInitialOrientation)
+        requestedOrientation = resolveFullscreenOrientation(resources.configuration)
         super.onCreate(savedInstanceState)
         configureImmersiveWindow()
 
@@ -60,8 +60,6 @@ class FullscreenPlayerActivity : AppCompatActivity() {
             speed = intent.getFloatExtra(EXTRA_SPEED, 1f),
             playWhenReady = intent.getBooleanExtra(EXTRA_PLAY_WHEN_READY, true)
         )
-        intent.initialVideoOrientation()?.let(::applyVideoOrientation)
-
         setContent {
             Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -79,7 +77,6 @@ class FullscreenPlayerActivity : AppCompatActivity() {
                     episodeName = selectedEpisodeName,
                     hasNextEpisode = hasNextEpisode,
                     initialSnapshot = latestSnapshot,
-                    onVideoOrientationDetected = ::applyVideoOrientation,
                     onPlaybackSnapshotChanged = { latestSnapshot = it },
                     onNextEpisode = { openEpisode(selectedIndex + 1, autoPlay = true) },
                     onClose = ::finish
@@ -94,6 +91,11 @@ class FullscreenPlayerActivity : AppCompatActivity() {
         if (hasFocus) {
             hideSystemBars()
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        requestedOrientation = resolveFullscreenOrientation(newConfig)
     }
 
     private fun openEpisode(index: Int, autoPlay: Boolean) {
@@ -130,7 +132,6 @@ class FullscreenPlayerActivity : AppCompatActivity() {
 
     private fun configureImmersiveWindow() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
         allowDisplayCutout()
@@ -163,26 +164,12 @@ class FullscreenPlayerActivity : AppCompatActivity() {
         window.attributes = attributes
     }
 
-    private fun applyInitialOrientation(isLandscapeVideo: Boolean) {
-        val targetOrientation = resolveVideoOrientation(isLandscapeVideo)
-        lastAppliedOrientation = targetOrientation
-        requestedOrientation = targetOrientation
-    }
 
-    private fun applyVideoOrientation(isLandscapeVideo: Boolean) {
-        val targetOrientation = resolveVideoOrientation(isLandscapeVideo)
-        if (lastAppliedOrientation == targetOrientation && requestedOrientation == targetOrientation) {
-            return
-        }
-        lastAppliedOrientation = targetOrientation
-        requestedOrientation = targetOrientation
-    }
-
-    private fun resolveVideoOrientation(isLandscapeVideo: Boolean): Int =
-        if (isLandscapeVideo) {
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+    private fun resolveFullscreenOrientation(configuration: Configuration): Int =
+        if (minOf(configuration.screenWidthDp, configuration.screenHeightDp) >= EXPANDED_WINDOW_MIN_DP) {
+            ActivityInfo.SCREEN_ORIENTATION_FULL_USER
         } else {
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         }
 
     override fun finish() {
@@ -212,6 +199,7 @@ class FullscreenPlayerActivity : AppCompatActivity() {
         private const val EXTRA_PLAY_WHEN_READY = "extra_play_when_ready"
         private const val EXTRA_HAS_INITIAL_ORIENTATION = "extra_has_initial_orientation"
         private const val EXTRA_IS_LANDSCAPE_VIDEO = "extra_is_landscape_video"
+        private const val EXPANDED_WINDOW_MIN_DP = 600
 
         fun createIntent(
             context: Context,
@@ -254,13 +242,6 @@ class FullscreenPlayerActivity : AppCompatActivity() {
     }
 }
 
-private fun Intent.initialVideoOrientation(): Boolean? =
-    if (getBooleanExtra("extra_has_initial_orientation", false)) {
-        getBooleanExtra("extra_is_landscape_video", true)
-    } else {
-        null
-    }
-
 @Composable
 private fun FullscreenPlayerContent(
     url: String,
@@ -269,7 +250,6 @@ private fun FullscreenPlayerContent(
     episodeName: String,
     hasNextEpisode: Boolean,
     initialSnapshot: PlaybackSnapshot,
-    onVideoOrientationDetected: (Boolean) -> Unit,
     onPlaybackSnapshotChanged: (PlaybackSnapshot) -> Unit,
     onNextEpisode: () -> Unit,
     onClose: () -> Unit
@@ -291,7 +271,6 @@ private fun FullscreenPlayerContent(
                 onNextEpisode = onNextEpisode,
                 onToggleFullscreen = null,
                 fullscreenMode = true,
-                onVideoOrientationDetected = onVideoOrientationDetected,
                 initialSnapshot = initialSnapshot,
                 onPlaybackSnapshotChanged = onPlaybackSnapshotChanged,
                 onPlaybackEnded = {

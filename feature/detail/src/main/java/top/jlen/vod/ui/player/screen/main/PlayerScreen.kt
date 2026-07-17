@@ -58,6 +58,7 @@ import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,6 +67,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,6 +80,7 @@ import kotlinx.coroutines.delay
 import top.jlen.vod.data.Episode
 import top.jlen.vod.data.VodItem
 
+private const val EXPANDED_PLAYBACK_WINDOW_MIN_DP = 600
 
 @Composable
 fun PlayerScreen(
@@ -93,14 +96,16 @@ fun PlayerScreen(
 ) {
     val isDarkTheme = isSystemInDarkTheme()
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
     val activity = remember(context) { context.findActivity() }
+    val isExpandedPlaybackWindow = minOf(
+        configuration.screenWidthDp,
+        configuration.screenHeightDp
+    ) >= EXPANDED_PLAYBACK_WINDOW_MIN_DP
     val playUrl = state.playUrl
     val resolveError = state.resolveError
     val directPlayable = playUrl.isNotBlank() && isDirectVideoUrl(playUrl)
-    var detectedLandscapeVideo by remember {
-        mutableStateOf<Boolean?>(null)
-    }
-    var isFullscreen by remember {
+    var isFullscreen by rememberSaveable {
         mutableStateOf(false)
     }
     var fullscreenTransitionLabel by remember {
@@ -119,9 +124,8 @@ fun PlayerScreen(
         onPlaybackSnapshotChange(snapshot)
     }
 
-    fun setFullscreen(fullscreen: Boolean, snapshot: PlaybackSnapshot? = null, isLandscapeVideo: Boolean? = null) {
+    fun setFullscreen(fullscreen: Boolean, snapshot: PlaybackSnapshot? = null) {
         snapshot?.let(::handleSnapshotChange)
-        detectedLandscapeVideo = isLandscapeVideo ?: detectedLandscapeVideo
         isFullscreen = fullscreen
     }
 
@@ -131,7 +135,7 @@ fun PlayerScreen(
     }
 
     BackHandler(enabled = isFullscreen) {
-        setFullscreen(false, latestSnapshot, detectedLandscapeVideo)
+        setFullscreen(false, latestSnapshot)
     }
 
     LaunchedEffect(isFullscreen, state.selectedEpisodeIndex, state.episodeName, state.sourceName) {
@@ -181,12 +185,13 @@ fun PlayerScreen(
         }
     }
 
-    DisposableEffect(activity, isFullscreen) {
+    DisposableEffect(activity, isFullscreen, isExpandedPlaybackWindow) {
         if (activity == null) {
             onDispose { }
         } else {
             val window = activity.window
             val controller = WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+            val originalRequestedOrientation = activity.requestedOrientation
             val originalCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 window.attributes.layoutInDisplayCutoutMode
             } else {
@@ -195,7 +200,6 @@ fun PlayerScreen(
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             if (isFullscreen) {
                 WindowCompat.setDecorFitsSystemWindows(window, false)
-                window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     val attributes = window.attributes
                     attributes.layoutInDisplayCutoutMode =
@@ -205,9 +209,12 @@ fun PlayerScreen(
                 controller.hide(WindowInsetsCompat.Type.systemBars())
                 controller.systemBarsBehavior =
                     WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                activity.requestedOrientation = if (isExpandedPlaybackWindow) {
+                    ActivityInfo.SCREEN_ORIENTATION_FULL_USER
+                } else {
+                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                }
             } else {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && originalCutoutMode != null) {
                     val attributes = window.attributes
                     attributes.layoutInDisplayCutoutMode = originalCutoutMode
@@ -216,12 +223,10 @@ fun PlayerScreen(
                 controller.show(WindowInsetsCompat.Type.systemBars())
                 controller.isAppearanceLightStatusBars = !isDarkTheme
                 controller.isAppearanceLightNavigationBars = !isDarkTheme
-                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
             onDispose {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 if (isFullscreen) {
-                    window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && originalCutoutMode != null) {
                         val attributes = window.attributes
                         attributes.layoutInDisplayCutoutMode = originalCutoutMode
@@ -230,7 +235,7 @@ fun PlayerScreen(
                     controller.show(WindowInsetsCompat.Type.systemBars())
                     controller.isAppearanceLightStatusBars = !isDarkTheme
                     controller.isAppearanceLightNavigationBars = !isDarkTheme
-                    activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    activity.requestedOrientation = originalRequestedOrientation
                 }
             }
         }
@@ -251,11 +256,10 @@ fun PlayerScreen(
                 episodeName = state.episodeName,
                 hasNextEpisode = state.hasNextEpisode,
                 onNextEpisode = onPlayNext,
-                onToggleFullscreen = { snapshot, isLandscapeVideo ->
-                    setFullscreen(!fullscreen, snapshot, isLandscapeVideo)
+                onToggleFullscreen = { snapshot, _ ->
+                    setFullscreen(!fullscreen, snapshot)
                 },
                 fullscreenMode = fullscreen,
-                onVideoOrientationDetected = { detectedLandscapeVideo = it },
                 initialSnapshot = state.playbackSnapshot,
                 onPlaybackSnapshotChanged = ::handleSnapshotChange,
                 onPlaybackEnded = {
@@ -264,7 +268,7 @@ fun PlayerScreen(
                     }
                 },
                 onClose = if (fullscreen) {
-                    { setFullscreen(false, latestSnapshot, detectedLandscapeVideo) }
+                    { setFullscreen(false, latestSnapshot) }
                 } else {
                     null
                 }

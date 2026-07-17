@@ -19,7 +19,7 @@
             android:name="top.jlen.vod.ui.FullscreenPlayerActivity"
             android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize"
             android:exported="false"
-            android:screenOrientation="fullSensor"
+            android:screenOrientation="unspecified"
             android:supportsPictureInPicture="true"
             android:windowLayoutInDisplayCutoutMode="shortEdges"
             android:theme="@style/Theme.JlenVideo"
