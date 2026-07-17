@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.view.WindowManager
@@ -55,6 +56,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.movableContentOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -108,6 +110,12 @@ fun PlayerScreen(
     var isFullscreen by rememberSaveable {
         mutableStateOf(false)
     }
+    var orientationBeforeFullscreen by rememberSaveable {
+        mutableIntStateOf(Configuration.ORIENTATION_UNDEFINED)
+    }
+    var hasExitedFullscreen by rememberSaveable {
+        mutableStateOf(false)
+    }
     var fullscreenTransitionLabel by remember {
         mutableStateOf("")
     }
@@ -126,6 +134,12 @@ fun PlayerScreen(
 
     fun setFullscreen(fullscreen: Boolean, snapshot: PlaybackSnapshot? = null) {
         snapshot?.let(::handleSnapshotChange)
+        if (fullscreen && !isFullscreen) {
+            orientationBeforeFullscreen = configuration.orientation
+            hasExitedFullscreen = false
+        } else if (!fullscreen && isFullscreen) {
+            hasExitedFullscreen = true
+        }
         isFullscreen = fullscreen
     }
 
@@ -185,13 +199,25 @@ fun PlayerScreen(
         }
     }
 
-    DisposableEffect(activity, isFullscreen, isExpandedPlaybackWindow) {
+    val orientationAfterFullscreen = when {
+        isExpandedPlaybackWindow -> ActivityInfo.SCREEN_ORIENTATION_FULL_USER
+        orientationBeforeFullscreen == Configuration.ORIENTATION_LANDSCAPE ->
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        else -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+    }
+
+    DisposableEffect(
+        activity,
+        isFullscreen,
+        isExpandedPlaybackWindow,
+        hasExitedFullscreen,
+        orientationAfterFullscreen
+    ) {
         if (activity == null) {
             onDispose { }
         } else {
             val window = activity.window
             val controller = WindowInsetsControllerCompat(activity.window, activity.window.decorView)
-            val originalRequestedOrientation = activity.requestedOrientation
             val originalCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 window.attributes.layoutInDisplayCutoutMode
             } else {
@@ -223,6 +249,9 @@ fun PlayerScreen(
                 controller.show(WindowInsetsCompat.Type.systemBars())
                 controller.isAppearanceLightStatusBars = !isDarkTheme
                 controller.isAppearanceLightNavigationBars = !isDarkTheme
+                if (hasExitedFullscreen) {
+                    activity.requestedOrientation = orientationAfterFullscreen
+                }
             }
             onDispose {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -235,7 +264,7 @@ fun PlayerScreen(
                     controller.show(WindowInsetsCompat.Type.systemBars())
                     controller.isAppearanceLightStatusBars = !isDarkTheme
                     controller.isAppearanceLightNavigationBars = !isDarkTheme
-                    activity.requestedOrientation = originalRequestedOrientation
+                    activity.requestedOrientation = orientationAfterFullscreen
                 }
             }
         }
