@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- DLNA 投屏：SSDP 组播搜索局域网设备 -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+
+    <!-- 无线显示器（Miracast）：跳转系统屏幕镜像页面 -->
     <queries>
         <package android:name="com.oplus.cast" />
-        <intent>
-            <action android:name="oplus.intent.action.cast.device.display" />
-        </intent>
         <intent>
             <action android:name="android.settings.CAST_SETTINGS" />
         </intent>
@@ -13,11 +15,5 @@
             <action android:name="android.settings.WIFI_DISPLAY_SETTINGS" />
         </intent>
     </queries>
-
-    <application>
-        <meta-data
-            android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
-            android:value="top.jlen.vod.ui.JlenCastOptionsProvider" />
-    </application>
 
 </manifest>

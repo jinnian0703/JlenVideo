@@ -1,36 +1,71 @@
 package top.jlen.vod.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.hardware.display.DisplayManager
+import android.provider.Settings
+import android.view.Display
 import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cast
 import androidx.compose.material.icons.rounded.CastConnected
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.DesktopWindows
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Tv
+import androidx.compose.material.icons.rounded.WifiFind
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.mediarouter.app.MediaRouteButton
-import com.google.android.gms.cast.MediaInfo
-import com.google.android.gms.cast.MediaLoadRequestData
-import com.google.android.gms.cast.MediaMetadata
-import com.google.android.gms.cast.framework.CastButtonFactory
-import com.google.android.gms.cast.framework.CastContext
-import com.google.android.gms.cast.framework.CastSession
-import com.google.android.gms.cast.framework.SessionManagerListener
-import com.google.android.gms.common.ConnectionResult
-import com.google.android.gms.common.GoogleApiAvailability
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import java.net.URL
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun CastPlaybackButton(
@@ -45,204 +80,506 @@ internal fun CastPlaybackButton(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val preferSystemCast = remember { prefersSystemCast() }
-    val castContext = remember(context, preferSystemCast) {
-        val playServicesAvailable = GoogleApiAvailability.getInstance()
-            .isGooglePlayServicesAvailable(context.applicationContext) == ConnectionResult.SUCCESS
-        if (!preferSystemCast && playServicesAvailable) {
-            runCatching { CastContext.getSharedInstance(context.applicationContext) }.getOrNull()
-        } else {
-            null
-        }
-    }
-    var routeButton by remember { mutableStateOf<MediaRouteButton?>(null) }
-    var castSession by remember(castContext) {
-        mutableStateOf(
-            runCatching { castContext?.sessionManager?.currentCastSession }.getOrNull()
-        )
-    }
+    val scope = rememberCoroutineScope()
+    var dialogVisible by remember { mutableStateOf(false) }
+    var searching by remember { mutableStateOf(false) }
+    var searchVersion by remember { mutableIntStateOf(0) }
+    var devices by remember { mutableStateOf<List<DlnaDevice>>(emptyList()) }
+    var connectingDevice by remember { mutableStateOf<DlnaDevice?>(null) }
+    var connectedDevice by remember { mutableStateOf<DlnaDevice?>(null) }
+    val wirelessDisplayName = rememberWirelessDisplayName(context)
     val latestPosition by rememberUpdatedState(positionMs.coerceAtLeast(0L))
-    val latestPlayWhenReady by rememberUpdatedState(playWhenReady)
     val latestConnectionCallback by rememberUpdatedState(onConnectionChanged)
     val latestPlaybackStartedCallback by rememberUpdatedState(onCastPlaybackStarted)
+    val mediaTitle = listOf(title, subtitle).filter(String::isNotBlank).joinToString(" · ")
 
-    DisposableEffect(castContext) {
-        val sessionManager = runCatching { castContext?.sessionManager }.getOrNull()
-        if (sessionManager == null) {
-            castSession = null
-            latestConnectionCallback(false)
-            onDispose { }
+    suspend fun castTo(device: DlnaDevice, startPositionMs: Long) {
+        connectingDevice = device
+        val success = DlnaCastClient.play(device, url, mediaTitle, startPositionMs)
+        connectingDevice = null
+        if (success) {
+            connectedDevice = device
+            dialogVisible = false
+            latestConnectionCallback(true)
+            latestPlaybackStartedCallback()
+            Toast.makeText(context, "已投屏到 ${device.name}", Toast.LENGTH_SHORT).show()
         } else {
-            val listener = object : SessionManagerListener<CastSession> {
-                override fun onSessionStarting(session: CastSession) = Unit
-
-                override fun onSessionStarted(session: CastSession, sessionId: String) {
-                    castSession = session
-                    latestConnectionCallback(true)
-                }
-
-                override fun onSessionStartFailed(session: CastSession, error: Int) {
-                    castSession = null
-                    latestConnectionCallback(false)
-                }
-
-                override fun onSessionEnding(session: CastSession) = Unit
-
-                override fun onSessionEnded(session: CastSession, error: Int) {
-                    castSession = null
-                    latestConnectionCallback(false)
-                }
-
-                override fun onSessionResuming(session: CastSession, sessionId: String) = Unit
-
-                override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
-                    castSession = session
-                    latestConnectionCallback(true)
-                }
-
-                override fun onSessionResumeFailed(session: CastSession, error: Int) {
-                    castSession = null
-                    latestConnectionCallback(false)
-                }
-
-                override fun onSessionSuspended(session: CastSession, reason: Int) {
-                    castSession = session
-                    latestConnectionCallback(true)
-                }
-            }
-            val listenerRegistered = runCatching {
-                sessionManager.addSessionManagerListener(listener, CastSession::class.java)
-            }.isSuccess
-            if (listenerRegistered) {
-                val currentSession = runCatching { sessionManager.currentCastSession }.getOrNull()
-                castSession = currentSession
-                latestConnectionCallback(currentSession?.isConnected == true)
-            } else {
-                castSession = null
-                latestConnectionCallback(false)
-            }
-            onDispose {
-                if (listenerRegistered) {
-                    runCatching {
-                        sessionManager.removeSessionManagerListener(listener, CastSession::class.java)
-                    }
-                }
-            }
+            Toast.makeText(context, "投屏失败，设备可能不支持该视频格式", Toast.LENGTH_SHORT).show()
         }
     }
 
-    LaunchedEffect(castSession, url, title, subtitle) {
-        val session = castSession?.takeIf { it.isConnected } ?: return@LaunchedEffect
-        if (url.isBlank()) return@LaunchedEffect
-        loadCastMedia(
-            session = session,
-            url = url,
-            title = title,
-            subtitle = subtitle,
-            positionMs = latestPosition,
-            playWhenReady = latestPlayWhenReady,
-            onSuccess = latestPlaybackStartedCallback
-        )
+    // 打开弹窗或点击刷新时搜索局域网设备
+    LaunchedEffect(dialogVisible, searchVersion) {
+        if (!dialogVisible || connectedDevice != null) return@LaunchedEffect
+        searching = true
+        devices = runCatching { DlnaCastClient.discover(context) }.getOrDefault(emptyList())
+        searching = false
+    }
+
+    // 已连接时切换剧集，自动把新地址推送到当前设备
+    LaunchedEffect(url) {
+        val device = connectedDevice ?: return@LaunchedEffect
+        if (url.isNotBlank()) castTo(device, 0L)
     }
 
     Box(modifier = modifier) {
-        if (castContext != null) {
-            AndroidView(
-                factory = { viewContext ->
-                    MediaRouteButton(viewContext).also { button ->
-                        routeButton = if (
-                            runCatching {
-                                CastButtonFactory.setUpMediaRouteButton(viewContext, button)
-                            }.isSuccess
-                        ) {
-                            button
-                        } else {
-                            null
-                        }
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(0f),
-                update = { button ->
-                    if (routeButton != null) {
-                        routeButton = button
-                    }
-                }
-            )
-        }
         IconButton(
             onClick = {
                 onInteraction()
-                if (preferSystemCast && launchSystemCast(context)) {
-                    return@IconButton
-                }
-                val button = routeButton
-                val googleCastOpened = if (castContext != null && button != null) {
-                    runCatching { button.performClick() }.getOrDefault(false)
-                } else {
-                    false
-                }
-                val systemCastOpened = !googleCastOpened && launchSystemCast(context)
-                if (!googleCastOpened && !systemCastOpened) {
-                    Toast.makeText(context, "当前设备没有可用的投屏入口", Toast.LENGTH_SHORT).show()
-                }
+                dialogVisible = true
             },
             modifier = Modifier.fillMaxSize()
         ) {
             Icon(
-                imageVector = if (castSession?.isConnected == true) {
+                imageVector = if (connectedDevice != null || wirelessDisplayName != null) {
                     Icons.Rounded.CastConnected
                 } else {
                     Icons.Rounded.Cast
                 },
-                contentDescription = if (preferSystemCast) "系统投屏" else "投屏",
+                contentDescription = "投屏",
                 tint = Color.White
+            )
+        }
+    }
+
+    if (dialogVisible) {
+        CastDialog(
+            devices = devices,
+            searching = searching,
+            connectingDevice = connectingDevice,
+            connectedDevice = connectedDevice,
+            wirelessDisplayName = wirelessDisplayName,
+            onDismiss = { dialogVisible = false },
+            onRefresh = { searchVersion++ },
+            onSelect = { device ->
+                if (url.isBlank() || connectingDevice != null) return@CastDialog
+                scope.launch { castTo(device, latestPosition) }
+            },
+            onDisconnect = { device ->
+                scope.launch { DlnaCastClient.stop(device) }
+                connectedDevice = null
+                dialogVisible = false
+                latestConnectionCallback(false)
+            },
+            onOpenWirelessDisplay = {
+                if (launchWirelessDisplaySettings(context)) {
+                    dialogVisible = false
+                } else {
+                    Toast.makeText(context, "当前系统不支持无线显示器投屏", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun CastDialog(
+    devices: List<DlnaDevice>,
+    searching: Boolean,
+    connectingDevice: DlnaDevice?,
+    connectedDevice: DlnaDevice?,
+    wirelessDisplayName: String?,
+    onDismiss: () -> Unit,
+    onRefresh: () -> Unit,
+    onSelect: (DlnaDevice) -> Unit,
+    onDisconnect: (DlnaDevice) -> Unit,
+    onOpenWirelessDisplay: () -> Unit
+) {
+    val configuration = LocalConfiguration.current
+    val dialogMaxHeight = (configuration.screenHeightDp.dp * 0.88f).coerceAtLeast(360.dp)
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = dialogMaxHeight),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = UiPalette.Surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                CastDialogHeader(
+                    connected = connectedDevice != null,
+                    searching = searching,
+                    deviceCount = devices.size
+                )
+                if (connectedDevice != null) {
+                    ConnectedPanel(device = connectedDevice)
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        CastSection(title = "电视 / 盒子（DLNA）") {
+                            DlnaDeviceSection(
+                                devices = devices,
+                                searching = searching,
+                                connectingDevice = connectingDevice,
+                                onSelect = onSelect
+                            )
+                        }
+                        CastSection(title = "电脑 / 屏幕镜像") {
+                            CastOptionRow(
+                                icon = Icons.Rounded.DesktopWindows,
+                                title = "Windows 无线显示器",
+                                subtitle = wirelessDisplayName?.let { "已连接：$it" }
+                                    ?: "Miracast 镜像，需在电脑上开启「投影到此电脑」",
+                                highlighted = wirelessDisplayName != null,
+                                onClick = onOpenWirelessDisplay
+                            )
+                        }
+                    }
+                }
+                CastDialogActions(
+                    connected = connectedDevice != null,
+                    searching = searching,
+                    onDismiss = onDismiss,
+                    onRefresh = onRefresh,
+                    onDisconnect = { connectedDevice?.let(onDisconnect) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CastDialogHeader(
+    connected: Boolean,
+    searching: Boolean,
+    deviceCount: Int
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .background(
+                    brush = Brush.linearGradient(colors = listOf(UiPalette.Accent, UiPalette.AccentSoft)),
+                    shape = RoundedCornerShape(18.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (connected) Icons.Rounded.CastConnected else Icons.Rounded.Cast,
+                contentDescription = null,
+                tint = UiPalette.AccentText
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = if (connected) "正在投屏" else "投屏到设备",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = UiPalette.Ink
+            )
+            Text(
+                text = if (connected) "视频正在其他设备上播放，手机可作为遥控。" else "请确保设备与手机连接同一 Wi-Fi。",
+                style = MaterialTheme.typography.bodyMedium,
+                color = UiPalette.TextSecondary
+            )
+        }
+        CastStatusPill(
+            text = when {
+                connected -> "已连接"
+                searching -> "搜索中"
+                else -> "$deviceCount 台"
+            }
+        )
+    }
+}
+
+@Composable
+private fun CastStatusPill(text: String) {
+    Box(
+        modifier = Modifier
+            .offset(y = 2.dp)
+            .background(UiPalette.AccentSoft.copy(alpha = 0.2f), RoundedCornerShape(999.dp))
+            .border(1.dp, UiPalette.Accent.copy(alpha = 0.28f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = UiPalette.Accent
+        )
+    }
+}
+
+@Composable
+private fun CastSection(title: String, content: @Composable () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = UiPalette.Ink
+            )
+            content()
+        }
+    }
+}
+
+@Composable
+private fun DlnaDeviceSection(
+    devices: List<DlnaDevice>,
+    searching: Boolean,
+    connectingDevice: DlnaDevice?,
+    onSelect: (DlnaDevice) -> Unit
+) {
+    // 预留固定高度（约两台设备），避免搜索完成前后弹窗高度跳动
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = DLNA_SECTION_MIN_HEIGHT),
+        contentAlignment = if (devices.isEmpty()) Alignment.Center else Alignment.TopStart
+    ) {
+        DlnaDeviceContent(
+            devices = devices,
+            searching = searching,
+            connectingDevice = connectingDevice,
+            onSelect = onSelect
+        )
+    }
+}
+
+@Composable
+private fun DlnaDeviceContent(
+    devices: List<DlnaDevice>,
+    searching: Boolean,
+    connectingDevice: DlnaDevice?,
+    onSelect: (DlnaDevice) -> Unit
+) {
+    if (devices.isEmpty()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (searching) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = UiPalette.Accent
+                )
+            } else {
+                Icon(Icons.Rounded.WifiFind, contentDescription = null, tint = UiPalette.TextMuted)
+            }
+            Text(
+                text = if (searching) "正在搜索附近的设备…" else "未发现设备，请在电视或盒子上开启 DLNA 投屏接收后重新搜索。",
+                style = MaterialTheme.typography.bodyMedium,
+                color = UiPalette.TextSecondary
+            )
+        }
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        devices.forEach { device ->
+            CastOptionRow(
+                icon = Icons.Rounded.Tv,
+                title = device.name,
+                subtitle = runCatching { URL(device.location).host }.getOrDefault("DLNA"),
+                loading = connectingDevice == device,
+                onClick = { onSelect(device) }
             )
         }
     }
 }
 
-private fun loadCastMedia(
-    session: CastSession,
-    url: String,
+private val DLNA_SECTION_MIN_HEIGHT = 130.dp
+
+@Composable
+private fun CastOptionRow(
+    icon: ImageVector,
     title: String,
     subtitle: String,
-    positionMs: Long,
-    playWhenReady: Boolean,
-    onSuccess: () -> Unit
+    onClick: () -> Unit,
+    loading: Boolean = false,
+    highlighted: Boolean = false
 ) {
-    runCatching {
-        val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
-            putString(MediaMetadata.KEY_TITLE, title.ifBlank { "JlenVideo" })
-            subtitle.takeIf(String::isNotBlank)?.let { putString(MediaMetadata.KEY_SUBTITLE, it) }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(UiPalette.Surface)
+            .border(
+                1.dp,
+                if (highlighted) UiPalette.Accent.copy(alpha = 0.5f) else UiPalette.BorderSoft,
+                RoundedCornerShape(16.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 11.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .background(UiPalette.AccentSoft.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = UiPalette.Accent, modifier = Modifier.size(20.dp))
         }
-        val mediaInfo = MediaInfo.Builder(url)
-            .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-            .setContentType(castContentType(url))
-            .setMetadata(metadata)
-            .build()
-        val request = MediaLoadRequestData.Builder()
-            .setMediaInfo(mediaInfo)
-            .setAutoplay(playWhenReady)
-            .setCurrentTime(positionMs.coerceAtLeast(0L))
-            .build()
-
-        session.remoteMediaClient
-            ?.load(request)
-            ?.setResultCallback { result ->
-                if (result.status.isSuccess) {
-                    onSuccess()
-                }
-            }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                color = UiPalette.Ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (highlighted) UiPalette.Accent else UiPalette.TextMuted,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = UiPalette.Accent
+            )
+        } else {
+            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = UiPalette.TextMuted)
+        }
     }
 }
 
-private fun castContentType(url: String): String {
-    val normalized = url.substringBefore('#').lowercase()
-    return when {
-        ".m3u8" in normalized -> "application/x-mpegURL"
-        ".mpd" in normalized -> "application/dash+xml"
-        else -> "video/mp4"
+@Composable
+private fun ConnectedPanel(device: DlnaDevice) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UiPalette.SurfaceSoft),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(Icons.Rounded.Tv, contentDescription = null, tint = UiPalette.Accent)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "当前设备",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = UiPalette.TextMuted
+                )
+                Text(
+                    text = device.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = UiPalette.Ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CastDialogActions(
+    connected: Boolean,
+    searching: Boolean,
+    onDismiss: () -> Unit,
+    onRefresh: () -> Unit,
+    onDisconnect: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TextButton(onClick = onDismiss) {
+            Text("关闭")
+        }
+        if (connected) {
+            Button(
+                onClick = onDisconnect,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = UiPalette.DangerText,
+                    contentColor = UiPalette.Surface
+                )
+            ) {
+                Text("断开投屏", fontWeight = FontWeight.Bold)
+            }
+        } else {
+            Button(
+                onClick = onRefresh,
+                enabled = !searching,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = UiPalette.Accent,
+                    contentColor = UiPalette.AccentText
+                )
+            ) {
+                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                Box(modifier = Modifier.width(4.dp))
+                Text(if (searching) "搜索中" else "重新搜索", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+// 监听系统无线显示器（Miracast）连接状态，返回已连接的显示器名称
+@Composable
+private fun rememberWirelessDisplayName(context: Context): String? {
+    val displayManager = remember(context) {
+        context.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager
+    }
+    fun query(): String? = runCatching {
+        displayManager?.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
+            ?.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
+            ?.name
+    }.getOrNull()
+
+    var name by remember { mutableStateOf(query()) }
+    DisposableEffect(displayManager) {
+        val listener = object : DisplayManager.DisplayListener {
+            override fun onDisplayAdded(displayId: Int) { name = query() }
+            override fun onDisplayRemoved(displayId: Int) { name = query() }
+            override fun onDisplayChanged(displayId: Int) { name = query() }
+        }
+        runCatching { displayManager?.registerDisplayListener(listener, null) }
+        onDispose { runCatching { displayManager?.unregisterDisplayListener(listener) } }
+    }
+    return name
+}
+
+// 普通应用无法直接发起 Miracast 连接，只能打开系统的无线显示/屏幕镜像页面
+private fun launchWirelessDisplaySettings(context: Context): Boolean {
+    val intents = listOf(
+        Intent(Settings.ACTION_CAST_SETTINGS),
+        Intent("android.settings.WIFI_DISPLAY_SETTINGS"),
+        Intent().setClassName("com.android.settings", "com.android.settings.Settings\$WifiDisplaySettingsActivity"),
+        Intent().setClassName("com.oplus.cast", "com.oplus.cast.ui.DeviceListActivity")
+    )
+    return intents.any { intent ->
+        runCatching {
+            if (context !is Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        }.isSuccess
     }
 }
