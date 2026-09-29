@@ -33,12 +33,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -149,7 +151,7 @@ fun CategoryScreen(
                 }
         }
 
-        Column(Modifier.fillMaxSize()) {
+        CategoryFloatingLayout(header = {
             CategoryFilterHeader(
                 state = state,
                 expanded = header.expanded,
@@ -166,14 +168,15 @@ fun CategoryScreen(
                     onSelectFilter(key, value)
                 }
             )
+        }) { headerHeight ->
             Box(
-                Modifier.weight(1f).fillMaxWidth()
+                Modifier.fillMaxSize()
                     .pullRefresh(pullState, enabled = !isRefreshing)
             ) {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().nestedScroll(scrollConnection),
-                    contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
+                    contentPadding = PaddingValues(top = headerHeight + 16.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     if (state.error != null) {
@@ -223,11 +226,31 @@ fun CategoryScreen(
                 PullRefreshIndicator(
                     refreshing = isRefreshing && refreshRequested,
                     state = pullState,
-                    modifier = Modifier.align(Alignment.TopCenter),
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = headerHeight),
                     backgroundColor = UiPalette.Surface,
                     contentColor = UiPalette.Accent
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun CategoryFloatingLayout(
+    header: @Composable () -> Unit,
+    content: @Composable (headerHeight: Dp) -> Unit
+) {
+    // 同一轮测量拿到真实高度，兼容筛选展开、横屏和大字体，不让首屏内容被遮挡。
+    SubcomposeLayout(Modifier.fillMaxSize()) { constraints ->
+        val headerPlaceable = subcompose("header", header).single()
+            .measure(constraints.copy(minHeight = 0))
+        val headerHeight = headerPlaceable.height.toDp()
+        val contentPlaceable = subcompose("content") { content(headerHeight) }.single()
+            .measure(constraints)
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            // 列表铺满视口，圆角框外无背景层，滚动内容可透过上方及两侧留白。
+            contentPlaceable.placeRelative(0, 0)
+            headerPlaceable.placeRelative(0, 0)
         }
     }
 }

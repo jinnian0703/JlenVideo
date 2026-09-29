@@ -4,6 +4,7 @@
 
 - For any new feature or small code/config change, automatically create a git commit and push it after the change is completed and verified when possible.
 - Reply to the user in Chinese throughout the whole collaboration.
+- Work directly on `main` and push completed changes to `main`; do not create a feature branch unless the user explicitly asks for one. Preserve unrelated uncommitted changes.
 - After app code changes, provide the APK path when applicable and include the pushed commit hash/message in the reply. If the user says "打包" without specifying a variant, build the release APK by default; build debug only when explicitly requested or for verification.
 - If HTTPS push fails, use a long-lived writable GitHub deploy key for this repository instead of creating and deleting a temporary SSH key each time.
 
