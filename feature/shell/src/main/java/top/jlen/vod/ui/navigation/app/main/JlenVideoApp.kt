@@ -73,6 +73,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+// Compose 1.6 原生提供的 Local，避免 Lifecycle 2.8 反射桥接在 R8 下失配。
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -81,6 +85,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.NetworkInterface
 import java.nio.charset.StandardCharsets
@@ -151,24 +157,31 @@ fun JlenVideoApp() {
             onSurfaceVariant = UiPalette.TextSecondary
         )
     }
-    var trafficCaptureState by remember(context) {
-        mutableStateOf(detectTrafficCaptureState(context))
-    }
-    LaunchedEffect(context) {
-        while (true) {
-            delay(TRAFFIC_CAPTURE_CHECK_MS)
-            trafficCaptureState = detectTrafficCaptureState(context)
+    var trafficCaptureState by remember(context) { mutableStateOf<TrafficCaptureState?>(null) }
+    var trafficCheckRetry by remember { mutableStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(context, lifecycleOwner, trafficCheckRetry) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                trafficCaptureState = withContext(Dispatchers.IO) { detectTrafficCaptureState(context) }
+                delay(TRAFFIC_CAPTURE_CHECK_MS)
+            }
         }
     }
-    if (trafficCaptureState.blocked) {
+    val checkedTrafficState = trafficCaptureState
+    if (checkedTrafficState == null || checkedTrafficState.blocked) {
         MaterialTheme(colorScheme = appColors) {
             Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
                 Box(modifier = Modifier.fillMaxSize().background(appBackground)) {
-                    TrafficCaptureBlockedScreen(
-                        state = trafficCaptureState,
-                        onRetry = { trafficCaptureState = detectTrafficCaptureState(context) },
-                        onExit = { activity?.finish() }
-                    )
+                    if (checkedTrafficState == null) {
+                        LoadingPane("正在检查运行环境...")
+                    } else {
+                        TrafficCaptureBlockedScreen(
+                            state = checkedTrafficState,
+                            onRetry = { trafficCheckRetry += 1 },
+                            onExit = { activity?.finish() }
+                        )
+                    }
                 }
             }
         }
@@ -224,10 +237,8 @@ fun JlenVideoApp() {
     var homeScrollToTopSignal by rememberSaveable { mutableStateOf(0) }
     var categoryScrollToTopSignal by rememberSaveable { mutableStateOf(0) }
     var searchScrollToTopSignal by rememberSaveable { mutableStateOf(0) }
-    var homeScrollIndex by rememberSaveable { mutableStateOf(0) }
-    var homeScrollOffset by rememberSaveable { mutableStateOf(0) }
-    var categoryScrollIndex by rememberSaveable { mutableStateOf(0) }
-    var categoryScrollOffset by rememberSaveable { mutableStateOf(0) }
+    val homeScroll = rememberSaveable(saver = SavedScrollPosition.Saver) { SavedScrollPosition() }
+    val categoryScroll = rememberSaveable(saver = SavedScrollPosition.Saver) { SavedScrollPosition() }
     val scrollTopSignals = mapOf(
         "home" to homeScrollToTopSignal,
         "categories" to categoryScrollToTopSignal,
@@ -441,11 +452,10 @@ fun JlenVideoApp() {
                                 state = viewModel.homeState,
                                 noticeState = viewModel.noticeState,
                                 scrollToTopSignal = homeScrollToTopSignal,
-                                initialScrollIndex = homeScrollIndex,
-                                initialScrollOffset = homeScrollOffset,
+                                initialScrollIndex = homeScroll.index,
+                                initialScrollOffset = homeScroll.offset,
                                 onScrollPositionChange = { index, offset ->
-                                    homeScrollIndex = index
-                                    homeScrollOffset = offset
+                                    homeScroll.update(index, offset)
                                 },
                                 onRefresh = viewModel::refreshHomeAndClearCaches,
                                 onRefreshAnnouncements = { viewModel.refreshNotices(forceRefresh = true) },
@@ -464,11 +474,10 @@ fun JlenVideoApp() {
                             CategoryScreen(
                                 state = viewModel.homeState,
                                 scrollToTopSignal = categoryScrollToTopSignal,
-                                initialScrollIndex = categoryScrollIndex,
-                                initialScrollOffset = categoryScrollOffset,
+                                initialScrollIndex = categoryScroll.index,
+                                initialScrollOffset = categoryScroll.offset,
                                 onScrollPositionChange = { index, offset ->
-                                    categoryScrollIndex = index
-                                    categoryScrollOffset = offset
+                                    categoryScroll.update(index, offset)
                                 },
                                 onSelectCategory = viewModel::selectCategory,
                                 onSelectFilter = viewModel::updateCategoryFilter,
@@ -680,8 +689,9 @@ fun JlenVideoApp() {
                         ) { entry ->
                             val logId = entry.arguments?.getString("logId").orEmpty()
                             val issueLog = viewModel.accountState.issueLogEntries.firstOrNull { it.id == logId }
-                            val logText = remember(logId, viewModel.accountState.latestCrashLog) {
-                                viewModel.readIssueLog(logId)
+                            var logText by remember(logId) { mutableStateOf("") }
+                            LaunchedEffect(logId, viewModel.accountState.latestCrashLog) {
+                                logText = withContext(Dispatchers.IO) { viewModel.readIssueLog(logId) }
                             }
                             if (issueLog == null) {
                                 LaunchedEffect(logId) {
@@ -1151,4 +1161,3 @@ private fun AppBottomBar(
 }
 
 private const val BOTTOM_BAR_DOUBLE_TAP_MS = 450L
-

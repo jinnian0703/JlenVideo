@@ -14,6 +14,8 @@ import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
 data class IssueLogEntry(
@@ -44,6 +46,16 @@ object CrashLogger {
     private val traceLock = Any()
     private val pendingTraceLines = ArrayDeque<String>()
     private const val FLUSH_TRACE_LINES = 12
+    private val logIo = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "jlen-log-writer").apply { isDaemon = true; logThread = this }
+    }
+    @Volatile private var logThread: Thread? = null
+    private val traceFileLock = Any()
+
+    private fun enqueueLog(task: () -> Unit) {
+        if (Thread.currentThread() === logThread) runCatching(task)
+        else logIo.execute { runCatching(task) }
+    }
 
     fun install(context: Context) {
         val appContext = context.applicationContext
@@ -51,11 +63,20 @@ object CrashLogger {
         synchronized(this) {
             if (installed) return
             val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
-            beginSession(appContext)
-            writePreviousExitReasonIfNeeded(appContext)
+            enqueueLog {
+                beginSession(appContext)
+                writePreviousExitReasonIfNeeded(appContext)
+            }
             Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-                runCatching { writeCrashLog(appContext, thread, throwable) }
-                runCatching { markSession(appContext, "crashed") }
+                val saveCrash = {
+                    runCatching { writeCrashLog(appContext, thread, throwable) }
+                    runCatching { markSession(appContext, "crashed") }
+                    Unit
+                }
+                // 崩溃关键记录不能只排队后退出；正常日志则完全不阻塞 UI。
+                if (Thread.currentThread() === logThread) saveCrash()
+                else runCatching { logIo.submit(saveCrash).get(2, TimeUnit.SECONDS) }
+                    .onFailure { runCatching { writeCrashLog(appContext, thread, throwable) } }
                 if (previousHandler != null) {
                     previousHandler.uncaughtException(thread, throwable)
                 } else {
@@ -134,6 +155,7 @@ object CrashLogger {
     }.getOrDefault("")
 
     fun readIssueLogEntries(context: Context): List<IssueLogEntry> = runCatching {
+        awaitPendingLogs()
         flushTrace(context.applicationContext)
         issueLogFiles(context).map { file ->
             val text = file.readText(StandardCharsets.UTF_8)
@@ -151,11 +173,16 @@ object CrashLogger {
     }.getOrDefault(emptyList())
 
     fun readIssueLog(context: Context, id: String): String = runCatching {
+        awaitPendingLogs()
         flushTrace(context.applicationContext)
         issueLogFile(context, id)?.readText(StandardCharsets.UTF_8).orEmpty()
     }.getOrDefault("")
 
     fun deleteIssueLog(context: Context, id: String) {
+        if (Thread.currentThread() !== logThread) {
+            enqueueLog { deleteIssueLog(context.applicationContext, id) }
+            return
+        }
         runCatching { issueLogFile(context, id)?.delete() }
         val latest = issueLogFiles(context).firstOrNull()
         if (latest == null) {
@@ -166,10 +193,20 @@ object CrashLogger {
     }
 
     fun clear(context: Context) {
+        if (Thread.currentThread() !== logThread) {
+            enqueueLog { clear(context.applicationContext) }
+            return
+        }
         crashDir(context).listFiles()?.forEach { file ->
             runCatching { file.delete() }
         }
         runCatching { beginSession(context.applicationContext) }
+    }
+
+    private fun awaitPendingLogs() {
+        if (Thread.currentThread() !== logThread) {
+            runCatching { logIo.submit {}.get(2, TimeUnit.SECONDS) }
+        }
     }
 
     private fun beginSession(context: Context) {
@@ -362,24 +399,25 @@ object CrashLogger {
             pendingTraceLines.size >= FLUSH_TRACE_LINES
         }
         if (shouldFlush) {
-            flushTrace(context)
+            enqueueLog { flushTrace(context) }
         }
     }
 
     private fun flushTrace(context: Context) {
-        runCatching {
-            val pending = synchronized(traceLock) {
-                if (pendingTraceLines.isEmpty()) return
-                pendingTraceLines.toList().also { pendingTraceLines.clear() }
+        synchronized(traceFileLock) {
+            runCatching {
+                val pending = synchronized(traceLock) {
+                    if (pendingTraceLines.isEmpty()) return
+                    pendingTraceLines.toList().also { pendingTraceLines.clear() }
+                }
+                val file = traceFile(context.applicationContext)
+                val existing = file.takeIf(File::exists)
+                    ?.readLines(StandardCharsets.UTF_8)
+                    .orEmpty()
+                val next = (existing + pending).takeLast(MAX_TRACE_LINES)
+                file.parentFile?.mkdirs()
+                file.writeText(next.joinToString("\n").takeLast(MAX_TRACE_CHARS), StandardCharsets.UTF_8)
             }
-            val file = traceFile(context.applicationContext)
-            val existing = file.takeIf(File::exists)
-                ?.readLines(StandardCharsets.UTF_8)
-                .orEmpty()
-            val next = (existing + pending)
-                .takeLast(MAX_TRACE_LINES)
-            file.parentFile?.mkdirs()
-            file.writeText(next.joinToString("\n").takeLast(MAX_TRACE_CHARS), StandardCharsets.UTF_8)
         }
     }
 
@@ -388,11 +426,12 @@ object CrashLogger {
     }.getOrDefault("")
 
     private fun updateSession(context: Context, mutate: (MutableMap<String, String>) -> Unit) {
-        runCatching {
-            val state = readSession(context).toMutableMap()
+        val appContext = context.applicationContext
+        enqueueLog {
+            val state = readSession(appContext).toMutableMap()
             mutate(state)
             state["updatedAt"] = displayNow()
-            writeSession(context, state)
+            writeSession(appContext, state)
         }
     }
 

@@ -87,12 +87,6 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadEmergencyHome
     val categories = runCatching { runtimeLoadBrowsableCategories(forceRefresh = false) }
         .getOrElse { runtimeGetCachedBrowsableCategories() }
         .ifEmpty { runtimeDefaultCategories().map { runtimeNormalizeCategory(it) } }
-    val selectedCategory = categories.firstOrNull()
-    val categoryPage = selectedCategory?.let { category ->
-        runCatching {
-            runtimeLoadCategoryCursorPage(typeId = category.typeId, cursor = "")
-        }.getOrNull()
-    } ?: CursorPagedVodItems()
     val latestItems = latestPage.items.ifEmpty { recommendedItems.take(36) }
     val featuredItems = recommendedItems
         .ifEmpty { cachedHome?.featured.orEmpty() }
@@ -100,7 +94,6 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadEmergencyHome
     runtimeRememberPreviewItems(buildList {
         addAll(latestItems)
         addAll(featuredItems)
-        addAll(categoryPage.items)
     })
 
     return HomePayload(
@@ -110,12 +103,12 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadEmergencyHome
         latest = latestItems,
         sections = emptyList(),
         categories = categories,
-        selectedCategory = selectedCategory,
-        categoryVideos = categoryPage.items,
+        selectedCategory = ALL_LIBRARY_CATEGORY,
+        categoryVideos = latestItems,
         latestCursor = latestPage.nextCursor,
         latestHasMore = latestPage.hasMore,
-        categoryCursor = categoryPage.nextCursor,
-        categoryHasMore = categoryPage.hasMore
+        categoryCursor = latestPage.nextCursor,
+        categoryHasMore = latestPage.hasMore
     ).also { payload ->
         runtimeCacheHomePayload(payload)
         runtimeCleanupCachesIfNeeded()
@@ -146,13 +139,8 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFreshHome(
         homeDocument?.let { runtimeParseLevelOneItemsFromHomePage(it, limit = 16) }.orEmpty()
     }
     val categories = runtimeLoadBrowsableCategories(homeDocument = homeDocument, forceRefresh = forceRefresh)
-    val selectedCategory = categories.firstOrNull()
-    val selectedCategoryPage = selectedCategory?.let { category ->
-        runCatching {
-            runtimeLoadCategoryCursorPage(typeId = category.typeId, cursor = "")
-        }.getOrNull()
-    }
-    runtimeRememberPreviewItems(latest + featured + selectedCategoryPage?.items.orEmpty())
+    // 默认片库为“全部”；具体分类在用户选择时加载，不阻塞首页。
+    runtimeRememberPreviewItems(latest + featured)
 
     if (latest.isEmpty() && featured.isEmpty() && categories.isEmpty()) {
         throw IOException("首页内容解析失败")
@@ -164,12 +152,12 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFreshHome(
         latest = latest,
         sections = emptyList(),
         categories = categories,
-        selectedCategory = selectedCategory,
-        categoryVideos = selectedCategoryPage?.items.orEmpty(),
+        selectedCategory = ALL_LIBRARY_CATEGORY,
+        categoryVideos = latest,
         latestCursor = latestPage.nextCursor,
         latestHasMore = latestPage.hasMore,
-        categoryCursor = selectedCategoryPage?.nextCursor.orEmpty(),
-        categoryHasMore = selectedCategoryPage?.hasMore ?: false
+        categoryCursor = latestPage.nextCursor,
+        categoryHasMore = latestPage.hasMore
     ).also { payload ->
         runtimeCacheHomePayload(payload)
         runtimeCleanupCachesIfNeeded()

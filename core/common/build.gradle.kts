@@ -3,6 +3,10 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+}
+
 val androidCompileSdk = providers.gradleProperty("ANDROID_COMPILE_SDK").get().toInt()
 val androidMinSdk = providers.gradleProperty("ANDROID_MIN_SDK").get().toInt()
 val appApplicationId = providers.gradleProperty("APP_APPLICATION_ID").get()

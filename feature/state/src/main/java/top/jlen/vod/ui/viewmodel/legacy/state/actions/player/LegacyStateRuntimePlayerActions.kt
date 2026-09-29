@@ -243,7 +243,7 @@ private fun LegacyStateRuntimeViewModelCore.persistCurrentPlaybackResume() {
             sourceName = playerState.currentSource?.name.orEmpty()
         )
     )
-    legacyRebuildFollowContent()
+    legacyUpdateFollowPlayback(record)
 }
 
 private fun resolvePlaybackResumeVodId(item: VodItem, episodePageUrl: String): String =

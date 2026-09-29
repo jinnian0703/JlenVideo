@@ -37,6 +37,20 @@ android {
                 "proguard-rules.pro"
             )
         }
+        if (providers.gradleProperty("enablePerformanceTests").orNull == "true") {
+            create("benchmark") {
+                initWith(getByName("release"))
+                matchingFallbacks += "release"
+                isDebuggable = false
+            }
+            create("profile") {
+                initWith(getByName("release"))
+                matchingFallbacks += "release"
+                isDebuggable = false
+                isMinifyEnabled = false
+                isShrinkResources = false
+            }
+        }
     }
 
     compileOptions {

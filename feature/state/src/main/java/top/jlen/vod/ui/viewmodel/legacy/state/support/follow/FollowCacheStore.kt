@@ -3,50 +3,54 @@ package top.jlen.vod.ui
 import android.content.Context
 import androidx.core.content.edit
 import com.google.gson.Gson
+import java.util.concurrent.ConcurrentHashMap
+import top.jlen.vod.performance.CoalescingTaskQueue
 
 internal class FollowCacheStore(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
+    private val memory = ConcurrentHashMap<String, List<FollowUpItem>>()
+    private val writes = CoalescingTaskQueue()
 
     fun load(ownerKey: String): List<FollowUpItem> {
         val key = storageKey(ownerKey)
         if (key.isBlank()) return emptyList()
+        memory[key]?.let { return it }
         val raw = prefs.getString(key, null)
             ?.takeIf(String::isNotBlank)
             ?: return emptyList()
-        return runCatching {
+        val items = runCatching {
             gson.fromJson(raw, FollowCacheSnapshot::class.java)
         }.getOrNull()
             ?.items
             .orEmpty()
             .filter { item -> item.vodId.isNotBlank() && item.title.isNotBlank() }
+        return memory.putIfAbsent(key, items) ?: items
     }
 
     fun save(ownerKey: String, items: List<FollowUpItem>) {
         val key = storageKey(ownerKey)
         if (key.isBlank()) return
-        if (items.isEmpty()) {
-            prefs.edit { remove(key) }
-            return
-        }
-        prefs.edit {
-            putString(
-                key,
-                gson.toJson(
-                    FollowCacheSnapshot(
-                        cachedAt = System.currentTimeMillis(),
-                        items = items
+        val snapshot = items.toList()
+        memory[key] = snapshot
+        writes.submit(key) {
+            prefs.edit {
+                if (snapshot.isEmpty()) remove(key)
+                else putString(
+                    key,
+                    gson.toJson(
+                        FollowCacheSnapshot(
+                            cachedAt = System.currentTimeMillis(),
+                            items = snapshot
+                        )
                     )
                 )
-            )
+            }
         }
     }
 
     fun clear(ownerKey: String) {
-        val key = storageKey(ownerKey)
-        if (key.isNotBlank()) {
-            prefs.edit { remove(key) }
-        }
+        save(ownerKey, emptyList())
     }
 
     private fun storageKey(ownerKey: String): String =

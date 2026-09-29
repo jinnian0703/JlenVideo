@@ -28,6 +28,8 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -38,6 +40,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -49,7 +52,7 @@ import top.jlen.vod.data.CategoryFilterGroup
 import top.jlen.vod.data.libraryCategoryOptions
 import top.jlen.vod.data.libraryFilterSummary
 
-@OptIn(ExperimentalMaterialApi::class)
+@OptIn(ExperimentalMaterialApi::class, ExperimentalComposeUiApi::class)
 @Composable
 fun CategoryScreen(
     state: HomeUiState,
@@ -68,20 +71,20 @@ fun CategoryScreen(
         LazyListState(initialScrollIndex, initialScrollOffset)
     }
     val behaviorSaver = remember {
-        listSaver<CategoryHeaderBehavior, Any>(
-            save = { listOf(it.expanded, it.hasLeftTop) },
-            restore = { CategoryHeaderBehavior(it[0] as Boolean, it[1] as Boolean) }
+        listSaver<CategoryHeaderController, Any>(
+            save = { listOf(it.behavior.expanded, it.behavior.hasLeftTop) },
+            restore = { CategoryHeaderController(CategoryHeaderBehavior(it[0] as Boolean, it[1] as Boolean)) }
         )
     }
-    var header by rememberSaveable(stateSaver = behaviorSaver) {
+    val header = rememberSaveable(saver = behaviorSaver) {
         val atTop = initialScrollIndex == 0 && initialScrollOffset == 0
-        mutableStateOf(CategoryHeaderBehavior(expanded = atTop, hasLeftTop = !atTop))
+        CategoryHeaderController(CategoryHeaderBehavior(expanded = atTop, hasLeftTop = !atTop))
     }
     val threshold = with(LocalDensity.current) { 32.dp.toPx() }
     val scrollConnection = remember(listState, threshold) {
         object : NestedScrollConnection {
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                header = header.onScroll(
+                header.onScroll(
                     deltaY = consumed.y,
                     atTop = !listState.canScrollBackward,
                     collapseThreshold = threshold
@@ -101,7 +104,7 @@ fun CategoryScreen(
     LaunchedEffect(scrollToTopSignal) {
         if (scrollToTopSignal > 0 && scrollToTopSignal != handledScrollToTopSignal) {
             handledScrollToTopSignal = scrollToTopSignal
-            header = CategoryHeaderBehavior()
+            header.reset()
             listState.animateScrollToItem(0)
         }
     }
@@ -110,7 +113,7 @@ fun CategoryScreen(
     LaunchedEffect(selectionKey) {
         if (selectionKey != lastSelectionKey) {
             lastSelectionKey = selectionKey
-            header = CategoryHeaderBehavior()
+            header.reset()
             listState.scrollToItem(0)
         }
     }
@@ -158,14 +161,14 @@ fun CategoryScreen(
                     state = state,
                     expanded = header.expanded,
                     maxBodyHeight = filterMaxHeight,
-                    onToggle = { header = header.toggle(atTop = !listState.canScrollBackward) },
+                    onToggle = { header.toggle(atTop = !listState.canScrollBackward) },
                     onSelectCategory = {
-                        header = CategoryHeaderBehavior()
+                        header.reset()
                         scope.launch { listState.scrollToItem(0) }
                         onSelectCategory(it)
                     },
                     onSelectFilter = { key, value ->
-                        header = CategoryHeaderBehavior()
+                        header.reset()
                         scope.launch { listState.scrollToItem(0) }
                         onSelectFilter(key, value)
                     }
@@ -178,7 +181,8 @@ fun CategoryScreen(
             ) {
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize().nestedScroll(scrollConnection),
+                    modifier = Modifier.fillMaxSize().nestedScroll(scrollConnection)
+                        .semantics { testTagsAsResourceId = true }.testTag("library_videos"),
                     contentPadding = PaddingValues(top = headerHeight + 16.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {

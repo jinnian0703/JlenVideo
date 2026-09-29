@@ -41,6 +41,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRef
         )
     }
 
+    val ownerKey = currentFollowOwnerKey()
     val requestVersion = nextFollowRefreshVersion()
     val hasExistingItems = currentFollowState().items.isNotEmpty()
     updateFollowState(
@@ -78,7 +79,9 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRef
                     resolveDetails = true
                 )
             }
-            if (requestVersion != currentFollowRefreshVersion()) return@followRefresh
+            if (requestVersion != currentFollowRefreshVersion() || ownerKey != currentFollowOwnerKey() ||
+                !currentAccountState().session.isLoggedIn) return@followRefresh
+            val mergedItems = mergeNewerFollowPlayback(items, currentFollowState().items)
 
             updateAccountState(
                 currentAccountState().copy(
@@ -93,14 +96,15 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRef
                     isLoading = false,
                     isRefreshing = false,
                     isLoggedIn = true,
-                    items = items
+                    items = mergedItems
                 )
             )
-            followCacheStore().save(currentFollowOwnerKey(), items)
+            followCacheStore().save(ownerKey, mergedItems)
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
-            if (requestVersion != currentFollowRefreshVersion()) return@followRefresh
+            if (requestVersion != currentFollowRefreshVersion() || ownerKey != currentFollowOwnerKey() ||
+                !currentAccountState().session.isLoggedIn) return@followRefresh
             updateFollowState(
                 currentFollowState().copy(
                     isLoading = false,
@@ -127,6 +131,15 @@ internal fun LegacyStateRuntimeViewModelCore.legacyShowCachedFollowContent() {
     )
 }
 
+internal fun LegacyStateRuntimeViewModelCore.legacyUpdateFollowPlayback(record: PlaybackResumeRecord) {
+    if (!currentAccountState().session.isLoggedIn) return
+    val current = currentFollowState()
+    val items = followItemsWithPlayback(current.items, record)
+    if (items === current.items) return
+    updateFollowState(current.copy(items = items))
+    followCacheStore().save(currentFollowOwnerKey(), items)
+}
+
 internal fun LegacyStateRuntimeViewModelCore.legacyRebuildFollowContent(forceUpdate: Boolean = false) {
     if (!currentAccountState().session.isLoggedIn) {
         updateFollowState(FollowUiState(isLoggedIn = false))
@@ -150,24 +163,31 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRebuildFollowContent(forceUpd
         return
     }
 
+    val ownerKey = currentFollowOwnerKey()
+    val history = currentAccountState().historyItems
+    val refreshVersion = currentFollowRefreshVersion()
     viewModelScope.launch {
         val items = withContext(Dispatchers.IO) {
             buildFollowItems(
                 favoriteItems = favorites,
-                historyItems = currentAccountState().historyItems,
+                historyItems = history,
                 resolveDetails = false
             )
         }
+        if (!currentAccountState().session.isLoggedIn || ownerKey != currentFollowOwnerKey() ||
+            refreshVersion != currentFollowRefreshVersion() || favorites != currentAccountState().favoriteItems
+        ) return@launch
+        val mergedItems = mergeNewerFollowPlayback(items, currentFollowState().items)
         updateFollowState(
             currentFollowState().copy(
                 isLoading = false,
                 isRefreshing = false,
                 isLoggedIn = true,
                 error = null,
-                items = items
+                items = mergedItems
             )
         )
-        followCacheStore().save(currentFollowOwnerKey(), items)
+        followCacheStore().save(ownerKey, mergedItems)
     }
 }
 
@@ -474,7 +494,7 @@ private fun buildFollowWatchTimeText(
     hasHistory: Boolean
 ): String = when {
     lastWatchedAtMillis != null && lastWatchedAtMillis > 0L ->
-        followDisplayTimeFormatter.format(Date(lastWatchedAtMillis))
+        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(lastWatchedAtMillis))
     hasHistory -> "已加入追剧，尚无本地续播时间"
     else -> "已加入追剧，尚无观看记录"
 }
@@ -516,5 +536,3 @@ private fun parseEpisodeIndex(text: String, regex: Regex): Int? =
 private val followItemComparator = compareByDescending<FollowUpItem> { it.hasUpdate }
     .thenByDescending { it.lastWatchedAtMillis ?: 0L }
     .thenBy { it.title }
-
-private val followDisplayTimeFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())

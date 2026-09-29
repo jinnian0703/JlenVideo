@@ -51,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,6 +65,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import java.io.File
 import java.nio.charset.StandardCharsets
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import top.jlen.vod.RuntimeEndpoints
 import top.jlen.vod.data.CacheRetentionOption
 import top.jlen.vod.data.CacheSizeLimitOption
@@ -475,12 +479,22 @@ fun AccountCrashLogSettingsScreen(
             }
         } else {
             items(issueLogEntries, key = { it.id }) { entry ->
-                val logText = remember(entry.id, crashLogText) { onReadIssueLog(entry.id) }
+                val logScope = rememberCoroutineScope()
                 IssueLogEntryCard(
                     entry = entry,
                     onOpen = { onOpenIssueLog(entry) },
-                    onCopy = { copyIssueLog(context, logText) },
-                    onShare = { shareIssueLog(context, entry, logText) },
+                    onCopy = {
+                        logScope.launch {
+                            val text = withContext(Dispatchers.IO) { onReadIssueLog(entry.id) }
+                            copyIssueLog(context, text)
+                        }
+                    },
+                    onShare = {
+                        logScope.launch {
+                            val text = withContext(Dispatchers.IO) { onReadIssueLog(entry.id) }
+                            shareIssueLog(context, entry, text)
+                        }
+                    },
                     onDelete = { onDeleteIssueLog(entry.id) }
                 )
             }

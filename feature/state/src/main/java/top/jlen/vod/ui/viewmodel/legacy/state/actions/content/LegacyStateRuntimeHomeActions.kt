@@ -39,11 +39,10 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshHome(forceRefresh: Boo
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyRefreshHomeAndClearCaches() {
-    viewModelScope.launch {
-        withContext(Dispatchers.IO) { legacyRepository().clearRuntimeCaches() }
-        clearSearchResultScrollPositions()
-        legacyRefreshHome(forceRefresh = true)
-    }
+    if (currentHomeState().isLoading) return
+    // 普通刷新只强制重取首页/公告/分类入口；完整清理由设置页负责。
+    // 保留旧缓存作为失败兜底，也保留搜索位置和其他页面的有效缓存。
+    legacyRefreshHome(forceRefresh = true)
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacySelectCategory(
