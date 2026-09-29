@@ -781,19 +781,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         cursor: String,
         filters: Map<String, String> = emptyMap()
     ): CursorPagedVodItems {
-        val queryParameters = linkedMapOf(
-            "type_id" to typeId.trim(),
-            "limit" to CATEGORY_CURSOR_PAGE_LIMIT.toString(),
-            "cursor" to cursor
-        ).apply {
-            filters.forEach { (key, value) ->
-                val normalizedKey = key.trim()
-                val normalizedValue = value.trim()
-                if (normalizedKey.isNotBlank() && normalizedValue.isNotBlank()) {
-                    put(normalizedKey, normalizedValue)
-                }
-            }
-        }
+        val queryParameters = buildLibraryQuery(typeId, cursor, filters, CATEGORY_CURSOR_PAGE_LIMIT)
 
         return requestApi { getCursorList(queryParameters) }
             .toCursorPagedVodItems()

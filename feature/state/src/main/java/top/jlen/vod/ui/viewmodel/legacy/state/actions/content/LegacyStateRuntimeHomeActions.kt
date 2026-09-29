@@ -14,7 +14,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshHome(forceRefresh: Boo
     } else {
         null
     }
-    updateHomeState(loadingHomeState(cachedPayload))
+    updateHomeState(homeStateKeepingLibrary(loadingHomeState(cachedPayload), currentHomeState()))
     viewModelScope.launch {
         val shouldRefreshFromNetwork = forceRefresh || cachedPayload != null
         runCatching {
@@ -22,7 +22,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshHome(forceRefresh: Boo
                 legacyRepository().loadHome(forceRefresh = shouldRefreshFromNetwork)
             }
         }.onSuccess { payload ->
-            updateHomeState(homeStateFromPayload(payload))
+            updateHomeState(homeStateKeepingLibrary(homeStateFromPayload(payload), currentHomeState()))
             legacyScheduleHomePreviewEnrich()
         }.onFailure { error ->
             updateHomeState(
@@ -84,20 +84,25 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadCategoryContent(
     category: AppleCmsCategory,
     filters: Map<String, String>
 ) {
+    val requestVersion = libraryRequests.begin()
+    val requestedFilters = filters.toMap()
+    currentCategoryPreviewEnrichJob()?.cancel()
+    updateHomeState(beginCategoryLoadState(currentHomeState(), category, requestedFilters))
     viewModelScope.launch {
-        updateHomeState(beginCategoryLoadState(currentHomeState(), category, filters))
         runCatching {
             withContext(Dispatchers.IO) {
                 legacyRepository().loadCategoryCursorPage(
                     typeId = category.typeId,
                     cursor = "",
-                    filters = filters
+                    filters = requestedFilters
                 )
             }
         }.onSuccess { payload ->
+            if (!libraryRequests.isCurrent(requestVersion)) return@onSuccess
             updateHomeState(homeStateWithCategoryPage(currentHomeState(), payload))
             legacyScheduleCategoryPreviewEnrich()
         }.onFailure { error ->
+            if (!libraryRequests.isCurrent(requestVersion)) return@onFailure
             updateHomeState(
                 homeStateWithCategoryError(
                     currentHomeState(),
@@ -145,41 +150,34 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreHome() {
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreCategory() {
-    if (currentHomeState().isCategoryAppending) {
+    val snapshot = currentHomeState()
+    if (snapshot.isCategoryAppending || snapshot.isCategoryLoading || snapshot.isLoading) return
+    if (snapshot.categoryVisibleCount < snapshot.categoryVideos.size) {
+        updateHomeState(homeStateWithExpandedCategoryVisibleCount(snapshot))
         return
     }
-    if (currentHomeState().categoryVisibleCount < currentHomeState().categoryVideos.size) {
-        updateHomeState(homeStateWithExpandedCategoryVisibleCount(currentHomeState()))
-        return
-    }
-    if (!currentHomeState().hasMoreCategoryItems) return
-    val category = currentHomeState().selectedCategory ?: return
+    if (!snapshot.hasMoreCategoryItems) return
+    val category = snapshot.selectedCategory ?: return
+    val requestVersion = libraryRequests.version
+    val previousVisibleCount = snapshot.categoryVisibleCount
+    updateHomeState(beginCategoryAppendState(snapshot))
     viewModelScope.launch {
-        val previousVisibleCount = currentHomeState().categoryVisibleCount
-        updateHomeState(beginCategoryAppendState(currentHomeState()))
         runCatching {
             withContext(Dispatchers.IO) {
                 legacyRepository().loadCategoryCursorPage(
                     typeId = category.typeId,
-                    cursor = currentHomeState().categoryCursor,
-                    filters = currentHomeState().selectedCategoryFilters
+                    cursor = snapshot.categoryCursor,
+                    filters = snapshot.selectedCategoryFilters
                 )
             }
         }.onSuccess { payload ->
-            updateHomeState(
-                homeStateWithAppendedCategoryPage(
-                    currentHomeState(),
-                    previousVisibleCount,
-                    payload
-                )
-            )
+            if (!libraryRequests.isCurrent(requestVersion)) return@onSuccess
+            updateHomeState(homeStateWithAppendedCategoryPage(currentHomeState(), previousVisibleCount, payload))
             legacyScheduleCategoryPreviewEnrich()
         }.onFailure { error ->
+            if (!libraryRequests.isCurrent(requestVersion)) return@onFailure
             updateHomeState(
-                homeStateWithCategoryAppendError(
-                    currentHomeState(),
-                    toUserFacingMessage(error, "继续加载分类失败")
-                )
+                homeStateWithCategoryAppendError(currentHomeState(), toUserFacingMessage(error, "继续加载分类失败"))
             )
         }
     }

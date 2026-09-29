@@ -39,6 +39,7 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
     private val historyCacheStore = HistoryCacheStore(application)
     private val searchResultScrollPositions = mutableMapOf<String, SearchResultScrollPosition>()
     private var hasEnteredAccountScreen = false
+    internal val libraryRequests = LibraryRequestTracker()
     private var searchJob: Job? = null
     private var searchSuggestJob: Job? = null
     private var searchEnrichJob: Job? = null

@@ -4,6 +4,7 @@ import top.jlen.vod.data.AppleCmsCategory
 import top.jlen.vod.data.CategoryFilterGroup
 import top.jlen.vod.data.HomeSection
 import top.jlen.vod.data.VodItem
+import top.jlen.vod.data.libraryFilterGroups
 
 data class HomeUiState(
     val isLoading: Boolean = true,
@@ -44,5 +45,5 @@ data class HomeUiState(
         get() = categoryVisibleCount < categoryVideos.size || hasMoreCategoryItems
 
     val categoryFilterGroups: List<CategoryFilterGroup>
-        get() = selectedCategory?.filterGroups.orEmpty()
+        get() = libraryFilterGroups(selectedCategory, categories)
 }

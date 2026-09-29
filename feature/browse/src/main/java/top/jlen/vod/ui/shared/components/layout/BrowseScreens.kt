@@ -859,7 +859,7 @@ internal fun LoadMoreFooter(
 }
 
 @Composable
-private fun CompactPosterCard(
+internal fun CompactPosterCard(
     item: VodItem,
     onClick: (String) -> Unit,
     modifier: Modifier = Modifier
