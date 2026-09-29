@@ -219,8 +219,8 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(UiPalette.BackgroundBottom)
-            .appTopInsetsPadding(),
-        contentPadding = PaddingValues(bottom = 24.dp),
+            .appScrollingInsets(),
+        contentPadding = appTopContentPadding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         item(key = "home_top", contentType = "home_top") {

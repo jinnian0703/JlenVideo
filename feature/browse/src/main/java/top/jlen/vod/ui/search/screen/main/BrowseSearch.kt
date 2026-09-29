@@ -202,10 +202,10 @@ private fun SearchLandingContent(
         modifier = Modifier
             .fillMaxSize()
             .background(UiPalette.BackgroundBottom)
-            .appTopInsetsPadding()
+            .appScrollingInsets()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
+        contentPadding = appTopContentPadding(top = 16.dp, bottom = 24.dp)
     ) {
         item {
             Text(
@@ -356,10 +356,10 @@ fun SearchResultsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(UiPalette.BackgroundBottom)
-            .appTopInsetsPadding()
+            .appScrollingInsets()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
+        contentPadding = appTopContentPadding(top = 16.dp, bottom = 24.dp)
     ) {
         item {
             Row(

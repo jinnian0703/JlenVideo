@@ -129,7 +129,7 @@ fun CategoryScreen(
     )
 
     BoxWithConstraints(
-        modifier = Modifier.fillMaxSize().background(UiPalette.BackgroundBottom).appTopInsetsPadding()
+        modifier = Modifier.fillMaxSize().background(UiPalette.BackgroundBottom).appHorizontalInsetsPadding()
     ) {
         val columns = ((maxWidth - 32.dp) / 120.dp).toInt().coerceIn(3, 8)
         // 横屏或大字体时筛选内容可独立滚动，始终为影片保留空间。
@@ -152,22 +152,25 @@ fun CategoryScreen(
         }
 
         CategoryFloatingLayout(header = {
-            CategoryFilterHeader(
-                state = state,
-                expanded = header.expanded,
-                maxBodyHeight = filterMaxHeight,
-                onToggle = { header = header.toggle(atTop = !listState.canScrollBackward) },
-                onSelectCategory = {
-                    header = CategoryHeaderBehavior()
-                    scope.launch { listState.scrollToItem(0) }
-                    onSelectCategory(it)
-                },
-                onSelectFilter = { key, value ->
-                    header = CategoryHeaderBehavior()
-                    scope.launch { listState.scrollToItem(0) }
-                    onSelectFilter(key, value)
-                }
-            )
+            // Only the floating controls avoid the status bar; the list fills the window.
+            Box(Modifier.appTopInsetsPadding()) {
+                CategoryFilterHeader(
+                    state = state,
+                    expanded = header.expanded,
+                    maxBodyHeight = filterMaxHeight,
+                    onToggle = { header = header.toggle(atTop = !listState.canScrollBackward) },
+                    onSelectCategory = {
+                        header = CategoryHeaderBehavior()
+                        scope.launch { listState.scrollToItem(0) }
+                        onSelectCategory(it)
+                    },
+                    onSelectFilter = { key, value ->
+                        header = CategoryHeaderBehavior()
+                        scope.launch { listState.scrollToItem(0) }
+                        onSelectFilter(key, value)
+                    }
+                )
+            }
         }) { headerHeight ->
             Box(
                 Modifier.fillMaxSize()

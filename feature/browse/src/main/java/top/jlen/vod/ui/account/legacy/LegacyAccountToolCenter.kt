@@ -705,10 +705,10 @@ internal fun AccountSettingsScaffold(
         modifier = Modifier
             .fillMaxSize()
             .background(UiPalette.BackgroundBottom)
-            .appTopInsetsPadding()
+            .appScrollingInsets()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 18.dp, bottom = 28.dp)
+        contentPadding = appTopContentPadding(top = 18.dp, bottom = 28.dp)
     ) {
         item {
             Row(

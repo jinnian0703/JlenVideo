@@ -1032,6 +1032,8 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         )
     }
 
+    fun hasPendingSessionRestore(): Boolean = cookieJar.hasPendingRestore()
+
     fun clearSession() {
         cookieJar.clear()
     }

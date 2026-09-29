@@ -2,6 +2,7 @@ package top.jlen.vod.ui
 
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.jlen.vod.AppRuntimeInfo
@@ -10,6 +11,19 @@ import top.jlen.vod.CrashLogger
 internal fun LegacyStateRuntimeViewModelCore.legacyRefreshAccount() {
     val session = legacyRepository().currentSession()
     updateAccountState(refreshedAccountState(currentAccountState(), session))
+    if (legacyRepository().hasPendingSessionRestore()) {
+        // During package replacement/device unlock the Keystore may not be ready on the first read.
+        viewModelScope.launch {
+            for (waitMs in listOf(250L, 1_000L, 3_000L)) {
+                delay(waitMs)
+                val restored = withContext(Dispatchers.IO) { legacyRepository().currentSession() }
+                if (!legacyRepository().hasPendingSessionRestore()) {
+                    if (restored.isLoggedIn) legacyRefreshAccount()
+                    break
+                }
+            }
+        }
+    }
     if (session.isLoggedIn) {
         legacyShowCachedFollowContent()
     }
@@ -20,6 +34,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshAccount() {
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyEnsureAccountScreenReady() {
+    if (legacyRepository().hasPendingSessionRestore()) legacyRefreshAccount()
     if (hasEnteredAccountScreenFlag()) return
     markAccountScreenEntered()
     if (!currentAccountState().session.isLoggedIn) return

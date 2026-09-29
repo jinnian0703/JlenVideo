@@ -201,10 +201,10 @@ internal fun LegacyAccountScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(UiPalette.BackgroundBottom)
-            .appTopInsetsPadding()
+            .appScrollingInsets()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 18.dp, bottom = 28.dp)
+        contentPadding = appTopContentPadding(top = 18.dp, bottom = 28.dp)
     ) {
         item(key = "account_title", contentType = "account_header") {
             Column {
@@ -2027,10 +2027,10 @@ fun AccountPointLogScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .appTopInsetsPadding()
+            .appScrollingInsets()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 18.dp, bottom = 28.dp)
+        contentPadding = appTopContentPadding(top = 18.dp, bottom = 28.dp)
     ) {
         item {
             Row(

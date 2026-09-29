@@ -45,10 +45,10 @@ fun AnnouncementListScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(UiPalette.BackgroundBottom)
-            .appTopInsetsPadding()
+            .appScrollingInsets()
             .padding(horizontal = UiDimens.PagePadding),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
+        contentPadding = appTopContentPadding(top = 24.dp, bottom = 24.dp)
     ) {
         item {
             Row(
@@ -119,10 +119,10 @@ fun AnnouncementDetailScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(UiPalette.BackgroundBottom)
-                    .appTopInsetsPadding()
+                    .appScrollingInsets()
                     .padding(horizontal = UiDimens.PagePadding),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
+                contentPadding = appTopContentPadding(top = 24.dp, bottom = 24.dp)
             ) {
                 item {
                     Row(
@@ -152,10 +152,10 @@ fun AnnouncementDetailScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(UiPalette.BackgroundBottom)
-                    .appTopInsetsPadding()
+                    .appScrollingInsets()
                     .padding(horizontal = UiDimens.PagePadding),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
+                contentPadding = appTopContentPadding(top = 24.dp, bottom = 24.dp)
             ) {
                 item {
                     Row(
