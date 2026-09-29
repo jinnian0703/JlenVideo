@@ -157,6 +157,7 @@ private fun FeedbackPaneContainer(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(UiPalette.BackgroundBottom)
+                    .appTopInsetsPadding()
                     .padding(horizontal = 24.dp),
                 contentAlignment = Alignment.Center
             ) {

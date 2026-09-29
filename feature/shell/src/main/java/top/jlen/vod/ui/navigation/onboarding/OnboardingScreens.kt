@@ -148,6 +148,7 @@ fun UserAgreementOnboardingScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .appTopInsetsPadding()
             .padding(horizontal = UiDimens.PagePadding, vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
@@ -265,6 +266,7 @@ fun FirstLoginOnboardingScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .appTopInsetsPadding()
             .padding(horizontal = 20.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {

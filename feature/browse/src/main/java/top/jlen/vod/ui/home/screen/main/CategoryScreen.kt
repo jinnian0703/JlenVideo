@@ -129,7 +129,7 @@ fun CategoryScreen(
     )
 
     BoxWithConstraints(
-        modifier = Modifier.fillMaxSize().background(UiPalette.BackgroundBottom).statusBarsPadding()
+        modifier = Modifier.fillMaxSize().background(UiPalette.BackgroundBottom).appTopInsetsPadding()
     ) {
         val columns = ((maxWidth - 32.dp) / 120.dp).toInt().coerceIn(3, 8)
         // 横屏或大字体时筛选内容可独立滚动，始终为影片保留空间。

@@ -2,6 +2,7 @@ package top.jlen.vod.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -42,7 +43,9 @@ fun DetailScreen(
 
     when {
         state.isLoading && detailItem == null -> LoadingPane("正在加载详情...")
-        !errorMessage.isNullOrBlank() -> ErrorBanner(message = errorMessage, onRetry = onBack, actionLabel = "返回")
+        !errorMessage.isNullOrBlank() -> Box(modifier = Modifier.appTopInsetsPadding()) {
+            ErrorBanner(message = errorMessage, onRetry = onBack, actionLabel = "返回")
+        }
         detailItem == null -> EmptyPane(
             message = "没有找到影片详情",
             description = "这条资源可能已下架，或当前站点暂未返回详情数据"

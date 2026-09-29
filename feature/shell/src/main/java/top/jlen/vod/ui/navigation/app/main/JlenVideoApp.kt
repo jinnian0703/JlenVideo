@@ -20,6 +20,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -261,7 +266,13 @@ fun JlenVideoApp() {
     val showBottomBar = currentTopLevelRoute != null &&
         !isSearchResultsRoute(currentRoute) &&
         !isAccountSettingsDetailRoute(currentRoute)
-    val rootContentInsets = WindowInsets(0, 0, 0, 0)
+    // Pages own their top inset so artwork can draw behind the transparent status bar.
+    // Playback manages all system bars itself, including its fullscreen transitions.
+    val rootContentInsets = if (heartbeatRoute == "player") {
+        WindowInsets(0, 0, 0, 0)
+    } else {
+        WindowInsets.navigationBars.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
+    }
     val updateInfo = viewModel.accountState.updateInfo
     val noticeDialog = viewModel.noticeState.dialogNotice
     val canShowGlobalDialogs = currentTopLevelRoute != null
@@ -381,7 +392,8 @@ fun JlenVideoApp() {
                         startDestination = startDestination,
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(innerPadding),
+                            .padding(innerPadding)
+                            .consumeWindowInsets(innerPadding),
                         enterTransition = { EnterTransition.None },
                         exitTransition = { ExitTransition.None },
                         popEnterTransition = { EnterTransition.None },
@@ -944,6 +956,7 @@ private fun TrafficCaptureBlockedScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .safeDrawingPadding()
             .padding(horizontal = 24.dp),
         contentAlignment = Alignment.Center
     ) {
