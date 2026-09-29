@@ -14,8 +14,6 @@ import android.os.SystemClock
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -66,9 +64,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -95,8 +96,6 @@ private const val ROUTE_ONBOARDING_AGREEMENT = "onboarding/agreement"
 private const val ROUTE_ONBOARDING_LOGIN = "onboarding/login"
 private const val TRAFFIC_CAPTURE_CHECK_MS = 2_000L
 
-private val topLevelRoutes = setOf("home", "categories", "follow", "search", "account")
-
 private val bottomBarItems = listOf(
     Triple("home", "首页", Icons.Rounded.Home),
     Triple("categories", "片库", Icons.Rounded.Category),
@@ -109,6 +108,8 @@ private val bottomBarItems = listOf(
 fun JlenVideoApp() {
     val isDarkTheme = isSystemInDarkTheme()
     val context = LocalContext.current
+    val screenSlideDirection = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1 else 1
+    val screenSlideDistancePx = with(LocalDensity.current) { 32.dp.roundToPx() }
     val activity = context.findActivity()
     SideEffect {
         UiPalette.syncWithSystem(isDarkTheme)
@@ -394,10 +395,18 @@ fun JlenVideoApp() {
                             .fillMaxSize()
                             .padding(innerPadding)
                             .consumeWindowInsets(innerPadding),
-                        enterTransition = { EnterTransition.None },
-                        exitTransition = { ExitTransition.None },
-                        popEnterTransition = { EnterTransition.None },
-                        popExitTransition = { ExitTransition.None }
+                        enterTransition = {
+                            screenEnterTransition(navigationTransitionStyle(), screenSlideDirection, screenSlideDistancePx)
+                        },
+                        exitTransition = {
+                            screenExitTransition(navigationTransitionStyle(), screenSlideDirection, screenSlideDistancePx)
+                        },
+                        popEnterTransition = {
+                            screenPopEnterTransition(navigationTransitionStyle(), screenSlideDirection, screenSlideDistancePx)
+                        },
+                        popExitTransition = {
+                            screenPopExitTransition(navigationTransitionStyle(), screenSlideDirection, screenSlideDistancePx)
+                        }
                     ) {
                         composable(ROUTE_ONBOARDING_AGREEMENT) {
                             UserAgreementOnboardingScreen(
