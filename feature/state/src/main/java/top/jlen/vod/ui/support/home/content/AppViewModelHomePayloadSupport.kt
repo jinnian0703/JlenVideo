@@ -1,10 +1,12 @@
 package top.jlen.vod.ui
 
+import top.jlen.vod.data.ALL_LIBRARY_CATEGORY
 import top.jlen.vod.data.HomePayload
 
 internal fun homeStateFromPayload(payload: HomePayload): HomeUiState {
-    val defaultSelected = payload.categories.firstOrNull()
-    val categoryVideos = payload.categoryVideos
+    // 首页最新列表来自不限制分类的游标接口，可作为“全部”的首屏。
+    // 不复用旧缓存中的 categoryVideos，否则会把首个分类误当成全部。
+    val categoryVideos = payload.latest
     return HomeUiState(
         isLoading = false,
         slides = payload.slides,
@@ -17,12 +19,12 @@ internal fun homeStateFromPayload(payload: HomePayload): HomeUiState {
         hasMoreHomeItems = payload.latestHasMore,
         homeFirstLoaded = true,
         categories = payload.categories,
-        selectedCategory = defaultSelected,
+        selectedCategory = ALL_LIBRARY_CATEGORY,
         categoryVideos = categoryVideos,
         categoryVisibleCount = categoryVideos.initialGridVisibleCount(),
-        categoryCursor = payload.categoryCursor,
-        hasMoreCategoryItems = payload.categoryHasMore,
-        categoryFirstLoaded = true,
+        categoryCursor = payload.latestCursor,
+        hasMoreCategoryItems = payload.latestHasMore,
+        categoryFirstLoaded = categoryVideos.isNotEmpty(),
         error = null
     )
 }

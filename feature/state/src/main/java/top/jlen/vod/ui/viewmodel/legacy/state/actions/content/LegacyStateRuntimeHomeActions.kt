@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.jlen.vod.data.ALL_LIBRARY_CATEGORY
 import top.jlen.vod.data.AppleCmsCategory
 
 internal fun LegacyStateRuntimeViewModelCore.legacyRefreshHome(forceRefresh: Boolean = false) {
@@ -184,7 +185,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreCategory() {
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyRefreshCategoryTab(forceRefresh: Boolean = false) {
-    val selectedCategory = currentHomeState().selectedCategory ?: currentHomeState().categories.firstOrNull() ?: return
+    val selectedCategory = currentHomeState().selectedCategory ?: currentHomeState().categories.firstOrNull()?.let { ALL_LIBRARY_CATEGORY } ?: return
     if (forceRefresh || currentHomeState().selectedCategoryFilters.isNotEmpty()) {
         legacyLoadCategoryContent(
             category = selectedCategory,

@@ -245,7 +245,12 @@ private fun CategoryFilterHeader(
     val groups = remember(state.selectedCategory, state.categories) { state.categoryFilterGroups }
     val summary = libraryFilterSummary(state.selectedCategory, groups, state.selectedCategoryFilters)
     val arrowRotation by animateFloatAsState(if (expanded) 180f else 0f, tween(180), label = "category_arrow")
-    Surface(color = UiPalette.Surface, shadowElevation = 2.dp) {
+    Surface(
+        modifier = Modifier.padding(start = 16.dp, top = 8.dp, end = 16.dp).fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = UiPalette.Surface,
+        shadowElevation = 3.dp
+    ) {
         Column(Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
@@ -293,7 +298,6 @@ private fun CategoryFilterHeader(
                     }
                 }
             }
-            HorizontalDivider(color = UiPalette.BorderSoft)
         }
     }
 }

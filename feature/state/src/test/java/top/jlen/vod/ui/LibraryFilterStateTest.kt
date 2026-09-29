@@ -50,8 +50,56 @@ class LibraryFilterStateTest {
         assertFalse(tracker.isCurrent(old))
         assertTrue(tracker.isCurrent(current))
     }
-    @Test fun initialHomeLoadStillUsesInitialCategoryPayload() {
-        val fresh = HomeUiState(categories = listOf(movie), selectedCategory = movie)
+    private fun initialPayload() = HomePayload(
+        slides = emptyList(),
+        hot = emptyList(),
+        featured = emptyList(),
+        latest = listOf(VodItem(vodId = "movie-1"), VodItem(vodId = "series-1")),
+        sections = emptyList(),
+        categories = listOf(movie, series),
+        selectedCategory = movie,
+        categoryVideos = listOf(VodItem(vodId = "only-movie")),
+        latestCursor = "all-next",
+        latestHasMore = true,
+        categoryCursor = "movie-next",
+        categoryHasMore = false
+    )
+    @Test fun initialHomeLoadDefaultsToAllWithMatchingItemsAndCursor() {
+        val payload = initialPayload()
+        val fresh = homeStateFromPayload(payload)
+        assertEquals(ALL_LIBRARY_CATEGORY, fresh.selectedCategory)
+        assertEquals(payload.latest, fresh.categoryVideos)
+        assertEquals(2, fresh.categoryVisibleCount)
+        assertEquals("all-next", fresh.categoryCursor)
+        assertTrue(fresh.hasMoreCategoryItems)
+        assertTrue(fresh.categoryFirstLoaded)
+        assertTrue(fresh.selectedCategoryFilters.isEmpty())
+        assertEquals(payload.categories, fresh.categories)
         assertEquals(fresh, homeStateKeepingLibrary(fresh, HomeUiState()))
+    }
+    @Test fun emptyLatestDoesNotMasqueradeOldCategoryCacheAsAll() {
+        val fresh = homeStateFromPayload(initialPayload().copy(
+            latest = emptyList(), latestCursor = "", latestHasMore = false
+        ))
+        assertEquals(ALL_LIBRARY_CATEGORY, fresh.selectedCategory)
+        assertTrue(fresh.categoryVideos.isEmpty())
+        assertFalse(fresh.categoryFirstLoaded)
+        assertEquals("", fresh.categoryCursor)
+        assertFalse(fresh.hasMoreCategoryItems)
+    }
+    @Test fun manuallySelectedCategorySurvivesHomeRefresh() {
+        val fresh = homeStateFromPayload(initialPayload())
+        val current = fresh.copy(
+            selectedCategory = series,
+            selectedCategoryFilters = mapOf("year" to "2025"),
+            categoryVideos = listOf(VodItem(vodId = "selected-series")),
+            categoryVisibleCount = 1,
+            categoryCursor = "series-next"
+        )
+        val result = homeStateKeepingLibrary(fresh, current)
+        assertEquals(series, result.selectedCategory)
+        assertEquals(current.selectedCategoryFilters, result.selectedCategoryFilters)
+        assertEquals(current.categoryVideos, result.categoryVideos)
+        assertEquals(current.categoryCursor, result.categoryCursor)
     }
 }
