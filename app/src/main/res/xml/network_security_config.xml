@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- 第三方视频源仍可能使用 HTTP，需允许明文播放；jlen.top 及其子域单独强制 HTTPS。 -->
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />

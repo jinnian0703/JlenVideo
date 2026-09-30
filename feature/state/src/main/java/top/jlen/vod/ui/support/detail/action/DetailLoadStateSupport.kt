@@ -7,15 +7,16 @@ import top.jlen.vod.data.VodItem
 
 internal fun beginDetailLoad(
     detailState: DetailUiState,
-    keepCurrentContent: Boolean
+    keepCurrentContent: Boolean,
+    requestedVodId: String
 ): DetailUiState = if (keepCurrentContent) {
-    detailState.copy(isLoading = true, error = null)
+    detailState.copy(isLoading = true, error = null, requestedVodId = requestedVodId)
 } else {
-    DetailUiState(isLoading = true, error = null)
+    DetailUiState(isLoading = true, requestedVodId = requestedVodId)
 }
 
-internal fun missingDetailState(): DetailUiState =
-    DetailUiState(isLoading = false, error = "详情不存在或已失效")
+internal fun missingDetailState(requestedVodId: String): DetailUiState =
+    DetailUiState(isLoading = false, error = "详情不存在或已失效", requestedVodId = requestedVodId)
 
 internal fun loadedDetailState(
     item: VodItem,
@@ -23,8 +24,10 @@ internal fun loadedDetailState(
     isFavorited: Boolean,
     selectedSourceIndex: Int = 0,
     playbackResumeBucket: PlaybackResumeBucket? = null,
-    pendingResumePlayback: PlaybackResumeRecord? = null
+    pendingResumePlayback: PlaybackResumeRecord? = null,
+    requestedVodId: String = item.vodId
 ): DetailUiState = DetailUiState(
+    requestedVodId = requestedVodId,
     isLoading = false,
     item = item,
     sources = sources,
@@ -36,10 +39,11 @@ internal fun loadedDetailState(
     pendingResumePlayback = pendingResumePlayback
 )
 
-internal fun detailStateWithLoadError(message: String): DetailUiState =
+internal fun detailStateWithLoadError(message: String, requestedVodId: String): DetailUiState =
     DetailUiState(
         isLoading = false,
-        error = message
+        error = message,
+        requestedVodId = requestedVodId
     )
 
 internal fun detailStateWithResumeBucket(

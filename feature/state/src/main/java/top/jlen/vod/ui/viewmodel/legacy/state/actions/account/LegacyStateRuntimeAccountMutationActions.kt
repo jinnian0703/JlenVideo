@@ -126,7 +126,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacySignInMembership() {
 
     if (shouldRefreshMembershipFirst) {
         viewModelScope.launch {
-            runCatching {
+            runStateCatching {
                 withContext(Dispatchers.IO) { legacyRepository().loadMembershipDataForApp() }
             }.onSuccess { page ->
                 updateAccountState(

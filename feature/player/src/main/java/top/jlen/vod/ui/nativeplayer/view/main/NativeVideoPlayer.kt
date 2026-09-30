@@ -65,6 +65,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -98,6 +99,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
@@ -133,8 +135,12 @@ fun NativeVideoPlayer(
     val audioManager = remember(context) { context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager }
     val playbackIdentity = remember(url, episodeName) { "$url|$episodeName" }
     val isPortraitWindow = configuration.screenHeightDp > configuration.screenWidthDp
+    val castState by DlnaCastSession.state.collectAsState()
+    val isCasting = castState.isActive
     val player = remember(playbackIdentity) {
-        runCatching { createNativePlayer(context, url, initialSnapshot) }.getOrNull()
+        runCatching {
+            createNativePlayer(context, url, initialSnapshot.copy(playWhenReady = initialSnapshot.playWhenReady && !DlnaCastSession.isCasting))
+        }.getOrNull()
     }
     val latestOrientationCallback = rememberUpdatedState(onVideoOrientationDetected)
     val snapshotCallbackForPlayback = remember(playbackIdentity) { onPlaybackSnapshotChanged }
@@ -148,7 +154,6 @@ fun NativeVideoPlayer(
     var sliderDragStartPositionMs by remember(playbackIdentity) { mutableLongStateOf(0L) }
     var speed by remember(playbackIdentity) { mutableFloatStateOf(initialSnapshot.speed) }
     var speedMenuExpanded by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
-    var isCasting by remember(playbackIdentity) { mutableStateOf(false) }
     var shouldResumeOnStart by remember(playbackIdentity) { mutableStateOf(false) }
     var controlsVisible by remember(fullscreenMode, playbackIdentity) { mutableStateOf(true) }
     var controlsVersion by remember(fullscreenMode, playbackIdentity) { mutableLongStateOf(0L) }
@@ -288,7 +293,8 @@ fun NativeVideoPlayer(
     }
 
     fun resumePlaybackByUser() {
-        if (playbackState != Player.STATE_ENDED) {
+        // 投屏期间本地保持暂停
+        if (playbackState != Player.STATE_ENDED && !DlnaCastSession.isCasting) {
             player?.play()
         }
         isUserPaused = false
@@ -390,7 +396,7 @@ fun NativeVideoPlayer(
             val target = gestureSeekPreviewMs.coerceIn(0L, duration.coerceAtLeast(0L))
             player?.seekTo(target)
             currentPosition = target
-            if (gestureWasPlaying && playbackState != Player.STATE_ENDED) {
+            if (gestureWasPlaying && playbackState != Player.STATE_ENDED && !DlnaCastSession.isCasting) {
                 player?.play()
             }
             dispatchSnapshot(force = true)
@@ -516,7 +522,7 @@ fun NativeVideoPlayer(
                     }
 
                     Lifecycle.Event.ON_START -> {
-                        if (shouldResumeOnStart && !isCasting) {
+                        if (shouldResumeOnStart && !DlnaCastSession.isCasting) {
                             player.play()
                             isPlaying = true
                             showPausedOverlay = false
@@ -558,12 +564,68 @@ fun NativeVideoPlayer(
             player.seekTo(initialSnapshot.positionMs)
             currentPosition = initialSnapshot.positionMs
         }
-        player.playWhenReady = initialSnapshot.playWhenReady
-        isPlaying = initialSnapshot.playWhenReady
+        val shouldPlayLocally = initialSnapshot.playWhenReady && !DlnaCastSession.isCasting
+        player.playWhenReady = shouldPlayLocally
+        isPlaying = shouldPlayLocally
         showPausedOverlay = false
         isUserPaused = false
-        if (initialSnapshot.playWhenReady) {
+        if (shouldPlayLocally) {
             player.play()
+        }
+    }
+
+    // 会话监听独立于控制栏，隐藏按钮也不会漏掉连接与进度回传。
+    LaunchedEffect(player, isCasting) {
+        if (player != null && isCasting) {
+            player.pause()
+            isPlaying = false
+            isUserPaused = false
+            showPausedOverlay = false
+            shouldResumeOnStart = false
+            hasStartedPlaybackOnce = true
+            dispatchSnapshot(force = true)
+        }
+    }
+
+    LaunchedEffect(player, url, lifecycleOwner) {
+        if (player == null) return@LaunchedEffect
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            DlnaCastSession.stopped.collect { event ->
+                if (event == null || event.url != url || DlnaCastSession.isCasting) return@collect
+                player.pause()
+                shouldResumeOnStart = false
+                hasStartedPlaybackOnce = true
+                event.positionMs?.takeIf { it >= 0L }?.let { position ->
+                    val target = if (duration > 0L) position.coerceAtMost(duration) else position
+                    player.seekTo(target)
+                    currentPosition = target
+                }
+                dispatchSnapshot(force = true)
+                DlnaCastSession.acknowledgeStopped(event.id)
+            }
+        }
+    }
+
+    LaunchedEffect(url, lifecycleOwner) {
+        // 只让当前前台页切集，避免后台内联播放器覆盖全屏页的地址。
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            DlnaCastSession.pushIfConnected(context, url, listOf(title, sourceName, episodeName).filter(String::isNotBlank).joinToString(" · "))
+        }
+    }
+
+    // 兜底：投屏期间任何入口让本地开始播放都立即暂停（含创建播放器时的 playWhenReady）
+    DisposableEffect(player) {
+        if (player == null) {
+            onDispose { }
+        } else {
+            if (DlnaCastSession.isCasting) player.pause()
+            val listener = object : Player.Listener {
+                override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                    if (playWhenReady && DlnaCastSession.isCasting) player.pause()
+                }
+            }
+            player.addListener(listener)
+            onDispose { player.removeListener(listener) }
         }
     }
 
@@ -608,6 +670,7 @@ fun NativeVideoPlayer(
             playbackState != Player.STATE_ENDED
         ) {
             repeat(if (fullscreenMode) 4 else 3) {
+                if (DlnaCastSession.isCasting) return@repeat
                 player.play()
                 delay(if (fullscreenMode) 350L else 500L)
                 if (hasStartedPlaybackOnce || player.isPlaying) {
@@ -1066,6 +1129,31 @@ fun NativeVideoPlayer(
                 )
             }
 
+            CastPlaybackButton(
+                url = url,
+                title = title,
+                subtitle = listOf(sourceName, episodeName).filter(String::isNotBlank).joinToString(" · "),
+                positionMs = currentPosition,
+                visible = controlsShown,
+                onInteraction = { markInteraction() },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .then(
+                        if (fullscreenMode) {
+                            Modifier.windowInsetsPadding(
+                                WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)
+                            )
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .padding(
+                        top = if (fullscreenMode) 16.dp else 8.dp,
+                        end = if (fullscreenMode) 16.dp else 8.dp
+                    )
+                    .size(48.dp)
+            )
+
             if (controlsShown) {
                 Text(
                     text = "视频来源于第三方，切勿相信任何广告信息",
@@ -1163,49 +1251,6 @@ fun NativeVideoPlayer(
                     }
                 }
 
-                CastPlaybackButton(
-                    url = url,
-                    title = title,
-                    subtitle = listOf(sourceName, episodeName)
-                        .filter(String::isNotBlank)
-                        .joinToString(" · "),
-                    positionMs = currentPosition,
-                    playWhenReady = isPlaying,
-                    onConnectionChanged = { connected ->
-                        isCasting = connected
-                        if (connected) {
-                            shouldResumeOnStart = false
-                        }
-                    },
-                    onCastPlaybackStarted = {
-                        player.pause()
-                        isPlaying = false
-                        isUserPaused = false
-                        showPausedOverlay = false
-                        shouldResumeOnStart = false
-                        dispatchSnapshot(force = true)
-                    },
-                    onInteraction = { markInteraction() },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .then(
-                            if (fullscreenMode) {
-                                Modifier.windowInsetsPadding(
-                                    WindowInsets.safeDrawing.only(
-                                        WindowInsetsSides.Horizontal + WindowInsetsSides.Top
-                                    )
-                                )
-                            } else {
-                                Modifier
-                            }
-                        )
-                        .padding(
-                            top = if (fullscreenMode) 16.dp else 8.dp,
-                            end = if (fullscreenMode) 16.dp else 8.dp
-                        )
-                        .size(48.dp)
-                )
-
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     IconButton(
                         onClick = {
@@ -1279,7 +1324,7 @@ fun NativeVideoPlayer(
                             val wasPlayingBeforeSeek = player.isPlaying
                             val wasPausedByUser = isUserPaused
                             player.seekTo(target)
-                            if (wasPlayingBeforeSeek && playbackState != Player.STATE_ENDED) {
+                            if (wasPlayingBeforeSeek && playbackState != Player.STATE_ENDED && !DlnaCastSession.isCasting) {
                                 player.play()
                                 isPlaying = true
                                 showPausedOverlay = false

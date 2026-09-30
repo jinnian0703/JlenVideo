@@ -16,6 +16,7 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -39,6 +40,10 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
@@ -150,194 +155,243 @@ fun HomeScreen(
     onOpenAnnouncementDetail: (String) -> Unit,
     onOpenSearch: () -> Unit
 ) {
-    if (state.isLoading) {
-        LoadingPane("首页加载中...", style = FeedbackPaneStyle.FullscreenPlain)
-        return
-    }
-
-    val context = LocalContext.current
-    val listState = rememberSaveable(saver = LazyListState.Saver) {
-        LazyListState(
-            firstVisibleItemIndex = initialScrollIndex,
-            firstVisibleItemScrollOffset = initialScrollOffset
-        )
-    }
-    var handledScrollToTopSignal by rememberSaveable { mutableStateOf(scrollToTopSignal) }
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
-            .distinctUntilChanged()
-            .collect { (index, offset) ->
-                onScrollPositionChange(index, offset)
+    BrowseRefreshLayout(isRefreshing = state.isLoading, onRefresh = onRefresh) { columns ->
+        val context = LocalContext.current
+        val listState = rememberSaveable(saver = LazyListState.Saver) {
+            LazyListState(
+                firstVisibleItemIndex = initialScrollIndex,
+                firstVisibleItemScrollOffset = initialScrollOffset
+            )
+        }
+        var handledScrollToTopSignal by rememberSaveable { mutableStateOf(scrollToTopSignal) }
+        LaunchedEffect(listState) {
+            snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+                .distinctUntilChanged()
+                .collect { (index, offset) ->
+                    onScrollPositionChange(index, offset)
+                }
+        }
+        LaunchedEffect(scrollToTopSignal) {
+            if (scrollToTopSignal > 0 && scrollToTopSignal != handledScrollToTopSignal) {
+                handledScrollToTopSignal = scrollToTopSignal
+                listState.animateScrollToItem(0)
             }
-    }
-    LaunchedEffect(scrollToTopSignal) {
-        if (scrollToTopSignal > 0 && scrollToTopSignal != handledScrollToTopSignal) {
-            handledScrollToTopSignal = scrollToTopSignal
-            listState.animateScrollToItem(0)
         }
-    }
-    val pauseHomeMotion by remember {
-        derivedStateOf { listState.isScrollInProgress }
-    }
-    val visibleLatest = remember(state.latest, state.homeVisibleCount) { state.visibleLatest }
-    val hotRows = remember(state.hot) { state.hot.chunked(POSTER_GRID_COLUMNS) }
-    val latestRows = remember(visibleLatest) { visibleLatest.chunked(POSTER_GRID_COLUMNS) }
-    val featuredPrefetchItems = remember(state.featured) { state.featured.take(2) }
-    val latestPrefetchItems = remember(visibleLatest) { visibleLatest.take(6) }
-    val featuredPrefetchKeys = remember(featuredPrefetchItems) { featuredPrefetchItems.map(VodItem::stableKey) }
-    val latestPrefetchKeys = remember(latestPrefetchItems) { latestPrefetchItems.map(VodItem::stableKey) }
+        val pauseHomeMotion by remember {
+            derivedStateOf { listState.isScrollInProgress }
+        }
+        val visibleLatest = remember(state.latest, state.homeVisibleCount) { state.visibleLatest }
+        val hotRows = remember(state.hot, columns) { state.hot.chunked(columns) }
+        val latestRows = remember(visibleLatest, columns) { visibleLatest.chunked(columns) }
+        val latestRowIndices = remember(latestRows) {
+            latestRows.mapIndexed { index, row -> posterRowKey("home_latest", row) to index }.toMap()
+        }
+        val featuredPrefetchItems = remember(state.featured) { state.featured.take(2) }
+        val latestPrefetchItems = remember(visibleLatest) { visibleLatest.take(6) }
+        val featuredPrefetchKeys = remember(featuredPrefetchItems) { featuredPrefetchItems.map(VodItem::stableKey) }
+        val latestPrefetchKeys = remember(latestPrefetchItems) { latestPrefetchItems.map(VodItem::stableKey) }
 
-    LaunchedEffect(featuredPrefetchKeys, latestPrefetchKeys) {
-        val imageLoader = context.imageLoader
-        featuredPrefetchItems.forEach { item ->
-            imageLoader.enqueue(buildPosterRequest(context, item.vodPic, 540, 324))
+        LaunchedEffect(featuredPrefetchKeys, latestPrefetchKeys) {
+            val imageLoader = context.imageLoader
+            featuredPrefetchItems.forEach { item ->
+                imageLoader.enqueue(buildPosterRequest(context, item.vodPic, 540, 324))
+            }
+            latestPrefetchItems.forEach { item ->
+                imageLoader.enqueue(buildPosterRequest(context, item.vodPic, 360, 520))
+            }
         }
-        latestPrefetchItems.forEach { item ->
-            imageLoader.enqueue(buildPosterRequest(context, item.vodPic, 360, 520))
-        }
-    }
 
-    LaunchedEffect(listState, latestRows.size, state.hasMoreLatest, state.isHomeAppending) {
-        snapshotFlow { listState.maxVisiblePosterRowIndex("home_latest-") }
-            .distinctUntilChanged()
-            .collect { lastVisibleRowIndex ->
-                if (
-                    shouldAutoPreloadRows(
-                        lastVisibleRowIndex = lastVisibleRowIndex,
-                        totalRows = latestRows.size,
-                        hasMore = state.hasMoreLatest,
-                        isLoading = state.isHomeAppending
+        LaunchedEffect(listState, latestRowIndices, state.hasMoreLatest, state.isHomeAppending, state.isLoading) {
+            snapshotFlow { listState.maxVisiblePosterRowIndex(latestRowIndices) }
+                .distinctUntilChanged()
+                .collect { lastVisibleRowIndex ->
+                    if (
+                        shouldAutoPreloadRows(
+                            lastVisibleRowIndex = lastVisibleRowIndex,
+                            totalRows = latestRows.size,
+                            hasMore = state.hasMoreLatest,
+                            isLoading = state.isHomeAppending || state.isLoading
+                        )
+                    ) {
+                        onLoadMore()
+                    }
+                }
+        }
+
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .background(UiPalette.BackgroundBottom)
+                .appScrollingInsets(),
+            contentPadding = appTopContentPadding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            item(key = "home_top", contentType = "home_top") {
+                HomeTopBlock(
+                    onRefresh = onRefresh,
+                    noticeState = noticeState,
+                    onRefreshAnnouncements = onRefreshAnnouncements,
+                    onOpenAnnouncementList = onOpenAnnouncementList,
+                    onOpenAnnouncementDetail = onOpenAnnouncementDetail,
+                    onOpenSearch = onOpenSearch,
+                    pauseMotion = pauseHomeMotion
+                )
+            }
+            state.error?.let { message ->
+                item(key = "home_error", contentType = "error") { ErrorBanner(message = message, onRetry = onRefresh) }
+            }
+            if (state.isLoading && state.slides.isEmpty() && state.hot.isEmpty() && state.latest.isEmpty()) {
+                item(key = "home_loading", contentType = "loading") {
+                    LoadingPane("正在加载内容...", style = FeedbackPaneStyle.Card)
+                }
+                return@LazyColumn
+            }
+            if (state.slides.isNotEmpty()) {
+                item(key = "home_slides_title", contentType = "section_title") {
+                    SectionTitle(
+                        title = "轮播推荐",
+                        action = null,
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Whatshot,
+                                contentDescription = null,
+                                tint = UiPalette.Accent,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onAction = {}
                     )
-                ) {
-                    onLoadMore()
+                }
+                item(key = "home_slides", contentType = "featured_carousel") {
+                    FeaturedCarouselSection(
+                        items = state.slides,
+                        onOpenDetail = onOpenDetail,
+                        pauseMotion = pauseHomeMotion
+                    )
                 }
             }
-    }
-
-    LazyColumn(
-        state = listState,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(UiPalette.BackgroundBottom)
-            .appScrollingInsets(),
-        contentPadding = appTopContentPadding(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
-    ) {
-        item(key = "home_top", contentType = "home_top") {
-            HomeTopBlock(
-                onRefresh = onRefresh,
-                noticeState = noticeState,
-                onRefreshAnnouncements = onRefreshAnnouncements,
-                onOpenAnnouncementList = onOpenAnnouncementList,
-                onOpenAnnouncementDetail = onOpenAnnouncementDetail,
-                onOpenSearch = onOpenSearch,
-                pauseMotion = pauseHomeMotion
-            )
-        }
-        state.error?.let { message ->
-            item(key = "home_error", contentType = "error") { ErrorBanner(message = message, onRetry = onRefresh) }
-        }
-        if (state.slides.isNotEmpty()) {
-            item(key = "home_slides_title", contentType = "section_title") {
+            if (state.hot.isNotEmpty()) {
+                item(key = "home_hot_title", contentType = "section_title") {
+                    SectionTitle(
+                        title = "正在热播",
+                        action = null,
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Whatshot,
+                                contentDescription = null,
+                                tint = UiPalette.Accent,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onAction = {}
+                    )
+                }
+                posterGridRows(
+                    rows = hotRows,
+                    columns = columns,
+                    rowKeyPrefix = "home_hot",
+                    onOpenDetail = onOpenDetail
+                )
+            }
+            if (state.featured.isNotEmpty()) {
+                item(key = "home_featured_title", contentType = "section_title") {
+                    SectionTitle(
+                        title = "推荐",
+                        action = null,
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Whatshot,
+                                contentDescription = null,
+                                tint = UiPalette.Accent,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onAction = {}
+                    )
+                }
+                item(key = "home_featured", contentType = "featured_carousel") {
+                    FeaturedCarouselSection(
+                        items = state.featured,
+                        onOpenDetail = onOpenDetail,
+                        pauseMotion = pauseHomeMotion
+                    )
+                }
+            }
+            item(key = "home_latest_title", contentType = "section_title") {
                 SectionTitle(
-                    title = "轮播推荐",
-                    action = null,
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Rounded.Whatshot,
-                            contentDescription = null,
-                            tint = UiPalette.Accent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    onAction = {}
+                    title = "最近更新",
+                    action = "进入片库",
+                    onAction = onOpenCategory
                 )
             }
-            item(key = "home_slides", contentType = "featured_carousel") {
-                FeaturedCarouselSection(
-                    items = state.slides,
-                    onOpenDetail = onOpenDetail,
-                    pauseMotion = pauseHomeMotion
+            if (state.latest.isEmpty()) {
+                item(key = "home_latest_empty", contentType = "empty") {
+                    InlineEmptyStateCard(
+                        message = "暂无内容",
+                        actionLabel = "\u5237\u65b0",
+                        onAction = onRefresh
+                    )
+                }
+            } else {
+                posterGridRows(
+                    rows = latestRows,
+                    columns = columns,
+                    rowKeyPrefix = "home_latest",
+                    onOpenDetail = onOpenDetail
                 )
-            }
-        }
-        if (state.hot.isNotEmpty()) {
-            item(key = "home_hot_title", contentType = "section_title") {
-                SectionTitle(
-                    title = "正在热播",
-                    action = null,
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Rounded.Whatshot,
-                            contentDescription = null,
-                            tint = UiPalette.Accent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    onAction = {}
-                )
-            }
-            posterGridRows(
-                rows = hotRows,
-                rowKeyPrefix = "home_hot",
-                onOpenDetail = onOpenDetail
-            )
-        }
-        if (state.featured.isNotEmpty()) {
-            item(key = "home_featured_title", contentType = "section_title") {
-                SectionTitle(
-                    title = "推荐",
-                    action = null,
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Rounded.Whatshot,
-                            contentDescription = null,
-                            tint = UiPalette.Accent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    onAction = {}
-                )
-            }
-            item(key = "home_featured", contentType = "featured_carousel") {
-                FeaturedCarouselSection(
-                    items = state.featured,
-                    onOpenDetail = onOpenDetail,
-                    pauseMotion = pauseHomeMotion
-                )
-            }
-        }
-        item(key = "home_latest_title", contentType = "section_title") {
-            SectionTitle(
-                title = "最近更新",
-                action = "进入片库",
-                onAction = onOpenCategory
-            )
-        }
-        if (state.latest.isEmpty()) {
-            item(key = "home_latest_empty", contentType = "empty") {
-                InlineEmptyStateCard(
-                    message = "暂无内容",
-                    actionLabel = "\u5237\u65b0",
-                    onAction = onRefresh
-                )
-            }
-        } else {
-            posterGridRows(
-                rows = latestRows,
-                rowKeyPrefix = "home_latest",
-                onOpenDetail = onOpenDetail
-            )
-            item(key = "home_latest_footer", contentType = "footer") {
-                LoadMoreFooter(
-                    hasMore = state.hasMoreLatest,
-                    isLoading = state.isHomeAppending,
-                    errorMessage = state.homeAppendError,
-                    onLoadMore = onLoadMore
-                )
+                item(key = "home_latest_footer", contentType = "footer") {
+                    LoadMoreFooter(
+                        hasMore = state.hasMoreLatest,
+                        isLoading = state.isHomeAppending,
+                        errorMessage = state.homeAppendError,
+                        onLoadMore = onLoadMore
+                    )
+                }
             }
         }
     }
 }
 
 
+
+
+@OptIn(ExperimentalMaterialApi::class)
+@Composable
+private fun BrowseRefreshLayout(
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    content: @Composable (columns: Int) -> Unit
+) {
+    var refreshRequested by remember { mutableStateOf(false) }
+    LaunchedEffect(isRefreshing) {
+        if (!isRefreshing) refreshRequested = false
+    }
+    val pullState = rememberPullRefreshState(
+        refreshing = isRefreshing && refreshRequested,
+        onRefresh = {
+            if (!isRefreshing) {
+                refreshRequested = true
+                onRefresh()
+            }
+        }
+    )
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(UiPalette.BackgroundBottom)
+            .appHorizontalInsetsPadding()
+            .pullRefresh(pullState, enabled = !isRefreshing)
+    ) {
+        // 两侧各留 16dp；手机保持三列，大屏按实际内容区宽度扩展。
+        val columns = ((maxWidth - 32.dp) / 120.dp).toInt().coerceIn(3, 8)
+        content(columns)
+        PullRefreshIndicator(
+            refreshing = isRefreshing && refreshRequested,
+            state = pullState,
+            modifier = Modifier.align(Alignment.TopCenter).appTopInsetsPadding(),
+            backgroundColor = UiPalette.Surface,
+            contentColor = UiPalette.Accent
+        )
+    }
+}

@@ -5,13 +5,14 @@ import com.google.gson.JsonObject
 import java.util.Locale
 
 internal fun JsonObject.extractNoticeItems(): List<JsonElement> {
+    val data = get("data").safeObject()
     val candidates = listOfNotNull(
-        getAsJsonObject("data")?.getAsJsonArray("items"),
-        getAsJsonArray("items"),
-        getAsJsonObject("data")?.getAsJsonArray("list"),
-        getAsJsonArray("list"),
-        getAsJsonObject("data")?.getAsJsonArray("rows"),
-        getAsJsonArray("rows")
+        data?.get("items").safeArray(),
+        get("items").safeArray(),
+        data?.get("list").safeArray(),
+        get("list").safeArray(),
+        data?.get("rows").safeArray(),
+        get("rows").safeArray()
     )
     return candidates.firstOrNull()?.toList().orEmpty()
 }
@@ -111,3 +112,13 @@ internal fun JsonObject.firstArray(vararg names: String): List<JsonElement> =
         }
         .firstOrNull()
         .orEmpty()
+
+// 安全取值：非对应类型（含 JsonNull、基本类型）时返回 null，而不是抛异常
+internal fun JsonElement?.safeObject(): JsonObject? =
+    this?.takeIf { it.isJsonObject }?.asJsonObject
+
+internal fun JsonElement?.safeArray(): com.google.gson.JsonArray? =
+    this?.takeIf { it.isJsonArray }?.asJsonArray
+
+internal fun JsonElement?.safeString(): String =
+    this?.takeIf { it.isJsonPrimitive }?.let { runCatching { it.asString }.getOrNull() }.orEmpty()

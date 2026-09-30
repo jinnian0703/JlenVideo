@@ -15,10 +15,10 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshHome(forceRefresh: Boo
     } else {
         null
     }
-    updateHomeState(homeStateKeepingLibrary(loadingHomeState(cachedPayload), currentHomeState()))
+    updateHomeState(loadingHomeState(cachedPayload, currentHomeState()))
     viewModelScope.launch {
         val shouldRefreshFromNetwork = forceRefresh || cachedPayload != null
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) {
                 legacyRepository().loadHome(forceRefresh = shouldRefreshFromNetwork)
             }
@@ -89,7 +89,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadCategoryContent(
     currentCategoryPreviewEnrichJob()?.cancel()
     updateHomeState(beginCategoryLoadState(currentHomeState(), category, requestedFilters))
     viewModelScope.launch {
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) {
                 legacyRepository().loadCategoryCursorPage(
                     typeId = category.typeId,
@@ -114,7 +114,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadCategoryContent(
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreHome() {
-    if (currentHomeState().isHomeAppending) {
+    if (currentHomeState().isHomeAppending || currentHomeState().isLoading) {
         return
     }
     if (currentHomeState().homeVisibleCount < currentHomeState().latest.size) {
@@ -125,7 +125,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreHome() {
     viewModelScope.launch {
         val previousVisibleCount = currentHomeState().homeVisibleCount
         updateHomeState(beginHomeAppendState(currentHomeState()))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) {
                 legacyRepository().loadLatestCursorPage(cursor = currentHomeState().homeCursor)
             }
@@ -162,7 +162,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreCategory() {
     val previousVisibleCount = snapshot.categoryVisibleCount
     updateHomeState(beginCategoryAppendState(snapshot))
     viewModelScope.launch {
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) {
                 legacyRepository().loadCategoryCursorPage(
                     typeId = category.typeId,
@@ -184,7 +184,12 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreCategory() {
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyRefreshCategoryTab(forceRefresh: Boolean = false) {
-    val selectedCategory = currentHomeState().selectedCategory ?: currentHomeState().categories.firstOrNull()?.let { ALL_LIBRARY_CATEGORY } ?: return
+    val selectedCategory = currentHomeState().selectedCategory ?: currentHomeState().categories.firstOrNull()?.let { ALL_LIBRARY_CATEGORY }
+    if (selectedCategory == null) {
+        // 首次首页加载失败时分类数据同样为空，重试必须重新请求分类入口。
+        legacyRefreshHome(forceRefresh = forceRefresh)
+        return
+    }
     if (forceRefresh || currentHomeState().selectedCategoryFilters.isNotEmpty()) {
         legacyLoadCategoryContent(
             category = selectedCategory,

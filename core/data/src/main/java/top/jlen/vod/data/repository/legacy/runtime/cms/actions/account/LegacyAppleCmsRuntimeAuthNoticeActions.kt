@@ -9,7 +9,7 @@ import okhttp3.FormBody
 import okhttp3.Request
 import top.jlen.vod.AppRuntimeInfo
 
-internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyReportHeartbeat(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyReportHeartbeat(
     route: String,
     userId: String = currentSession().userId,
     vodId: String = "",
@@ -48,9 +48,9 @@ internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyReportHeartbeat(
         )
         .build()
 
-    runtimeHttpClient().newCall(request).execute().use { response ->
+    runtimeHttpClient().newCall(request).await().use { response ->
         if (!response.isSuccessful) {
-            throw IOException("韫囧啳鐑︽稉濠冨Г婢惰精瑙﹂敍娆籘TP ${response.code}")
+            throw IOException("心跳上报失败：HTTP ${response.code}")
         }
     }
 }
@@ -70,10 +70,10 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLogin(
         .post(payload)
         .build()
 
-    val response = runtimeHttpClient().newCall(request).execute()
+    val response = runtimeHttpClient().newCall(request).await()
     response.use {
         if (!it.isSuccessful) {
-            throw IOException("鐧诲綍澶辫触锛欻TTP ${it.code}")
+            throw IOException("登录失败：HTTP ${it.code}")
         }
         val body = it.body?.string().orEmpty()
         val authResponse = runtimeParseAuthResponse(body)
@@ -89,7 +89,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLogin(
 
         throw IOException(
             failureMessage
-                ?: "鐧诲綍澶辫触锛岃妫€鏌ヨ处鍙锋垨瀵嗙爜"
+                ?: "登录失败，请检查账号或密码"
         )
     }
 }
@@ -171,7 +171,7 @@ internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyMarkNoticeDismissed(notic
         .apply()
 }
 
-internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFreshNotices(
+internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFreshNotices(
     appVersion: String,
     userId: String
 ): List<AppNotice> {
@@ -192,16 +192,16 @@ internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFreshNotices(
         .header("Accept", "application/json")
         .build()
 
-    runtimeHttpClient().newCall(request).execute().use { response ->
+    runtimeHttpClient().newCall(request).await().use { response ->
         if (!response.isSuccessful) {
-            throw IOException("鍏憡鍔犺浇澶辫触锛欻TTP ${response.code}")
+            throw IOException("公告加载失败：HTTP ${response.code}")
         }
 
         val body = response.body?.string().orEmpty()
-        val json = JsonParser.parseString(body).asJsonObject
-        val items = runtimeExtractNoticeItems(json)
+        val json = runCatching { JsonParser.parseString(body).safeObject() }.getOrNull()
+        val items = json?.let { runtimeExtractNoticeItems(it) }.orEmpty()
         val notices = items.mapNotNull { element ->
-            runCatching { runtimeParseNoticeItem(element.asJsonObject) }.getOrNull()
+            runCatching { element.safeObject()?.let { runtimeParseNoticeItem(it) } }.getOrNull()
         }
             .sortedWith(
                 compareByDescending<AppNotice> { it.isPinned }
@@ -240,7 +240,7 @@ internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyNormalizeLoginFailureMess
     val message = rawMessage.trim()
     return when {
         message.isBlank() -> ""
-        message.contains("鑾峰彇鐢ㄦ埛淇℃伅澶辫触") -> "鐢ㄦ埛鍚嶄笉瀛樺湪鎴栧瘑鐮侀敊璇?"
+        message.contains("获取用户信息失败") -> "用户名不存在或密码错误"
         else -> message
     }
 }
@@ -257,8 +257,8 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadRegisterPage(
 
     return RegisterPage(
         channel = channel,
-        contactLabel = if (channel == "phone") "鎵嬫満鍙?" else "閭",
-        codeLabel = if (channel == "phone") "鎵嬫満楠岃瘉鐮?" else "閭楠岃瘉鐮?",
+        contactLabel = if (channel == "phone") "手机号" else "邮箱",
+        codeLabel = if (channel == "phone") "手机验证码" else "邮箱验证码",
         requiresCode = requiresCode,
         requiresVerify = requiresVerify,
         captchaUrl = runtimeResolveUrl(captchaUrl),
@@ -274,11 +274,11 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadRegisterCaptc
         .header("Referer", "${runtimeBaseUrl()}/index.php/user/reg.html")
         .build()
 
-    runtimeHttpClient().newCall(request).execute().use { response ->
+    runtimeHttpClient().newCall(request).await().use { response ->
         if (!response.isSuccessful) {
-            throw IOException("鍔犺浇楠岃瘉鐮佸け璐ワ細HTTP ${response.code}")
+            throw IOException("加载验证码失败：HTTP ${response.code}")
         }
-        return response.body?.bytes() ?: throw IOException("鍔犺浇楠岃瘉鐮佸け璐?")
+        return response.body?.bytes() ?: throw IOException("加载验证码失败")
     }
 }
 
@@ -304,11 +304,11 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFindPasswordC
         .header("Referer", "${runtimeBaseUrl()}/index.php/user/findpass.html")
         .build()
 
-    runtimeHttpClient().newCall(request).execute().use { response ->
+    runtimeHttpClient().newCall(request).await().use { response ->
         if (!response.isSuccessful) {
-            throw IOException("閸旂姾娴囨宀冪槈閻礁銇戠拹銉窗HTTP ${response.code}")
+            throw IOException("加载验证码失败：HTTP ${response.code}")
         }
-        return response.body?.bytes() ?: throw IOException("閸旂姾娴囨宀冪槈閻礁銇戠拹?")
+        return response.body?.bytes() ?: throw IOException("加载验证码失败")
     }
 }
 
@@ -370,9 +370,9 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLogout() {
         .post(FormBody.Builder().build())
         .build()
 
-    runtimeHttpClient().newCall(request).execute().use {
+    runtimeHttpClient().newCall(request).await().use {
         if (!it.isSuccessful && it.code != 302) {
-            throw IOException("閫€鍑虹櫥褰曞け璐ワ細HTTP ${it.code}")
+            throw IOException("退出登录失败：HTTP ${it.code}")
         }
     }
     clearSession()

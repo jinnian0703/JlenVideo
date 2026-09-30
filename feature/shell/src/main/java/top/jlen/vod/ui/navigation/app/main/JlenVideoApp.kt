@@ -17,6 +17,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -45,6 +50,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -79,6 +87,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -87,12 +96,16 @@ import androidx.navigation.navArgument
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import java.io.File
 import java.net.NetworkInterface
 import java.nio.charset.StandardCharsets
 import top.jlen.vod.RuntimeEndpoints
 import top.jlen.vod.data.AppUpdateInfo
 import top.jlen.vod.data.VodItem
+import top.jlen.vod.data.PlaySource
+import top.jlen.vod.data.Episode
 
 private const val ONBOARDING_PREFS = "jlen_video_onboarding"
 private const val KEY_ACCEPTED_USER_AGREEMENT = "accepted_user_agreement"
@@ -101,6 +114,11 @@ private const val KEY_COMPLETED_FIRST_LOGIN_PROMPT = "completed_first_login_prom
 private const val ROUTE_ONBOARDING_AGREEMENT = "onboarding/agreement"
 private const val ROUTE_ONBOARDING_LOGIN = "onboarding/login"
 private const val TRAFFIC_CAPTURE_CHECK_MS = 2_000L
+private const val ROUTE_SEARCH_RESULTS = "search/results/{query}"
+// 播放页携带 vodId/线路/选集参数，进程重建后可据此恢复播放
+private const val ROUTE_PLAYER = "player?vodId={vodId}&sourceIndex={sourceIndex}&episodeIndex={episodeIndex}&resumeUrl={resumeUrl}&title={title}"
+// 宽度达到该值时底部导航改为左侧 NavigationRail
+private val NAVIGATION_RAIL_MIN_WIDTH = 600.dp
 
 private val bottomBarItems = listOf(
     Triple("home", "首页", Icons.Rounded.Home),
@@ -334,7 +352,27 @@ fun JlenVideoApp() {
             viewModel.updateQuery(normalized)
         } else {
             viewModel.updateQuery(normalized)
-            navController.navigate("search/results/${Uri.encode(normalized)}")
+            val isOnSearchResults = isSearchResultsRoute(navController.currentBackStackEntry?.destination?.route)
+            navController.navigate("search/results/${Uri.encode(normalized)}") {
+                // 已在结果页时替换当前结果页，避免反复搜索无限压栈
+                if (isOnSearchResults) {
+                    popUpTo(ROUTE_SEARCH_RESULTS) {
+                        inclusive = true
+                    }
+                }
+                launchSingleTop = true
+            }
+        }
+    }
+    val openDetail: (String) -> Unit = { vodId ->
+        // 与搜索路由一致使用 Uri.encode，singleTop 防止快速连点重复压栈
+        navController.navigate(detailRoute(vodId)) {
+            launchSingleTop = true
+        }
+    }
+    val openPlayerRoute: (String, Int, Int) -> Unit = { vodId, sourceIndex, episodeIndex ->
+        navController.navigate(playerRoute(vodId, sourceIndex, episodeIndex)) {
+            launchSingleTop = true
         }
     }
     val openAccountSettingsChild: (String) -> Unit = { route ->
@@ -385,447 +423,479 @@ fun JlenVideoApp() {
                         onOpenLink = openAnnouncementLink
                     )
                 }
-                Scaffold(
-                    containerColor = Color.Transparent,
-                    contentWindowInsets = rootContentInsets,
-                    bottomBar = {
-                        if (showBottomBar) {
-                            AppBottomBar(
-                                currentRoute = currentTopLevelRoute.orEmpty(),
-                                scrollTopSignals = scrollTopSignals,
-                                onNavigate = navigateToTopLevel,
-                                onScrollToTop = triggerTopLevelScrollToTop
-                            )
-                        }
-                    }
-                ) { innerPadding ->
-                    NavHost(
-                        navController = navController,
-                        startDestination = startDestination,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding)
-                            .consumeWindowInsets(innerPadding),
-                        enterTransition = {
-                            screenEnterTransition(navigationTransitionStyle(), screenSlideDirection, screenSlideDistancePx)
-                        },
-                        exitTransition = {
-                            screenExitTransition(navigationTransitionStyle(), screenSlideDirection, screenSlideDistancePx)
-                        },
-                        popEnterTransition = {
-                            screenPopEnterTransition(navigationTransitionStyle(), screenSlideDirection, screenSlideDistancePx)
-                        },
-                        popExitTransition = {
-                            screenPopExitTransition(navigationTransitionStyle(), screenSlideDirection, screenSlideDistancePx)
-                        }
-                    ) {
-                        composable(ROUTE_ONBOARDING_AGREEMENT) {
-                            UserAgreementOnboardingScreen(
-                                onAccept = acceptAgreement,
-                                onExit = { activity?.finish() }
-                            )
-                        }
-                        composable(ROUTE_ONBOARDING_LOGIN) {
-                            LaunchedEffect(viewModel.accountState.session.isLoggedIn) {
-                                if (viewModel.accountState.session.isLoggedIn) {
-                                    completeFirstLoginPrompt("home")
-                                }
-                            }
-                            FirstLoginOnboardingScreen(
-                                state = viewModel.accountState,
-                                onUserNameChange = viewModel::updateLoginUserName,
-                                onPasswordChange = viewModel::updateLoginPassword,
-                                onLogin = viewModel::login,
-                                onSkip = { completeFirstLoginPrompt("home") },
-                                onAuthModeChange = viewModel::setAccountAuthMode,
-                                onRegisterEditorChange = viewModel::updateRegisterEditor,
-                                onRefreshRegisterCaptcha = viewModel::refreshRegisterCaptcha,
-                                onSendRegisterCode = viewModel::sendRegisterCode,
-                                onRegister = viewModel::register,
-                                onFindPasswordEditorChange = viewModel::updateFindPasswordEditor,
-                                onSendFindPasswordCode = viewModel::sendFindPasswordCode,
-                                onFindPassword = viewModel::findPassword
-                            )
-                        }
-                        composable("home") {
-                            HomeScreen(
-                                state = viewModel.homeState,
-                                noticeState = viewModel.noticeState,
-                                scrollToTopSignal = homeScrollToTopSignal,
-                                initialScrollIndex = homeScroll.index,
-                                initialScrollOffset = homeScroll.offset,
-                                onScrollPositionChange = { index, offset ->
-                                    homeScroll.update(index, offset)
-                                },
-                                onRefresh = viewModel::refreshHomeAndClearCaches,
-                                onRefreshAnnouncements = { viewModel.refreshNotices(forceRefresh = true) },
-                                onLoadMore = viewModel::loadMoreHome,
-                                onOpenDetail = { navController.navigate("detail/$it") },
-                                onOpenCategory = { navigateToTopLevel("categories") },
-                                onOpenAnnouncementList = { navController.navigate("announcements") },
-                                onOpenAnnouncementDetail = { noticeId ->
-                                    viewModel.markNoticeOpened(noticeId)
-                                    navController.navigate("announcement/${Uri.encode(noticeId)}")
-                                },
-                                onOpenSearch = { navigateToTopLevel("search") }
-                            )
-                        }
-                        composable("categories") {
-                            CategoryScreen(
-                                state = viewModel.homeState,
-                                scrollToTopSignal = categoryScrollToTopSignal,
-                                initialScrollIndex = categoryScroll.index,
-                                initialScrollOffset = categoryScroll.offset,
-                                onScrollPositionChange = { index, offset ->
-                                    categoryScroll.update(index, offset)
-                                },
-                                onSelectCategory = viewModel::selectCategory,
-                                onSelectFilter = viewModel::updateCategoryFilter,
-                                onRetryCategory = { viewModel.refreshCategoryTab(forceRefresh = true) },
-                                onLoadMore = viewModel::loadMoreCategory,
-                                onOpenDetail = { navController.navigate("detail/$it") }
-                            )
-                        }
-                        composable("search") {
-                            LaunchedEffect(Unit) {
-                                viewModel.refreshHotSearches()
-                            }
-                            SearchScreen(
-                                state = viewModel.searchState,
-                                scrollToTopSignal = searchScrollToTopSignal,
-                                onQueryChange = viewModel::updateQuery,
-                                onOpenSearchResults = openSearchResults,
-                                onSearchHistory = viewModel::searchHistory,
-                                onClearHistory = viewModel::clearSearchHistory,
-                                onLoadHotSearches = viewModel::refreshHotSearches
-                            )
-                        }
-                        composable("follow") {
-                            LaunchedEffect(Unit) {
-                                viewModel.showCachedFollowContent()
-                                viewModel.refreshFollowContent()
-                            }
-                            LaunchedEffect(
-                                viewModel.accountState.session.isLoggedIn,
-                                viewModel.accountState.favoriteItems,
-                                viewModel.accountState.historyItems
-                            ) {
-                                viewModel.rebuildFollowContent()
-                            }
-                            FollowScreen(
-                                state = viewModel.followState,
-                                onRefresh = { viewModel.refreshFollowContent(forceRefresh = true) },
-                                onOpenDetail = { navController.navigate("detail/$it") },
-                                onOpenAccount = { navigateToTopLevel("account") },
-                                onOpenLibrary = { navigateToTopLevel("categories") }
-                            )
-                        }
-                        composable(
-                            route = "search/results/{query}",
-                            arguments = listOf(navArgument("query") { type = NavType.StringType })
-                        ) { entry ->
-                            val query = entry.arguments?.getString("query").orEmpty()
-                            val scrollPosition = viewModel.getSearchResultScroll(query)
-                            LaunchedEffect(query) {
-                                viewModel.ensureSearchResults(query)
-                            }
-                            SearchResultsScreen(
-                                state = viewModel.searchState,
-                                resultKey = query.trim(),
-                                initialScrollIndex = scrollPosition.index,
-                                initialScrollOffset = scrollPosition.offset,
-                                scrollToTopSignal = searchScrollToTopSignal,
-                                onScrollPositionChange = { index, offset ->
-                                    viewModel.updateSearchResultScroll(query, index, offset)
-                                },
-                                onBack = { navController.popBackStack() },
-                                onQueryChange = viewModel::updateQuery,
-                                onSearch = {
-                                    val normalized = viewModel.searchState.query.trim()
-                                    if (normalized == query.trim()) {
-                                        viewModel.search()
-                                    } else {
-                                        openSearchResults(normalized)
-                                    }
-                                },
-                                onPickSuggestion = { keyword ->
-                                    viewModel.searchHistory(keyword)
-                                    openSearchResults(keyword)
-                                },
-                                onLoadMore = viewModel::loadMoreSearchResults,
-                                onOpenDetail = { navController.navigate("detail/$it") }
-                            )
-                        }
-                        composable("account") {
-                            LaunchedEffect(Unit) {
-                                viewModel.ensureAccountScreenReady()
-                            }
-                            AccountScreen(
-                                state = viewModel.accountState,
-                                onUserNameChange = viewModel::updateLoginUserName,
-                                onPasswordChange = viewModel::updateLoginPassword,
-                                onLogin = viewModel::login,
-                                onLogout = viewModel::logout,
-                                onSelectSection = viewModel::selectAccountSection,
-                                onChangePortrait = { portraitPicker.launch("image/*") },
-                                onOpenHistoryRecord = { item ->
-                                    viewModel.resumeHistoryRecord(item)
-                                    navController.navigate("player")
-                                },
-                                onOpenFollow = { navigateToTopLevel("follow") },
-                                onLoadMoreHistory = viewModel::loadMoreHistory,
-                                onDeleteHistory = viewModel::deleteHistory,
-                                onClearHistory = viewModel::clearHistory,
-                                onUpgradeMembership = viewModel::upgradeMembership,
-                                onRedeemMembershipCard = viewModel::redeemMembershipCard,
-                                onSignInMembership = viewModel::signInMembership,
-                                onOpenPointLogs = { navController.navigate("account/points") },
-                                onProfileEditorChange = viewModel::updateProfileEditor,
-                                onProfileTabChange = viewModel::setProfileEditTab,
-                                onSaveProfile = viewModel::saveProfile,
-                                onAuthModeChange = viewModel::setAccountAuthMode,
-                                onRegisterEditorChange = viewModel::updateRegisterEditor,
-                                onRefreshRegisterCaptcha = viewModel::refreshRegisterCaptcha,
-                                onSendRegisterCode = viewModel::sendRegisterCode,
-                                onRegister = viewModel::register,
-                                onFindPasswordEditorChange = viewModel::updateFindPasswordEditor,
-                                onSendFindPasswordCode = viewModel::sendFindPasswordCode,
-                                onFindPassword = viewModel::findPassword,
-                                onOpenSettingsUpdate = { openAccountSettingsChild("account/settings/update") },
-                                onOpenSettingsCache = { openAccountSettingsChild("account/settings/cache") },
-                                onOpenSettingsLogs = { openAccountSettingsChild("account/settings/logs") },
-                                onOpenSettingsAbout = { openAccountSettingsChild("account/settings/about") },
-                                onSendEmailCode = viewModel::sendEmailBindCode,
-                                onBindEmail = viewModel::bindEmail,
-                                onUnbindEmail = viewModel::unbindEmail
-                            )
-                        }
-                        composable("announcements") {
-                            LaunchedEffect(Unit) {
-                                viewModel.refreshNotices()
-                            }
-                            AnnouncementListScreen(
-                                state = viewModel.noticeState,
-                                onBack = { navController.popBackStack() },
-                                onRefresh = { viewModel.refreshNotices(forceRefresh = true) },
-                                onOpenNotice = { noticeId ->
-                                    viewModel.markNoticeOpened(noticeId)
-                                    navController.navigate("announcement/${Uri.encode(noticeId)}")
-                                }
-                            )
-                        }
-                        composable("account/points") {
-                            AccountPointLogScreen(
-                                pointLogs = viewModel.accountState.membershipPointLogs,
-                                onBack = { navController.popBackStack() }
-                            )
-                        }
-                        composable("account/settings/update") {
-                            AccountUpdateSettingsScreen(
-                                currentVersion = viewModel.accountState.updateInfo?.currentVersion
-                                    ?.ifBlank { "--" }
-                                    ?: "--",
-                                latestVersion = viewModel.accountState.updateInfo?.latestVersion.orEmpty(),
-                                notes = viewModel.accountState.updateInfo?.notes.orEmpty(),
-                                hasUpdate = viewModel.accountState.updateInfo?.hasUpdate == true,
-                                isUpdateLoading = viewModel.accountState.isUpdateLoading,
-                                onBack = backToAccount,
-                                onCheckUpdate = viewModel::checkAppUpdate,
-                                onOpenRelease = openReleaseLink,
-                                onDownloadUpdate = openUpdateLink
-                            )
-                        }
-                        composable("account/settings/cache") {
-                            LaunchedEffect(Unit) {
-                                viewModel.refreshCacheSettings()
-                            }
-                            AccountCacheSettingsScreen(
-                                cacheRetention = viewModel.accountState.cacheRetention,
-                                cacheSizeLimit = viewModel.accountState.cacheSizeLimit,
-                                cacheSizeSummary = viewModel.accountState.cacheSizeSummary,
-                                isCacheSizeLoading = viewModel.accountState.isCacheSizeLoading,
-                                isCacheClearing = viewModel.accountState.isCacheClearing,
-                                onBack = backToAccount,
-                                onRefreshCacheSize = viewModel::refreshCacheSize,
-                                onSetCacheRetention = viewModel::setCacheRetention,
-                                onSetCacheSizeLimit = viewModel::setCacheSizeLimit,
-                                onClearAppCache = viewModel::clearAppCache
-                            )
-                        }
-                        composable("account/settings/agreement") {
-                            AccountAgreementSettingsScreen(onBack = backToAccount)
-                        }
-                        composable("account/settings/about") {
-                            AccountAboutSettingsScreen(
-                                currentVersion = viewModel.accountState.updateInfo?.currentVersion?.ifBlank { "--" } ?: "--",
-                                onBack = backToAccount,
-                                onOpenUpdate = { openAccountSettingsChild("account/settings/update") },
-                                onOpenLogs = { openAccountSettingsChild("account/settings/logs") },
-                                onOpenAgreement = { openAccountSettingsChild("account/settings/agreement") },
-                                onOpenUrl = { url -> openExternalUrl(context, url) }
-                            )
-                        }
-                        composable("account/settings/logs") {
-                            LaunchedEffect(Unit) {
-                                viewModel.refreshCrashLog()
-                            }
-                            AccountCrashLogSettingsScreen(
-                                crashLogText = viewModel.accountState.latestCrashLog,
-                                issueLogEntries = viewModel.accountState.issueLogEntries,
-                                hasCrashLog = viewModel.accountState.hasCrashLog,
-                                onBack = backToAccount,
-                                onRefreshCrashLog = viewModel::refreshCrashLog,
-                                onClearCrashLog = viewModel::clearCrashLog,
-                                onOpenIssueLog = { issueLog ->
-                                    navController.navigate("account/settings/logs/detail/${Uri.encode(issueLog.id)}")
-                                },
-                                onReadIssueLog = viewModel::readIssueLog,
-                                onDeleteIssueLog = viewModel::deleteIssueLog
-                            )
-                        }
-                        composable(
-                            route = "account/settings/logs/detail/{logId}",
-                            arguments = listOf(navArgument("logId") { type = NavType.StringType })
-                        ) { entry ->
-                            val logId = entry.arguments?.getString("logId").orEmpty()
-                            val issueLog = viewModel.accountState.issueLogEntries.firstOrNull { it.id == logId }
-                            var logText by remember(logId) { mutableStateOf("") }
-                            LaunchedEffect(logId, viewModel.accountState.latestCrashLog) {
-                                logText = withContext(Dispatchers.IO) { viewModel.readIssueLog(logId) }
-                            }
-                            if (issueLog == null) {
-                                LaunchedEffect(logId) {
-                                    viewModel.refreshCrashLog()
-                                }
-                            }
-                            AccountIssueLogDetailScreen(
-                                entry = issueLog ?: AccountIssueLogEntry(
-                                    id = logId,
-                                    title = "问题日志",
-                                    time = "",
-                                    summary = ""
-                                ),
-                                logText = logText,
-                                onBack = { navController.popBackStack() },
-                                onCopy = { copyTextToClipboard(context, "issue_log", logText, "问题日志已复制") },
-                                onShare = { shareIssueLogText(context, logId, issueLog?.title ?: "问题日志", logText) },
-                                onDelete = {
-                                    viewModel.deleteIssueLog(logId)
-                                    navController.popBackStack()
-                                }
-                            )
-                        }
-                        composable(
-                            route = "announcement/{noticeId}",
-                            arguments = listOf(navArgument("noticeId") { type = NavType.StringType })
-                        ) { entry ->
-                            val noticeId = entry.arguments?.getString("noticeId").orEmpty()
-                            LaunchedEffect(noticeId) {
-                                viewModel.markNoticeOpened(noticeId)
-                                if (viewModel.findNotice(noticeId) == null) {
-                                    viewModel.refreshNotices(forceRefresh = true)
-                                }
-                            }
-                            AnnouncementDetailScreen(
-                                notice = viewModel.findNotice(noticeId),
-                                isLoading = viewModel.noticeState.isLoading,
-                                onBack = { navController.popBackStack() },
-                                onRefresh = { viewModel.refreshNotices(forceRefresh = true) },
-                                onOpenLink = openAnnouncementLink
-                            )
-                        }
-                        composable(
-                            route = "detail/{vodId}",
-                            arguments = listOf(navArgument("vodId") { type = NavType.StringType })
-                        ) { entry ->
-                            val vodId = entry.arguments?.getString("vodId").orEmpty()
-                            var showRemoveFavoriteDialog by remember(vodId) { mutableStateOf(false) }
-                            LaunchedEffect(vodId) {
-                                viewModel.loadDetail(vodId)
-                            }
-                            val routeDetailState = viewModel.detailState.takeIf { state ->
-                                state.item?.matchesDetailRoute(vodId) == true
-                            } ?: DetailUiState(isLoading = true)
-                            DetailScreen(
-                                state = routeDetailState,
-                                isLoggedIn = viewModel.accountState.session.isLoggedIn,
-                                onBack = { navController.popBackStack() },
-                                onSelectSource = viewModel::selectSource,
-                                onFavorite = {
-                                    if (
-                                        viewModel.accountState.session.isLoggedIn &&
-                                        routeDetailState.isFavorited
-                                    ) {
-                                        showRemoveFavoriteDialog = true
-                                    } else if (routeDetailState.item != null) {
-                                        viewModel.addCurrentDetailFavorite()
-                                    }
-                                },
-                                onDismissActionMessage = viewModel::dismissDetailActionMessage,
-                                onPlay = { title, sourceIndex, episodeIndex ->
-                                    val pendingResume = routeDetailState.pendingResumePlayback
-                                    val resumeSnapshot = if (
-                                        pendingResume != null &&
-                                        pendingResume.sourceIndex == sourceIndex &&
-                                        pendingResume.episodeIndex == episodeIndex
-                                    ) {
-                                        PlaybackSnapshot(
-                                            positionMs = pendingResume.positionMs,
-                                            speed = pendingResume.speed
-                                        )
-                                    } else {
-                                        PlaybackSnapshot()
-                                    }
-                                    viewModel.openPlayer(
-                                        title = title,
-                                        item = routeDetailState.item,
-                                        sources = routeDetailState.sources,
-                                        sourceIndex = sourceIndex,
-                                        episodeIndex = episodeIndex,
-                                        snapshot = resumeSnapshot
-                                    )
-                                    navController.navigate("player")
-                                }
-                            )
-                            if (showRemoveFavoriteDialog) {
-                                FollowRemoveConfirmDialog(
-                                    onDismiss = { showRemoveFavoriteDialog = false },
-                                    onConfirm = {
-                                        showRemoveFavoriteDialog = false
-                                        viewModel.cancelCurrentDetailFavorite()
-                                    }
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val useNavigationRail = maxWidth >= NAVIGATION_RAIL_MIN_WIDTH
+                    Scaffold(
+                        containerColor = Color.Transparent,
+                        contentWindowInsets = rootContentInsets,
+                        bottomBar = {
+                            if (showBottomBar && !useNavigationRail) {
+                                AppBottomBar(
+                                    currentRoute = currentTopLevelRoute.orEmpty(),
+                                    scrollTopSignals = scrollTopSignals,
+                                    onNavigate = navigateToTopLevel,
+                                    onScrollToTop = triggerTopLevelScrollToTop
                                 )
                             }
                         }
-                        composable("player") {
-                            LaunchedEffect(viewModel.playerState.item?.vodId) {
-                                viewModel.refreshPlayerSources()
+                    ) { innerPadding ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(innerPadding)
+                                .consumeWindowInsets(innerPadding)
+                        ) {
+                            // 平板/大屏：一级页面导航放在左侧，内容区占剩余宽度
+                            if (showBottomBar && useNavigationRail) {
+                                AppNavigationRail(
+                                    currentRoute = currentTopLevelRoute.orEmpty(),
+                                    scrollTopSignals = scrollTopSignals,
+                                    onNavigate = navigateToTopLevel,
+                                    onScrollToTop = triggerTopLevelScrollToTop
+                                )
                             }
-                            val snapshotVodId = viewModel.playerState.item?.vodId
-                            val snapshotSourceIndex = viewModel.playerState.selectedSourceIndex
-                            val snapshotEpisodeIndex = viewModel.playerState.selectedEpisodeIndex
-                            val snapshotEpisodePageUrl = viewModel.playerState.episodePageUrl
-                            PlayerScreen(
-                                state = viewModel.playerState,
-                                onBack = { navController.popBackStack() },
-                                onSelectEpisode = viewModel::selectPlayerEpisode,
-                                onSelectSource = viewModel::selectPlayerSource,
-                                onRefreshSources = viewModel::refreshPlayerSources,
-                                onPlayNext = viewModel::playNextEpisode,
-                                onPlaybackSnapshotChange = { snapshot ->
-                                    val currentPlayerState = viewModel.playerState
-                                    val matchesCurrentEpisode =
-                                        currentPlayerState.item?.vodId == snapshotVodId &&
-                                            currentPlayerState.selectedSourceIndex == snapshotSourceIndex &&
-                                            currentPlayerState.selectedEpisodeIndex == snapshotEpisodeIndex &&
-                                            currentPlayerState.episodePageUrl == snapshotEpisodePageUrl
-                                    if (matchesCurrentEpisode) {
-                                        viewModel.updatePlaybackSnapshot(snapshot)
-                                    }
+                            NavHost(
+                                navController = navController,
+                                startDestination = startDestination,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                enterTransition = {
+                                    screenEnterTransition(navigationTransitionStyle(), screenSlideDirection, screenSlideDistancePx)
                                 },
-                                onDetectedStream = viewModel::adoptDetectedStream,
-                                onResolveFallbackFailed = viewModel::reportTakeoverFailure
-                            )
+                                exitTransition = {
+                                    screenExitTransition(navigationTransitionStyle(), screenSlideDirection, screenSlideDistancePx)
+                                },
+                                popEnterTransition = {
+                                    screenPopEnterTransition(navigationTransitionStyle(), screenSlideDirection, screenSlideDistancePx)
+                                },
+                                popExitTransition = {
+                                    screenPopExitTransition(navigationTransitionStyle(), screenSlideDirection, screenSlideDistancePx)
+                                }
+                            ) {
+                                composable(ROUTE_ONBOARDING_AGREEMENT) {
+                                    UserAgreementOnboardingScreen(
+                                        onAccept = acceptAgreement,
+                                        onExit = { activity?.finish() }
+                                    )
+                                }
+                                composable(ROUTE_ONBOARDING_LOGIN) {
+                                    LaunchedEffect(viewModel.accountState.session.isLoggedIn) {
+                                        if (viewModel.accountState.session.isLoggedIn) {
+                                            completeFirstLoginPrompt("home")
+                                        }
+                                    }
+                                    FirstLoginOnboardingScreen(
+                                        state = viewModel.accountState,
+                                        onUserNameChange = viewModel::updateLoginUserName,
+                                        onPasswordChange = viewModel::updateLoginPassword,
+                                        onLogin = viewModel::login,
+                                        onSkip = { completeFirstLoginPrompt("home") },
+                                        onAuthModeChange = viewModel::setAccountAuthMode,
+                                        onRegisterEditorChange = viewModel::updateRegisterEditor,
+                                        onRefreshRegisterCaptcha = viewModel::refreshRegisterCaptcha,
+                                        onSendRegisterCode = viewModel::sendRegisterCode,
+                                        onRegister = viewModel::register,
+                                        onFindPasswordEditorChange = viewModel::updateFindPasswordEditor,
+                                        onSendFindPasswordCode = viewModel::sendFindPasswordCode,
+                                        onFindPassword = viewModel::findPassword
+                                    )
+                                }
+                                composable("home") {
+                                    HomeScreen(
+                                        state = viewModel.homeState,
+                                        noticeState = viewModel.noticeState,
+                                        scrollToTopSignal = homeScrollToTopSignal,
+                                        initialScrollIndex = homeScroll.index,
+                                        initialScrollOffset = homeScroll.offset,
+                                        onScrollPositionChange = { index, offset ->
+                                            homeScroll.update(index, offset)
+                                        },
+                                        onRefresh = viewModel::refreshHomeAndClearCaches,
+                                        onRefreshAnnouncements = { viewModel.refreshNotices(forceRefresh = true) },
+                                        onLoadMore = viewModel::loadMoreHome,
+                                        onOpenDetail = openDetail,
+                                        onOpenCategory = { navigateToTopLevel("categories") },
+                                        onOpenAnnouncementList = { navController.navigate("announcements") },
+                                        onOpenAnnouncementDetail = { noticeId ->
+                                            viewModel.markNoticeOpened(noticeId)
+                                            navController.navigate("announcement/${Uri.encode(noticeId)}")
+                                        },
+                                        onOpenSearch = { navigateToTopLevel("search") }
+                                    )
+                                }
+                                composable("categories") {
+                                    CategoryScreen(
+                                        state = viewModel.homeState,
+                                        scrollToTopSignal = categoryScrollToTopSignal,
+                                        initialScrollIndex = categoryScroll.index,
+                                        initialScrollOffset = categoryScroll.offset,
+                                        onScrollPositionChange = { index, offset ->
+                                            categoryScroll.update(index, offset)
+                                        },
+                                        onSelectCategory = viewModel::selectCategory,
+                                        onSelectFilter = viewModel::updateCategoryFilter,
+                                        onRetryCategory = { viewModel.refreshCategoryTab(forceRefresh = true) },
+                                        onLoadMore = viewModel::loadMoreCategory,
+                                        onOpenDetail = openDetail
+                                    )
+                                }
+                                composable("search") {
+                                    LaunchedEffect(Unit) {
+                                        viewModel.refreshHotSearches()
+                                    }
+                                    SearchScreen(
+                                        state = viewModel.searchState,
+                                        scrollToTopSignal = searchScrollToTopSignal,
+                                        onQueryChange = viewModel::updateQuery,
+                                        onOpenSearchResults = openSearchResults,
+                                        onSearchHistory = viewModel::searchHistory,
+                                        onClearHistory = viewModel::clearSearchHistory,
+                                        onLoadHotSearches = viewModel::refreshHotSearches
+                                    )
+                                }
+                                composable("follow") {
+                                    LaunchedEffect(Unit) {
+                                        viewModel.showCachedFollowContent()
+                                        viewModel.refreshFollowContent()
+                                    }
+                                    LaunchedEffect(
+                                        viewModel.accountState.session.isLoggedIn,
+                                        viewModel.accountState.favoriteItems,
+                                        viewModel.accountState.historyItems
+                                    ) {
+                                        viewModel.rebuildFollowContent()
+                                    }
+                                    FollowScreen(
+                                        state = viewModel.followState,
+                                        onRefresh = { viewModel.refreshFollowContent(forceRefresh = true) },
+                                        onOpenDetail = openDetail,
+                                        onOpenAccount = { navigateToTopLevel("account") },
+                                        onOpenLibrary = { navigateToTopLevel("categories") }
+                                    )
+                                }
+                                composable(
+                                    route = ROUTE_SEARCH_RESULTS,
+                                    arguments = listOf(navArgument("query") { type = NavType.StringType })
+                                ) { entry ->
+                                    val query = entry.arguments?.getString("query").orEmpty()
+                                    val scrollPosition = viewModel.getSearchResultScroll(query)
+                                    LaunchedEffect(query) {
+                                        viewModel.ensureSearchResults(query)
+                                    }
+                                    SearchResultsScreen(
+                                        state = viewModel.searchState,
+                                        resultKey = query.trim(),
+                                        initialScrollIndex = scrollPosition.index,
+                                        initialScrollOffset = scrollPosition.offset,
+                                        scrollToTopSignal = searchScrollToTopSignal,
+                                        onScrollPositionChange = { index, offset ->
+                                            viewModel.updateSearchResultScroll(query, index, offset)
+                                        },
+                                        onBack = { navController.popBackStack() },
+                                        onQueryChange = viewModel::updateQuery,
+                                        onSearch = {
+                                            val normalized = viewModel.searchState.query.trim()
+                                            if (normalized == query.trim()) {
+                                                viewModel.search()
+                                            } else {
+                                                openSearchResults(normalized)
+                                            }
+                                        },
+                                        onPickSuggestion = { keyword ->
+                                            viewModel.searchHistory(keyword)
+                                            openSearchResults(keyword)
+                                        },
+                                        onRetrySearch = { viewModel.search(query) },
+                                        onLoadMore = viewModel::loadMoreSearchResults,
+                                        onOpenDetail = openDetail
+                                    )
+                                }
+                                composable("account") {
+                                    LaunchedEffect(Unit) {
+                                        viewModel.ensureAccountScreenReady()
+                                    }
+                                    AccountScreen(
+                                        state = viewModel.accountState,
+                                        onUserNameChange = viewModel::updateLoginUserName,
+                                        onPasswordChange = viewModel::updateLoginPassword,
+                                        onLogin = viewModel::login,
+                                        onLogout = viewModel::logout,
+                                        onSelectSection = viewModel::selectAccountSection,
+                                        onChangePortrait = { portraitPicker.launch("image/*") },
+                                        onOpenHistoryRecord = { item ->
+                                            // 记录本身也写入路由，详情失效或没有 vodId 时仍可恢复直达播放。
+                                            navController.navigate(
+                                                playerRoute(
+                                                    vodId = resolveHistoryVodId(item),
+                                                    sourceIndex = item.sourceIndex,
+                                                    episodeIndex = item.episodeIndex,
+                                                    resumeUrl = item.playUrl.ifBlank { item.actionUrl },
+                                                    title = item.title
+                                                )
+                                            ) {
+                                                launchSingleTop = true
+                                            }
+                                        },
+                                        onOpenFollow = { navigateToTopLevel("follow") },
+                                        onLoadMoreHistory = viewModel::loadMoreHistory,
+                                        onDeleteHistory = viewModel::deleteHistory,
+                                        onClearHistory = viewModel::clearHistory,
+                                        onUpgradeMembership = viewModel::upgradeMembership,
+                                        onRedeemMembershipCard = viewModel::redeemMembershipCard,
+                                        onSignInMembership = viewModel::signInMembership,
+                                        onOpenPointLogs = { navController.navigate("account/points") },
+                                        onProfileEditorChange = viewModel::updateProfileEditor,
+                                        onProfileTabChange = viewModel::setProfileEditTab,
+                                        onSaveProfile = viewModel::saveProfile,
+                                        onAuthModeChange = viewModel::setAccountAuthMode,
+                                        onRegisterEditorChange = viewModel::updateRegisterEditor,
+                                        onRefreshRegisterCaptcha = viewModel::refreshRegisterCaptcha,
+                                        onSendRegisterCode = viewModel::sendRegisterCode,
+                                        onRegister = viewModel::register,
+                                        onFindPasswordEditorChange = viewModel::updateFindPasswordEditor,
+                                        onSendFindPasswordCode = viewModel::sendFindPasswordCode,
+                                        onFindPassword = viewModel::findPassword,
+                                        onOpenSettingsUpdate = { openAccountSettingsChild("account/settings/update") },
+                                        onOpenSettingsCache = { openAccountSettingsChild("account/settings/cache") },
+                                        onOpenSettingsLogs = { openAccountSettingsChild("account/settings/logs") },
+                                        onOpenSettingsAbout = { openAccountSettingsChild("account/settings/about") },
+                                        onSendEmailCode = viewModel::sendEmailBindCode,
+                                        onBindEmail = viewModel::bindEmail,
+                                        onUnbindEmail = viewModel::unbindEmail
+                                    )
+                                }
+                                composable("announcements") {
+                                    LaunchedEffect(Unit) {
+                                        viewModel.refreshNotices()
+                                    }
+                                    AnnouncementListScreen(
+                                        state = viewModel.noticeState,
+                                        onBack = { navController.popBackStack() },
+                                        onRefresh = { viewModel.refreshNotices(forceRefresh = true) },
+                                        onOpenNotice = { noticeId ->
+                                            viewModel.markNoticeOpened(noticeId)
+                                            navController.navigate("announcement/${Uri.encode(noticeId)}")
+                                        }
+                                    )
+                                }
+                                composable("account/points") {
+                                    AccountPointLogScreen(
+                                        pointLogs = viewModel.accountState.membershipPointLogs,
+                                        onBack = { navController.popBackStack() }
+                                    )
+                                }
+                                composable("account/settings/update") {
+                                    AccountUpdateSettingsScreen(
+                                        currentVersion = viewModel.accountState.updateInfo?.currentVersion
+                                            ?.ifBlank { "--" }
+                                            ?: "--",
+                                        latestVersion = viewModel.accountState.updateInfo?.latestVersion.orEmpty(),
+                                        notes = viewModel.accountState.updateInfo?.notes.orEmpty(),
+                                        hasUpdate = viewModel.accountState.updateInfo?.hasUpdate == true,
+                                        isUpdateLoading = viewModel.accountState.isUpdateLoading,
+                                        onBack = backToAccount,
+                                        onCheckUpdate = viewModel::checkAppUpdate,
+                                        onOpenRelease = openReleaseLink,
+                                        onDownloadUpdate = openUpdateLink
+                                    )
+                                }
+                                composable("account/settings/cache") {
+                                    LaunchedEffect(Unit) {
+                                        viewModel.refreshCacheSettings()
+                                    }
+                                    AccountCacheSettingsScreen(
+                                        cacheRetention = viewModel.accountState.cacheRetention,
+                                        cacheSizeLimit = viewModel.accountState.cacheSizeLimit,
+                                        cacheSizeSummary = viewModel.accountState.cacheSizeSummary,
+                                        isCacheSizeLoading = viewModel.accountState.isCacheSizeLoading,
+                                        isCacheClearing = viewModel.accountState.isCacheClearing,
+                                        onBack = backToAccount,
+                                        onRefreshCacheSize = viewModel::refreshCacheSize,
+                                        onSetCacheRetention = viewModel::setCacheRetention,
+                                        onSetCacheSizeLimit = viewModel::setCacheSizeLimit,
+                                        onClearAppCache = viewModel::clearAppCache
+                                    )
+                                }
+                                composable("account/settings/agreement") {
+                                    AccountAgreementSettingsScreen(onBack = backToAccount)
+                                }
+                                composable("account/settings/about") {
+                                    AccountAboutSettingsScreen(
+                                        currentVersion = viewModel.accountState.updateInfo?.currentVersion?.ifBlank { "--" } ?: "--",
+                                        onBack = backToAccount,
+                                        onOpenUpdate = { openAccountSettingsChild("account/settings/update") },
+                                        onOpenLogs = { openAccountSettingsChild("account/settings/logs") },
+                                        onOpenAgreement = { openAccountSettingsChild("account/settings/agreement") },
+                                        onOpenUrl = { url -> openExternalUrl(context, url) }
+                                    )
+                                }
+                                composable("account/settings/logs") {
+                                    LaunchedEffect(Unit) {
+                                        viewModel.refreshCrashLog()
+                                    }
+                                    AccountCrashLogSettingsScreen(
+                                        crashLogText = viewModel.accountState.latestCrashLog,
+                                        issueLogEntries = viewModel.accountState.issueLogEntries,
+                                        hasCrashLog = viewModel.accountState.hasCrashLog,
+                                        onBack = backToAccount,
+                                        onRefreshCrashLog = viewModel::refreshCrashLog,
+                                        onClearCrashLog = viewModel::clearCrashLog,
+                                        onOpenIssueLog = { issueLog ->
+                                            navController.navigate("account/settings/logs/detail/${Uri.encode(issueLog.id)}")
+                                        },
+                                        onReadIssueLog = viewModel::readIssueLog,
+                                        onDeleteIssueLog = viewModel::deleteIssueLog
+                                    )
+                                }
+                                composable(
+                                    route = "account/settings/logs/detail/{logId}",
+                                    arguments = listOf(navArgument("logId") { type = NavType.StringType })
+                                ) { entry ->
+                                    val logId = entry.arguments?.getString("logId").orEmpty()
+                                    val issueLog = viewModel.accountState.issueLogEntries.firstOrNull { it.id == logId }
+                                    var logText by remember(logId) { mutableStateOf("") }
+                                    LaunchedEffect(logId, viewModel.accountState.latestCrashLog) {
+                                        logText = withContext(Dispatchers.IO) { viewModel.readIssueLog(logId) }
+                                    }
+                                    if (issueLog == null) {
+                                        LaunchedEffect(logId) {
+                                            viewModel.refreshCrashLog()
+                                        }
+                                    }
+                                    AccountIssueLogDetailScreen(
+                                        entry = issueLog ?: AccountIssueLogEntry(
+                                            id = logId,
+                                            title = "问题日志",
+                                            time = "",
+                                            summary = ""
+                                        ),
+                                        logText = logText,
+                                        onBack = { navController.popBackStack() },
+                                        onCopy = { copyTextToClipboard(context, "issue_log", logText, "问题日志已复制") },
+                                        onShare = { shareIssueLogText(context, logId, issueLog?.title ?: "问题日志", logText) },
+                                        onDelete = {
+                                            viewModel.deleteIssueLog(logId)
+                                            navController.popBackStack()
+                                        }
+                                    )
+                                }
+                                composable(
+                                    route = "announcement/{noticeId}",
+                                    arguments = listOf(navArgument("noticeId") { type = NavType.StringType })
+                                ) { entry ->
+                                    val noticeId = entry.arguments?.getString("noticeId").orEmpty()
+                                    LaunchedEffect(noticeId) {
+                                        viewModel.markNoticeOpened(noticeId)
+                                        if (viewModel.findNotice(noticeId) == null) {
+                                            viewModel.refreshNotices(forceRefresh = true)
+                                        }
+                                    }
+                                    AnnouncementDetailScreen(
+                                        notice = viewModel.findNotice(noticeId),
+                                        isLoading = viewModel.noticeState.isLoading,
+                                        onBack = { navController.popBackStack() },
+                                        onRefresh = { viewModel.refreshNotices(forceRefresh = true) },
+                                        onOpenLink = openAnnouncementLink
+                                    )
+                                }
+                                composable(
+                                    route = "detail/{vodId}",
+                                    arguments = listOf(navArgument("vodId") { type = NavType.StringType })
+                                ) { entry ->
+                                    val vodId = entry.arguments?.getString("vodId").orEmpty()
+                                    var showRemoveFavoriteDialog by remember(vodId) { mutableStateOf(false) }
+                                    LaunchedEffect(vodId) {
+                                        viewModel.loadDetail(vodId)
+                                    }
+                                    // item 为空（加载中/失败/不存在）时按 requestedVodId 判断状态是否属于当前路由
+                                    val routeDetailState = viewModel.detailState.takeIf { state ->
+                                        state.matchesDetailRoute(vodId)
+                                    } ?: DetailUiState(isLoading = true, requestedVodId = vodId)
+                                    DetailScreen(
+                                        state = routeDetailState,
+                                        isLoggedIn = viewModel.accountState.session.isLoggedIn,
+                                        onBack = { navController.popBackStack() },
+                                        onSelectSource = viewModel::selectSource,
+                                        onFavorite = {
+                                            if (
+                                                viewModel.accountState.session.isLoggedIn &&
+                                                routeDetailState.isFavorited
+                                            ) {
+                                                showRemoveFavoriteDialog = true
+                                            } else if (routeDetailState.item != null) {
+                                                viewModel.addCurrentDetailFavorite()
+                                            }
+                                        },
+                                        onDismissActionMessage = viewModel::dismissDetailActionMessage,
+                                        onRetry = { viewModel.loadDetail(vodId) },
+                                        onPlay = { title, sourceIndex, episodeIndex ->
+                                            val pendingResume = routeDetailState.pendingResumePlayback
+                                            val resumeSnapshot = if (
+                                                pendingResume != null &&
+                                                pendingResume.sourceIndex == sourceIndex &&
+                                                pendingResume.episodeIndex == episodeIndex
+                                            ) {
+                                                PlaybackSnapshot(
+                                                    positionMs = pendingResume.positionMs,
+                                                    speed = pendingResume.speed
+                                                )
+                                            } else {
+                                                PlaybackSnapshot()
+                                            }
+                                            viewModel.openPlayer(
+                                                title = title,
+                                                item = routeDetailState.item,
+                                                sources = routeDetailState.sources,
+                                                sourceIndex = sourceIndex,
+                                                episodeIndex = episodeIndex,
+                                                snapshot = resumeSnapshot
+                                            )
+                                            openPlayerRoute(vodId, sourceIndex, episodeIndex)
+                                        }
+                                    )
+                                    if (showRemoveFavoriteDialog) {
+                                        FollowRemoveConfirmDialog(
+                                            onDismiss = { showRemoveFavoriteDialog = false },
+                                            onConfirm = {
+                                                showRemoveFavoriteDialog = false
+                                                viewModel.cancelCurrentDetailFavorite()
+                                            }
+                                        )
+                                    }
+                                }
+                                composable(
+                                    route = ROUTE_PLAYER,
+                                    arguments = listOf(
+                                        navArgument("vodId") {
+                                            type = NavType.StringType
+                                            defaultValue = ""
+                                        },
+                                        navArgument("sourceIndex") {
+                                            type = NavType.IntType
+                                            defaultValue = -1
+                                        },
+                                        navArgument("episodeIndex") {
+                                            type = NavType.IntType
+                                            defaultValue = -1
+                                        },
+                                        navArgument("resumeUrl") {
+                                            type = NavType.StringType
+                                            defaultValue = ""
+                                        },
+                                        navArgument("title") {
+                                            type = NavType.StringType
+                                            defaultValue = ""
+                                        }
+                                    )
+                                ) { entry ->
+                                    PlayerRouteScreen(
+                                        entry = entry,
+                                        viewModel = viewModel,
+                                        onBack = { navController.popBackStack() }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -1058,7 +1128,161 @@ private fun normalizeTopLevelRoute(route: String?): String? = when {
 }
 
 private fun isSearchResultsRoute(route: String?): Boolean =
-    route?.startsWith("search/results/") == true || route == "search/results/{query}"
+    route?.startsWith("search/results/") == true || route == ROUTE_SEARCH_RESULTS
+
+private fun detailRoute(vodId: String): String = "detail/${Uri.encode(vodId.trim())}"
+
+private fun playerRoute(
+    vodId: String,
+    sourceIndex: Int,
+    episodeIndex: Int,
+    resumeUrl: String = "",
+    title: String = ""
+): String = "player?vodId=${Uri.encode(vodId.trim())}&sourceIndex=$sourceIndex&episodeIndex=$episodeIndex" +
+    "&resumeUrl=${Uri.encode(resumeUrl)}&title=${Uri.encode(title)}"
+
+@Composable
+private fun PlayerRouteScreen(
+    entry: NavBackStackEntry,
+    viewModel: AppViewModel,
+    onBack: () -> Unit
+) {
+    // Navigation 已解码字符串参数，不再 Uri.decode，避免百分号被二次解码。
+    val vodId = entry.arguments?.getString("vodId").orEmpty()
+    val historyTitle = entry.arguments?.getString("title").orEmpty()
+    var ready by remember(entry.id) { mutableStateOf(false) }
+    var loadError by remember(entry.id) { mutableStateOf<String?>(null) }
+    var retrySerial by remember(entry.id) { mutableStateOf(0) }
+
+    LaunchedEffect(entry.id, retrySerial) {
+        ready = false
+        loadError = null
+        val sourceIndex = entry.savedStateHandle.get<Int>("player_source")
+            ?: entry.arguments?.getInt("sourceIndex") ?: -1
+        val episodeIndex = entry.savedStateHandle.get<Int>("player_episode")
+            ?: entry.arguments?.getInt("episodeIndex") ?: -1
+        val resumeUrl = entry.savedStateHandle.get<String>("player_episode_url")
+            ?: entry.arguments?.getString("resumeUrl").orEmpty()
+        val current = viewModel.playerState
+        val matchesItem = if (vodId.isNotBlank()) {
+            current.item?.matchesDetailRoute(vodId) == true
+        } else {
+            resumeUrl.isNotBlank() && current.episodePageUrl == resumeUrl
+        }
+        if (
+            matchesItem && current.currentEpisode != null &&
+            (sourceIndex < 0 || current.selectedSourceIndex == sourceIndex) &&
+            (episodeIndex < 0 || current.selectedEpisodeIndex == episodeIndex)
+        ) {
+            ready = true
+            return@LaunchedEffect
+        }
+
+        var detail: DetailUiState? = null
+        if (vodId.isNotBlank()) {
+            // 请求完成后再开播；离开路由时取消本次请求，不让后台恢复覆盖后来打开的影片。
+            val loadJob = viewModel.loadDetail(vodId)
+            try {
+                loadJob?.join()
+            } finally {
+                if (!currentCoroutineContext().isActive) loadJob?.cancel()
+            }
+            detail = viewModel.detailState.takeIf {
+                it.matchesDetailRoute(vodId)
+            }
+        }
+        val item = detail?.item
+        val sources = detail?.sources.orEmpty()
+        if (item != null && sources.isNotEmpty()) {
+            val resume = detail?.pendingResumePlayback
+            val selectedSource = sourceIndex.takeIf { it in sources.indices }
+                ?: resume?.sourceIndex?.takeIf { it in sources.indices }
+                ?: 0
+            val episodes = sources[selectedSource].episodes
+            val matchedEpisode = episodes.indexOfFirst { resumeUrl.isNotBlank() && it.url == resumeUrl }
+            val selectedEpisode = (
+                matchedEpisode.takeIf { it >= 0 }
+                    ?: episodeIndex.takeIf { it >= 0 }
+                    ?: resume?.episodeIndex?.takeIf { resume.sourceIndex == selectedSource }
+                    ?: 0
+                ).coerceIn(0, episodes.lastIndex.coerceAtLeast(0))
+            val snapshot = if (
+                resume != null && resume.sourceIndex == selectedSource && resume.episodeIndex == selectedEpisode
+            ) {
+                PlaybackSnapshot(positionMs = resume.positionMs, speed = resume.speed)
+            } else {
+                PlaybackSnapshot()
+            }
+            viewModel.openPlayer(item.displayTitle, item, sources, selectedSource, selectedEpisode, snapshot)
+        } else if (resumeUrl.isNotBlank()) {
+            // 保留原有历史记录的直达兜底，参数随导航栈保存，进程重建后同样有效。
+            viewModel.openPlayer(
+                title = historyTitle.ifBlank { "继续观看" },
+                item = null,
+                sources = listOf(PlaySource("继续观看", listOf(Episode("继续观看", resumeUrl)))),
+                sourceIndex = 0,
+                episodeIndex = 0
+            )
+        } else {
+            loadError = detail?.error ?: if (item != null) "暂无可播放的线路" else "未找到影片详情，请重试"
+            return@LaunchedEffect
+        }
+        ready = true
+    }
+
+    val state = viewModel.playerState
+    LaunchedEffect(ready, state.item?.vodId) {
+        if (ready) viewModel.refreshPlayerSources()
+    }
+    LaunchedEffect(ready, state.selectedSourceIndex, state.selectedEpisodeIndex, state.episodePageUrl) {
+        if (ready) {
+            // 包含切集、切源和全屏返回后的选择；重建时优先恢复最新选择而非入口的旧选集。
+            entry.savedStateHandle["player_source"] = state.selectedSourceIndex
+            entry.savedStateHandle["player_episode"] = state.selectedEpisodeIndex
+            entry.savedStateHandle["player_episode_url"] = state.episodePageUrl
+        }
+    }
+    if (!ready) {
+        Column(
+            modifier = Modifier.fillMaxSize().background(UiPalette.BackgroundBottom),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            DetailTopBar(title = historyTitle.ifBlank { "恢复播放" }, onBack = onBack)
+            val error = loadError
+            if (error == null) {
+                LoadingPane("正在恢复播放...", style = FeedbackPaneStyle.Card)
+            } else {
+                ErrorBanner(
+                    message = error,
+                    onRetry = { retrySerial += 1 },
+                    modifier = Modifier.padding(horizontal = UiDimens.PagePadding)
+                )
+            }
+        }
+        return
+    }
+    PlayerScreen(
+        state = state,
+        onBack = onBack,
+        onSelectEpisode = viewModel::selectPlayerEpisode,
+        onSelectSource = viewModel::selectPlayerSource,
+        onRefreshSources = viewModel::refreshPlayerSources,
+        onPlayNext = viewModel::playNextEpisode,
+        onPlaybackSnapshotChange = { snapshot ->
+            val current = viewModel.playerState
+            if (
+                current.item?.vodId == state.item?.vodId &&
+                current.selectedSourceIndex == state.selectedSourceIndex &&
+                current.selectedEpisodeIndex == state.selectedEpisodeIndex &&
+                current.episodePageUrl == state.episodePageUrl
+            ) {
+                viewModel.updatePlaybackSnapshot(snapshot)
+            }
+        },
+        onDetectedStream = viewModel::adoptDetectedStream,
+        onResolveFallbackFailed = viewModel::reportTakeoverFailure
+    )
+}
 
 private fun isAccountSettingsDetailRoute(route: String?): Boolean =
     route?.startsWith("account/settings/") == true
@@ -1070,20 +1294,11 @@ private fun normalizeHeartbeatRoute(route: String?): String = when {
     route.isNullOrBlank() -> "home"
     isSearchResultsRoute(route) -> "search_results"
     route.startsWith("detail/") || route == "detail/{vodId}" -> "detail"
+    route == "player" || route.startsWith("player?") -> "player"
     route.startsWith("announcement/") || route == "announcement/{noticeId}" -> "announcement_detail"
     else -> route
 }
 
-private fun VodItem.matchesDetailRoute(vodId: String): Boolean {
-    val normalizedId = vodId.trim()
-    if (normalizedId.isBlank()) return false
-    return linkedSetOf(
-        this.vodId.trim(),
-        this.siteVodId.trim(),
-        Regex("""/voddetail/([^/.]+)""").find(detailUrl)?.groupValues?.getOrNull(1).orEmpty(),
-        Regex("""/vodplay/([^/-?.]+)""").find(detailUrl)?.groupValues?.getOrNull(1).orEmpty()
-    ).any { it.isNotBlank() && it == normalizedId }
-}
 
 private fun copyTextToClipboard(context: Context, label: String, text: String, toast: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -1160,4 +1375,58 @@ private fun AppBottomBar(
     }
 }
 
+@Composable
+private fun AppNavigationRail(
+    currentRoute: String,
+    scrollTopSignals: Map<String, Int>,
+    onNavigate: (String) -> Unit,
+    onScrollToTop: (String) -> Unit
+) {
+    var lastTapRoute by remember { mutableStateOf("") }
+    var lastTapAt by remember { mutableStateOf(0L) }
+    NavigationRail(
+        modifier = Modifier
+            .fillMaxHeight()
+            .appTopInsetsPadding(),
+        containerColor = UiPalette.Surface.copy(alpha = 0.96f),
+        contentColor = MaterialTheme.colorScheme.onSurface
+    ) {
+        bottomBarItems.forEach { (route, label, icon) ->
+            val selected = currentRoute == route
+            NavigationRailItem(
+                selected = selected,
+                onClick = {
+                    // 与底部导航一致：双击当前页回到顶部
+                    val now = SystemClock.elapsedRealtime()
+                    val isDoubleTap = selected &&
+                        lastTapRoute == route &&
+                        now - lastTapAt <= BOTTOM_BAR_DOUBLE_TAP_MS
+                    lastTapRoute = route
+                    lastTapAt = now
+                    if (isDoubleTap && route in scrollTopSignals) {
+                        onScrollToTop(route)
+                    } else {
+                        onNavigate(route)
+                    }
+                },
+                colors = NavigationRailItemDefaults.colors(
+                    selectedIconColor = UiPalette.AccentText,
+                    selectedTextColor = UiPalette.Ink,
+                    indicatorColor = UiPalette.Accent,
+                    unselectedIconColor = UiPalette.TextMuted,
+                    unselectedTextColor = UiPalette.TextMuted
+                ),
+                icon = { Icon(icon, contentDescription = label) },
+                label = {
+                    Text(
+                        text = label,
+                        color = if (selected) UiPalette.Ink else UiPalette.TextMuted
+                    )
+                }
+            )
+        }
+    }
+}
+
 private const val BOTTOM_BAR_DOUBLE_TAP_MS = 450L
+

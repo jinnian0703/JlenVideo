@@ -24,6 +24,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -62,9 +63,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -243,7 +246,6 @@ internal fun EpisodePanel(
     pauseMarquee: Boolean,
     onEpisodeClick: (Int) -> Unit
 ) {
-    val columns = 3
     val pageSize = 60
     val pageCount = if (episodes.isEmpty()) 0 else ((episodes.size - 1) / pageSize) + 1
     var currentPage by remember(episodes.size) {
@@ -263,7 +265,8 @@ internal fun EpisodePanel(
     }
 
     val pageStart = currentPage * pageSize
-    val visibleEpisodes = episodes.drop(pageStart).take(pageSize)
+    val pageIndices = remember(pageCount) { List(pageCount) { it } }
+    val latestOnEpisodeClick by rememberUpdatedState(onEpisodeClick)
 
     Card(
         modifier = Modifier
@@ -281,7 +284,10 @@ internal fun EpisodePanel(
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    itemsIndexed(List(pageCount) { it }) { _, pageIndex ->
+                    itemsIndexed(
+                        items = pageIndices,
+                        key = { _, pageIndex -> pageIndex }
+                    ) { _, pageIndex ->
                         val selected = pageIndex == currentPage
                         val start = pageIndex * pageSize + 1
                         val end = minOf((pageIndex + 1) * pageSize, episodes.size)
@@ -306,42 +312,80 @@ internal fun EpisodePanel(
                 }
             }
 
-            visibleEpisodes.chunked(columns).forEachIndexed { rowIndex, row ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    row.forEachIndexed { columnIndex, episode ->
-                        val absoluteIndex = pageStart + rowIndex * columns + columnIndex
-                        val selected = absoluteIndex == selectedIndex
-                        OutlinedButton(
-                            onClick = { onEpisodeClick(absoluteIndex) },
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = UiDimens.SecondaryButtonHeight),
-                            shape = RoundedCornerShape(UiDimens.ControlRadius),
-                            border = BorderStroke(1.dp, if (selected) UiPalette.Accent else UiPalette.Border),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = if (selected) UiPalette.AccentGlow else UiPalette.SurfaceSoft,
-                                contentColor = if (selected) UiPalette.Accent else UiPalette.Ink
-                            ),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 12.dp)
-                        ) {
-                            EpisodeChipLabel(
-                                text = episode.name,
-                                enableMarquee = !pauseMarquee &&
-                                    absoluteIndex == selectedIndex &&
-                                    shouldMarqueeEpisodeLabel(episode.name),
-                                fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold
-                            )
+            // 按可用宽度计算列数：手机上保持 3 列，平板/横屏按按钮最小宽度增加列数
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val columns = ((maxWidth + EPISODE_BUTTON_SPACING) / (EPISODE_BUTTON_MIN_WIDTH + EPISODE_BUTTON_SPACING))
+                    .toInt()
+                    .coerceIn(3, 8)
+                // 只缓存当前页分块，避免每次重组都切分整份列表。
+                val rows = remember(episodes, pageStart, columns) {
+                    val start = pageStart.coerceIn(0, episodes.size)
+                    episodes.subList(start, minOf(start + pageSize, episodes.size)).chunked(columns)
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    rows.forEachIndexed { rowIndex, row ->
+                        val rowStart = pageStart + rowIndex * columns
+                        key(rowStart) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(EPISODE_BUTTON_SPACING)
+                            ) {
+                                row.forEachIndexed { columnIndex, episode ->
+                                    val absoluteIndex = rowStart + columnIndex
+                                    val selected = absoluteIndex == selectedIndex
+                                    key(absoluteIndex, episode.url) {
+                                        val onClick = remember(absoluteIndex) {
+                                            { latestOnEpisodeClick(absoluteIndex) }
+                                        }
+                                        // 稳定参数和点击回调让未变化的按钮可以跳过重组。
+                                        EpisodeButton(
+                                            name = episode.name,
+                                            selected = selected,
+                                            enableMarquee = selected && !pauseMarquee,
+                                            onClick = onClick,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+                                repeat(columns - row.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
                         }
-                    }
-                    repeat(columns - row.size) {
-                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
         }
+    }
+}
+
+private val EPISODE_BUTTON_MIN_WIDTH = 120.dp
+private val EPISODE_BUTTON_SPACING = 10.dp
+
+@Composable
+private fun EpisodeButton(
+    name: String,
+    selected: Boolean,
+    enableMarquee: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = UiDimens.SecondaryButtonHeight),
+        shape = RoundedCornerShape(UiDimens.ControlRadius),
+        border = BorderStroke(1.dp, if (selected) UiPalette.Accent else UiPalette.Border),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = if (selected) UiPalette.AccentGlow else UiPalette.SurfaceSoft,
+            contentColor = if (selected) UiPalette.Accent else UiPalette.Ink
+        ),
+        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 12.dp)
+    ) {
+        EpisodeChipLabel(
+            text = name,
+            enableMarquee = enableMarquee && shouldMarqueeEpisodeLabel(name),
+            fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold
+        )
     }
 }
 
@@ -771,4 +815,3 @@ private fun extractEpisodeNumber(text: String): Int? {
         pattern.find(text)?.groupValues?.getOrNull(1)?.toIntOrNull()
     }
 }
-

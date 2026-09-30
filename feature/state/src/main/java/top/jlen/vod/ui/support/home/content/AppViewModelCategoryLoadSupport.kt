@@ -7,19 +7,23 @@ internal fun beginCategoryLoadState(
     homeState: HomeUiState,
     category: AppleCmsCategory,
     filters: Map<String, String>
-): HomeUiState = homeState.copy(
-    selectedCategory = category,
-    selectedCategoryFilters = filters,
-    categoryVideos = emptyList(),
-    categoryVisibleCount = 0,
-    categoryCursor = "",
-    hasMoreCategoryItems = true,
-    categoryFirstLoaded = false,
-    isCategoryLoading = true,
-    isCategoryAppending = false,
-    categoryAppendError = null,
-    error = null
-)
+): HomeUiState {
+    val keepContent = homeState.selectedCategory?.typeId == category.typeId &&
+        homeState.selectedCategoryFilters == filters
+    return homeState.copy(
+        selectedCategory = category,
+        selectedCategoryFilters = filters,
+        categoryVideos = if (keepContent) homeState.categoryVideos else emptyList(),
+        categoryVisibleCount = if (keepContent) homeState.categoryVisibleCount else 0,
+        categoryCursor = if (keepContent) homeState.categoryCursor else "",
+        hasMoreCategoryItems = if (keepContent) homeState.hasMoreCategoryItems else true,
+        categoryFirstLoaded = keepContent && homeState.categoryFirstLoaded,
+        isCategoryLoading = true,
+        isCategoryAppending = false,
+        categoryAppendError = null,
+        error = null
+    )
+}
 
 internal fun homeStateWithCategoryPage(
     homeState: HomeUiState,

@@ -312,7 +312,7 @@ private suspend fun LegacyStateRuntimeViewModelCore.buildFollowItem(
             .thenBy { if (it.sourceName.isNotBlank()) 1 else 0 }
     )
     val detailItem = if (resolveDetails) {
-        runCatching { legacyRepository().loadDetail(vodId) }.getOrNull()
+        runStateCatching { legacyRepository().loadDetail(vodId) }.getOrNull()
     } else {
         null
     }

@@ -1,5 +1,6 @@
 package top.jlen.vod.data
 
+import top.jlen.vod.common.coroutines.runSuspendCatching
 
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadByCategory(
     typeId: String
@@ -108,7 +109,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyPrewarmCategoryFi
 ) {
     val categories = runtimeGetBrowsableCategories(forceRefresh = forceRefresh)
     categories.forEach { category ->
-        runCatching {
+        runSuspendCatching {
             runtimeLoadCategoryPage(
                 typeId = category.typeId,
                 page = 1,

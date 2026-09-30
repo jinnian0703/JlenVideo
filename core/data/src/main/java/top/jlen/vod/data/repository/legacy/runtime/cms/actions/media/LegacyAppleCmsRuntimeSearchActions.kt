@@ -3,6 +3,7 @@ package top.jlen.vod.data
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import top.jlen.vod.common.coroutines.runSuspendCatching
 
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacySearch(
     keyword: String,
@@ -34,12 +35,12 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyPerformSearch(
     keyword: String,
     cacheKey: String
 ): List<VodItem> {
-    return runCatching {
+    return runSuspendCatching {
         runtimeRequestSearch(keyword = keyword, page = 1, limit = 60)
             .distinctBy { it.vodId }
             .take(60)
     }.getOrElse {
-        runCatching {
+        runSuspendCatching {
             val document = runtimeFetchSearchDocument(keyword)
             runtimeParseSearchResults(document, keyword)
                 .distinctBy { it.vodId }
@@ -76,7 +77,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyEnrichSearchResul
     val enrichedById = coroutineScope {
         enrichTargets.map { item ->
             async {
-                val detailItem = runCatching { loadDetail(item.vodId) }.getOrNull()
+                val detailItem = runSuspendCatching { loadDetail(item.vodId) }.getOrNull()
                 val description = detailItem?.description
                     ?.takeIf { it.isNotBlank() && it != "暂无简介" }
                     .orEmpty()

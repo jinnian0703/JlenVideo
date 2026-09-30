@@ -27,7 +27,7 @@ internal fun failedHistoryPlayerState(
     )
 )
 
-internal fun resolveHistoryVodId(item: UserCenterItem): String =
+fun resolveHistoryVodId(item: UserCenterItem): String =
     item.vodId.ifBlank {
         Regex("""/vodplay/([^/]+?)-\d+-\d+(?:\.html)?/?(?:\?.*)?$""")
             .find(item.playUrl.ifBlank { item.actionUrl })

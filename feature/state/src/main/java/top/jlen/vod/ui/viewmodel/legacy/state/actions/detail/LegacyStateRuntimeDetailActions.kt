@@ -2,6 +2,7 @@ package top.jlen.vod.ui
 
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.jlen.vod.data.PlaybackResumeBucket
@@ -22,17 +23,21 @@ internal fun LegacyStateRuntimeViewModelCore.legacyAddCurrentDetailFavorite() {
     if (currentDetailState().isActionLoading) return
     viewModelScope.launch {
         updateDetailState(beginDetailFavoriteAction(currentDetailState()))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().addFavoriteForApp(item) }
         }.onSuccess { message ->
             val normalizedMessage = normalizeFavoriteActionMessage(message)
-            updateDetailState(detailStateWithFavoriteSuccess(currentDetailState(), normalizedMessage))
+            // 用户可能已切到其他详情页，只在仍是同一影片时更新详情状态
+            if (currentDetailState().item?.vodId == item.vodId) {
+                updateDetailState(detailStateWithFavoriteSuccess(currentDetailState(), normalizedMessage))
+            }
             legacyUpsertFollowContentFromDetail(item)
             legacyRefreshFollowContent(forceRefresh = true)
             if (currentAccountState().selectedSection == AccountSection.Favorites) {
                 selectAccountSection(AccountSection.Favorites, forceRefresh = true)
             }
         }.onFailure { error ->
+            if (currentDetailState().item?.vodId != item.vodId) return@onFailure
             val isDuplicate = isDuplicateFavoriteMessage(error.message.orEmpty())
             updateDetailState(
                 detailStateWithFavoriteFailure(
@@ -68,7 +73,9 @@ internal fun LegacyStateRuntimeViewModelCore.legacyCancelCurrentDetailFavorite()
         block = { deleteUserRecordForApp(recordIds = listOf(favoriteVodId), type = 2, clearAll = false) },
         onSuccess = {
             updateAccountState(accountStateRemovingFavoriteByVodId(currentAccountState(), favoriteVodId))
-            updateDetailState(detailStateWithFavoriteRemoved(currentDetailState(), "已取消追剧"))
+            if (currentDetailState().item?.vodId == item.vodId) {
+                updateDetailState(detailStateWithFavoriteRemoved(currentDetailState(), "已取消追剧"))
+            }
             legacyRemoveFollowContentByVodId(favoriteVodId)
             legacyRefreshFollowContent(forceRefresh = true)
         }
@@ -113,7 +120,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyOpenHistoryRecord(item: UserC
 
     updatePlayerState(resolvingHistoryPlayerState(item.title))
     viewModelScope.launch {
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadDetail(resolvedVodId) }
         }.onSuccess { detailItem ->
             if (detailItem == null) {
@@ -157,7 +164,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyResumeHistoryRecord(item: Use
 
     updatePlayerState(resolvingHistoryPlayerState(item.title))
     viewModelScope.launch {
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadDetail(resolvedVodId) }
         }.onSuccess { detailItem ->
             if (detailItem == null) {
@@ -196,17 +203,22 @@ internal fun LegacyStateRuntimeViewModelCore.legacyOpenHistoryRecordDirectly(ite
     )
 }
 
-internal fun LegacyStateRuntimeViewModelCore.legacyLoadDetail(vodId: String) {
+internal fun LegacyStateRuntimeViewModelCore.legacyLoadDetail(vodId: String): Job? {
+    // 连续进入不同详情时取消旧请求，避免旧请求回写到后来打开的同名路由。
+    currentDetailLoadJob()?.cancel()
     val currentState = currentDetailState()
     val currentItem = currentState.item
     if (currentItem != null && currentItem.matchesDetailRoute(vodId) && currentState.sources.isNotEmpty()) {
         val resumeBucket = resolvePlaybackResumeBucket(currentItem, vodId)
         val resumeRecord = resolvePlaybackResumeRecordForSources(resumeBucket, currentState.sources)
-        updateDetailState(detailStateWithResumeBucket(currentState, resumeBucket, resumeRecord))
-        return
+        updateDetailState(
+            detailStateWithResumeBucket(currentState, resumeBucket, resumeRecord)
+                .copy(requestedVodId = vodId, isLoading = false, error = null)
+        )
+        return null
     }
 
-    viewModelScope.launch {
+    return viewModelScope.launch {
         val existingState = currentDetailState()
         val currentRouteItem = existingState.item?.takeIf { it.matchesDetailRoute(vodId) }
         val cachedItem = currentRouteItem ?: legacyRepository().peekDetailForApp(vodId)
@@ -222,21 +234,26 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadDetail(vodId: String) {
                     isFavorited = currentAccountState().favoriteItems.any { favorite -> favorite.vodId == cachedItem.vodId },
                     selectedSourceIndex = resumeRecord?.sourceIndex?.coerceIn(0, (cachedSources.lastIndex).coerceAtLeast(0)) ?: 0,
                     playbackResumeBucket = resumeBucket,
-                    pendingResumePlayback = resumeRecord
+                    pendingResumePlayback = resumeRecord,
+                    requestedVodId = vodId
                 ).copy(isLoading = true)
             )
         } else {
-            updateDetailState(beginDetailLoad(existingState, keepCurrentContent && currentRouteItem != null))
+            updateDetailState(
+                beginDetailLoad(existingState, keepCurrentContent && currentRouteItem != null, vodId)
+            )
         }
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadDetail(vodId) }
         }.onSuccess { item ->
+            // 期间已切换到其他详情页时丢弃旧结果，避免覆盖新页面
+            if (currentDetailState().requestedVodId != vodId) return@onSuccess
             if (item == null) {
                 val fallbackState = currentDetailState()
                 if (fallbackState.item?.matchesDetailRoute(vodId) == true) {
                     updateDetailState(fallbackState.copy(isLoading = false, error = null))
                 } else {
-                    updateDetailState(missingDetailState())
+                    updateDetailState(missingDetailState(vodId))
                 }
             } else {
                 val sources = legacyRepository().parseSources(item)
@@ -254,31 +271,25 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadDetail(vodId: String) {
                         isFavorited = currentAccountState().favoriteItems.any { favorite -> favorite.vodId == item.vodId },
                         selectedSourceIndex = selectedSourceIndex,
                         playbackResumeBucket = resumeBucket,
-                        pendingResumePlayback = resumeRecord
+                        pendingResumePlayback = resumeRecord,
+                        requestedVodId = vodId
                     )
                 )
             }
         }.onFailure { error ->
+            if (currentDetailState().requestedVodId != vodId) return@onFailure
             val fallbackState = currentDetailState()
             if (fallbackState.item?.matchesDetailRoute(vodId) == true) {
                 updateDetailState(fallbackState.copy(isLoading = false, error = null))
             } else {
-                updateDetailState(detailStateWithLoadError(toUserFacingMessage(error, "详情加载失败")))
+                updateDetailState(
+                    detailStateWithLoadError(toUserFacingMessage(error, "详情加载失败"), vodId)
+                )
             }
         }
-    }
+    }.also(::replaceDetailLoadJob)
 }
 
-private fun VodItem.matchesDetailRoute(vodId: String): Boolean {
-    val normalizedId = vodId.trim()
-    if (normalizedId.isBlank()) return false
-    return linkedSetOf(
-        this.vodId.trim(),
-        this.siteVodId.trim(),
-        Regex("""/voddetail/([^/.]+)""").find(detailUrl)?.groupValues?.getOrNull(1).orEmpty(),
-        Regex("""/vodplay/([^/-?.]+)""").find(detailUrl)?.groupValues?.getOrNull(1).orEmpty()
-    ).any { it.isNotBlank() && it == normalizedId }
-}
 
 internal fun LegacyStateRuntimeViewModelCore.legacySelectSource(index: Int) {
     updateDetailState(detailStateWithSelectedSource(currentDetailState(), index))

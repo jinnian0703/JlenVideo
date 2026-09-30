@@ -1,10 +1,20 @@
 package top.jlen.vod.ui
 
+import kotlinx.coroutines.CancellationException
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.jlen.vod.data.AppleCmsRepository
+
+// state 模块独立处理协程取消，不能把取消当成网络/业务失败或走默认值回退。
+internal inline fun <T> runStateCatching(block: () -> T): Result<T> = try {
+    Result.success(block())
+} catch (error: CancellationException) {
+    throw error
+} catch (error: Throwable) {
+    Result.failure(error)
+}
 
 internal fun LegacyStateRuntimeViewModelCore.legacyReportHeartbeat(route: String) {
     val normalizedRoute = route.trim().ifBlank { "home" }
@@ -13,7 +23,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyReportHeartbeat(route: String
     val sid = if (normalizedRoute == "player") currentPlayerState().selectedSourceIndex + 1 else null
     val nid = if (normalizedRoute == "player") currentPlayerState().selectedEpisodeIndex + 1 else null
     viewModelScope.launch(Dispatchers.IO) {
-        runCatching {
+        runStateCatching {
             legacyRepository().reportHeartbeat(
                 route = normalizedRoute,
                 userId = userId,
@@ -33,7 +43,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRunAccountAction(
     if (currentAccountState().isActionLoading) return
     viewModelScope.launch {
         updateAccountState(beginAccountAction(currentAccountState()))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().block() }
         }.onSuccess { message ->
             updateAccountState(

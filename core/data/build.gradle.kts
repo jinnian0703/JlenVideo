@@ -22,6 +22,11 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    buildFeatures {
+        // 用于 BuildConfig.DEBUG 判断，仅 debug 构建输出网络日志
+        buildConfig = true
+    }
 }
 
 dependencies {
@@ -35,5 +40,6 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
     testImplementation("junit:junit:4.13.2")
 }

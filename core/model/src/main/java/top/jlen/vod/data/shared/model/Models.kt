@@ -299,6 +299,7 @@ data class VodItem(
 fun sanitizeUserFacingToken(value: String?): String =
     value.orEmpty()
         .trim()
+        // 这些字符串是服务端历史乱码的匹配键，保留兼容；输出统一为正常中文。
         .replace("绫诲瀷", "类型")
         .replace("鍦板尯", "地区")
         .replace("骞翠唤", "年份")

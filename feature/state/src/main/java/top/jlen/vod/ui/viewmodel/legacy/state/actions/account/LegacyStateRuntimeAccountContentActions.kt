@@ -15,7 +15,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshRegisterCaptcha() {
 
     viewModelScope.launch {
         updateAccountState(beginAccountContentLoad(currentAccountState()))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadRegisterCaptcha(captchaUrl) }
         }.onSuccess { bytes ->
             updateAccountState(accountStateWithRegisterCaptcha(currentAccountState(), bytes))
@@ -40,7 +40,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFindPasswordCaptcha() 
 
     viewModelScope.launch {
         updateAccountState(beginAccountContentLoad(currentAccountState()))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadFindPasswordCaptcha(captchaUrl) }
         }.onSuccess { bytes ->
             updateAccountState(accountStateWithFindPasswordCaptcha(currentAccountState(), bytes))
@@ -60,7 +60,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadRegisterPage(forceRefresh
     if (currentAccountState().isContentLoading && !forceRefresh) return
     viewModelScope.launch {
         updateAccountState(beginAccountContentLoad(currentAccountState()))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadRegisterPageForApp() }
         }.onSuccess { page ->
             updateAccountState(accountStateWithRegisterPage(currentAccountState(), page))
@@ -83,7 +83,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadFindPasswordPage(forceRef
     if (currentAccountState().isContentLoading && !forceRefresh) return
     viewModelScope.launch {
         updateAccountState(beginAccountContentLoad(currentAccountState()))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadFindPasswordPageForApp() }
         }.onSuccess { page ->
             updateAccountState(accountStateWithFindPasswordPage(currentAccountState(), page))
@@ -105,7 +105,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadFindPasswordPage(forceRef
 internal fun LegacyStateRuntimeViewModelCore.legacyLoadAccountProfile() {
     viewModelScope.launch {
         updateAccountState(beginAccountContentLoad(currentAccountState()))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadUserProfileForApp() }
         }.onSuccess { page ->
             updateAccountState(accountStateWithProfilePage(currentAccountState(), page))
@@ -124,7 +124,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadAccountProfile() {
 internal fun LegacyStateRuntimeViewModelCore.legacyLoadFavoriteRecords(pageUrl: String? = null, append: Boolean = false) {
     viewModelScope.launch {
         updateAccountState(beginAccountContentLoad(currentAccountState()))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadFavoritePageForApp(pageUrl) }
         }.onSuccess { page ->
             updateAccountState(accountStateWithFavoritePage(currentAccountState(), page, append))
@@ -152,7 +152,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadHistoryRecords(pageUrl: S
         } else {
             updateAccountState(currentAccountState().copy(error = null))
         }
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadHistoryPageForApp(pageUrl) }
         }.onSuccess { page ->
             val historyPageState = accountStateWithHistoryPage(currentAccountState(), page, append)
@@ -189,7 +189,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyEnrichHistoryRecords(items: L
     currentHistoryEnrichJob()?.cancel()
     val requestVersion = nextHistoryEnrichVersion()
     replaceHistoryEnrichJob(viewModelScope.launch {
-        val enrichedItems = runCatching {
+        val enrichedItems = runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().enrichHistoryItems(targetItems) }
         }.getOrNull() ?: return@launch
         if (requestVersion != currentHistoryEnrichVersion()) return@launch
@@ -204,7 +204,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyEnrichHistoryRecords(items: L
 internal fun LegacyStateRuntimeViewModelCore.legacyLoadMembership() {
     viewModelScope.launch {
         updateAccountState(beginAccountContentLoad(currentAccountState()))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadMembershipDataForApp() }
         }.onSuccess { page ->
             updateAccountState(
@@ -229,7 +229,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadMembership() {
 internal fun LegacyStateRuntimeViewModelCore.legacyRefreshMembershipSignInStatus() {
     if (!currentAccountState().session.isLoggedIn) return
     viewModelScope.launch {
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadMembershipDataForApp() }
         }.onSuccess { page ->
             updateAccountState(

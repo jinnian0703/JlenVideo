@@ -785,6 +785,7 @@ internal fun InlineEmptyStateCard(
 @Composable
 internal fun PosterGridRow(
     rowItems: List<VodItem>,
+    columns: Int,
     onOpenDetail: (String) -> Unit
 ) {
     Row(
@@ -798,7 +799,7 @@ internal fun PosterGridRow(
                 modifier = Modifier.weight(1f)
             )
         }
-        repeat(POSTER_GRID_COLUMNS - rowItems.size) {
+        repeat((columns - rowItems.size).coerceAtLeast(0)) {
             Spacer(modifier = Modifier.weight(1f))
         }
     }
@@ -1000,15 +1001,10 @@ private fun rememberPosterBadgeText(raw: String, compact: Boolean): String =
         formatPosterBadge(raw = raw, compact = compact)
     }
 
-internal fun LazyListState.maxVisiblePosterRowIndex(rowKeyPrefix: String): Int =
+internal fun LazyListState.maxVisiblePosterRowIndex(rowIndices: Map<String, Int>): Int =
     layoutInfo.visibleItemsInfo
-        .mapNotNull { itemInfo ->
-            val key = itemInfo.key.toString()
-            if (!key.startsWith(rowKeyPrefix)) return@mapNotNull null
-            key.removePrefix(rowKeyPrefix)
-                .substringBefore('-')
-                .toIntOrNull()
-        }
+        // 行 key 不再包含位置，分页预加载用当前分块的索引表定位。
+        .mapNotNull { itemInfo -> rowIndices[itemInfo.key.toString()] }
         .maxOrNull() ?: -1
 
 internal fun shouldAutoPreloadRows(
@@ -1176,4 +1172,3 @@ internal fun AuthenticatedAvatar(
 internal fun VodItem.stableKey(): String = vodId.ifBlank { "$displayTitle|${vodPic.orEmpty()}" }
 
 private fun Int.floorMod(divisor: Int): Int = ((this % divisor) + divisor) % divisor
-

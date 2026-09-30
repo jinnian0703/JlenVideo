@@ -40,7 +40,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshHotSearches(forceRefre
     }
     viewModelScope.launch {
         updateSearchState(startHotSearchLoading(currentSearchState()))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadHotSearchGroups(forceRefresh = forceRefresh) }
         }.onSuccess { groups ->
             updateSearchState(searchStateWithHotSearchGroups(currentSearchState(), groups))
@@ -150,7 +150,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadMoreSearchResults() {
 
     viewModelScope.launch {
         updateSearchState(beginSearchAppend(currentSearchState()))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) {
                 legacyRepository().searchCursor(keyword = query, cursor = currentSearchState().cursor)
             }

@@ -4,6 +4,32 @@ import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.io.IOException
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import org.jsoup.nodes.Document
+import org.jsoup.nodes.Entities
+
+// 只接受名称以 .apk 结尾的附件，不把源码归档或校验文件当作安装包。
+internal fun parseGithubApkDownloadUrl(json: JsonObject): String =
+    json.get("assets").safeArray()
+        ?.asSequence()
+        ?.mapNotNull { it.safeObject() }
+        ?.filter { it.get("name").safeString().trim().endsWith(".apk", ignoreCase = true) }
+        ?.map { it.get("browser_download_url").safeString().trim() }
+        ?.firstOrNull { it.toHttpUrlOrNull() != null }
+        .orEmpty()
+
+internal fun findGithubApkDownloadUrl(document: Document): String =
+    document.select("a[href]")
+        .asSequence()
+        .map { it.absUrl("href").trim() }
+        .firstOrNull { it.toHttpUrlOrNull()?.encodedPath?.endsWith(".apk", ignoreCase = true) == true }
+        .orEmpty()
+
+// 上层按 HTML 渲染更新说明；优先使用 GitHub 渲染的 HTML，缺失时转义原文并保留换行。
+internal fun parseGithubReleaseNotes(json: JsonObject): String =
+    json.get("body_html").safeString().trim().ifBlank {
+        Entities.escape(json.get("body").safeString().trim()).replace("\n", "<br>")
+    }
 
 internal fun parseUserCenterVod(
     row: JsonObject,

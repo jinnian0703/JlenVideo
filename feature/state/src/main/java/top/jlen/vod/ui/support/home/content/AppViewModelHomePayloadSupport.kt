@@ -29,8 +29,13 @@ internal fun homeStateFromPayload(payload: HomePayload): HomeUiState {
     )
 }
 
-internal fun loadingHomeState(cachedPayload: HomePayload?): HomeUiState =
-    cachedPayload?.let(::homeStateFromPayload) ?: HomeUiState(isLoading = true)
+internal fun loadingHomeState(cachedPayload: HomePayload?, currentState: HomeUiState): HomeUiState {
+    // 下拉刷新保留已展示的列表和滚动位置，首次加载才使用空状态。
+    val content = if (currentState.homeFirstLoaded) currentState else {
+        cachedPayload?.let(::homeStateFromPayload) ?: currentState
+    }
+    return content.copy(isLoading = true, isHomeAppending = false, error = null, homeAppendError = null)
+}
 
 internal fun homeStateWithHomeError(
     homeState: HomeUiState,

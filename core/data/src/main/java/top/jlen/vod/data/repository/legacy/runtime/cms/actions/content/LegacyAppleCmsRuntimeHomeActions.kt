@@ -4,6 +4,7 @@ import java.io.IOException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import org.jsoup.nodes.Document
+import top.jlen.vod.common.coroutines.runSuspendCatching
 
 internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyClearMemoryCaches() {
     runtimeClearHomeCacheEntry()
@@ -56,7 +57,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadHome(
         legacyPeekHomePayload()?.let { return it }
     }
 
-    return runCatching {
+    return runSuspendCatching {
         if (forceRefresh) {
             legacyLoadFreshHome(forceRefresh = true)
         } else {
@@ -71,7 +72,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadHome(
 
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadEmergencyHome(): HomePayload {
     val cachedHome = runtimePeekHomeCacheEntry()?.value
-    val latestPage = runCatching { runtimeLoadLatestCursorPage(cursor = "") }
+    val latestPage = runSuspendCatching { runtimeLoadLatestCursorPage(cursor = "") }
         .getOrNull()
         ?: CursorPagedVodItems(
             items = cachedHome?.latest.orEmpty(),
@@ -79,12 +80,12 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadEmergencyHome
             nextCursor = cachedHome?.latestCursor.orEmpty(),
             hasMore = cachedHome?.latestHasMore ?: false
         )
-    val recommendedItems = runCatching {
+    val recommendedItems = runSuspendCatching {
         runtimeLoadRecommendedPreviewItems(limit = 16)
     }.getOrElse {
         cachedHome?.featured.orEmpty()
     }
-    val categories = runCatching { runtimeLoadBrowsableCategories(forceRefresh = false) }
+    val categories = runSuspendCatching { runtimeLoadBrowsableCategories(forceRefresh = false) }
         .getOrElse { runtimeGetCachedBrowsableCategories() }
         .ifEmpty { runtimeDefaultCategories().map { runtimeNormalizeCategory(it) } }
     val latestItems = latestPage.items.ifEmpty { recommendedItems.take(36) }
@@ -120,17 +121,17 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadFreshHome(
 ): HomePayload {
     val (latestPage, recommendedItems) = coroutineScope {
         val latestDeferred = async {
-            runCatching { runtimeLoadLatestCursorPage(cursor = "") }
+            runSuspendCatching { runtimeLoadLatestCursorPage(cursor = "") }
                 .getOrElse { CursorPagedVodItems() }
         }
         val recommendedDeferred = async {
-            runCatching { runtimeLoadRecommendedPreviewItems(limit = 16) }
+            runSuspendCatching { runtimeLoadRecommendedPreviewItems(limit = 16) }
                 .getOrDefault(emptyList())
         }
         latestDeferred.await() to recommendedDeferred.await()
     }
     val homeDocument: Document? = if (recommendedItems.isEmpty()) {
-        runCatching { runtimeFetchHomeDocument() }.getOrNull()
+        runSuspendCatching { runtimeFetchHomeDocument() }.getOrNull()
     } else {
         null
     }

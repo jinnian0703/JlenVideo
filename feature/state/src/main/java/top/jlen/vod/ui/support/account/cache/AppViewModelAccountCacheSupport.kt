@@ -26,7 +26,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshCacheSize() {
     if (currentAccountState().isCacheSizeLoading) return
     viewModelScope.launch {
         updateAccountState(currentAccountState().copy(isCacheSizeLoading = true, error = null))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) {
                 legacyRepository().loadCacheSizeSummary()
             }
@@ -84,7 +84,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacySetCacheSizeLimit(option: Cac
 
 private fun LegacyStateRuntimeViewModelCore.legacyEnforceCacheLimits() {
     viewModelScope.launch {
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) {
                 legacyRepository().enforceAppCachePolicy()
             }
@@ -104,7 +104,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyClearAppCache() {
                 message = null
             )
         )
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) {
                 legacyRepository().clearAppContentAndImageCaches()
                 getApplication<android.app.Application>().imageLoader.memoryCache?.clear()

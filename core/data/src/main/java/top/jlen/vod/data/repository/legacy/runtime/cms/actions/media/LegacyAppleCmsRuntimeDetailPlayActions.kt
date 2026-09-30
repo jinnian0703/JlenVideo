@@ -3,6 +3,7 @@ package top.jlen.vod.data
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import top.jlen.vod.common.coroutines.runSuspendCatching
 
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadDetail(
     vodId: String,
@@ -85,7 +86,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyResolveDetailMism
     val targetTitle = canonicalTitle(previewItem.vodName)
     if (targetTitle.isBlank()) return null
 
-    val candidates = runCatching {
+    val candidates = runSuspendCatching {
         runtimeRequestSearch(keyword = previewItem.vodName, page = 1, limit = 10)
     }.getOrDefault(emptyList())
         .filter { candidate ->
@@ -97,7 +98,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyResolveDetailMism
         }
 
     for (candidate in candidates.take(5)) {
-        val detail = runCatching { legacyLoadDetailFromApi(candidate.vodId) }.getOrNull() ?: continue
+        val detail = runSuspendCatching { legacyLoadDetailFromApi(candidate.vodId) }.getOrNull() ?: continue
         if (detailMatchesPreview(detail, previewItem)) {
             return detail
         }
@@ -112,7 +113,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyFilterPlayablePre
     return coroutineScope {
         items.map { previewItem ->
             async {
-                val resolved = runCatching {
+                val resolved = runSuspendCatching {
                     legacyResolvePlayableDetailForPreview(previewItem)
                 }.getOrNull()
                 if (resolved != null && legacyParseSources(resolved).isNotEmpty()) {

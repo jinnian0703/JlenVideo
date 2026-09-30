@@ -40,6 +40,7 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
     private val searchResultScrollPositions = mutableMapOf<String, SearchResultScrollPosition>()
     private var hasEnteredAccountScreen = false
     internal val libraryRequests = LibraryRequestTracker()
+    private var detailLoadJob: Job? = null
     private var searchJob: Job? = null
     private var searchSuggestJob: Job? = null
     private var searchEnrichJob: Job? = null
@@ -177,6 +178,12 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
 
     internal fun putSearchResultScrollPosition(query: String, position: SearchResultScrollPosition) {
         searchResultScrollPositions[query] = position
+    }
+
+    internal fun currentDetailLoadJob(): Job? = detailLoadJob
+
+    internal fun replaceDetailLoadJob(value: Job?) {
+        detailLoadJob = value
     }
 
     internal fun currentSearchJob(): Job? = searchJob

@@ -35,6 +35,7 @@ fun DetailScreen(
     onSelectSource: (Int) -> Unit,
     onFavorite: () -> Unit,
     onDismissActionMessage: () -> Unit,
+    onRetry: () -> Unit,
     onPlay: (String, Int, Int) -> Unit
 ) {
     val isDarkTheme = isSystemInDarkTheme()
@@ -44,7 +45,7 @@ fun DetailScreen(
     when {
         state.isLoading && detailItem == null -> LoadingPane("正在加载详情...")
         !errorMessage.isNullOrBlank() -> Box(modifier = Modifier.appTopInsetsPadding()) {
-            ErrorBanner(message = errorMessage, onRetry = onBack, actionLabel = "返回")
+            DetailLoadErrorPane(message = errorMessage, onRetry = onRetry, onBack = onBack)
         }
         detailItem == null -> EmptyPane(
             message = "没有找到影片详情",
@@ -99,12 +100,22 @@ fun DetailScreen(
                         )
 
                         val pendingResume = state.pendingResumePlayback
+                        // 有续播记录时优先按记录中的线路续播，便于携带播放进度直接进入播放页
+                        val primarySourceIndex = pendingResume
+                            ?.sourceIndex
+                            ?.takeIf { it in state.sources.indices }
+                            ?: state.selectedSourceIndex
+                        val primarySource = state.sources.getOrNull(primarySourceIndex) ?: source
                         val primaryEpisodeIndex = pendingResume
                             ?.episodeIndex
                             ?.takeIf { it >= 0 }
-                            ?.coerceAtMost((source?.episodes?.lastIndex ?: 0).coerceAtLeast(0))
+                            ?.coerceAtMost((primarySource?.episodes?.lastIndex ?: 0).coerceAtLeast(0))
                             ?: 0
-                        val primaryActionLabel = if (pendingResume != null) "继续观看" else "立即播放"
+                        val primaryActionLabel = if (pendingResume != null) {
+                            formatResumeActionLabel(primaryEpisodeIndex, pendingResume.positionMs)
+                        } else {
+                            "立即播放"
+                        }
                         val followActionLabel = when {
                             !isLoggedIn -> "登录后追剧"
                             state.isActionLoading -> "处理中..."
@@ -115,11 +126,11 @@ fun DetailScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Button(
                                 onClick = {
-                                    if (source != null) {
-                                        onPlay(item.displayTitle, state.selectedSourceIndex, primaryEpisodeIndex)
+                                    if (primarySource != null) {
+                                        onPlay(item.displayTitle, primarySourceIndex, primaryEpisodeIndex)
                                     }
                                 },
-                                enabled = source != null,
+                                enabled = primarySource != null,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(UiDimens.PrimaryButtonHeight),
@@ -212,6 +223,53 @@ fun DetailScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+// 续播按钮文案：继续观看 第 N 集 mm:ss，没有进度时只显示集数
+private fun formatResumeActionLabel(episodeIndex: Int, positionMs: Long): String {
+    val episodeLabel = "继续观看 第 ${episodeIndex + 1} 集"
+    if (positionMs <= 0L) return episodeLabel
+    val totalSeconds = positionMs / 1000L
+    val hours = totalSeconds / 3600L
+    val minutes = (totalSeconds % 3600L) / 60L
+    val seconds = totalSeconds % 60L
+    val time = if (hours > 0L) {
+        "%d:%02d:%02d".format(hours, minutes, seconds)
+    } else {
+        "%02d:%02d".format(minutes, seconds)
+    }
+    return "$episodeLabel $time"
+}
+
+@Composable
+private fun DetailLoadErrorPane(
+    message: String,
+    onRetry: () -> Unit,
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = UiDimens.PagePadding, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // 重试会重新请求详情，返回按钮保留退出途径
+        ErrorBanner(message = message, onRetry = onRetry)
+        OutlinedButton(
+            onClick = onBack,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(UiDimens.SecondaryButtonHeight),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(UiDimens.ControlRadius),
+            border = androidx.compose.foundation.BorderStroke(1.dp, UiPalette.BorderSoft),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = UiPalette.SurfaceSoft.copy(alpha = 0.38f),
+                contentColor = UiPalette.TextPrimary
+            )
+        ) {
+            Text("返回", fontWeight = FontWeight.Bold)
         }
     }
 }

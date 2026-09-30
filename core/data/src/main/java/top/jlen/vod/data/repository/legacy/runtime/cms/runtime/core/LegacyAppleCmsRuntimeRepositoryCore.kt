@@ -5,7 +5,6 @@ import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.os.Build
 import android.provider.OpenableColumns
 import android.util.Base64
 import androidx.core.text.HtmlCompat
@@ -26,12 +25,14 @@ import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
-import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -53,6 +54,7 @@ import top.jlen.vod.AppConfig
 import top.jlen.vod.AppRuntimeInfo
 import top.jlen.vod.RuntimeEndpoints
 import top.jlen.vod.PLAYER_DESKTOP_UA
+import top.jlen.vod.common.coroutines.runSuspendCatching
 import javax.net.ssl.SSLException
 
 open class LegacyAppleCmsRuntimeRepositoryCore(
@@ -76,6 +78,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     )
     private val baseUrl = AppConfig.appleCmsBaseUrl.trimEnd('/')
     private val gson = Gson()
+    private val sharedRequestScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val categoryPageCache = ConcurrentHashMap<String, CachedValue<PagedVodItems>>()
     private val detailCache = ConcurrentHashMap<String, CachedValue<VodItem?>>()
     private val searchCache = ConcurrentHashMap<String, CachedValue<List<VodItem>>>()
@@ -499,24 +502,26 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             typeId.trim().takeIf { it.isNotBlank() }?.let { put("type_id", it) }
             level.trim().takeIf { it.isNotBlank() }?.let { put("level", it) }
         }
-        val page = runCatching {
+        val page = runSuspendCatching {
             loadLegacySearchSuggestions(
                 keyword = normalizedKeyword,
                 limit = limit.coerceAtLeast(1)
             )
-        }.recoverCatching {
-            val json = requestVideoApiJson(
-                path = "api.php/video/suggest",
-                queryParameters = queryParameters
-            )
-            parseSearchSuggestionPage(json)
         }.getOrElse {
-            SearchSuggestionPage(keyword = normalizedKeyword, limit = limit)
+            runSuspendCatching {
+                val json = requestVideoApiJson(
+                    path = "api.php/video/suggest",
+                    queryParameters = queryParameters
+                )
+                parseSearchSuggestionPage(json)
+            }.getOrElse {
+                SearchSuggestionPage(keyword = normalizedKeyword, limit = limit)
+            }
         }.let { resolvedPage ->
             if (resolvedPage.items.isNotEmpty()) {
                 resolvedPage
             } else {
-                runCatching {
+                runSuspendCatching {
                     val json = requestVideoApiJson(
                         path = "api.php/video/suggest",
                         queryParameters = queryParameters
@@ -534,7 +539,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         )
     }
 
-    private fun loadLegacySearchSuggestions(
+    private suspend fun loadLegacySearchSuggestions(
         keyword: String,
         limit: Int
     ): SearchSuggestionPage {
@@ -550,7 +555,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             .header("Accept", "application/json")
             .get()
             .build()
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).await().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 throw IOException("HTTP ${response.code}")
@@ -762,7 +767,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     private suspend fun loadFreshCategoryPage(typeId: String, page: Int): PagedVodItems {
         val cacheKey = "$typeId:$page"
-        val payload = runCatching {
+        val payload = runSuspendCatching {
             typeId.takeIf { it.all(Char::isDigit) }
                 ?.let { numericTypeId ->
                     requestApi {
@@ -797,30 +802,6 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     suspend fun searchCursor(keyword: String, cursor: String): CursorPagedVodItems =
         legacySearchCursor(keyword, cursor)
 
-    private suspend fun enrichSearchResultsOriginal(items: List<VodItem>, limit: Int = 8): List<VodItem> {
-        if (items.isEmpty()) return items
-        val enrichTargets = items.take(limit)
-        val enrichedById = coroutineScope {
-            enrichTargets.map { item ->
-                async {
-                    val detailItem = runCatching { loadDetail(item.vodId) }.getOrNull()
-                    val description = detailItem?.description
-                        ?.takeIf { it.isNotBlank() && it != "暂无简介" }
-                        .orEmpty()
-                    item.vodId to if (description.isNotBlank()) {
-                        item.copy(
-                            vodBlurb = description,
-                            vodContent = description
-                        )
-                    } else {
-                        item
-                    }
-                }
-            }.awaitAll().toMap()
-        }
-        return items.map { item -> enrichedById[item.vodId] ?: item }
-    }
-
     suspend fun enrichSearchResults(items: List<VodItem>, limit: Int = 8): List<VodItem> =
         legacyEnrichSearchResults(items, limit)
 
@@ -837,7 +818,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         val enrichedById = coroutineScope {
             enrichTargets.map { item ->
                 async {
-                    val detailItem = runCatching { loadDetail(item.vodId) }.getOrNull()
+                    val detailItem = runSuspendCatching { loadDetail(item.vodId) }.getOrNull()
                     item.vodId to (detailItem?.let { item.mergeDisplayMetadataFrom(it) } ?: item)
                 }
             }.awaitAll().toMap()
@@ -875,7 +856,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 hotSearchCache
                     ?.takeIf { isCacheValid(it.timestampMs, runtimeCacheRetentionMs()) }
                     ?.value
-                    ?: runCatching { loadFreshHotSearchGroups() }
+                    ?: runSuspendCatching { loadFreshHotSearchGroups() }
                         .getOrElse { error ->
                             staleGroups.takeIf { it.isNotEmpty() } ?: throw error
                         }
@@ -887,19 +868,19 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         val groups = coroutineScope {
             listOf(
                 async {
-                    runCatching { loadTencentHotSearchGroup(limit = 10) }
+                    runSuspendCatching { loadTencentHotSearchGroup(limit = 10) }
                         .getOrNull()
                 },
                 async {
-                    runCatching { loadIqiyiHotSearchGroup(limit = 10) }
+                    runSuspendCatching { loadIqiyiHotSearchGroup(limit = 10) }
                         .getOrNull()
                 },
                 async {
-                    runCatching { loadYoukuHotSearchGroup(limit = 10) }
+                    runSuspendCatching { loadYoukuHotSearchGroup(limit = 10) }
                         .getOrNull()
                 },
                 async {
-                    runCatching { loadMgtvHotSearchGroup(limit = 10) }
+                    runSuspendCatching { loadMgtvHotSearchGroup(limit = 10) }
                         .getOrNull()
                 }
             ).awaitAll()
@@ -930,32 +911,32 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         }
     }
 
-    private fun loadLatestReleaseFromGithubApi(currentVersion: String): AppUpdateInfo {
+    private suspend fun loadLatestReleaseFromGithubApi(currentVersion: String): AppUpdateInfo {
         val request = Request.Builder()
             .url(GITHUB_RELEASE_API_URL)
-            .header("Accept", "application/vnd.github+json")
+            .header("Accept", "application/vnd.github.html+json")
             .header("X-GitHub-Api-Version", "2022-11-28")
             .header("User-Agent", "JlenVideo-Android")
             .build()
 
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).await().use { response ->
             if (!response.isSuccessful) {
-                throw IOException("妫€鏌ユ洿鏂板け璐ワ細HTTP ${response.code}")
+                throw IOException("检查更新失败：HTTP ${response.code}")
             }
 
             val body = response.body?.string().orEmpty()
-            val json = JsonParser.parseString(body).asJsonObject
-            val latestVersion = json.get("tag_name")?.asString.orEmpty()
+            val json = JsonParser.parseString(body).safeObject()
+                ?: throw IOException("检查更新失败：版本信息为空")
+            val latestVersion = json.get("tag_name").safeString()
                 .removePrefix("v")
                 .trim()
-            val releasePageUrl = json.get("html_url")?.asString.orEmpty().trim()
-            val notes = json.get("body")?.asString.orEmpty().trim()
-            val downloadUrl = json.getAsJsonArray("assets")
-                ?.firstOrNull()
-                ?.asJsonObject
-                ?.get("browser_download_url")
-                ?.asString
-                .orEmpty()
+            if (latestVersion.isBlank()) {
+                throw IOException("检查更新失败：版本信息为空")
+            }
+            val releasePageUrl = json.get("html_url").safeString().trim()
+                .ifBlank { GITHUB_RELEASE_LATEST_URL }
+            val notes = parseGithubReleaseNotes(json)
+            val downloadUrl = parseGithubApkDownloadUrl(json)
 
             return AppUpdateInfo(
                 currentVersion = currentVersion.trim(),
@@ -968,15 +949,15 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         }
     }
 
-    private fun loadLatestReleaseFromGithubPage(currentVersion: String): AppUpdateInfo {
+    private suspend fun loadLatestReleaseFromGithubPage(currentVersion: String): AppUpdateInfo {
         val request = Request.Builder()
             .url(GITHUB_RELEASE_LATEST_URL)
             .header("User-Agent", "JlenVideo-Android")
             .build()
 
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).await().use { response ->
             if (!response.isSuccessful) {
-                throw IOException("妫€鏌ユ洿鏂板け璐ワ細HTTP ${response.code}")
+                throw IOException("检查更新失败：HTTP ${response.code}")
             }
 
             val finalUrl = response.request.url.toString()
@@ -1001,14 +982,41 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 ?: ""
 
             if (resolvedVersion.isBlank()) {
-                throw IOException("妫€鏌ユ洿鏂板け璐ワ細鐗堟湰淇℃伅涓虹┖")
+                throw IOException("检查更新失败：版本信息为空")
+            }
+            // GitHub 的附件可能通过片段懒加载；仅补取同站点的附件列表。
+            val downloadUrl = findGithubApkDownloadUrl(document).ifBlank {
+                val pageUrl = response.request.url
+                val assetsUrl = document.select("include-fragment[src]")
+                    .asSequence()
+                    .mapNotNull { pageUrl.resolve(it.attr("src")) }
+                    .firstOrNull {
+                        it.isHttps && it.host == pageUrl.host &&
+                            it.encodedPath.contains("/releases/expanded_assets/")
+                    }
+                if (assetsUrl == null) {
+                    ""
+                } else {
+                    runSuspendCatching {
+                        val assetsRequest = Request.Builder()
+                            .url(assetsUrl)
+                            .header("User-Agent", "JlenVideo-Android")
+                            .build()
+                        client.newCall(assetsRequest).await().use { assetsResponse ->
+                            if (!assetsResponse.isSuccessful) return@use ""
+                            findGithubApkDownloadUrl(
+                                Jsoup.parse(assetsResponse.body?.string().orEmpty(), assetsUrl.toString())
+                            )
+                        }
+                    }.getOrDefault("")
+                }
             }
 
             return AppUpdateInfo(
                 currentVersion = currentVersion.trim(),
                 latestVersion = resolvedVersion,
                 releasePageUrl = finalUrl,
-                downloadUrl = "",
+                downloadUrl = downloadUrl,
                 notes = notes.trim(),
                 hasUpdate = compareVersionNames(resolvedVersion, currentVersion) > 0
             )
@@ -1069,7 +1077,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 .build()
 
             try {
-                client.newCall(request).execute().use { response ->
+                client.newCall(request).await().use { response ->
                     if (!response.isSuccessful && response.code !in acceptedStatusCodes) {
                         throw IOException("HTTP ${response.code}")
                     }
@@ -1096,7 +1104,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             formBody = formBody
         )
 
-    private fun performVideoApiJsonRequest(
+    private suspend fun performVideoApiJsonRequest(
         base: String,
         path: String,
         queryParameters: Map<String, String>,
@@ -1124,7 +1132,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 .build()
         }
 
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).await().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 throw IOException("HTTP ${response.code}")
@@ -1136,7 +1144,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     private fun extractVideoApiMessage(json: JsonObject, fallbackMessage: String): String =
         top.jlen.vod.data.extractVideoApiMessage(json, fallbackMessage)
 
-    fun reportHeartbeat(
+    suspend fun reportHeartbeat(
         route: String,
         userId: String = currentSession().userId,
         vodId: String = "",
@@ -1181,306 +1189,12 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     suspend fun logout() = legacyLogout()
 
-    private fun reportHeartbeatOriginal(
-        route: String,
-        userId: String = currentSession().userId,
-        vodId: String = "",
-        sid: Int? = null,
-        nid: Int? = null
-    ) {
-        val request = Request.Builder()
-            .url(
-                Uri.parse(APP_CENTER_API_URL)
-                    .buildUpon()
-                    .appendQueryParameter("action", "heartbeat")
-                    .build()
-                    .toString()
-            )
-            .post(
-                FormBody.Builder()
-                    .add("device_id", ensureHeartbeatDeviceIdOriginal())
-                    .add("platform", "android")
-                    .add("app_version", AppRuntimeInfo.versionName)
-                    .add("android_release", Build.VERSION.RELEASE.orEmpty())
-                    .add("android_sdk", Build.VERSION.SDK_INT.toString())
-                    .add("manufacturer", Build.MANUFACTURER.orEmpty().trim())
-                    .add("model", Build.MODEL.orEmpty().trim())
-                    .add("route", route.trim().ifBlank { "home" })
-                    .apply {
-                        userId.trim()
-                            .takeIf(String::isNotBlank)
-                            ?.let { add("user_id", it) }
-                        vodId.trim()
-                            .takeIf(String::isNotBlank)
-                            ?.let { add("vod_id", it) }
-                        sid
-                            ?.takeIf { it > 0 }
-                            ?.let { add("sid", it.toString()) }
-                        nid
-                            ?.takeIf { it > 0 }
-                            ?.let { add("nid", it.toString()) }
-                    }
-                    .build()
-            )
-            .build()
-
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw IOException("蹇冭烦涓婃姤澶辫触锛欻TTP ${response.code}")
-            }
-        }
-    }
-
-    private suspend fun loginOriginal(userName: String, password: String): AuthSession {
-        val payload = FormBody.Builder()
-            .add("user_name", userName.trim())
-            .add("user_pwd", password)
-            .build()
-        val request = Request.Builder()
-            .url("$baseUrl/index.php/user/login")
-            .header("Referer", "$baseUrl/index.php/user/login.html")
-            .header("X-Requested-With", "XMLHttpRequest")
-            .post(payload)
-            .build()
-
-        val response = client.newCall(request).execute()
-        response.use {
-            if (!it.isSuccessful) {
-                throw IOException("登录失败：HTTP ${it.code}")
-            }
-            val body = it.body?.string().orEmpty()
-            val authResponse = runCatching {
-                gson.fromJson(body, AuthResponse::class.java)
-            }.getOrNull()
-
-            val session = currentSession()
-            if (session.isLoggedIn) {
-                return session
-            }
-
-            val failureMessage = authResponse?.msg
-                ?.takeIf(String::isNotBlank)
-                ?.let(::normalizeLoginFailureMessage)
-
-            throw IOException(
-                failureMessage
-                    ?: "登录失败，请检查账号或密码"
-            )
-        }
-    }
-
-    private suspend fun loadNoticesOriginal(
-        appVersion: String = AppRuntimeInfo.versionName,
-        userId: String = "",
-        forceRefresh: Boolean = false
-    ): List<AppNotice> {
-        if (!forceRefresh) {
-            noticeCache
-                ?.takeIf { isCacheValid(it.timestampMs, runtimeNoticeCacheTtlMs()) }
-                ?.value
-                ?.let { return it }
-        }
-
-        val requestKey = buildString {
-            append("notices:")
-            append(appVersion.trim())
-            append(':')
-            append(userId.trim())
-        }
-
-        return if (forceRefresh) {
-            loadFreshNoticesOriginal(appVersion = appVersion, userId = userId)
-        } else {
-            awaitSharedRequest(requestKey) {
-                noticeCache
-                    ?.takeIf { isCacheValid(it.timestampMs, runtimeNoticeCacheTtlMs()) }
-                    ?.value
-                    ?: loadFreshNoticesOriginal(appVersion = appVersion, userId = userId)
-            }
-        }
-    }
-
-    private fun pickPendingNoticeOriginal(notices: List<AppNotice>): AppNotice? {
-        val dismissedIds = noticePrefs.getStringSet(KEY_DISMISSED_NOTICE_IDS, emptySet()).orEmpty()
-        return notices.firstOrNull { notice ->
-            notice.isActive &&
-                notice.id.isNotBlank() &&
-                (notice.alwaysShowDialog || !dismissedIds.contains(notice.id))
-        }
-    }
-
-    private fun unreadActiveNoticeIdsOriginal(notices: List<AppNotice>): Set<String> {
-        val dismissedIds = noticePrefs.getStringSet(KEY_DISMISSED_NOTICE_IDS, emptySet()).orEmpty()
-        return notices.asSequence()
-            .filter { notice ->
-                notice.isActive &&
-                    notice.id.isNotBlank() &&
-                    (notice.alwaysShowDialog || !dismissedIds.contains(notice.id))
-            }
-            .map { it.id }
-            .toSet()
-    }
-
-    private fun markNoticeDismissedOriginal(notice: AppNotice) {
-        if (notice.alwaysShowDialog) return
-        markNoticeDismissed(notice.id)
-    }
-
-    private fun markNoticeDismissedOriginal(noticeId: String) {
-        val normalized = noticeId.trim()
-        if (normalized.isBlank()) return
-        val currentIds = noticePrefs.getStringSet(KEY_DISMISSED_NOTICE_IDS, emptySet()).orEmpty()
-        if (currentIds.contains(normalized)) return
-        noticePrefs.edit()
-            .putStringSet(KEY_DISMISSED_NOTICE_IDS, currentIds + normalized)
-            .apply()
-    }
-
-    private fun loadFreshNoticesOriginal(appVersion: String, userId: String): List<AppNotice> {
-        val url = Uri.parse(APP_CENTER_API_URL)
-            .buildUpon()
-            .appendQueryParameter("action", "notices")
-            .appendQueryParameter("app_version", appVersion.trim().ifBlank { AppRuntimeInfo.versionName })
-            .apply {
-                userId.trim()
-                    .takeIf(String::isNotBlank)
-                    ?.let { appendQueryParameter("user_id", it) }
-            }
-            .build()
-            .toString()
-
-        val request = Request.Builder()
-            .url(url)
-            .header("Accept", "application/json")
-            .build()
-
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw IOException("公告加载失败：HTTP ${response.code}")
-            }
-
-            val body = response.body?.string().orEmpty()
-            val json = JsonParser.parseString(body).asJsonObject
-            val items = json.extractNoticeItems()
-            val notices = items.mapNotNull(::parseNoticeItem)
-                .sortedWith(
-                    compareByDescending<AppNotice> { it.isPinned }
-                        .thenByDescending { it.isActive }
-                        .thenByDescending { parseNoticeTimeToMillis(it.updatedAt) ?: parseNoticeTimeToMillis(it.createdAt) ?: 0L }
-                        .thenByDescending { it.id }
-                )
-
-            noticeCache = CachedValue(
-                value = notices,
-                timestampMs = System.currentTimeMillis()
-            )
-            cleanupCachesIfNeeded()
-            return notices
-        }
-    }
-
-    private fun ensureHeartbeatDeviceIdOriginal(): String {
-        heartbeatPrefs.getString(HEARTBEAT_DEVICE_ID_KEY, null)
-            ?.takeIf(String::isNotBlank)
-            ?.let { return it }
-        val generated = "android-${UUID.randomUUID()}"
-        heartbeatPrefs.edit().putString(HEARTBEAT_DEVICE_ID_KEY, generated).apply()
-        return generated
-    }
-
-    private fun normalizeLoginFailureMessageOriginal(rawMessage: String): String {
-        val message = rawMessage.trim()
-        return when {
-            message.isBlank() -> ""
-            message.contains("获取用户信息失败") -> "用户名不存在或密码错误"
-            else -> message
-        }
-    }
-
-    private suspend fun loadRegisterPageOriginal(): RegisterPage {
-        val document = fetchDocument("$baseUrl/index.php/user/reg.html")
-        val channel = document.selectFirst("input[name=ac]")?.attr("value")?.trim().orEmpty()
-            .ifBlank { "email" }
-        val requiresCode = document.selectFirst("input[name=code]") != null
-        val requiresVerify = document.selectFirst("input[name=verify]") != null
-        val captchaUrl = document.selectFirst("img.ewave-verify-img, img[src*=/verify/]")
-            ?.attr("src")
-            .orEmpty()
-
-        return RegisterPage(
-            channel = channel,
-            contactLabel = if (channel == "phone") "手机号" else "邮箱",
-            codeLabel = if (channel == "phone") "手机验证码" else "邮箱验证码",
-            requiresCode = requiresCode,
-            requiresVerify = requiresVerify,
-            captchaUrl = resolveUrl(captchaUrl),
-            captchaBytes = null
-        )
-    }
-
-    private suspend fun loadRegisterCaptchaOriginal(captchaUrl: String): ByteArray {
-        val request = Request.Builder()
-            .url(appendTimestamp(captchaUrl))
-            .header("Referer", "$baseUrl/index.php/user/reg.html")
-            .build()
-
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw IOException("加载验证码失败：HTTP ${response.code}")
-            }
-            return response.body?.bytes() ?: throw IOException("加载验证码失败")
-        }
-    }
-
-    private suspend fun loadFindPasswordPageOriginal(): FindPasswordPage {
-        val document = fetchDocument("$baseUrl/index.php/user/findpass.html")
-        val requiresVerify = document.selectFirst("input[name=verify]") != null
-        val captchaUrl = document.selectFirst("img[src*=/verify/], img.mac_verify_img")
-            ?.attr("src")
-            .orEmpty()
-
-        return FindPasswordPage(
-            requiresVerify = requiresVerify,
-            captchaUrl = resolveUrl(captchaUrl),
-            captchaBytes = null
-        )
-    }
-
-    private suspend fun loadFindPasswordCaptchaOriginal(captchaUrl: String): ByteArray {
-        val request = Request.Builder()
-            .url(appendTimestamp(captchaUrl))
-            .header("Referer", "$baseUrl/index.php/user/findpass.html")
-            .build()
-
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw IOException("鍔犺浇楠岃瘉鐮佸け璐ワ細HTTP ${response.code}")
-            }
-            return response.body?.bytes() ?: throw IOException("鍔犺浇楠岃瘉鐮佸け璐?")
-        }
-    }
-
-    private suspend fun findPasswordOriginal(editor: FindPasswordEditor): String {
-        val form = FormBody.Builder()
-            .add("to", editor.email.trim())
-            .add("code", editor.code.trim())
-            .add("user_pwd", editor.password)
-            .add("user_pwd2", editor.confirmPassword)
-            .add("ac", "email")
-            .build()
-        return submitPublicAction(
-            url = "$baseUrl/index.php/user/findpass_reset",
-            referer = "$baseUrl/index.php/user/findpass.html",
-            formBody = form
-        )
-    }
-
     suspend fun uploadPortrait(uri: Uri): String {
         val resolver = appContext.contentResolver
         val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
-            ?: throw IOException("鏃犳硶璇诲彇澶村儚鏂囦欢")
+            ?: throw IOException("无法读取头像文件")
         if (bytes.isEmpty()) {
-            throw IOException("澶村儚鏂囦欢涓虹┖")
+            throw IOException("头像文件为空")
         }
 
         val mimeType = resolver.getType(uri).orEmpty().ifBlank { "image/jpeg" }
@@ -1510,13 +1224,13 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             .post(body)
             .build()
 
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).await().use { response ->
             val responseBody = response.body?.string().orEmpty()
             if (isUserLoginResponse(response, responseBody)) {
                 throw IOException("请先登录")
             }
             if (!response.isSuccessful) {
-                throw IOException("涓婁紶澶村儚澶辫触锛欻TTP ${response.code}")
+                throw IOException("上传头像失败：HTTP ${response.code}")
             }
             val authResponse = runCatching { gson.fromJson(responseBody, AuthResponse::class.java) }.getOrNull()
             if (authResponse != null && authResponse.msg.isNotBlank()) {
@@ -1528,20 +1242,20 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 }
                 throw IOException(authResponse.msg)
             }
-            if (responseBody.contains("user_portrait") || responseBody.contains("鎴愬姛")) {
-                return "澶村儚淇敼鎴愬姛"
+            if (responseBody.contains("user_portrait") || responseBody.contains("成功")) {
+                return "头像修改成功"
             }
-            return "澶村儚宸叉洿鏂?"
+            return "头像已更新"
         }
     }
 
     suspend fun uploadPortraitOptimized(uri: Uri): String {
         val payload = preparePortraitUpload(uri)
-        runCatching { uploadPortraitViaVideoApi(payload) }
+        runSuspendCatching { uploadPortraitViaVideoApi(payload) }
             .getOrNull()
             ?.let { return it }
 
-        runCatching { uploadPortraitViaVideoApiBase64(payload) }
+        runSuspendCatching { uploadPortraitViaVideoApiBase64(payload) }
             .getOrNull()
             ?.let { return it }
 
@@ -1562,7 +1276,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             .post(body)
             .build()
 
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).await().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("上传头像失败：HTTP ${response.code}")
             }
@@ -1585,7 +1299,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         }
     }
 
-    private fun uploadPortraitViaVideoApi(payload: PortraitUploadPayload): String {
+    private suspend fun uploadPortraitViaVideoApi(payload: PortraitUploadPayload): String {
         val body = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart(
@@ -1605,7 +1319,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             .post(body)
             .build()
 
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).await().use { response ->
             val responseBody = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 throw IOException("HTTP ${response.code}")
@@ -1614,7 +1328,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         }
     }
 
-    private fun uploadPortraitViaVideoApiBase64(payload: PortraitUploadPayload): String {
+    private suspend fun uploadPortraitViaVideoApiBase64(payload: PortraitUploadPayload): String {
         val base64Payload = buildString {
             append("data:")
             append(payload.mimeType.ifBlank { "image/jpeg" })
@@ -1635,7 +1349,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             .post(body)
             .build()
 
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).await().use { response ->
             val responseBody = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 throw IOException("HTTP ${response.code}")
@@ -1661,50 +1375,6 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         } else {
             message
         }
-    }
-
-    private suspend fun sendRegisterCodeOriginal(channel: String, contact: String): String {
-        val form = FormBody.Builder()
-            .add("ac", channel.trim())
-            .add("to", contact.trim())
-            .build()
-        return submitPublicAction(
-            url = normalizeUrl("/user/reg_msg/"),
-            referer = "$baseUrl/index.php/user/reg.html",
-            formBody = form
-        )
-    }
-
-    private suspend fun registerOriginal(editor: RegisterEditor): String {
-        val form = FormBody.Builder()
-            .add("user_name", editor.userName.trim())
-            .add("user_pwd", editor.password)
-            .add("user_pwd2", editor.confirmPassword)
-            .add("ac", editor.channel.trim())
-            .add("to", editor.contact.trim())
-            .add("code", editor.code.trim())
-            .add("verify", editor.verify.trim())
-            .build()
-        return submitPublicAction(
-            url = normalizeUrl("/user/reg/"),
-            referer = "$baseUrl/index.php/user/reg.html",
-            formBody = form
-        )
-    }
-
-    private suspend fun logoutOriginal() {
-        val request = Request.Builder()
-            .url("$baseUrl/index.php/user/logout")
-            .header("Referer", "$baseUrl/index.php/user")
-            .post(FormBody.Builder().build())
-            .build()
-
-        client.newCall(request).execute().use {
-            if (!it.isSuccessful && it.code != 302) {
-                throw IOException("退出登录失败：HTTP ${it.code}")
-            }
-        }
-        cookieJar.clear()
     }
 
     suspend fun loadUserProfile(): UserProfilePage = legacyLoadUserProfile()
@@ -1784,13 +1454,13 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         val code = json.firstInt("code", "status")
         val message = json.firstString("msg", "message")
         if (code == 401 || message.equals("login required", ignoreCase = true)) {
-            throw IOException("璇峰厛鐧诲綍")
+            throw IOException("请先登录")
         }
         if (code != null && code !in setOf(1, 200)) {
-            throw IOException(message.ifBlank { "浼氬憳淇℃伅鍔犺浇澶辫触" })
+            throw IOException(message.ifBlank { "会员信息加载失败" })
         }
         return parseVideoMemberInfoSnapshot(json)
-            ?: throw IOException("浼氬憳淇℃伅涓虹┖")
+            ?: throw IOException("会员信息为空")
     }
 
     suspend fun sendEmailBindCode(email: String): String = legacySendEmailBindCode(email)
@@ -1827,7 +1497,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             .get()
             .build()
 
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).await().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("请求失败：HTTP ${response.code}")
             }
@@ -2011,7 +1681,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     }
 
     suspend fun logoutForApp() {
-        runCatching {
+        runSuspendCatching {
             executeUserRequest(
                 path = "/index.php/user/logout",
                 refererPath = "/index.php/user",
@@ -2023,22 +1693,22 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     }
 
     suspend fun loadUserProfileForApp(): UserProfilePage {
-        runCatching { loadUserProfileFromUserDetailApi(currentSession()) }
+        runSuspendCatching { loadUserProfileFromUserDetailApi(currentSession()) }
             .getOrNull()
             ?.takeIf { it.session.isLoggedIn }
             ?.let { return enrichUserProfilePageSession(it) }
 
-        runCatching { loadUserProfileFromVideoMemberInfoApi() }
+        runSuspendCatching { loadUserProfileFromVideoMemberInfoApi() }
             .getOrNull()
             ?.takeIf { it.session.isLoggedIn }
             ?.let { return enrichUserProfilePageSession(it) }
 
-        runCatching { loadUserProfileFromAppCenter() }
+        runSuspendCatching { loadUserProfileFromAppCenter() }
             .getOrNull()
             ?.takeIf { it.session.isLoggedIn }
             ?.let { return enrichUserProfilePageSession(it) }
 
-        runCatching { loadUserProfile() }
+        runSuspendCatching { loadUserProfile() }
             .getOrNull()
             ?.takeIf { it.session.isLoggedIn || currentSession().isLoggedIn }
             ?.let { return enrichUserProfilePageSession(it) }
@@ -2060,7 +1730,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     }
 
     private suspend fun enrichUserProfilePageSession(page: UserProfilePage): UserProfilePage {
-        val htmlSession = runCatching {
+        val htmlSession = runSuspendCatching {
             parseUserProfileSession(fetchUserDocument("/index.php/user/index.html"))
         }.getOrNull() ?: return page
 
@@ -2104,7 +1774,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     }
 
     suspend fun loadMembershipPageForApp(): MembershipPage {
-        runCatching { loadMembershipPageFromVideoMemberInfoApi() }
+        runSuspendCatching { loadMembershipPageFromVideoMemberInfoApi() }
             .getOrNull()
             ?.takeIf { it.info.groupName.isNotBlank() || it.info.points.isNotBlank() || it.info.expiry.isNotBlank() || it.plans.isNotEmpty() }
             ?.let { return it }
@@ -2112,18 +1782,18 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         currentSession().userId
             .takeIf(String::isNotBlank)
             ?.let { userId ->
-                runCatching { loadMembershipInfoFromUserDetailApi(userId) }
+                runSuspendCatching { loadMembershipInfoFromUserDetailApi(userId) }
                     .getOrNull()
                     ?.takeIf { it.info.groupName.isNotBlank() || it.info.points.isNotBlank() || it.info.expiry.isNotBlank() }
                     ?.let { return it }
             }
 
-        runCatching { loadMembershipPageFromUserCenterJson() }
+        runSuspendCatching { loadMembershipPageFromUserCenterJson() }
             .getOrNull()
             ?.takeIf { it.info.groupName.isNotBlank() || it.info.points.isNotBlank() || it.info.expiry.isNotBlank() || it.plans.isNotEmpty() }
             ?.let { return it }
 
-        runCatching { loadMembershipPageFromAppCenter() }
+        runSuspendCatching { loadMembershipPageFromAppCenter() }
             .getOrNull()
             ?.let { return it }
 
@@ -2141,39 +1811,39 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     suspend fun loadMembershipDataForApp(): MembershipPage {
         val session = currentSession()
         if (!session.isLoggedIn) {
-            throw IOException("璇峰厛鐧诲綍")
+            throw IOException("请先登录")
         }
 
         val merged = mergeMembershipPages(
             base = MembershipPage(info = MembershipInfo(groupName = session.groupName)),
-            fallback = runCatching { loadMembershipPageFromVideoMemberInfoApi() }.getOrNull()
+            fallback = runSuspendCatching { loadMembershipPageFromVideoMemberInfoApi() }.getOrNull()
         ).let { merged ->
             mergeMembershipPages(
                 base = merged,
-                fallback = runCatching { loadMembershipInfoFromUserDetailApi(session.userId) }.getOrNull()
+                fallback = runSuspendCatching { loadMembershipInfoFromUserDetailApi(session.userId) }.getOrNull()
             )
         }.let { merged ->
             mergeMembershipPages(
                 base = merged,
-                fallback = runCatching { loadMembershipPageFromUserCenterJson() }.getOrNull()
+                fallback = runSuspendCatching { loadMembershipPageFromUserCenterJson() }.getOrNull()
             )
         }.let { merged ->
             mergeMembershipPages(
                 base = merged,
-                fallback = runCatching { loadMembershipPageFromAppCenter() }.getOrNull()
+                fallback = runSuspendCatching { loadMembershipPageFromAppCenter() }.getOrNull()
             )
         }.let { merged ->
             mergeMembershipPages(
                 base = merged,
-                fallback = runCatching { loadMembershipInfoFromProfileHtml() }.getOrNull()
+                fallback = runSuspendCatching { loadMembershipInfoFromProfileHtml() }.getOrNull()
             )
         }.let { merged ->
             mergeMembershipPages(
                 base = merged,
-                fallback = runCatching { loadMembershipPageFromHtml() }.getOrNull()
+                fallback = runSuspendCatching { loadMembershipPageFromHtml() }.getOrNull()
             )
         }
-        val pointLogs = runCatching { loadPointLogsForApp() }.getOrDefault(emptyList())
+        val pointLogs = runSuspendCatching { loadPointLogsForApp() }.getOrDefault(emptyList())
         return merged.copy(pointLogs = if (merged.pointLogs.isNotEmpty()) merged.pointLogs else pointLogs)
     }
 
@@ -2480,7 +2150,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             .take(limit)
     }
 
-    private fun loadTencentHotSearchGroup(limit: Int): HotSearchGroup {
+    private suspend fun loadTencentHotSearchGroup(limit: Int): HotSearchGroup {
         val sourceUrl = RuntimeEndpoints.tencentHotSearchUrl
         val document = fetchDocument(sourceUrl)
         val items = document.select(".mod_rank_search_list .hotlist li a")
@@ -2508,7 +2178,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         )
     }
 
-    private fun loadIqiyiHotSearchGroup(limit: Int): HotSearchGroup {
+    private suspend fun loadIqiyiHotSearchGroup(limit: Int): HotSearchGroup {
         val sourceUrl = RuntimeEndpoints.iqiyiHotSearchUrl
         val document = fetchDocument(sourceUrl)
         val items = document.select("a.rvi__box")
@@ -2536,7 +2206,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         )
     }
 
-    private fun loadYoukuHotSearchGroup(limit: Int): HotSearchGroup {
+    private suspend fun loadYoukuHotSearchGroup(limit: Int): HotSearchGroup {
         val sourceUrl = RuntimeEndpoints.youkuHotSearchUrl
         val html = fetchHtml(
             url = sourceUrl,
@@ -2552,32 +2222,32 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             return HotSearchGroup(platform = "\u4f18\u9177")
         }
 
-        val root = JsonParser.parseString(layoutJson).asJsonObject
-        val moduleList = root.getAsJsonObject("__INITIAL_DATA__")
-            ?.getAsJsonObject("data")
-            ?.getAsJsonArray("moduleList")
+        // 安全取值：遇到 JsonNull 或基本类型时降级为空结果而不是抛异常
+        val root = runCatching { JsonParser.parseString(layoutJson) }.getOrNull().safeObject()
+        val moduleList = root?.get("__INITIAL_DATA__").safeObject()
+            ?.get("data").safeObject()
+            ?.get("moduleList").safeArray()
             ?: return HotSearchGroup(platform = "\u4f18\u9177")
 
         var fallbackComponent: com.google.gson.JsonObject? = null
         var hotComponent: com.google.gson.JsonObject? = null
         for (moduleElement in moduleList) {
-            val components = moduleElement.asJsonObject.getAsJsonArray("components") ?: continue
+            val components = moduleElement.safeObject()?.get("components").safeArray() ?: continue
             for (componentElement in components) {
-                val component = componentElement.asJsonObject
-                val tag = component.getAsJsonObject("template")
+                val component = componentElement.safeObject() ?: continue
+                val tag = component.get("template").safeObject()
                     ?.get("tag")
-                    ?.asString
-                    .orEmpty()
+                    .safeString()
                 if (fallbackComponent == null && tag == "PHONE_BASE_B") {
                     fallbackComponent = component
                 }
 
-                val itemMap = component.getAsJsonArray("itemMap") ?: continue
+                val itemMap = component.get("itemMap").safeArray() ?: continue
                 if (itemMap.size() == 0) continue
-                val previewItem = itemMap[0].asJsonObject
-                val trackInfo = previewItem.getAsJsonObject("trackInfo")
-                val objectTitle = trackInfo?.get("object_title")?.asString.orEmpty()
-                val resourceId = trackInfo?.get("ucd_res_id")?.asString.orEmpty()
+                val previewItem = itemMap[0].safeObject() ?: continue
+                val trackInfo = previewItem.get("trackInfo").safeObject()
+                val objectTitle = trackInfo?.get("object_title").safeString()
+                val resourceId = trackInfo?.get("ucd_res_id").safeString()
                 if (objectTitle.contains("\u70ed\u64ad") ||
                     resourceId.contains("_HOT", ignoreCase = true)
                 ) {
@@ -2590,13 +2260,14 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
         val items = buildList {
             val itemMap = (hotComponent ?: fallbackComponent)
-                ?.getAsJsonArray("itemMap")
+                ?.get("itemMap")
+                .safeArray()
                 ?: return@buildList
             for ((index, itemElement) in itemMap.withIndex()) {
-                val item = itemElement.asJsonObject
+                val item = itemElement.safeObject() ?: continue
                 val keyword = sanitizeHotSearchKeyword(
                     platform = "优酷",
-                    raw = decodeSiteText(item.get("title")?.asString.orEmpty())
+                    raw = decodeSiteText(item.get("title").safeString())
                 )
                 if (keyword.isBlank()) continue
                 add(
@@ -2617,7 +2288,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         )
     }
 
-    private fun loadMgtvHotSearchGroup(limit: Int): HotSearchGroup {
+    private suspend fun loadMgtvHotSearchGroup(limit: Int): HotSearchGroup {
         val sourceUrl = RuntimeEndpoints.mgtvHotSearchUrl
         val document = fetchDocument(sourceUrl)
         val section = document.select(".m-list-single")
@@ -2996,7 +2667,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             historySourceCache[vodId]
                 ?.takeIf { isCacheValid(it.timestampMs, runtimeCacheRetentionMs()) }
                 ?.value
-                ?: runCatching {
+                ?: runSuspendCatching {
                     loadDetail(vodId)?.let(::parseSources).orEmpty()
                 }.getOrDefault(emptyList()).also { sources ->
                     historySourceCache[vodId] = CachedValue(
@@ -3068,7 +2739,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         val root = runCatching {
             JsonParser.parseString(raw).asJsonObject
         }.getOrNull() ?: return null
-        val payloadObject = root.getAsJsonObject("payload") ?: return null
+        val payloadObject = root.get("payload").safeObject() ?: return null
         if (
             !payloadObject.has("latestCursor") ||
                 !payloadObject.has("latestHasMore") ||
@@ -3308,25 +2979,24 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     private suspend fun <T> awaitSharedRequest(
         key: String,
         block: suspend () -> T
-    ): T = coroutineScope {
+    ): T {
         val existing = inFlightRequests[key] as Deferred<T>?
         if (existing != null) {
-            return@coroutineScope existing.await()
+            return existing.await()
         }
 
-        val deferred = async(start = CoroutineStart.LAZY) { block() }
+        // 共享请求在仓库自有 scope 中执行，单个调用方取消不会连带取消其他等待者
+        val deferred = sharedRequestScope.async(start = CoroutineStart.LAZY) { block() }
         val deferredAny = deferred as Deferred<Any>
         val active = (inFlightRequests.putIfAbsent(key, deferredAny) as Deferred<T>?) ?: deferred
         if (active === deferred) {
+            // 完成（含失败/取消）后从 map 中移除
+            deferred.invokeOnCompletion { inFlightRequests.remove(key, deferredAny) }
             deferred.start()
+        } else {
+            deferred.cancel()
         }
-        try {
-            active.await()
-        } finally {
-            if (active === deferred) {
-                inFlightRequests.remove(key, deferredAny)
-            }
-        }
+        return active.await()
     }
 
     private suspend fun loadBrowsableCategories(
@@ -3349,7 +3019,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                     ?: loadBrowsableCategories(forceRefresh = true)
             }
         }
-        val apiCategories = runCatching { requestApi { getCategories() }.data.orEmpty() }
+        val apiCategories = runSuspendCatching { requestApi { getCategories() }.data.orEmpty() }
             .getOrDefault(emptyList())
             .map(::normalizeCategory)
             .filter(::isBrowsableCategory)
@@ -3365,8 +3035,8 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             }
         }
 
-        val resolvedHomeDocument = homeDocument ?: runCatching { fetchDocument("$baseUrl/") }.getOrNull()
-        val mapDocument = runCatching { fetchDocument("$baseUrl/map/") }.getOrNull()
+        val resolvedHomeDocument = homeDocument ?: runSuspendCatching { fetchDocument("$baseUrl/") }.getOrNull()
+        val mapDocument = runSuspendCatching { fetchDocument("$baseUrl/map/") }.getOrNull()
 
         val parsedCategories = resolvedHomeDocument
             ?.let { parseCategories(it, mapDocument) }
@@ -3470,7 +3140,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             .post(formBody)
             .build()
 
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).await().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("请求失败：HTTP ${response.code}")
             }
@@ -3502,7 +3172,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             .post(formBody)
             .build()
 
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).await().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("请求失败：HTTP ${response.code}")
             }
@@ -3640,10 +3310,10 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         )
     }
 
-    private fun fetchDocument(url: String, postBody: FormBody? = null): Document =
+    private suspend fun fetchDocument(url: String, postBody: FormBody? = null): Document =
         Jsoup.parse(fetchHtml(url, postBody = postBody), url)
 
-    private fun fetchHtml(
+    private suspend fun fetchHtml(
         url: String,
         postBody: FormBody? = null,
         referer: String = "$baseUrl/",
@@ -3661,7 +3331,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             .build()
 
         return try {
-            client.newCall(request).execute().use { response ->
+            client.newCall(request).await().use { response ->
                 if (!response.isSuccessful) {
                     throw IOException("$url -> HTTP ${response.code}")
                 }
@@ -3670,6 +3340,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 }
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             throw IOException(e.message ?: "站点请求失败", e)
         }
     }
@@ -3689,7 +3360,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             return candidateUrl
         }
 
-        val html = runCatching { fetchHtml(candidateUrl, referer = referer) }.getOrNull().orEmpty()
+        val html = runSuspendCatching { fetchHtml(candidateUrl, referer = referer) }.getOrNull().orEmpty()
         if (html.isBlank()) return candidateUrl
 
         val nestedCandidates = extractEmbeddedMediaUrls(html)
@@ -3906,7 +3577,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             }
             .build()
 
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).await().use { response ->
             val body = response.body?.string().orEmpty()
             val json = runCatching {
                 JsonParser.parseString(body).asJsonObject
@@ -3948,10 +3619,10 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             }
         }
 
-        throw lastError ?: IOException("鐢ㄦ埛涓績璇锋眰澶辫触")
+        throw lastError ?: IOException("用户中心请求失败")
     }
 
-    private fun performUserCenterJsonRequest(
+    private suspend fun performUserCenterJsonRequest(
         base: String,
         path: String,
         queryParameters: Map<String, String>,
@@ -3987,12 +3658,12 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 .build()
         }
 
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).await().use { response ->
             val body = response.body?.string().orEmpty()
             val resolvedPath = response.request.url.encodedPath
 
             if (resolvedPath.contains("/index.php/user/login")) {
-                throw IOException("璇峰厛鐧诲綍")
+                throw IOException("请先登录")
             }
 
             if (!response.isSuccessful) {
@@ -4006,9 +3677,9 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                     body.contains("/index.php/user/login", ignoreCase = true) ||
                     body.contains("user/login", ignoreCase = true)
                 ) {
-                    throw IOException("璇峰厛鐧诲綍")
+                    throw IOException("请先登录")
                 }
-                throw IOException("鐢ㄦ埛涓績杩斿洖浜嗘棤娉曡В鏋愮殑鏁版嵁")
+                throw IOException("用户中心返回了无法解析的数据")
             }
         }
     }
@@ -4286,18 +3957,18 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     private suspend fun loadUserProfileFromUserDetailApi(session: AuthSession): UserProfilePage {
         val normalizedUserId = session.userId.trim().takeIf(String::isNotBlank)
-            ?: throw IOException("璇峰厛鐧诲綍")
+            ?: throw IOException("请先登录")
         val json = requestVideoApiJson(
             path = "api.php/user/get_detail",
             queryParameters = mapOf("id" to normalizedUserId)
         )
         val code = json.firstInt("code", "status")
         if (code != null && code !in setOf(1, 200)) {
-            throw IOException(json.firstString("msg", "message").ifBlank { "鑾峰彇鐢ㄦ埛璇︽儏澶辫触" })
+            throw IOException(json.firstString("msg", "message").ifBlank { "获取用户详情失败" })
         }
 
         val payload = extractUserApiPayload(json)
-            ?: throw IOException("鐢ㄦ埛璇︽儏涓虹┖")
+            ?: throw IOException("用户详情为空")
         val points = decodeSiteText(payload.firstString("user_points", "points", "score", "integral", "point_balance"))
         val groupName = decodeSiteText(payload.firstString("group_name", "member_name", "vip_name", "group"))
             .ifBlank { session.groupName }
@@ -4359,7 +4030,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         val profileBodyText = decodeSiteText(profileDocument.body().text())
         val groupName = profileFields
             .firstOrNull { (label, _) ->
-                label.contains("鎵€灞") || label.contains("鐢ㄦ埛缁") || label.contains("分组") || label.contains("用户组")
+                label.contains("所属") || label.contains("分组") || label.contains("用户组")
             }
             ?.second
             .orEmpty()
@@ -4371,7 +4042,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             }
             .ifBlank { session.groupName }
         val expiry = profileFields
-            .firstOrNull { (label, _) -> label.contains("浼氬憳鏈") || label.contains("鍒版湡") || label.contains("期限") }
+            .firstOrNull { (label, _) -> label.contains("会员期") || label.contains("到期") || label.contains("期限") }
             ?.second
             .orEmpty()
             .ifBlank {
@@ -4381,7 +4052,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
                 )
             }
         val points = profileFields
-            .firstOrNull { (label, _) -> label.contains("绉垎") || label.contains("璐︽埛") || label.contains("积分") }
+            .firstOrNull { (label, _) -> label.contains("积分") || label.contains("账户") }
             ?.second
             .orEmpty()
             .ifBlank {
@@ -4539,16 +4210,16 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     private fun parseMembershipDurationFromText(text: String): String {
         val normalized = text.lowercase(Locale.ROOT)
         return when {
-            "day" in normalized || "鍖呭ぉ" in text -> "day"
-            "week" in normalized || "鍖呭懆" in text -> "week"
-            "month" in normalized || "鍖呮湀" in text -> "month"
-            "year" in normalized || "鍖呭勾" in text -> "year"
+            "day" in normalized || "包天" in text -> "day"
+            "week" in normalized || "包周" in text -> "week"
+            "month" in normalized || "包月" in text -> "month"
+            "year" in normalized || "包年" in text -> "year"
             else -> ""
         }
     }
 
     private fun parseMembershipPointsFromText(text: String): String =
-        Regex("(\\d{1,8})\\s*(?:绉垎|points|score)", RegexOption.IGNORE_CASE)
+        Regex("(\\d{1,8})\\s*(?:积分|points|score)", RegexOption.IGNORE_CASE)
             .find(text)
             ?.groupValues
             ?.getOrNull(1)
@@ -4789,19 +4460,23 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             isAppCacheEnabled() && ttlMs > 0 && now - timestampMs <= ttlMs
 
         internal fun createClient(cookieJar: PersistentCookieJar): OkHttpClient {
-            val logging = HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BASIC
-            }
-
-            return OkHttpClient.Builder()
+            val builder = OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
+                // 整个请求的总超时，避免阻塞调用无限挂起
+                .callTimeout(30, TimeUnit.SECONDS)
                 .protocols(listOf(Protocol.HTTP_1_1))
                 .cookieJar(cookieJar)
-                .addInterceptor(logging)
-                .build()
+            // 仅 debug 构建输出网络日志
+            if (top.jlen.vod.core.data.BuildConfig.DEBUG) {
+                builder.addInterceptor(
+                    HttpLoggingInterceptor().apply {
+                        level = HttpLoggingInterceptor.Level.BASIC
+                    }
+                )
+            }
+            return builder.build()
         }
     }
 }
-

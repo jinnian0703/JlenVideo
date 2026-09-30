@@ -154,23 +154,27 @@ fun SearchScreen(
     )
 }
 
-internal const val POSTER_GRID_COLUMNS = 3
+internal fun posterRowKey(prefix: String, row: List<VodItem>): String =
+    prefix + row.joinToString(separator = "|", prefix = "-") { item ->
+        // 长度前缀避免 stableKey 自身包含分隔符时发生拼接歧义。
+        val key = item.stableKey()
+        "${key.length}:$key"
+    }
 
 internal fun LazyListScope.posterGridRows(
     rows: List<List<VodItem>>,
+    columns: Int,
     rowKeyPrefix: String,
     onOpenDetail: (String) -> Unit
 ) {
     items(
         count = rows.size,
-        key = { rowIndex ->
-            val firstKey = rows[rowIndex].firstOrNull()?.stableKey().orEmpty()
-            "$rowKeyPrefix-$rowIndex-$firstKey"
-        },
+        key = { rowIndex -> posterRowKey(rowKeyPrefix, rows[rowIndex]) },
         contentType = { "poster_row" }
     ) { rowIndex ->
         PosterGridRow(
             rowItems = rows[rowIndex],
+            columns = columns,
             onOpenDetail = onOpenDetail
         )
     }
@@ -310,6 +314,7 @@ fun SearchResultsScreen(
     onBack: () -> Unit,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
+    onRetrySearch: () -> Unit,
     onPickSuggestion: (String) -> Unit,
     onLoadMore: () -> Unit,
     onOpenDetail: (String) -> Unit
@@ -397,7 +402,7 @@ fun SearchResultsScreen(
             !state.error.isNullOrBlank() && state.submittedQuery.isBlank() && state.results.isEmpty() ->
                 item { SearchEmptyState(query = "", message = state.error.orEmpty()) }
             !state.error.isNullOrBlank() && state.results.isEmpty() ->
-                item { ErrorBanner(message = state.error.orEmpty(), onRetry = onSearch) }
+                item { ErrorBanner(message = state.error.orEmpty(), onRetry = onRetrySearch) }
             state.results.isEmpty() ->
                 item { SearchEmptyState(query = state.submittedQuery) }
             else -> items(

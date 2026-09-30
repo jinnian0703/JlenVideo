@@ -45,11 +45,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -65,7 +65,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import java.net.URL
-import kotlinx.coroutines.launch
 
 @Composable
 internal fun CastPlaybackButton(
@@ -73,56 +72,39 @@ internal fun CastPlaybackButton(
     title: String,
     subtitle: String,
     positionMs: Long,
-    playWhenReady: Boolean,
-    onConnectionChanged: (Boolean) -> Unit,
-    onCastPlaybackStarted: () -> Unit,
+    visible: Boolean,
     onInteraction: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     var dialogVisible by remember { mutableStateOf(false) }
     var searching by remember { mutableStateOf(false) }
     var searchVersion by remember { mutableIntStateOf(0) }
     var devices by remember { mutableStateOf<List<DlnaDevice>>(emptyList()) }
-    var connectingDevice by remember { mutableStateOf<DlnaDevice?>(null) }
-    var connectedDevice by remember { mutableStateOf<DlnaDevice?>(null) }
+    // 投屏状态来自进程级会话，切集、进出全屏都不会丢失
+    val castState by DlnaCastSession.state.collectAsState()
+    val connectingDevice = castState.connectingDevice
+    val connectedDevice = castState.device
     val wirelessDisplayName = rememberWirelessDisplayName(context)
     val latestPosition by rememberUpdatedState(positionMs.coerceAtLeast(0L))
-    val latestConnectionCallback by rememberUpdatedState(onConnectionChanged)
-    val latestPlaybackStartedCallback by rememberUpdatedState(onCastPlaybackStarted)
     val mediaTitle = listOf(title, subtitle).filter(String::isNotBlank).joinToString(" · ")
 
-    suspend fun castTo(device: DlnaDevice, startPositionMs: Long) {
-        connectingDevice = device
-        val success = DlnaCastClient.play(device, url, mediaTitle, startPositionMs)
-        connectingDevice = null
-        if (success) {
-            connectedDevice = device
-            dialogVisible = false
-            latestConnectionCallback(true)
-            latestPlaybackStartedCallback()
-            Toast.makeText(context, "已投屏到 ${device.name}", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(context, "投屏失败，设备可能不支持该视频格式", Toast.LENGTH_SHORT).show()
-        }
+    LaunchedEffect(connectedDevice) {
+        if (connectedDevice != null) dialogVisible = false
     }
 
     // 打开弹窗或点击刷新时搜索局域网设备
     LaunchedEffect(dialogVisible, searchVersion) {
         if (!dialogVisible || connectedDevice != null) return@LaunchedEffect
         searching = true
-        devices = runCatching { DlnaCastClient.discover(context) }.getOrDefault(emptyList())
-        searching = false
+        try {
+            devices = runCatchingCancellable { DlnaCastClient.discover(context) }.getOrDefault(emptyList())
+        } finally {
+            searching = false
+        }
     }
 
-    // 已连接时切换剧集，自动把新地址推送到当前设备
-    LaunchedEffect(url) {
-        val device = connectedDevice ?: return@LaunchedEffect
-        if (url.isNotBlank()) castTo(device, 0L)
-    }
-
-    Box(modifier = modifier) {
+    if (visible) Box(modifier = modifier) {
         IconButton(
             onClick = {
                 onInteraction()
@@ -153,13 +135,11 @@ internal fun CastPlaybackButton(
             onRefresh = { searchVersion++ },
             onSelect = { device ->
                 if (url.isBlank() || connectingDevice != null) return@CastDialog
-                scope.launch { castTo(device, latestPosition) }
+                DlnaCastSession.castTo(context, device, url, mediaTitle, latestPosition)
             },
-            onDisconnect = { device ->
-                scope.launch { DlnaCastClient.stop(device) }
-                connectedDevice = null
+            onDisconnect = {
                 dialogVisible = false
-                latestConnectionCallback(false)
+                DlnaCastSession.disconnect()
             },
             onOpenWirelessDisplay = {
                 if (launchWirelessDisplaySettings(context)) {
@@ -226,7 +206,8 @@ private fun CastDialog(
                             CastOptionRow(
                                 icon = Icons.Rounded.DesktopWindows,
                                 title = "Windows 无线显示器",
-                                subtitle = wirelessDisplayName?.let { "已连接：$it" }
+                                // 系统无法可靠区分有线 HDMI 与无线显示器，使用中性文案
+                                subtitle = wirelessDisplayName?.let { "外接显示器：$it" }
                                     ?: "Miracast 镜像，需在电脑上开启「投影到此电脑」",
                                 highlighted = wirelessDisplayName != null,
                                 onClick = onOpenWirelessDisplay
@@ -279,7 +260,7 @@ private fun CastDialogHeader(
                 color = UiPalette.Ink
             )
             Text(
-                text = if (connected) "视频正在其他设备上播放，手机可作为遥控。" else "请确保设备与手机连接同一 Wi-Fi。",
+                text = if (connected) "视频正在电视端播放，可在此断开投屏。" else "请确保设备与手机连接同一 Wi-Fi。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = UiPalette.TextSecondary
             )
@@ -390,7 +371,7 @@ private fun DlnaDeviceContent(
             CastOptionRow(
                 icon = Icons.Rounded.Tv,
                 title = device.name,
-                subtitle = runCatching { URL(device.location).host }.getOrDefault("DLNA"),
+                subtitle = runCatchingCancellable { URL(device.location).host }.getOrDefault("DLNA"),
                 loading = connectingDevice == device,
                 onClick = { onSelect(device) }
             )

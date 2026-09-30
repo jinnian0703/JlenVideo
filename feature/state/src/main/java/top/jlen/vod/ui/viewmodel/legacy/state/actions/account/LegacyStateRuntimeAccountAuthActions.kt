@@ -207,7 +207,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLogin() {
 
     viewModelScope.launch {
         updateAccountState(beginLogin(currentAccountState()))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) {
                 legacyRepository().loginForApp(userName = userName, password = password)
             }
@@ -231,7 +231,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLogout() {
     if (currentAccountState().isLoading) return
     viewModelScope.launch {
         updateAccountState(beginLogout(currentAccountState()))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().logoutForApp() }
         }.onSuccess {
             updateAccountState(loggedOutAccountState(currentAccountState()))

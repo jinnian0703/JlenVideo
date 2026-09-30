@@ -45,7 +45,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyEnsureAccountScreenReady() {
 
 internal fun LegacyStateRuntimeViewModelCore.legacyHydrateAccountSession() {
     viewModelScope.launch {
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadUserProfileForApp() }
         }.onSuccess { page ->
             updateAccountState(
@@ -59,16 +59,22 @@ internal fun LegacyStateRuntimeViewModelCore.legacyHydrateAccountSession() {
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyRefreshCrashLog() {
-    val latestCrashLog = CrashLogger.readLatest(getApplication())
-    val entries = CrashLogger.readIssueLogEntries(getApplication()).map {
-        AccountIssueLogEntry(
-            id = it.id,
-            title = it.title,
-            time = it.time,
-            summary = it.summary
-        )
+    viewModelScope.launch {
+        // 日志文件读取放到 IO 线程，避免阻塞主线程；结果回主线程再更新状态
+        val (latestCrashLog, entries) = withContext(Dispatchers.IO) {
+            val latest = CrashLogger.readLatest(getApplication())
+            val issueEntries = CrashLogger.readIssueLogEntries(getApplication()).map {
+                AccountIssueLogEntry(
+                    id = it.id,
+                    title = it.title,
+                    time = it.time,
+                    summary = it.summary
+                )
+            }
+            latest to issueEntries
+        }
+        updateAccountState(accountStateWithCrashLog(currentAccountState(), latestCrashLog, entries))
     }
-    updateAccountState(accountStateWithCrashLog(currentAccountState(), latestCrashLog, entries))
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyClearCrashLog() {
@@ -85,7 +91,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyCheckAppUpdate() {
     if (currentAccountState().isUpdateLoading) return
     viewModelScope.launch {
         updateAccountState(beginUpdateCheck(currentAccountState()))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) {
                 legacyRepository().loadLatestRelease(AppRuntimeInfo.versionName)
             }
@@ -102,7 +108,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshNotices(forceRefresh: 
     val userId = currentAccountState().session.userId
     viewModelScope.launch {
         updateNoticeState(beginNoticeRefresh(currentNoticeState()))
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) {
                 legacyRepository().loadNotices(
                     appVersion = AppRuntimeInfo.versionName,

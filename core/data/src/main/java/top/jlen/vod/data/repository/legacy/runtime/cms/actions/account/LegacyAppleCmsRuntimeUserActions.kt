@@ -2,13 +2,14 @@ package top.jlen.vod.data
 
 import java.io.IOException
 import okhttp3.FormBody
+import top.jlen.vod.common.coroutines.runSuspendCatching
 
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadUserProfile(): UserProfilePage {
-    runCatching { runtimeLoadUserProfileFromUserDetailApi(currentSession()) }
+    runSuspendCatching { runtimeLoadUserProfileFromUserDetailApi(currentSession()) }
         .getOrNull()
         ?.let { return it }
 
-    runCatching { runtimeLoadUserProfileFromVideoMemberInfoApi() }
+    runSuspendCatching { runtimeLoadUserProfileFromVideoMemberInfoApi() }
         .getOrNull()
         ?.let { return it }
 
@@ -34,25 +35,25 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadHistoryPage(
 )
 
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyLoadMembershipPage(): MembershipPage {
-    runCatching { runtimeLoadMembershipPageFromVideoMemberInfoApi() }
+    runSuspendCatching { runtimeLoadMembershipPageFromVideoMemberInfoApi() }
         .getOrNull()
         ?.let { return it }
 
     currentSession().userId
         .takeIf(String::isNotBlank)
         ?.let { userId ->
-            runCatching { runtimeLoadMembershipInfoFromUserDetailApi(userId) }
+            runSuspendCatching { runtimeLoadMembershipInfoFromUserDetailApi(userId) }
                 .getOrNull()
                 ?.takeIf { it.info.groupName.isNotBlank() || it.info.points.isNotBlank() || it.info.expiry.isNotBlank() }
                 ?.let { return it }
         }
 
-    runCatching { runtimeLoadMembershipPageFromUserCenterJson() }
+    runSuspendCatching { runtimeLoadMembershipPageFromUserCenterJson() }
         .getOrNull()
         ?.takeIf { it.info.groupName.isNotBlank() || it.info.points.isNotBlank() || it.info.expiry.isNotBlank() || it.plans.isNotEmpty() }
         ?.let { return it }
 
-    runCatching { runtimeLoadMembershipPageFromAppCenter() }
+    runSuspendCatching { runtimeLoadMembershipPageFromAppCenter() }
         .getOrNull()
         ?.let { return it }
 
@@ -80,7 +81,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacySaveUserProfile(
 }
 
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacySendEmailBindCode(email: String): String {
-    runCatching {
+    runSuspendCatching {
         val json = runtimeRequestVideoApiJson(
             path = "api.php/video/bindMsg",
             formBody = FormBody.Builder()
@@ -106,7 +107,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyBindEmail(
     email: String,
     code: String
 ): String {
-    runCatching {
+    runSuspendCatching {
         val json = runtimeRequestVideoApiJson(
             path = "api.php/video/bind",
             formBody = FormBody.Builder()
@@ -131,7 +132,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyBindEmail(
 }
 
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyUnbindEmail(): String {
-    runCatching {
+    runSuspendCatching {
         val json = runtimeRequestVideoApiJson(
             path = "api.php/video/unbind",
             formBody = FormBody.Builder()
@@ -190,7 +191,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyDeleteUserRecord(
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyUpgradeMembership(
     plan: MembershipPlan
 ): String {
-    runCatching {
+    runSuspendCatching {
         val json = runtimeRequestVideoApiJson(
             path = "api.php/video/upgrade",
             formBody = FormBody.Builder()

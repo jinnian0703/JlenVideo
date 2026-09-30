@@ -20,7 +20,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshPlayerSources() {
     val currentEpisodeName = currentPlayerState().currentEpisode?.name.orEmpty()
 
     viewModelScope.launch {
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().loadDetail(vodId) }
         }.onSuccess { detailItem ->
             if (detailItem == null || currentPlayerState().item?.vodId != vodId) {
@@ -146,7 +146,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRecordCurrentPlayback() {
     }
 
     viewModelScope.launch {
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().addPlayRecordForApp(item, episodePageUrl) }
         }.onSuccess {
             if (currentAccountState().historyItems.any { it.recordId.startsWith("local:") }) {
@@ -285,7 +285,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyResolveCurrentPlayerUrl() {
     val episodePageUrl = currentEpisode.url
     updatePlayerState(beginPlayerResolution(currentPlayerState()))
     viewModelScope.launch {
-        runCatching {
+        runStateCatching {
             withContext(Dispatchers.IO) { legacyRepository().resolvePlayUrl(episodePageUrl) }
         }.onSuccess { resolved ->
             if (currentPlayerState().currentEpisode?.url != episodePageUrl) return@onSuccess
