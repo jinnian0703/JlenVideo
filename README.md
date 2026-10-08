@@ -1,5 +1,5 @@
 # JlenVideo
-
+交流群1107163956
 JlenVideo 是一个基于 Kotlin、Jetpack Compose 和 Media3 的 Android 视频客户端，用于浏览、搜索和播放苹果 CMS 站点提供的影视内容。
 
 当前工程已经完成 `app / core / feature` 多模块拆分，代码按数据、设计、播放、页面、导航和状态调度分层，便于继续维护和扩展。
