@@ -237,6 +237,7 @@ internal fun LegacyAccountScreen(
                             if (state.session.portraitUrl.isNotBlank()) {
                                 AuthenticatedAvatar(
                                     imageUrl = state.session.portraitUrl,
+                                    userId = state.session.userId,
                                     contentDescription = state.session.userName,
                                     modifier = Modifier
                                         .size(74.dp)

@@ -77,6 +77,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         AppleCmsCategory(typeId = "GCCCCW", typeName = "动漫", parentId = "GCCCCW")
     )
     private val baseUrl = AppConfig.appleCmsBaseUrl.trimEnd('/')
+    private val portraitVersionStore = PortraitVersionStore(appContext, baseUrl)
     private val gson = Gson()
     private val sharedRequestScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val categoryPageCache = ConcurrentHashMap<String, CachedValue<PagedVodItems>>()
@@ -1036,7 +1037,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             userId = userId,
             userName = decodeSiteText(userName),
             groupName = decodeSiteText(groupName),
-            portraitUrl = normalizePortraitUrl(portraitUrl)
+            portraitUrl = normalizePortraitUrl(portraitUrl, userId)
         )
     }
 
@@ -1190,6 +1191,11 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     suspend fun logout() = legacyLogout()
 
     suspend fun uploadPortrait(uri: Uri): String {
+        val userId = currentSession().userId
+        return uploadPortraitFile(uri).also { portraitVersionStore.markUpdated(userId) }
+    }
+
+    private suspend fun uploadPortraitFile(uri: Uri): String {
         val resolver = appContext.contentResolver
         val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
             ?: throw IOException("无法读取头像文件")
@@ -1250,7 +1256,12 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     }
 
     suspend fun uploadPortraitOptimized(uri: Uri): String {
-        val payload = preparePortraitUpload(uri)
+        val userId = currentSession().userId
+        return uploadPreparedPortrait(preparePortraitUpload(uri))
+            .also { portraitVersionStore.markUpdated(userId) }
+    }
+
+    private suspend fun uploadPreparedPortrait(payload: PortraitUploadPayload): String {
         runSuspendCatching { uploadPortraitViaVideoApi(payload) }
             .getOrNull()
             ?.let { return it }
@@ -3402,8 +3413,10 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     private fun normalizeUrl(raw: String): String =
         top.jlen.vod.data.normalizeUrl(baseUrl, raw)
 
-    private fun normalizePortraitUrl(raw: String): String =
-        top.jlen.vod.data.normalizePortraitUrl(baseUrl, raw)
+    private fun normalizePortraitUrl(
+        raw: String,
+        userId: String = cookieJar.snapshot().firstCookieValue("user_id")
+    ): String = top.jlen.vod.data.normalizePortraitUrl(baseUrl, raw, portraitVersionStore.version(userId))
 
     private fun createApi(baseUrl: String): AppleCmsApi =
         Retrofit.Builder()

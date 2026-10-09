@@ -5,7 +5,9 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import okhttp3.OkHttpClient
 import top.jlen.vod.data.AppleCmsRepository
+import top.jlen.vod.data.PersistentCookieJar
 
 class JlenVideoApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
@@ -21,6 +23,11 @@ class JlenVideoApplication : Application(), ImageLoaderFactory {
 
     override fun newImageLoader(): ImageLoader =
         ImageLoader.Builder(this)
+            .okHttpClient {
+                OkHttpClient.Builder()
+                    .cookieJar(PersistentCookieJar(this))
+                    .build()
+            }
             .crossfade(false)
             .respectCacheHeaders(false)
             .memoryCache {

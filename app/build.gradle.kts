@@ -123,6 +123,7 @@ dependencies {
     implementation(project(":feature:player"))
     implementation(project(":feature:shell"))
     implementation("io.coil-kt:coil:2.7.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.profileinstaller:profileinstaller:1.3.1")

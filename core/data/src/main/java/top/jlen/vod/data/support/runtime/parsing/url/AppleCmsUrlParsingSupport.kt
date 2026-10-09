@@ -6,6 +6,7 @@ import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import okhttp3.Cookie
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 internal fun decodeSiteText(raw: String): String {
     val cleaned = raw.trim()
@@ -96,10 +97,17 @@ internal fun List<Cookie>.firstCookieValue(name: String): String =
         .takeUnless { it == "deleted" }
         .orEmpty()
 
-internal fun normalizePortraitUrl(baseUrl: String, raw: String): String {
+internal fun normalizePortraitUrl(baseUrl: String, raw: String, version: Long = 0L): String {
     val value = raw.trim()
     if (value.isBlank() || value == "deleted") return ""
-    return appendTimestamp(normalizeUrl(baseUrl, value))
+    val url = normalizeUrl(baseUrl.trimEnd('/'), value)
+    // 普通资料刷新必须复用同一地址；只有成功上传头像才改变本地版本。
+    if (version <= 0L) return url
+    return url.toHttpUrlOrNull()?.newBuilder()
+        ?.setQueryParameter("_jlen_portrait", version.toString())
+        ?.build()
+        ?.toString()
+        ?: url
 }
 
 internal fun decodePlayerUrl(rawUrl: String, encrypt: Int): String {

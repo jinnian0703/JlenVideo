@@ -94,10 +94,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
+import coil.imageLoader
+import coil.memory.MemoryCache
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Precision
@@ -106,7 +107,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.delay
-import okhttp3.OkHttpClient
 import top.jlen.vod.AppConfig
 import top.jlen.vod.AppRuntimeInfo
 import top.jlen.vod.data.AppNotice
@@ -115,7 +115,6 @@ import top.jlen.vod.data.CategoryFilterGroup
 import top.jlen.vod.data.FindPasswordEditor
 import top.jlen.vod.data.HotSearchGroup
 import top.jlen.vod.data.MembershipPlan
-import top.jlen.vod.data.PersistentCookieJar
 import top.jlen.vod.data.RegisterEditor
 import top.jlen.vod.data.UserProfileEditor
 import top.jlen.vod.data.VodItem
@@ -1127,22 +1126,17 @@ internal fun ListCard(item: VodItem, onClick: (String) -> Unit) {
 @Composable
 internal fun AuthenticatedAvatar(
     imageUrl: String,
+    userId: String,
     contentDescription: String,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop
 ) {
     val context = LocalContext.current
-    val cookieJar = remember(context) { PersistentCookieJar(context.applicationContext) }
-    val imageLoader = remember(context, cookieJar) {
-        ImageLoader.Builder(context)
-            .okHttpClient {
-                OkHttpClient.Builder()
-                    .cookieJar(cookieJar)
-                    .build()
-            }
-            .build()
-    }
-    val request = remember(context, imageUrl) {
+    val imageLoader = context.imageLoader
+    var lastSuccessfulKey by remember(userId) { mutableStateOf<MemoryCache.Key?>(null) }
+    // 加载成功只记下占位图来源，不重建同一头像的请求。
+    val request = remember(context, imageUrl, userId) {
+        val previousBitmap = lastSuccessfulKey?.let { imageLoader.memoryCache?.get(it)?.bitmap }
         ImageRequest.Builder(context)
             .data(imageUrl)
             .size(160, 160)
@@ -1156,8 +1150,10 @@ internal fun AuthenticatedAvatar(
             .crossfade(false)
             .addHeader("Referer", AppConfig.appleCmsBaseUrl)
             .addHeader("Origin", AppConfig.appleCmsBaseUrl.trimEnd('/'))
-            .memoryCacheKey("avatar::$imageUrl@160")
-            .diskCacheKey("avatar::$imageUrl")
+            .memoryCacheKey("avatar::$userId::$imageUrl@160")
+            .diskCacheKey("avatar::$userId::$imageUrl")
+            .placeholderMemoryCacheKey(lastSuccessfulKey)
+            .error(previousBitmap?.let { android.graphics.drawable.BitmapDrawable(context.resources, it) })
             .build()
     }
     AsyncImage(
@@ -1165,7 +1161,8 @@ internal fun AuthenticatedAvatar(
         imageLoader = imageLoader,
         contentDescription = contentDescription,
         modifier = modifier,
-        contentScale = contentScale
+        contentScale = contentScale,
+        onSuccess = { lastSuccessfulKey = it.result.memoryCacheKey }
     )
 }
 
