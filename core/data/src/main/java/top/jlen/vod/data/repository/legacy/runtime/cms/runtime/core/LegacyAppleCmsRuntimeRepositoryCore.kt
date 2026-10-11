@@ -933,7 +933,39 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             if (!response.isSuccessful) throw IOException("检查更新失败：HTTP ${response.code}")
             val json = runCatching { JsonParser.parseString(response.body?.string().orEmpty()).asJsonObject }.getOrNull()
                 ?: throw IOException("检查更新失败：响应格式异常")
-            return parseAppCenterUpdateResponse(
+            val updateInfo = parseAppCenterUpdateResponse(
+                json = json,
+                currentVersion = currentVersion,
+                currentVersionCode = currentVersionCode,
+                expectedPackageName = AppRuntimeInfo.applicationId
+            )
+            if (updateInfo.hasUpdate || updateInfo.notes.isNotBlank()) return updateInfo
+            return loadCurrentReleaseNotesFromAppCenter(currentVersion, currentVersionCode, sdkInt)
+        }
+    }
+
+    private suspend fun loadCurrentReleaseNotesFromAppCenter(
+        currentVersion: String,
+        currentVersionCode: Int,
+        sdkInt: Int
+    ): AppUpdateInfo {
+        val url = Uri.parse(APP_CENTER_API_URL)
+            .buildUpon()
+            .appendQueryParameter("action", "app_download")
+            .appendQueryParameter("version_code", currentVersionCode.toString())
+            .appendQueryParameter("sdk_int", sdkInt.toString())
+            .build()
+            .toString()
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json")
+            .header("User-Agent", "JlenVideo-Android")
+            .build()
+        client.newCall(request).await().use { response ->
+            if (!response.isSuccessful) throw IOException("获取更新说明失败：HTTP ${response.code}")
+            val json = runCatching { JsonParser.parseString(response.body?.string().orEmpty()).asJsonObject }.getOrNull()
+                ?: throw IOException("获取更新说明失败：响应格式异常")
+            return parseAppCenterDownloadResponse(
                 json = json,
                 currentVersion = currentVersion,
                 currentVersionCode = currentVersionCode,

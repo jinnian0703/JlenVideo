@@ -77,4 +77,16 @@ class ParsingRegressionTest {
         assertFalse(info.forceUpdate)
         assertEquals(41, info.currentVersionCode)
     }
+
+    @Test
+    fun appCenterDownloadResponseProvidesCurrentReleaseNotes() {
+        val json = JsonParser.parseString(
+            """{"code":1,"data":{"url":"https://user.jlen.top/download.php?id=abc&file=1","release":{"package_name":"top.jlen.vod","version_name":"2.1.2.4","version_code":41,"notes":"纯文本","notes_html":"<p>富文本</p>","release_url":"https://user.jlen.top/download.php?id=abc","direct_url":"https://user.jlen.top/download.php?id=abc&file=1","download_url":"https://user.jlen.top/download.php?id=abc&file=1"}}}"""
+        ).asJsonObject
+        val info = parseAppCenterDownloadResponse(json, "2.1.2.4", 41, "top.jlen.vod")
+        assertFalse(info.hasUpdate)
+        assertEquals("2.1.2.4", info.latestVersion)
+        assertEquals(41, info.latestVersionCode)
+        assertEquals("<p>富文本</p>", info.notes)
+    }
 }

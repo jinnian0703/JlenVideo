@@ -97,6 +97,57 @@ internal fun parseAppCenterUpdateResponse(
     )
 }
 
+// app_update 按接口约定在没有新版本时不返回 release；此接口用于补取当前已安装版本的发布说明。
+internal fun parseAppCenterDownloadResponse(
+    json: JsonObject,
+    currentVersion: String,
+    currentVersionCode: Int,
+    expectedPackageName: String
+): AppUpdateInfo {
+    val code = json.firstInt("code", "status")
+    if (code != null && code !in setOf(1, 200)) {
+        throw IOException(json.firstString("msg", "message").ifBlank { "获取更新说明失败" })
+    }
+    val data = json.firstObject("data") ?: throw IOException("获取更新说明失败：版本信息为空")
+    val release = data.firstObject("release") ?: throw IOException("获取更新说明失败：版本信息为空")
+    val packageName = release.firstString("package_name")
+    if (packageName.isNotBlank() && packageName != expectedPackageName) {
+        throw IOException("获取更新说明失败：安装包不匹配")
+    }
+    val latestVersion = release.firstString("version_name")
+    val latestVersionCode = release.firstInt("version_code")
+        ?: throw IOException("获取更新说明失败：版本号无效")
+    if (latestVersion.isBlank() || latestVersionCode <= 0) {
+        throw IOException("获取更新说明失败：版本信息无效")
+    }
+    val releasePageUrl = release.firstString("release_url")
+    val directUrl = release.firstString("direct_url")
+    val declaredDownloadUrl = release.firstString("download_url")
+    listOf(releasePageUrl, directUrl, declaredDownloadUrl)
+        .filter(String::isNotBlank)
+        .forEach { value ->
+            val parsed = value.toHttpUrlOrNull()
+            if (parsed == null || parsed.scheme !in setOf("http", "https")) {
+                throw IOException("获取更新说明失败：下载地址无效")
+            }
+        }
+    val downloadUrl = declaredDownloadUrl
+        .ifBlank { directUrl }
+        .ifBlank { releasePageUrl }
+    val notesHtml = release.firstString("notes_html")
+    return AppUpdateInfo(
+        currentVersion = currentVersion.trim(),
+        currentVersionCode = currentVersionCode,
+        latestVersion = latestVersion,
+        latestVersionCode = latestVersionCode,
+        minSupportedVersionCode = release.firstInt("min_supported_code") ?: 0,
+        releasePageUrl = releasePageUrl,
+        downloadUrl = downloadUrl,
+        notes = notesHtml.ifBlank { release.firstString("notes") },
+        hasUpdate = latestVersionCode > currentVersionCode
+    )
+}
+
 internal fun parseUserCenterVod(
     row: JsonObject,
     gson: Gson,
