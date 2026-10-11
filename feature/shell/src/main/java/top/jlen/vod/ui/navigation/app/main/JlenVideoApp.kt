@@ -307,10 +307,12 @@ fun JlenVideoApp() {
     val noticeDialog = viewModel.noticeState.dialogNotice
     val canShowGlobalDialogs = currentTopLevelRoute != null
     var dismissedUpdateVersion by rememberSaveable { mutableStateOf("") }
+    val updateDismissKey = updateInfo?.latestVersionCode?.takeIf { it > 0 }?.toString()
+        ?: updateInfo?.latestVersion.orEmpty()
     val shouldShowUpdateDialog = canShowGlobalDialogs &&
         updateInfo?.hasUpdate == true &&
         updateInfo.latestVersion.isNotBlank() &&
-        dismissedUpdateVersion != updateInfo.latestVersion &&
+        (updateInfo.forceUpdate || dismissedUpdateVersion != updateDismissKey) &&
         noticeDialog == null
     val openReleaseLink: () -> Unit = {
         val targetUrl = updateInfo?.releasePageUrl
@@ -413,11 +415,11 @@ fun JlenVideoApp() {
                     UpdatePromptDialog(
                         updateInfo = updateInfo ?: AppUpdateInfo(),
                         onDismiss = {
-                            dismissedUpdateVersion = updateInfo?.latestVersion.orEmpty()
+                            if (updateInfo?.forceUpdate != true) dismissedUpdateVersion = updateDismissKey
                         },
                         onOpenRelease = openReleaseLink,
                         onUpdate = {
-                            dismissedUpdateVersion = updateInfo?.latestVersion.orEmpty()
+                            if (updateInfo?.forceUpdate != true) dismissedUpdateVersion = updateDismissKey
                             openUpdateLink()
                         },
                         onOpenLink = openAnnouncementLink

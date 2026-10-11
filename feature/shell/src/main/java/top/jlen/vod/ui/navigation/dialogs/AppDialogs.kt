@@ -251,7 +251,7 @@ fun UpdatePromptDialog(
     val notesMaxHeight = (configuration.screenHeightDp.dp * 0.34f).coerceIn(140.dp, 260.dp)
     val notesScrollState = rememberScrollState()
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = { if (!updateInfo.forceUpdate) onDismiss() }) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -286,13 +286,17 @@ fun UpdatePromptDialog(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
-                            text = "发现新版本",
+                            text = if (updateInfo.forceUpdate) "必须更新" else "发现新版本",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.ExtraBold,
                             color = UiPalette.Ink
                         )
                         Text(
-                            text = "建议更新到最新版本，获得更好的稳定性和使用体验。",
+                            text = if (updateInfo.forceUpdate) {
+                                "当前版本已不再支持，请更新后继续使用。"
+                            } else {
+                                "建议更新到最新版本，获得更好的稳定性和使用体验。"
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = UiPalette.TextSecondary
                         )
@@ -308,7 +312,7 @@ fun UpdatePromptDialog(
                             .padding(horizontal = 10.dp, vertical = 5.dp)
                     ) {
                         Text(
-                            text = "可更新",
+                            text = if (updateInfo.forceUpdate) "强制更新" else "可更新",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = UiPalette.DangerText
@@ -376,15 +380,19 @@ fun UpdatePromptDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                 ) {
-                    TextButton(
-                        onClick = onDismiss,
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 12.dp)
-                    ) {
-                        Text(
-                            text = "稍后再说",
-                            maxLines = 1,
-                            softWrap = false
-                        )
+                    if (!updateInfo.forceUpdate) {
+                        TextButton(
+                            onClick = onDismiss,
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 12.dp)
+                        ) {
+                            Text(
+                                text = "稍后再说",
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
+                    } else {
+                        Box(modifier = Modifier.width(1.dp))
                     }
                     Row(
                         modifier = Modifier.weight(1f),

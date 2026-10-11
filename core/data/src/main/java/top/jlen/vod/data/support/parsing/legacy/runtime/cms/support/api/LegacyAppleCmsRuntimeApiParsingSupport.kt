@@ -31,6 +31,72 @@ internal fun parseGithubReleaseNotes(json: JsonObject): String =
         Entities.escape(json.get("body").safeString().trim()).replace("\n", "<br>")
     }
 
+internal fun parseAppCenterUpdateResponse(
+    json: JsonObject,
+    currentVersion: String,
+    currentVersionCode: Int,
+    expectedPackageName: String
+): AppUpdateInfo {
+    val code = json.firstInt("code", "status")
+    if (code != null && code !in setOf(1, 200)) {
+        throw IOException(json.firstString("msg", "message").ifBlank { "检查更新失败" })
+    }
+    val data = json.firstObject("data") ?: throw IOException("检查更新失败：版本信息为空")
+    val hasUpdate = data.firstBoolean("has_update")
+        ?: throw IOException("检查更新失败：响应缺少 has_update")
+    if (!hasUpdate) {
+        if (data.firstBoolean("force_update") == true || data.get("release")?.isJsonNull == false) {
+            throw IOException("检查更新失败：无更新响应字段无效")
+        }
+        return AppUpdateInfo(
+            currentVersion = currentVersion.trim(),
+            currentVersionCode = currentVersionCode,
+            hasUpdate = false
+        )
+    }
+    val release = data.firstObject("release") ?: throw IOException("检查更新失败：版本信息为空")
+    val packageName = release.firstString("package_name")
+    if (packageName.isNotBlank() && packageName != expectedPackageName) {
+        throw IOException("检查更新失败：安装包不匹配")
+    }
+    val latestVersion = release.firstString("version_name")
+    val latestVersionCode = release.firstInt("version_code")
+        ?: throw IOException("检查更新失败：版本号无效")
+    if (latestVersion.isBlank() || latestVersionCode <= currentVersionCode) {
+        throw IOException("检查更新失败：版本信息无效")
+    }
+    val releasePageUrl = release.firstString("release_url")
+    val directUrl = release.firstString("direct_url")
+    val declaredDownloadUrl = release.firstString("download_url")
+    listOf(releasePageUrl, directUrl, declaredDownloadUrl)
+        .filter(String::isNotBlank)
+        .forEach { value ->
+            val parsed = value.toHttpUrlOrNull()
+            if (parsed == null || parsed.scheme !in setOf("http", "https")) {
+                throw IOException("检查更新失败：下载地址无效")
+            }
+        }
+    val downloadUrl = declaredDownloadUrl
+        .ifBlank { directUrl }
+        .ifBlank { releasePageUrl }
+    if (downloadUrl.isBlank() && releasePageUrl.isBlank()) {
+        throw IOException("检查更新失败：下载地址为空")
+    }
+    val notesHtml = release.firstString("notes_html")
+    return AppUpdateInfo(
+        currentVersion = currentVersion.trim(),
+        currentVersionCode = currentVersionCode,
+        latestVersion = latestVersion,
+        latestVersionCode = latestVersionCode,
+        minSupportedVersionCode = release.firstInt("min_supported_code") ?: 0,
+        forceUpdate = data.firstBoolean("force_update") ?: false,
+        releasePageUrl = releasePageUrl,
+        downloadUrl = downloadUrl,
+        notes = notesHtml.ifBlank { release.firstString("notes") },
+        hasUpdate = true
+    )
+}
+
 internal fun parseUserCenterVod(
     row: JsonObject,
     gson: Gson,

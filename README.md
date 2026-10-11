@@ -10,15 +10,15 @@ JlenVideo 是一个基于 Kotlin、Jetpack Compose 和 Media3 的 Android 视频
 | 项目 | 值 |
 | --- | --- |
 | Application Id | `top.jlen.vod` |
-| 当前版本 | `2.1.2.3` |
-| 当前 versionCode | `40` |
+| 当前版本 | `2.1.2.4` |
+| 当前 versionCode | `41` |
 | minSdk | `24` |
 | targetSdk | `34` |
 | compileSdk | `34` |
 | JVM Target | `17` |
 | 默认站点 | `https://cms.jlen.top/` |
 
-本次更新详见 [2.1.2.3 更新日志](docs/releases/2.1.2.3.md)。
+本次更新详见 [2.1.2.4 更新日志](docs/releases/2.1.2.4.md)。
 
 相关仓库：
 
@@ -223,7 +223,7 @@ app
 app/build/outputs/apk/release/JlenVideo-版本号-release.apk
 ```
 
-客户端固定服务地址使用运行时解码，避免在 release 包中直接暴露主要接口地址。更新版本时，应用内下载链接应指向 GitHub Release 中的 release APK。
+客户端固定服务地址使用运行时解码，避免在 release 包中直接暴露主要接口地址。应用内更新优先使用用户系统版本管理返回的 release APK 下载地址，接口异常时保留 GitHub Release 兜底。
 
 加固建议采用稳妥策略：
 

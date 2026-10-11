@@ -629,7 +629,11 @@ fun formatCacheSize(bytes: Long): String {
 
 data class AppUpdateInfo(
     val currentVersion: String = "",
+    val currentVersionCode: Int = 0,
     val latestVersion: String = "",
+    val latestVersionCode: Int = 0,
+    val minSupportedVersionCode: Int = 0,
+    val forceUpdate: Boolean = false,
     val releasePageUrl: String = "",
     val downloadUrl: String = "",
     val notes: String = "",

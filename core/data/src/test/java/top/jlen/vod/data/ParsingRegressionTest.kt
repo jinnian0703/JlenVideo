@@ -53,4 +53,28 @@ class ParsingRegressionTest {
         assertEquals("语言", sanitizeUserFacingToken("璇█"))
         assertEquals("年份", sanitizeUserFacingToken("年份"))
     }
+
+    @Test
+    fun appCenterUpdateResponseUsesVersionCodeAndSupportsForcedUpdate() {
+        val json = JsonParser.parseString(
+            """{"code":1,"data":{"has_update":true,"force_update":true,"release":{"package_name":"top.jlen.vod","version_name":"2.1.2.4","version_code":41,"min_supported_code":40,"notes":"纯文本","notes_html":"<p>富文本</p>","release_url":"https://user.jlen.top/download.php?id=abc","direct_url":"https://user.jlen.top/download.php?id=abc&file=1","download_url":"https://user.jlen.top/download.php?id=abc&file=1"}}}"""
+        ).asJsonObject
+        val info = parseAppCenterUpdateResponse(json, "2.1.2.3", 40, "top.jlen.vod")
+        assertTrue(info.hasUpdate)
+        assertTrue(info.forceUpdate)
+        assertEquals(41, info.latestVersionCode)
+        assertEquals("<p>富文本</p>", info.notes)
+        assertEquals("https://user.jlen.top/download.php?id=abc&file=1", info.downloadUrl)
+    }
+
+    @Test
+    fun appCenterNoUpdateResponseReturnsNoUpdate() {
+        val json = JsonParser.parseString(
+            """{"code":1,"data":{"has_update":false,"force_update":false,"current_version_code":41,"release":null}}"""
+        ).asJsonObject
+        val info = parseAppCenterUpdateResponse(json, "2.1.2.4", 41, "top.jlen.vod")
+        assertFalse(info.hasUpdate)
+        assertFalse(info.forceUpdate)
+        assertEquals(41, info.currentVersionCode)
+    }
 }

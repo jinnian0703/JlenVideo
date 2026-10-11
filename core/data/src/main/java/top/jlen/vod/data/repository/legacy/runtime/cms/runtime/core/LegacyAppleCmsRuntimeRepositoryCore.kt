@@ -905,6 +905,45 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     suspend fun loadLatestRelease(currentVersion: String): AppUpdateInfo {
         return try {
+            loadLatestReleaseFromAppCenter(currentVersion, AppRuntimeInfo.versionCode, android.os.Build.VERSION.SDK_INT)
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            loadLatestReleaseFromGithubFallback(currentVersion)
+        }
+    }
+
+    private suspend fun loadLatestReleaseFromAppCenter(
+        currentVersion: String,
+        currentVersionCode: Int,
+        sdkInt: Int
+    ): AppUpdateInfo {
+        val url = Uri.parse(APP_CENTER_API_URL)
+            .buildUpon()
+            .appendQueryParameter("action", "app_update")
+            .appendQueryParameter("version_code", currentVersionCode.toString())
+            .appendQueryParameter("sdk_int", sdkInt.toString())
+            .build()
+            .toString()
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json")
+            .header("User-Agent", "JlenVideo-Android")
+            .build()
+        client.newCall(request).await().use { response ->
+            if (!response.isSuccessful) throw IOException("检查更新失败：HTTP ${response.code}")
+            val json = runCatching { JsonParser.parseString(response.body?.string().orEmpty()).asJsonObject }.getOrNull()
+                ?: throw IOException("检查更新失败：响应格式异常")
+            return parseAppCenterUpdateResponse(
+                json = json,
+                currentVersion = currentVersion,
+                currentVersionCode = currentVersionCode,
+                expectedPackageName = AppRuntimeInfo.applicationId
+            )
+        }
+    }
+
+    private suspend fun loadLatestReleaseFromGithubFallback(currentVersion: String): AppUpdateInfo {
+        return try {
             loadLatestReleaseFromGithubApi(currentVersion)
         } catch (error: Exception) {
             if (error is CancellationException) throw error
@@ -941,6 +980,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
             return AppUpdateInfo(
                 currentVersion = currentVersion.trim(),
+                currentVersionCode = AppRuntimeInfo.versionCode,
                 latestVersion = latestVersion,
                 releasePageUrl = releasePageUrl,
                 downloadUrl = downloadUrl,
@@ -1015,6 +1055,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
             return AppUpdateInfo(
                 currentVersion = currentVersion.trim(),
+                currentVersionCode = AppRuntimeInfo.versionCode,
                 latestVersion = resolvedVersion,
                 releasePageUrl = finalUrl,
                 downloadUrl = downloadUrl,
