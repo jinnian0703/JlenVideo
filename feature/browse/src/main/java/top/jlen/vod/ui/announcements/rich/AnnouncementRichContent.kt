@@ -65,7 +65,10 @@ fun AnnouncementRichHtmlContent(
     fallbackContent: String = htmlContent,
     onOpenLink: (String) -> Unit = NoAnnouncementLinkHandler
 ) {
-    val richBlocks = remember(htmlContent) { parseAnnouncementHtmlBlocks(htmlContent) }
+    val normalizedContent = remember(htmlContent) {
+        normalizeAnnouncementContent(htmlContent)
+    }
+    val richBlocks = remember(normalizedContent) { parseAnnouncementHtmlBlocks(normalizedContent) }
 
     if (richBlocks.isEmpty()) {
         AnnouncementRichText(content = fallbackContent.stripAnnouncementCodeFenceForDisplay())
@@ -83,6 +86,142 @@ fun AnnouncementRichHtmlContent(
         }
     }
 }
+
+/**
+ * 更新说明有两种来源：服务端富文本 HTML，以及旧版/备用接口返回的 Markdown 文本。
+ * 纯 Markdown 以及由服务端转成 `<br>` 的 Markdown 会先转换成安全 HTML，继续复用现有富文本渲染器。
+ */
+internal fun normalizeAnnouncementContent(content: String): String {
+    val raw = content.trim()
+    if (raw.isBlank()) return ""
+    val hasHtmlElement = Regex("(?is)<(?!br\\b|/br\\b)[a-z][^>]*>").containsMatchIn(raw)
+    if (hasHtmlElement || !looksLikeAnnouncementMarkdown(raw)) return raw
+    val markdown = Parser.unescapeEntities(raw, false)
+        .replace(Regex("(?i)<br\\s*/?>"), "\n")
+        .replace(Regex("(?i)</(?:p|div|h[1-6])\\s*>"), "\n")
+        .trim()
+    return markdownToAnnouncementHtml(markdown)
+}
+
+internal fun looksLikeAnnouncementMarkdown(content: String): Boolean {
+    val normalized = Parser.unescapeEntities(content, false)
+    return Regex("(?m)^\\s{0,3}(?:#{1,6}\\s+|[-*+]\\s+|\\d+[.)]\\s+|>\\s+|```)").containsMatchIn(normalized) ||
+        Regex("(?:\\*\\*[^*]+\\*\\*|__[^_]+__|~~[^~]+~~|`[^`]+`|\\[[^]]+\\]\\(https?://[^)]+\\))").containsMatchIn(normalized)
+}
+
+internal fun markdownToAnnouncementHtml(markdown: String): String {
+    val lines = markdown
+        .replace("\r\n", "\n")
+        .replace('\r', '\n')
+        .split('\n')
+    val result = StringBuilder()
+    val paragraph = mutableListOf<String>()
+    var index = 0
+
+    fun flushParagraph() {
+        if (paragraph.isEmpty()) return
+        val text = paragraph.joinToString("<br>") { markdownInlineToAnnouncementHtml(it.trim()) }
+        if (text.isNotBlank()) result.append("<p>").append(text).append("</p>")
+        paragraph.clear()
+    }
+
+    while (index < lines.size) {
+        val line = lines[index]
+        val trimmed = line.trim()
+        when {
+            trimmed.isBlank() -> {
+                flushParagraph()
+                index += 1
+            }
+            trimmed.startsWith("```") -> {
+                flushParagraph()
+                val code = mutableListOf<String>()
+                index += 1
+                while (index < lines.size && !lines[index].trim().startsWith("```")) {
+                    code += lines[index]
+                    index += 1
+                }
+                if (index < lines.size) index += 1
+                result.append("<pre><code>")
+                    .append(escapeAnnouncementHtml(code.joinToString("\n")))
+                    .append("</code></pre>")
+            }
+            Regex("^\\s{0,3}#{1,6}\\s+.+").matches(line) -> {
+                flushParagraph()
+                val match = Regex("^\\s{0,3}(#{1,6})\\s+(.+?)\\s*#*\\s*$").find(line)
+                if (match != null) {
+                    val tag = if (match.groupValues[1].length <= 2) "h2" else "h3"
+                    result.append('<').append(tag).append('>')
+                        .append(markdownInlineToAnnouncementHtml(match.groupValues[2]))
+                        .append("</").append(tag).append('>')
+                }
+                index += 1
+            }
+            Regex("^\\s{0,3}(?:[-*+]\\s+.+|\\d+[.)]\\s+.+)$").matches(line) -> {
+                flushParagraph()
+                val ordered = Regex("^\\s{0,3}\\d+[.)]\\s+").containsMatchIn(line)
+                val tag = if (ordered) "ol" else "ul"
+                result.append('<').append(tag).append('>')
+                while (index < lines.size) {
+                    val item = lines[index]
+                    val match = if (ordered) {
+                        Regex("^\\s{0,3}\\d+[.)]\\s+(.+)$").find(item)
+                    } else {
+                        Regex("^\\s{0,3}[-*+]\\s+(.+)$").find(item)
+                    }
+                    if (match == null) break
+                    result.append("<li>")
+                        .append(markdownInlineToAnnouncementHtml(match.groupValues[1]))
+                        .append("</li>")
+                    index += 1
+                }
+                result.append("</").append(tag).append('>')
+            }
+            Regex("^\\s{0,3}>\\s?.+").matches(line) -> {
+                flushParagraph()
+                val quote = mutableListOf<String>()
+                while (index < lines.size) {
+                    val match = Regex("^\\s{0,3}>\\s?(.*)$").find(lines[index]) ?: break
+                    quote += match.groupValues[1]
+                    index += 1
+                }
+                result.append("<blockquote><p>")
+                    .append(quote.joinToString("<br>") { markdownInlineToAnnouncementHtml(it) })
+                    .append("</p></blockquote>")
+            }
+            Regex("^\\s{0,3}(?:---+|\\*\\*\\*+|___+)$").matches(line) -> {
+                flushParagraph()
+                result.append("<hr>")
+                index += 1
+            }
+            else -> {
+                paragraph += line
+                index += 1
+            }
+        }
+    }
+    flushParagraph()
+    return result.toString()
+}
+
+private fun markdownInlineToAnnouncementHtml(text: String): String {
+    var value = escapeAnnouncementHtml(text)
+    value = value.replace(Regex("\\[([^]]+)]\\((https?://[^)\\s]+)\\)")) {
+        "<a href=\"${it.groupValues[2]}\">${it.groupValues[1]}</a>"
+    }
+    value = value.replace(Regex("`([^`]+)`"), "<code>$1</code>")
+    value = value.replace(Regex("(\\*\\*|__)(.+?)\\1"), "<strong>$2</strong>")
+    value = value.replace(Regex("~~(.+?)~~"), "<s>$1</s>")
+    value = value.replace(Regex("(?<![\\w*])\\*([^*\\n]+)\\*(?!\\*)"), "<em>$1</em>")
+    value = value.replace(Regex("(?<![\\w_])_([^_\\n]+)_(?!\\w)"), "<em>$1</em>")
+    return value
+}
+
+private fun escapeAnnouncementHtml(value: String): String = value
+    .replace("&", "&amp;")
+    .replace("<", "&lt;")
+    .replace(">", "&gt;")
+    .replace("\"", "&quot;")
 
 @Composable
 fun AnnouncementRichInlineText(
