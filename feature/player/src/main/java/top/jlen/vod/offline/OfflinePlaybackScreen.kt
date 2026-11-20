@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -17,11 +18,17 @@ import top.jlen.vod.data.PlaybackResumeRecord
 import top.jlen.vod.data.PlaybackResumeStore
 import top.jlen.vod.ui.FullscreenPlayerContent
 import top.jlen.vod.ui.PlaybackSnapshot
+import top.jlen.vod.ui.PlayerEpisodePicker
+import top.jlen.vod.ui.PickerSource
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import java.io.File
 
-internal fun offlineQueue(entries: List<Entry>, selected: Entry): List<Entry> = entries.filter {
-    it.stage == Stage.DONE && it.vod == selected.vod && it.si == selected.si && it.source == selected.source
-}.sortedBy { it.ei }
+internal fun downloadedSources(entries: List<Entry>, vod: String): List<List<Entry>> = entries
+    .filter { it.vod == vod && it.stage == Stage.DONE }
+    .sortedWith(compareBy(Entry::si, Entry::source, Entry::ei))
+    .groupBy { it.si to it.source }
+    .values.toList()
 
 internal fun PlaybackSnapshot.offlineResumePosition(): Long? = when {
     durationMs <= 0L -> null
@@ -52,7 +59,14 @@ internal fun OfflinePlaybackScreen(downloadId: String, onClose: () -> Unit) {
     }
 
     key(row.id) {
-        val next = remember(entries, row) { offlineQueue(entries, row).firstOrNull { it.ei > row.ei } }
+        val sourceFlow = remember(library, row.vod) {
+            library.entries.map { downloadedSources(it, row.vod) }.distinctUntilChanged()
+        }
+        val groups by sourceFlow.collectAsState(initial = remember(entries, row.vod) { downloadedSources(entries, row.vod) })
+        val sourceIndex = groups.indexOfFirst { it.first().si == row.si && it.first().source == row.source }
+        val queue = groups.getOrNull(sourceIndex).orEmpty()
+        val next = queue.firstOrNull { it.ei > row.ei }
+        var showPicker by rememberSaveable { mutableStateOf(false) }
         val initial = remember {
             val record = resumes.loadForSource(row.vod, row.source, row.si)
             PlaybackSnapshot(positionMs = record?.takeIf { it.episodeIndex == row.ei }?.positionMs ?: 0L,
@@ -70,9 +84,22 @@ internal fun OfflinePlaybackScreen(downloadId: String, onClose: () -> Unit) {
             hasNextEpisode = next != null, initialSnapshot = initial,
             onPlaybackSnapshotChanged = checkpoint::update,
             onNextEpisode = { next?.let { checkpoint.flush(); selectedId = it.id } },
+            onOpenEpisodePicker = if (sourceIndex >= 0) ({ showPicker = true }) else null,
             onClose = onClose, localFilesOnly = true,
             onPlaybackError = { fail("离线文件无法播放，请删除后重新下载") }
         )
+        if (showPicker && sourceIndex >= 0) {
+            PlayerEpisodePicker(
+                sources = remember(groups) { groups.map { PickerSource(it.first().source, it.map(Entry::episode)) } },
+                playingSource = sourceIndex,
+                playingEpisode = queue.indexOfFirst { it.id == row.id },
+                onDismiss = { showPicker = false },
+                onPick = { source, episode ->
+                    checkpoint.flush()
+                    selectedId = groups[source][episode].id
+                }
+            )
+        }
     }
 }
 

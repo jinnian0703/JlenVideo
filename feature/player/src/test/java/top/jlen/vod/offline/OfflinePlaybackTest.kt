@@ -11,8 +11,9 @@ class OfflinePlaybackTest {
         val fourth = first.copy(id = "4", ei = 4)
         val entries = listOf(fourth, first.copy(ei = 2, stage = Stage.ACTIVE),
             first.copy(ei = 3, stage = Stage.FAILED), first.copy(vod = "other"),
-            first.copy(si = 1), first.copy(source = "其他线路"), first)
-        assertEquals(listOf(first, fourth), offlineQueue(entries, first))
+            first.copy(id = "B", si = 1), first.copy(id = "C", source = "其他线路"), first)
+        val groups = downloadedSources(entries, first.vod)
+        assertEquals(listOf(listOf("C"), listOf("1", "4"), listOf("B")), groups.map { it.map(Entry::id) })
     }
 
     @Test fun resumeIgnoresUnknownDurationAndRestartsFinishedVideos() {

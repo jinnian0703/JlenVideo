@@ -482,6 +482,8 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
 
     fun selectPlayerEpisode(index: Int) = legacySelectPlayerEpisode(index)
 
+    fun pickPlayerEpisode(sourceIndex: Int, episodeIndex: Int) = legacySelectPlayerEpisode(episodeIndex, sourceIndex)
+
     fun selectPlayerSource(index: Int) = legacySelectPlayerSource(index)
 
     fun playNextEpisode() = legacyPlayNextEpisode()

@@ -1,4 +1,4 @@
-﻿package top.jlen.vod.ui
+package top.jlen.vod.ui
 
 import android.app.Activity
 import android.content.Context
@@ -90,6 +90,7 @@ fun PlayerScreen(
     onBack: () -> Unit,
     onSelectEpisode: (Int) -> Unit,
     onSelectSource: (Int) -> Unit,
+    onPickEpisode: (Int, Int) -> Unit,
     onRefreshSources: () -> Unit,
     onPlayNext: () -> Unit,
     onPlaybackSnapshotChange: (PlaybackSnapshot) -> Unit,
@@ -273,7 +274,10 @@ fun PlayerScreen(
         }
     }
 
+    var pickerOpen by rememberSaveable(vodId) { mutableStateOf(false) }
+    val hasSources = state.sources.isNotEmpty()
     val playerContent = remember(
+        hasSources,
         playUrl,
         state.title,
         state.sourceName,
@@ -288,6 +292,7 @@ fun PlayerScreen(
                 episodeName = state.episodeName,
                 hasNextEpisode = state.hasNextEpisode,
                 onNextEpisode = onPlayNext,
+                onOpenEpisodePicker = if (hasSources) ({ pickerOpen = true }) else null,
                 onToggleFullscreen = { snapshot, _ ->
                     setFullscreen(!fullscreen, snapshot)
                 },
@@ -460,6 +465,16 @@ fun PlayerScreen(
                 pageUrl = playUrl,
                 onDetected = onDetectedStream,
                 onFailed = onResolveFallbackFailed
+            )
+        }
+
+        if (pickerOpen && hasSources) {
+            PlayerEpisodePicker(
+                sources = remember(state.sources) { state.sources.map { PickerSource(it.name, it.episodes.map(Episode::name)) } },
+                playingSource = state.selectedSourceIndex,
+                playingEpisode = state.selectedEpisodeIndex,
+                onDismiss = { pickerOpen = false },
+                onPick = onPickEpisode
             )
         }
 

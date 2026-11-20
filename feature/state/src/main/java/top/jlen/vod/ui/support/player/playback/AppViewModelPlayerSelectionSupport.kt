@@ -42,12 +42,14 @@ internal fun buildPlayerState(
 
 internal fun updatePlayerEpisodeSelection(
     playerState: PlayerUiState,
-    index: Int
+    index: Int,
+    sourceIndex: Int
 ): PlayerUiState? {
-    val currentEpisodes = playerState.currentSource?.episodes.orEmpty()
-    if (currentEpisodes.isEmpty()) return null
+    val episodes = playerState.sources.getOrNull(sourceIndex)?.episodes ?: return null
+    if (index !in episodes.indices) return null
     return playerState.copy(
-        selectedEpisodeIndex = index.coerceIn(0, currentEpisodes.lastIndex),
+        selectedSourceIndex = sourceIndex,
+        selectedEpisodeIndex = index,
         playbackSnapshot = PlaybackSnapshot(),
         resolveError = null,
         diagnostic = null

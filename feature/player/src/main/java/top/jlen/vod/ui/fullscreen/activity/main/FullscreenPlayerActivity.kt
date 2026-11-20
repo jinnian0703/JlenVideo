@@ -266,6 +266,7 @@ internal fun FullscreenPlayerContent(
     onNextEpisode: () -> Unit,
     onClose: () -> Unit,
     localFilesOnly: Boolean = false,
+    onOpenEpisodePicker: (() -> Unit)? = null,
     onPlaybackError: (() -> Unit)? = null
 ) {
     BackHandler(onBack = onClose)
@@ -293,6 +294,7 @@ internal fun FullscreenPlayerContent(
                     }
                 },
                 onClose = onClose,
+                onOpenEpisodePicker = onOpenEpisodePicker,
                 localFilesOnly = localFilesOnly,
                 onPlaybackError = onPlaybackError
             )

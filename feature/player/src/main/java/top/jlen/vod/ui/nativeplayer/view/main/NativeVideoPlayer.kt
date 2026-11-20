@@ -126,6 +126,7 @@ fun NativeVideoPlayer(
     onPlaybackEnded: (() -> Unit)? = null,
     onClose: (() -> Unit)? = null,
     localFilesOnly: Boolean = false,
+    onOpenEpisodePicker: (() -> Unit)? = null,
     onPlaybackError: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -771,7 +772,6 @@ fun NativeVideoPlayer(
     val embeddedResizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     val controlPillTextStyle = if (fullscreenMode) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelMedium
     val controlChipHeight = if (fullscreenMode) 36.dp else 32.dp
-    val controlChipWidth = if (fullscreenMode) 76.dp else 64.dp
     val controlsShown = controlsVisible && !playerLocked
 
     Card(
@@ -797,6 +797,7 @@ fun NativeVideoPlayer(
                 .background(if (fullscreenMode) Color.Black else UiPalette.BackgroundBottom)
                 .onSizeChanged { contentSize = it }
         ) {
+            val controlChipWidth = if (fullscreenMode) minOf(76.dp, (maxWidth - 56.dp) / 4) else 44.dp
             val useStackedFullscreenControls = fullscreenMode && (
                 maxHeight > maxWidth || maxWidth < 560.dp
             )
@@ -1421,6 +1422,19 @@ fun NativeVideoPlayer(
                                     onClick = {
                                         speedMenuExpanded = true
                                         markInteraction()
+                                    }
+                                )
+                            }
+                            if (onOpenEpisodePicker != null) {
+                                ControlChip(
+                                    text = "选集",
+                                    width = controlChipWidth,
+                                    height = controlChipHeight,
+                                    textStyle = controlPillTextStyle,
+                                    onClick = {
+                                        markInteraction()
+                                        dispatchSnapshot(force = true)
+                                        onOpenEpisodePicker()
                                     }
                                 )
                             }

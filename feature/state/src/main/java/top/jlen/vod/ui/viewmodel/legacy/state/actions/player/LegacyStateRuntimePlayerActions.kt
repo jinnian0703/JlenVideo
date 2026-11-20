@@ -75,8 +75,11 @@ internal fun LegacyStateRuntimeViewModelCore.legacyOpenPlayer(
     legacyRecordCurrentPlayback()
 }
 
-internal fun LegacyStateRuntimeViewModelCore.legacySelectPlayerEpisode(index: Int) {
-    val updatedState = updatePlayerEpisodeSelection(currentPlayerState(), index) ?: return
+internal fun LegacyStateRuntimeViewModelCore.legacySelectPlayerEpisode(
+    index: Int,
+    sourceIndex: Int = currentPlayerState().selectedSourceIndex
+) {
+    val updatedState = updatePlayerEpisodeSelection(currentPlayerState(), index, sourceIndex) ?: return
     updatePlayerState(updatedState)
     persistCurrentPlaybackResume()
     legacyResolveCurrentPlayerUrl()

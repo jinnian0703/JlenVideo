@@ -1283,6 +1283,7 @@ private fun PlayerRouteScreen(
         onBack = onBack,
         onSelectEpisode = viewModel::selectPlayerEpisode,
         onSelectSource = viewModel::selectPlayerSource,
+        onPickEpisode = viewModel::pickPlayerEpisode,
         onRefreshSources = viewModel::refreshPlayerSources,
         onPlayNext = viewModel::playNextEpisode,
         onPlaybackSnapshotChange = { snapshot ->
