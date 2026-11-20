@@ -496,11 +496,9 @@ fun NativeVideoPlayer(
         val listener = object : Player.Listener {
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) { latestErrorHandler?.invoke() }
         }
-        if (localFilesOnly) {
-            if (player == null || player.playerError != null) latestErrorHandler?.invoke()
-            else player.addListener(listener)
-        }
-        onDispose { if (localFilesOnly) player?.removeListener(listener) }
+        if (player == null || player.playerError != null) latestErrorHandler?.invoke()
+        player?.addListener(listener)
+        onDispose { player?.removeListener(listener) }
     }
 
     DisposableEffect(player, onPlaybackEnded) {

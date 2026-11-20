@@ -426,6 +426,10 @@ fun JlenVideoApp() {
                         onOpenLink = openAnnouncementLink
                     )
                 }
+                viewModel.loginChallenge?.let { image ->
+                    LoginChallengeDialog(image, viewModel.accountState.isLoading, viewModel::dismissLoginChallenge,
+                        viewModel::submitLoginChallenge, viewModel::login)
+                }
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     val useNavigationRail = maxWidth >= NAVIGATION_RAIL_MIN_WIDTH
                     Scaffold(
@@ -845,6 +849,10 @@ fun JlenVideoApp() {
                                         },
                                         onDismissActionMessage = viewModel::dismissDetailActionMessage,
                                         onRetry = { viewModel.loadDetail(vodId) },
+                                        onUnlock = { type, password ->
+                                            viewModel.unlockContent(vodId, type, password)
+                                            viewModel.reloadUnlockedDetail(vodId)
+                                        },
                                         onPlay = { title, sourceIndex, episodeIndex ->
                                             val pendingResume = routeDetailState.pendingResumePlayback
                                             val resumeSnapshot = if (
@@ -1209,6 +1217,10 @@ private fun PlayerRouteScreen(
         }
         val item = detail?.item
         val sources = detail?.sources.orEmpty()
+        if (detail?.detailLocked == true || (item?.playPassword == 1 && sources.isEmpty())) {
+            loadError = "请先在影片详情页输入密码后播放"
+            return@LaunchedEffect
+        }
         if (item != null && sources.isNotEmpty()) {
             val resume = detail?.pendingResumePlayback
             val selectedSource = sourceIndex.takeIf { it in sources.indices }
@@ -1285,6 +1297,10 @@ private fun PlayerRouteScreen(
         onSelectSource = viewModel::selectPlayerSource,
         onPickEpisode = viewModel::pickPlayerEpisode,
         onRefreshSources = viewModel::refreshPlayerSources,
+        onUnlockDownload = { password ->
+            viewModel.unlockContent(state.item?.vodId ?: vodId, 5, password)
+            viewModel.refreshPlayerSources()
+        },
         onPlayNext = viewModel::playNextEpisode,
         onPlaybackSnapshotChange = { snapshot ->
             val current = viewModel.playerState

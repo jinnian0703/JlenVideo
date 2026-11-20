@@ -8,6 +8,7 @@ import top.jlen.vod.data.VodItem
 data class DetailUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
+    val detailLocked: Boolean = false,
     val item: VodItem? = null,
     val sources: List<PlaySource> = emptyList(),
     val selectedSourceIndex: Int = 0,

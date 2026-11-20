@@ -34,6 +34,19 @@ import top.jlen.vod.data.VodItem
 
 open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidViewModel(application) {
     private val repository = AppleCmsRepository(application)
+    var loginChallenge by mutableStateOf<ByteArray?>(null)
+        internal set
+
+    fun dismissLoginChallenge() { loginChallenge = null }
+    fun submitLoginChallenge(answer: String) { legacyLogin(answer) }
+
+    suspend fun unlockContent(vodId: String, type: Int, password: String) = withContext(Dispatchers.IO) {
+        repository.appApi.unlock(vodId, type, password)
+    }
+
+    internal var cloudProgressKey = ""
+    internal var cloudProgressAt = 0L
+    internal val cloudProgressMutex = kotlinx.coroutines.sync.Mutex()
     private val searchHistoryStore = SearchHistoryStore(application)
     private val followCacheStore = FollowCacheStore(application)
     private val historyCacheStore = HistoryCacheStore(application)
@@ -456,6 +469,8 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
     private fun openHistoryRecordDirectly(item: UserCenterItem) = legacyOpenHistoryRecordDirectly(item)
 
     fun loadDetail(vodId: String) = legacyLoadDetail(vodId)
+
+    fun reloadUnlockedDetail(vodId: String) = legacyLoadDetail(vodId, forceRefresh = true)
 
     fun consumePendingDetailResume() {
         updateDetailState(detailStateWithoutPendingResume(currentDetailState()))

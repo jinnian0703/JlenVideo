@@ -230,6 +230,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyRedeemMembershipC
 }
 
 internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacySignInMembership(): String {
+    if (appApi.tasksEnabled()) return appApi.signIn(currentSession().userId)
     val json = runtimeRequestVideoApiJson(
         path = "api.php/video/signIn",
         formBody = FormBody.Builder().build()

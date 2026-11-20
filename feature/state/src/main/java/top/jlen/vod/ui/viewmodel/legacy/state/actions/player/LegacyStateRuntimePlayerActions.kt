@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withLock
 import top.jlen.vod.data.normalizePlaybackSourceKey
 import top.jlen.vod.data.PlaybackResumeRecord
 import top.jlen.vod.data.PlaySource
@@ -21,7 +22,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshPlayerSources() {
 
     viewModelScope.launch {
         runStateCatching {
-            withContext(Dispatchers.IO) { legacyRepository().loadDetail(vodId) }
+            withContext(Dispatchers.IO) { legacyRepository().loadDetail(vodId, forceRefresh = true) }
         }.onSuccess { detailItem ->
             if (detailItem == null || currentPlayerState().item?.vodId != vodId) {
                 return@onSuccess
@@ -120,13 +121,35 @@ internal fun LegacyStateRuntimeViewModelCore.legacyAdoptDetectedStream(streamUrl
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyReportTakeoverFailure(message: String) {
-    updatePlayerState(applyTakeoverFailure(currentPlayerState(), message))
+    val state = currentPlayerState()
+    if (state.resolveError == message) return
+    updatePlayerState(applyTakeoverFailure(state, message).copy(resolvedUrl = ""))
+    val vod = state.item?.vodId?.takeIf { it.toLongOrNull() != null } ?: return
+    val user = currentAccountState().session.userId
+    viewModelScope.launch(Dispatchers.IO) { runStateCatching {
+        legacyRepository().appApi.reportFailure(user, vod, state.selectedSourceIndex, state.selectedEpisodeIndex, state.sourceName)
+    } }
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyUpdatePlaybackSnapshot(snapshot: PlaybackSnapshot) {
-    if (!hasMeaningfulPlaybackChange(currentPlayerState().playbackSnapshot, snapshot)) return
+    val state = currentPlayerState()
+    if (!hasMeaningfulPlaybackChange(state.playbackSnapshot, snapshot)) return
     updatePlayerState(playerStateWithPlaybackSnapshot(currentPlayerState(), snapshot))
     persistCurrentPlaybackResume()
+    val user = currentAccountState().session.takeIf { it.isLoggedIn }?.userId ?: return
+    val vod = state.item?.vodId?.takeIf { it.toLongOrNull() != null } ?: return
+    if (snapshot.durationMs <= 0L || snapshot.positionMs < 1000L) return
+    val key = "$user:$vod:${state.selectedSourceIndex}:${state.selectedEpisodeIndex}"
+    val now = android.os.SystemClock.elapsedRealtime()
+    val paused = state.playbackSnapshot.playWhenReady && !snapshot.playWhenReady
+    if (key == cloudProgressKey && !paused && now - cloudProgressAt < 15_000L) return
+    cloudProgressKey = key
+    cloudProgressAt = now
+    viewModelScope.launch { cloudProgressMutex.withLock {
+        if (currentAccountState().session.userId == user) runStateCatching { withContext(Dispatchers.IO) {
+            legacyRepository().appApi.progress(user, vod, state.selectedSourceIndex, state.selectedEpisodeIndex, snapshot.positionMs, snapshot.durationMs)
+        } }
+    } }
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyRecordCurrentPlayback() {
@@ -139,15 +162,6 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRecordCurrentPlayback() {
         legacyUpsertCachedHistoryRecord(record)
     }
 
-    viewModelScope.launch {
-        runStateCatching {
-            withContext(Dispatchers.IO) { legacyRepository().addPlayRecordForApp(item, episodePageUrl) }
-        }.onSuccess {
-            if (currentAccountState().historyItems.any { it.recordId.startsWith("local:") }) {
-                runtimeLoadHistoryRecords()
-            }
-        }
-    }
 }
 
 private fun LegacyStateRuntimeViewModelCore.buildOptimisticHistoryRecord(

@@ -70,6 +70,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         AppleCmsCategory(typeId = "GCCCCW", typeName = "动漫", parentId = "GCCCCW")
     )
     private val baseUrl = AppConfig.appleCmsBaseUrl.trimEnd('/')
+    val appApi = CmsAppApi(client, baseUrl)
     private val portraitVersionStore = PortraitVersionStore(appContext, baseUrl)
     private val gson = Gson()
     private val sharedRequestScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -329,7 +330,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         detailCache[vodId]
 
     internal fun runtimeUpdateDetailCacheEntry(vodId: String, value: CachedValue<VodItem?>) {
-        detailCache[vodId] = value
+        if (value.value?.passwordProtected == true) detailCache.remove(vodId) else detailCache[vodId] = value
     }
 
     internal fun runtimeDetailCacheTtlMs(): Long = runtimeCacheRetentionMs()
@@ -348,6 +349,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     internal suspend fun runtimeRequestDetailApi(vodId: String): VodItem? =
         requestApi { getDetail(vodId = vodId) }
+            .also { if (it.code == 1012 || (it.code == 1000 && listOf("密码", "密碼", "password").any { word -> it.message.contains(word, true) })) throw CmsApiError(1012, "请输入影片详情密码") }
             .data
             ?.takeIf { it.isJsonObject }
             ?.let { json -> gson.fromJson(json, VodItem::class.java) }
@@ -1551,13 +1553,18 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         return parsePointLogItems(json)
     }
 
-    suspend fun loginForApp(userName: String, password: String): AuthSession {
+    suspend fun loginForApp(userName: String, password: String, verify: String = ""): AuthSession {
+        if (appApi.cookieLoginEnabled()) {
+            appApi.login(userName.trim(), password, verify)
+            return currentSession().takeIf { it.isLoggedIn } ?: throw IOException("登录会话未保存，请重新登录")
+        }
         val body = executeUserRequest(
             path = "/index.php/user/login",
             refererPath = "/index.php/user/login.html",
             requestBody = FormBody.Builder()
                 .add("user_name", userName.trim())
                 .add("user_pwd", password)
+                .add("verify", verify)
                 .build(),
             extraHeaders = mapOf("X-Requested-With" to "XMLHttpRequest")
         )
@@ -2962,6 +2969,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         if (!isAppCacheEnabled()) return
         val now = System.currentTimeMillis()
         items.forEach { item ->
+            if (item.passwordProtected) return@forEach
             val vodId = item.vodId.trim()
             if (vodId.isNotBlank()) {
                 previewItemCache[vodId] = CachedValue(item, now)

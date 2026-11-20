@@ -137,8 +137,15 @@ data class VodItem(
     @SerializedName("vod_play_from") val vodPlayFrom: String? = null,
     @SerializedName("vod_play_url") val vodPlayUrl: String? = null,
     val siteVodId: String = "",
-    val detailUrl: String = ""
+    val detailUrl: String = "",
+    @SerializedName("play_sources") val playGroups: List<CmsSourceGroup>? = null,
+    @SerializedName("download_sources") val downloadGroups: List<CmsSourceGroup>? = null,
+    @SerializedName("vod_pwd") val detailPassword: Int = 0,
+    @SerializedName("vod_pwd_play") val playPassword: Int = 0,
+    @SerializedName("vod_pwd_down") val downloadPassword: Int = 0
 ) {
+    val passwordProtected: Boolean get() = detailPassword == 1 || playPassword == 1 || downloadPassword == 1
+
     val displayTitle: String
         get() = vodName.ifBlank { "未命名影片" }
 
@@ -330,14 +337,19 @@ private val CATEGORY_FILTER_LABELS = linkedMapOf(
     "version" to "版本"
 )
 
+data class CmsSourceGroup(
+    @SerializedName("from") val source: String = "",
+    @SerializedName("episodes") val episodes: List<Episode> = emptyList()
+)
+
 data class PlaySource(
     val name: String,
     val episodes: List<Episode>
 )
 
 data class Episode(
-    val name: String,
-    val url: String
+    @SerializedName("name") val name: String,
+    @SerializedName("url") val url: String
 )
 
 data class AuthResponse(

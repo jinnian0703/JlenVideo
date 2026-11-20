@@ -93,6 +93,7 @@ fun PlayerScreen(
     onSelectSource: (Int) -> Unit,
     onPickEpisode: (Int, Int) -> Unit,
     onRefreshSources: () -> Unit,
+    onUnlockDownload: suspend (String) -> Unit,
     onPlayNext: () -> Unit,
     onPlaybackSnapshotChange: (PlaybackSnapshot) -> Unit,
     onDetectedStream: (String) -> Unit,
@@ -111,7 +112,7 @@ fun PlayerScreen(
     val downloadLabels = top.jlen.vod.offline.episodeDownloadLabels(downloadVod, state.selectedSourceIndex, source?.name.orEmpty())
     val playUrl = state.playUrl
     val resolveError = state.resolveError
-    val directPlayable = isDirectMediaUrl(playUrl)
+    val directPlayable = resolveError == null && isDirectMediaUrl(playUrl)
     var isFullscreen by rememberSaveable {
         mutableStateOf(false)
     }
@@ -293,6 +294,7 @@ fun PlayerScreen(
                 hasNextEpisode = state.hasNextEpisode,
                 onNextEpisode = onPlayNext,
                 onOpenEpisodePicker = openEpisodePicker,
+                onPlaybackError = { onResolveFallbackFailed("视频播放失败，请刷新或切换线路") },
                 onToggleFullscreen = { snapshot, _ ->
                     setFullscreen(!fullscreen, snapshot)
                 },
@@ -408,7 +410,12 @@ fun PlayerScreen(
 
                 if (state.episodes.isNotEmpty()) {
                     item(key = "episode_title") {
-                        if (source != null && downloadVod.isNotBlank()) {
+                        if (state.item?.downloadPassword == 1 && state.item?.downloadGroups.isNullOrEmpty()) {
+                            ContentUnlock("下载", onUnlockDownload)
+                        } else if (!state.item?.downloadGroups.isNullOrEmpty()) {
+                            top.jlen.vod.offline.CmsDownloadHeader(downloadVod, state.title, state.item?.vodPic.orEmpty(),
+                                state.item?.downloadGroups.orEmpty(), state.selectedEpisodeIndex)
+                        } else if (source != null && downloadVod.isNotBlank()) {
                             top.jlen.vod.offline.DownloadEpisodeHeader(downloadVod, state.title, state.item?.vodPic.orEmpty(), state.selectedSourceIndex,
                                 source, state.selectedEpisodeIndex, downloadLabels)
                         } else SectionTitle(title = "切换选集", action = null, onAction = {})
@@ -434,6 +441,8 @@ fun PlayerScreen(
             ) {
                 playerContent(true, if (hasSources) ({ pickerOpen = true }) else null)
             }
+        } else if (resolveError != null && isFullscreen) {
+            ResolveUnavailableSurface(fullscreenMode = true, title = "播放失败", message = resolveError, onRefresh = onRefreshSources)
         } else if (state.isResolving && isFullscreen) {
             Box(
                 modifier = Modifier

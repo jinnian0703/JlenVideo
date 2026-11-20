@@ -187,6 +187,7 @@ internal suspend fun LegacyAppleCmsRuntimeRepositoryCore.legacyResolvePlayUrl(
 internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyParseSources(
     item: VodItem
 ): List<PlaySource> {
+    item.playGroups?.let { groups -> return groups.toSources(::runtimeNormalizeUrl) }
     val sourceNames = item.vodPlayFrom
         .orEmpty()
         .split("$$$")
@@ -224,4 +225,10 @@ internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyParseSources(
             episodes = episodes
         )
     }
+}
+
+fun List<CmsSourceGroup>.toSources(normalize: (String) -> String): List<PlaySource> = mapIndexed { index, group ->
+    PlaySource(sanitizeUserFacingToken(group.source).ifBlank { "线路 ${index + 1}" }, group.episodes.map { episode ->
+        episode.copy(name = sanitizeUserFacingToken(episode.name).ifBlank { "播放" }, url = normalize(episode.url))
+    })
 }

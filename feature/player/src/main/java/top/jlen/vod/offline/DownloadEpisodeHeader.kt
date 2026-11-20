@@ -21,6 +21,32 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import top.jlen.vod.data.PlaySource
+import top.jlen.vod.AppConfig
+import top.jlen.vod.data.CmsSourceGroup
+import top.jlen.vod.data.toSources
+
+@Composable
+fun CmsDownloadHeader(vod: String, title: String, poster: String, groups: List<CmsSourceGroup>, current: Int) {
+    val sources = remember(groups) { groups.toSources { raw ->
+        runCatching { java.net.URI(AppConfig.appleCmsBaseUrl).resolve(raw).toString() }.getOrDefault(raw)
+    }.filter { it.episodes.isNotEmpty() } }
+    if (sources.isEmpty()) {
+        Text("切换选集", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleMedium)
+        return
+    }
+    var index by remember(vod, sources) { mutableIntStateOf(0) }
+    var menu by remember { mutableStateOf(false) }
+    val source = sources[index]
+    Column {
+        if (sources.size > 1) Box {
+            TextButton(onClick = { menu = true }) { Text("下载线路：${source.name} ▾") }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                sources.forEachIndexed { i, group -> DropdownMenuItem(text = { Text(group.name) }, onClick = { index = i; menu = false }) }
+            }
+        }
+        DownloadEpisodeHeader(vod, title, poster, index, source, current.coerceIn(source.episodes.indices), episodeDownloadLabels(vod, index, source.name))
+    }
+}
 
 @Composable
 fun episodeDownloadLabels(vod: String, si: Int, source: String): Map<Int, String> {

@@ -36,6 +36,7 @@ fun DetailScreen(
     onFavorite: () -> Unit,
     onDismissActionMessage: () -> Unit,
     onRetry: () -> Unit,
+    onUnlock: suspend (Int, String) -> Unit,
     onPlay: (String, Int, Int) -> Unit
 ) {
     val isDarkTheme = isSystemInDarkTheme()
@@ -43,6 +44,11 @@ fun DetailScreen(
     val detailItem = state.item
 
     when {
+        state.detailLocked -> Column(Modifier.appTopInsetsPadding().padding(16.dp)) {
+            Text("这部影片的详情需要密码")
+            ContentUnlock("详情") { onUnlock(1, it) }
+            androidx.compose.material3.TextButton(onClick = onBack) { Text("返回") }
+        }
         state.isLoading && detailItem == null -> LoadingPane("正在加载详情...")
         !errorMessage.isNullOrBlank() -> Box(modifier = Modifier.appTopInsetsPadding()) {
             DetailLoadErrorPane(message = errorMessage, onRetry = onRetry, onBack = onBack)
@@ -126,6 +132,9 @@ fun DetailScreen(
                         }
 
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            if (item.playPassword == 1 && state.sources.none { it.episodes.isNotEmpty() }) {
+                                ContentUnlock("播放") { onUnlock(4, it) }
+                            }
                             Button(
                                 onClick = {
                                     if (primarySource != null) {
