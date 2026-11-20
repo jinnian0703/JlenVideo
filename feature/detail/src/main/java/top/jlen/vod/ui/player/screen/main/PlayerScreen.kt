@@ -275,7 +275,7 @@ fun PlayerScreen(
         }
     }
 
-    var pickerOpen by rememberSaveable(vodId) { mutableStateOf(false) }
+    var pickerOpen by rememberSaveable(vodId, isFullscreen) { mutableStateOf(false) }
     val hasSources = state.sources.isNotEmpty()
     val playerContent = remember(
         hasSources,
@@ -293,7 +293,7 @@ fun PlayerScreen(
                 episodeName = state.episodeName,
                 hasNextEpisode = state.hasNextEpisode,
                 onNextEpisode = onPlayNext,
-                onOpenEpisodePicker = if (hasSources) ({ pickerOpen = true }) else null,
+                onOpenEpisodePicker = if (fullscreen && hasSources) ({ pickerOpen = true }) else null,
                 onToggleFullscreen = { snapshot, _ ->
                     setFullscreen(!fullscreen, snapshot)
                 },
@@ -469,7 +469,7 @@ fun PlayerScreen(
             )
         }
 
-        if (pickerOpen && hasSources) {
+        if (isFullscreen && pickerOpen && hasSources) {
             PlayerEpisodePicker(
                 sources = remember(state.sources) { state.sources.map { PickerSource(it.name, it.episodes.map(Episode::name)) } },
                 playingSource = state.selectedSourceIndex,
