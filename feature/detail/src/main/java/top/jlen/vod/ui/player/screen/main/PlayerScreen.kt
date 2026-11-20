@@ -278,14 +278,13 @@ fun PlayerScreen(
     var pickerOpen by rememberSaveable(vodId, isFullscreen) { mutableStateOf(false) }
     val hasSources = state.sources.isNotEmpty()
     val playerContent = remember(
-        hasSources,
         playUrl,
         state.title,
         state.sourceName,
         state.episodeName,
         state.hasNextEpisode
     ) {
-        movableContentOf<Boolean> { fullscreen ->
+        movableContentOf<Boolean, (() -> Unit)?> { fullscreen, openEpisodePicker ->
             NativeVideoPlayer(
                 url = playUrl,
                 title = state.title,
@@ -293,7 +292,7 @@ fun PlayerScreen(
                 episodeName = state.episodeName,
                 hasNextEpisode = state.hasNextEpisode,
                 onNextEpisode = onPlayNext,
-                onOpenEpisodePicker = if (fullscreen && hasSources) ({ pickerOpen = true }) else null,
+                onOpenEpisodePicker = openEpisodePicker,
                 onToggleFullscreen = { snapshot, _ ->
                     setFullscreen(!fullscreen, snapshot)
                 },
@@ -349,7 +348,7 @@ fun PlayerScreen(
                             message = state.diagnostic?.message ?: resolveError,
                             onRefresh = onRefreshSources
                         )
-                        directPlayable && !isFullscreen -> playerContent(false)
+                        directPlayable && !isFullscreen -> playerContent(false, null)
                         directPlayable -> Spacer(modifier = Modifier.height(0.dp))
                         else -> EmptyPane(
                             message = "暂无可播放地址",
@@ -433,7 +432,7 @@ fun PlayerScreen(
                     .fillMaxSize()
                     .background(Color.Black)
             ) {
-                playerContent(true)
+                playerContent(true, if (hasSources) ({ pickerOpen = true }) else null)
             }
         } else if (state.isResolving && isFullscreen) {
             Box(
