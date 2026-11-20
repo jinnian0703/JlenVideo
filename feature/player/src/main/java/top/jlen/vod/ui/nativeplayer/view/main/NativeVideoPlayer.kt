@@ -1,4 +1,4 @@
-﻿package top.jlen.vod.ui
+package top.jlen.vod.ui
 
 import android.app.Activity
 import android.app.PictureInPictureParams
@@ -124,7 +124,9 @@ fun NativeVideoPlayer(
     initialSnapshot: PlaybackSnapshot = PlaybackSnapshot(),
     onPlaybackSnapshotChanged: ((PlaybackSnapshot) -> Unit)? = null,
     onPlaybackEnded: (() -> Unit)? = null,
-    onClose: (() -> Unit)? = null
+    onClose: (() -> Unit)? = null,
+    localFilesOnly: Boolean = false,
+    onPlaybackError: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -136,10 +138,11 @@ fun NativeVideoPlayer(
     val playbackIdentity = remember(url, episodeName) { "$url|$episodeName" }
     val isPortraitWindow = configuration.screenHeightDp > configuration.screenWidthDp
     val castState by DlnaCastSession.state.collectAsState()
-    val isCasting = castState.isActive
-    val player = remember(playbackIdentity) {
+    val isCasting = !localFilesOnly && castState.isActive
+    fun castOwnsPlayback() = !localFilesOnly && DlnaCastSession.isCasting
+    val player = remember(playbackIdentity, localFilesOnly) {
         runCatching {
-            createNativePlayer(context, url, initialSnapshot.copy(playWhenReady = initialSnapshot.playWhenReady && !DlnaCastSession.isCasting))
+            createNativePlayer(context, url, initialSnapshot.copy(playWhenReady = initialSnapshot.playWhenReady && !castOwnsPlayback()), localFilesOnly)
         }.getOrNull()
     }
     val latestOrientationCallback = rememberUpdatedState(onVideoOrientationDetected)
@@ -294,7 +297,7 @@ fun NativeVideoPlayer(
 
     fun resumePlaybackByUser() {
         // 投屏期间本地保持暂停
-        if (playbackState != Player.STATE_ENDED && !DlnaCastSession.isCasting) {
+        if (playbackState != Player.STATE_ENDED && !castOwnsPlayback()) {
             player?.play()
         }
         isUserPaused = false
@@ -396,7 +399,7 @@ fun NativeVideoPlayer(
             val target = gestureSeekPreviewMs.coerceIn(0L, duration.coerceAtLeast(0L))
             player?.seekTo(target)
             currentPosition = target
-            if (gestureWasPlaying && playbackState != Player.STATE_ENDED && !DlnaCastSession.isCasting) {
+            if (gestureWasPlaying && playbackState != Player.STATE_ENDED && !castOwnsPlayback()) {
                 player?.play()
             }
             dispatchSnapshot(force = true)
@@ -487,6 +490,18 @@ fun NativeVideoPlayer(
         }
     }
 
+    val latestErrorHandler by rememberUpdatedState(onPlaybackError)
+    DisposableEffect(player, localFilesOnly) {
+        val listener = object : Player.Listener {
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) { latestErrorHandler?.invoke() }
+        }
+        if (localFilesOnly) {
+            if (player == null || player.playerError != null) latestErrorHandler?.invoke()
+            else player.addListener(listener)
+        }
+        onDispose { if (localFilesOnly) player?.removeListener(listener) }
+    }
+
     DisposableEffect(player, onPlaybackEnded) {
         if (player == null || onPlaybackEnded == null) {
             onDispose { }
@@ -496,6 +511,7 @@ fun NativeVideoPlayer(
                     playbackState = newPlaybackState
                     if (newPlaybackState == Player.STATE_ENDED && !hasHandledEnded) {
                         hasHandledEnded = true
+                        if (localFilesOnly) dispatchSnapshot(force = true)
                         onPlaybackEnded()
                     } else if (newPlaybackState != Player.STATE_ENDED) {
                         hasHandledEnded = false
@@ -516,13 +532,14 @@ fun NativeVideoPlayer(
                     Lifecycle.Event.ON_STOP -> {
                         shouldResumeOnStart = player.isPlaying
                         player.pause()
+                        if (localFilesOnly) dispatchSnapshot(force = true)
                         isPlaying = false
                         showPausedOverlay = false
                         isUserPaused = false
                     }
 
                     Lifecycle.Event.ON_START -> {
-                        if (shouldResumeOnStart && !DlnaCastSession.isCasting) {
+                        if (shouldResumeOnStart && !castOwnsPlayback()) {
                             player.play()
                             isPlaying = true
                             showPausedOverlay = false
@@ -564,7 +581,7 @@ fun NativeVideoPlayer(
             player.seekTo(initialSnapshot.positionMs)
             currentPosition = initialSnapshot.positionMs
         }
-        val shouldPlayLocally = initialSnapshot.playWhenReady && !DlnaCastSession.isCasting
+        val shouldPlayLocally = initialSnapshot.playWhenReady && !castOwnsPlayback()
         player.playWhenReady = shouldPlayLocally
         isPlaying = shouldPlayLocally
         showPausedOverlay = false
@@ -588,7 +605,7 @@ fun NativeVideoPlayer(
     }
 
     LaunchedEffect(player, url, lifecycleOwner) {
-        if (player == null) return@LaunchedEffect
+        if (localFilesOnly || player == null) return@LaunchedEffect
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             DlnaCastSession.stopped.collect { event ->
                 if (event == null || event.url != url || DlnaCastSession.isCasting) return@collect
@@ -607,6 +624,7 @@ fun NativeVideoPlayer(
     }
 
     LaunchedEffect(url, lifecycleOwner) {
+        if (localFilesOnly) return@LaunchedEffect
         // 只让当前前台页切集，避免后台内联播放器覆盖全屏页的地址。
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             DlnaCastSession.pushIfConnected(context, url, listOf(title, sourceName, episodeName).filter(String::isNotBlank).joinToString(" · "))
@@ -618,10 +636,10 @@ fun NativeVideoPlayer(
         if (player == null) {
             onDispose { }
         } else {
-            if (DlnaCastSession.isCasting) player.pause()
+            if (castOwnsPlayback()) player.pause()
             val listener = object : Player.Listener {
                 override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                    if (playWhenReady && DlnaCastSession.isCasting) player.pause()
+                    if (playWhenReady && castOwnsPlayback()) player.pause()
                 }
             }
             player.addListener(listener)
@@ -670,7 +688,7 @@ fun NativeVideoPlayer(
             playbackState != Player.STATE_ENDED
         ) {
             repeat(if (fullscreenMode) 4 else 3) {
-                if (DlnaCastSession.isCasting) return@repeat
+                if (castOwnsPlayback()) return@repeat
                 player.play()
                 delay(if (fullscreenMode) 350L else 500L)
                 if (hasStartedPlaybackOnce || player.isPlaying) {
@@ -1129,7 +1147,7 @@ fun NativeVideoPlayer(
                 )
             }
 
-            CastPlaybackButton(
+            if (!localFilesOnly) CastPlaybackButton(
                 url = url,
                 title = title,
                 subtitle = listOf(sourceName, episodeName).filter(String::isNotBlank).joinToString(" · "),
@@ -1324,7 +1342,7 @@ fun NativeVideoPlayer(
                             val wasPlayingBeforeSeek = player.isPlaying
                             val wasPausedByUser = isUserPaused
                             player.seekTo(target)
-                            if (wasPlayingBeforeSeek && playbackState != Player.STATE_ENDED && !DlnaCastSession.isCasting) {
+                            if (wasPlayingBeforeSeek && playbackState != Player.STATE_ENDED && !castOwnsPlayback()) {
                                 player.play()
                                 isPlaying = true
                                 showPausedOverlay = false
@@ -1413,6 +1431,7 @@ fun NativeVideoPlayer(
                                     height = controlChipHeight,
                                     onClick = {
                                         markInteraction()
+                                        if (localFilesOnly) dispatchSnapshot(force = true)
                                         onNextEpisode()
                                     }
                                 )

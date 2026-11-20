@@ -170,7 +170,6 @@ internal fun LegacyAccountScreen(
     onSendFindPasswordCode: () -> Unit,
     onFindPassword: () -> Unit,
     onOpenSettingsUpdate: () -> Unit,
-    onOpenDownloads: () -> Unit,
     onOpenDownloadSettings: () -> Unit,
     onOpenSettingsCache: () -> Unit,
     onOpenSettingsLogs: () -> Unit,
@@ -219,9 +218,6 @@ internal fun LegacyAccountScreen(
             }
         }
 
-        item(key = "offline_downloads") {
-            OutlinedButton(onClick = onOpenDownloads, modifier = Modifier.fillMaxWidth()) { Text("我的下载") }
-        }
         if (showLoggedInContent) {
             item(key = "account_signed_in_header", contentType = "account_header") {
                 Card(

@@ -661,7 +661,6 @@ fun JlenVideoApp() {
                                         onSendFindPasswordCode = viewModel::sendFindPasswordCode,
                                         onFindPassword = viewModel::findPassword,
                                         onOpenSettingsUpdate = { openAccountSettingsChild("account/settings/update") },
-                                        onOpenDownloads = openDownloads,
                                         onOpenDownloadSettings = { openAccountSettingsChild("account/settings/downloads") },
                                         onOpenSettingsCache = { openAccountSettingsChild("account/settings/cache") },
                                         onOpenSettingsLogs = { openAccountSettingsChild("account/settings/logs") },

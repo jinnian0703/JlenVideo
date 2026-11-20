@@ -5,6 +5,7 @@ import android.os.Build
 import android.webkit.WebSettings
 import android.webkit.WebView
 import androidx.media3.common.MediaItem
+import androidx.media3.datasource.FileDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -14,9 +15,10 @@ import top.jlen.vod.PLAYER_DESKTOP_UA
 internal fun createNativePlayer(
     context: Context,
     url: String,
-    snapshot: PlaybackSnapshot = PlaybackSnapshot()
+    snapshot: PlaybackSnapshot = PlaybackSnapshot(),
+    localFilesOnly: Boolean = false
 ): ExoPlayer {
-    val httpFactory = DefaultHttpDataSource.Factory()
+    val dataSource = if (localFilesOnly) FileDataSource.Factory() else DefaultHttpDataSource.Factory()
         .setUserAgent(PLAYER_DESKTOP_UA)
         .setAllowCrossProtocolRedirects(true)
         .setDefaultRequestProperties(
@@ -27,7 +29,7 @@ internal fun createNativePlayer(
         )
 
     return ExoPlayer.Builder(context)
-        .setMediaSourceFactory(DefaultMediaSourceFactory(httpFactory))
+        .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
         .build()
         .apply {
             setMediaItem(MediaItem.fromUri(url))

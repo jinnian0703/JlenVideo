@@ -1,6 +1,6 @@
 package top.jlen.vod.offline
 
-import android.content.Intent
+import top.jlen.vod.ui.FullscreenPlayerActivity
 import android.text.format.Formatter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -112,7 +112,7 @@ fun DownloadsScreen(onBack: () -> Unit) {
                 if (expanded) items(group, key = { it.id }) { row ->
                     DownloadRow(row, allowed, mobile, manage, row.id in chosen,
                         toggle = { selected = if (row.id in selected) selected - row.id else selected + row.id },
-                        play = { context.startActivity(Intent(context, OfflinePlayerActivity::class.java).putExtra("id", row.id)) },
+                        play = { context.startActivity(FullscreenPlayerActivity.forDownload(context, row.id)) },
                         change = { lib.pauseOrResume(row) }, remove = { deleting = setOf(row.id) })
                 }
             }

@@ -47,6 +47,13 @@ class FullscreenPlayerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         configureImmersiveWindow()
 
+        val downloadId = intent.getStringExtra(EXTRA_DOWNLOAD_ID)
+        if (downloadId != null) {
+            setContent { top.jlen.vod.offline.OfflinePlaybackScreen(downloadId, onClose = ::finish) }
+            consumeRootWindowInsets()
+            return
+        }
+
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         val sourceName = intent.getStringExtra(EXTRA_SOURCE_NAME).orEmpty()
         episodeNames = intent.getStringArrayListExtra(EXTRA_EPISODE_NAMES).orEmpty()
@@ -187,6 +194,11 @@ class FullscreenPlayerActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val EXTRA_DOWNLOAD_ID = "offline_download_id"
+
+        internal fun forDownload(context: Context, id: String) =
+            Intent(context, FullscreenPlayerActivity::class.java).putExtra(EXTRA_DOWNLOAD_ID, id)
+
         private const val EXTRA_URL = "extra_url"
         private const val EXTRA_TITLE = "extra_title"
         private const val EXTRA_SOURCE_NAME = "extra_source_name"
@@ -243,7 +255,7 @@ class FullscreenPlayerActivity : AppCompatActivity() {
 }
 
 @Composable
-private fun FullscreenPlayerContent(
+internal fun FullscreenPlayerContent(
     url: String,
     title: String,
     sourceName: String,
@@ -252,7 +264,9 @@ private fun FullscreenPlayerContent(
     initialSnapshot: PlaybackSnapshot,
     onPlaybackSnapshotChanged: (PlaybackSnapshot) -> Unit,
     onNextEpisode: () -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    localFilesOnly: Boolean = false,
+    onPlaybackError: (() -> Unit)? = null
 ) {
     BackHandler(onBack = onClose)
 
@@ -278,7 +292,9 @@ private fun FullscreenPlayerContent(
                         onNextEpisode()
                     }
                 },
-                onClose = onClose
+                onClose = onClose,
+                localFilesOnly = localFilesOnly,
+                onPlaybackError = onPlaybackError
             )
         }
     }
