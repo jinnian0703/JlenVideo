@@ -74,7 +74,7 @@ internal class OfflineLibrary private constructor(private val app: Context) {
     private class Run(val id: String, val job: Job, val client: OkHttpClient)
     private val baseClient = OkHttpClient.Builder().addInterceptor { chain -> chain.proceed(chain.request().newBuilder()
         .header("User-Agent",PLAYER_DESKTOP_UA).header("Referer",AppConfig.appleCmsBaseUrl)
-        .header("Origin",AppConfig.appleCmsBaseUrl.trimEnd('/')).build()) }.build()
+        .header("Origin",AppConfig.appleCmsOrigin).build()) }.build()
     private val repo by lazy { AppleCmsRepository(app) }
     init {
         val pending = prefs.all.mapNotNull { (key, folder) ->

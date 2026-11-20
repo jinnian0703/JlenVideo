@@ -1,8 +1,13 @@
 package top.jlen.vod
 
+import java.net.URI
+import top.jlen.vod.core.common.BuildConfig
+
 object AppConfig {
     val appleCmsBaseUrl: String
-        get() = RuntimeEndpoints.appleCmsBaseUrl
+        get() = BuildConfig.APPLE_CMS_BASE_URL
+
+    val appleCmsOrigin: String = URI(appleCmsBaseUrl).resolve("/").toString().removeSuffix("/")
 }
 
 object AppRuntimeInfo {

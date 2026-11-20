@@ -1150,7 +1150,7 @@ internal fun AuthenticatedAvatar(
             .allowHardware(true)
             .crossfade(false)
             .addHeader("Referer", AppConfig.appleCmsBaseUrl)
-            .addHeader("Origin", AppConfig.appleCmsBaseUrl.trimEnd('/'))
+            .addHeader("Origin", AppConfig.appleCmsOrigin)
             .memoryCacheKey("avatar::$userId::$imageUrl@160")
             .diskCacheKey("avatar::$userId::$imageUrl")
             .placeholderMemoryCacheKey(lastSuccessfulKey)

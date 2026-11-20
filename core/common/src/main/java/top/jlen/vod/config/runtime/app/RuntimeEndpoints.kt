@@ -1,10 +1,6 @@
 package top.jlen.vod
 
 object RuntimeEndpoints {
-    val appleCmsBaseUrl: String by lazy {
-        decode(137, intArrayOf(225, 220, 179, 150, 374, 286, 364, 333, 482, 461, 460, 496, 407, 624, 606, 564, 599, 748, 728, 678, 730))
-    }
-
     val appCenterApiUrl: String by lazy {
         decode(154, intArrayOf(242, 205, 172, 135, 357, 271, 379, 348, 487, 450, 437, 413, 544, 583, 544, 526, 740, 647, 700, 648, 886, 778, 805, 787, 1003, 911, 944, 951, 910))
     }

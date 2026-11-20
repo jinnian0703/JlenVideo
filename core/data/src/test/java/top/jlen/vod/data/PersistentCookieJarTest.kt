@@ -6,6 +6,7 @@ import okhttp3.Cookie
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.junit.Assert.*
 import org.junit.Test
+import top.jlen.vod.AppConfig
 import top.jlen.vod.RuntimeEndpoints
 
 class PersistentCookieJarTest {
@@ -15,9 +16,8 @@ class PersistentCookieJarTest {
 
     @Test
     fun migratesLegacyCookiesWithoutChangingDomainOrSessionRules() {
-        assertEquals("cms.jlen.top", RuntimeEndpoints.appleCmsBaseUrl.toHttpUrl().host)
+        assertTrue(AppConfig.appleCmsBaseUrl.toHttpUrl().isHttps)
         assertEquals("user.jlen.top", RuntimeEndpoints.appCenterApiUrl.toHttpUrl().host)
-        assertTrue(RuntimeEndpoints.appleCmsBaseUrl.toHttpUrl().isHttps)
         assertTrue(RuntimeEndpoints.appCenterApiUrl.toHttpUrl().isHttps)
         val cookies = listOf(
             cookie("user_id", "42", "cms.jlen.top"),

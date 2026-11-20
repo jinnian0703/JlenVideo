@@ -24,7 +24,7 @@ internal fun createNativePlayer(
         .setDefaultRequestProperties(
             mapOf(
                 "Referer" to AppConfig.appleCmsBaseUrl,
-                "Origin" to AppConfig.appleCmsBaseUrl.trimEnd('/')
+                "Origin" to AppConfig.appleCmsOrigin
             )
         )
 
