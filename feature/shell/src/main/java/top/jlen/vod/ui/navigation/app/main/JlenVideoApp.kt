@@ -659,6 +659,7 @@ fun JlenVideoApp() {
                                         onSendFindPasswordCode = viewModel::sendFindPasswordCode,
                                         onFindPassword = viewModel::findPassword,
                                         onOpenSettingsUpdate = { openAccountSettingsChild("account/settings/update") },
+                                        onOpenDownloads = { openAccountSettingsChild("account/downloads") },
                                         onOpenSettingsCache = { openAccountSettingsChild("account/settings/cache") },
                                         onOpenSettingsLogs = { openAccountSettingsChild("account/settings/logs") },
                                         onOpenSettingsAbout = { openAccountSettingsChild("account/settings/about") },
@@ -701,6 +702,9 @@ fun JlenVideoApp() {
                                         onOpenRelease = openReleaseLink,
                                         onDownloadUpdate = openUpdateLink
                                     )
+                                }
+                                composable("account/downloads") {
+                                    top.jlen.vod.offline.DownloadsScreen(onBack = backToAccount)
                                 }
                                 composable("account/settings/cache") {
                                     LaunchedEffect(Unit) {

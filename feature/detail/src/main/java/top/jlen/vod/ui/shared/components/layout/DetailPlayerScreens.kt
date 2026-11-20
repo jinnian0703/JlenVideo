@@ -242,6 +242,7 @@ internal fun DetailInfoCard(
 @Composable
 internal fun EpisodePanel(
     episodes: List<Episode>,
+    downloadLabels: Map<Int,String> = emptyMap(),
     selectedIndex: Int,
     pauseMarquee: Boolean,
     onEpisodeClick: (Int) -> Unit
@@ -339,7 +340,7 @@ internal fun EpisodePanel(
                                         }
                                         // 稳定参数和点击回调让未变化的按钮可以跳过重组。
                                         EpisodeButton(
-                                            name = episode.name,
+                                            name = downloadLabels[absoluteIndex]?.let { "${episode.name} · $it" } ?: episode.name,
                                             selected = selected,
                                             enableMarquee = selected && !pauseMarquee,
                                             onClick = onClick,

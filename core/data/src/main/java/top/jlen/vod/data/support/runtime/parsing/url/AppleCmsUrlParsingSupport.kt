@@ -83,11 +83,8 @@ internal fun appendTimestamp(url: String): String {
 }
 
 internal fun isDirectMediaUrl(url: String): Boolean {
-    val lower = url.lowercase()
-    return lower.endsWith(".m3u8") ||
-        lower.endsWith(".mp4") ||
-        lower.contains(".m3u8?") ||
-        lower.contains("/index.m3u8")
+    val path = url.substringBefore('?').substringBefore('#')
+    return path.endsWith(".m3u8", true) || path.endsWith(".mp4", true)
 }
 
 internal fun List<Cookie>.firstCookieValue(name: String): String =

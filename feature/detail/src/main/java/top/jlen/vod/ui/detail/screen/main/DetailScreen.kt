@@ -55,6 +55,8 @@ fun DetailScreen(
         else -> {
             val item = detailItem
             val source = state.selectedSource
+            val downloadVod = item.vodId.ifBlank { item.siteVodId }.ifBlank { state.requestedVodId.orEmpty() }
+            val downloadLabels = top.jlen.vod.offline.episodeDownloadLabels(downloadVod, state.selectedSourceIndex, source?.name.orEmpty())
             val detailSubtitle = remember(item, state.sources) {
                 resolvedDetailSubtitle(item).ifBlank { "站内资源" }
             }
@@ -209,10 +211,11 @@ fun DetailScreen(
                         )
                     }
                     source?.let { selected ->
-                        item { SectionTitle(title = "选集播放", action = selected.name, onAction = {}) }
+                        item { top.jlen.vod.offline.DownloadEpisodeHeader(downloadVod, item.displayTitle, state.selectedSourceIndex, selected, downloadLabels) }
                         item {
                             EpisodePanel(
                                 episodes = selected.episodes,
+                                downloadLabels = downloadLabels,
                                 selectedIndex = -1,
                                 pauseMarquee = detailListState.isScrollInProgress,
                                 onEpisodeClick = { episodeIndex ->

@@ -7,6 +7,12 @@ import org.junit.Test
 
 class ParsingRegressionTest {
     @Test
+    fun mediaDetectionUsesPathAndIgnoresQueryAndFragment() {
+        assertTrue(isDirectMediaUrl("https://example.test/clip.MP4?expires=42#play"))
+        assertTrue(isDirectMediaUrl("https://example.test/index.m3u8#start"))
+        assertFalse(isDirectMediaUrl("https://example.test/player?target=/index.m3u8"))
+    }
+    @Test
     fun updateAssetsSkipSourceArchivesNullsAndNonApkNames() {
         val json = JsonParser.parseString(
             """{"assets":[null,42,{"name":"source.zip","browser_download_url":"https://example.test/source.zip"},{"name":"app.apk.sha256","browser_download_url":"https://example.test/checksum"},{"name":"broken.apk","browser_download_url":null},{"name":"app.APK","browser_download_url":"https://example.test/app.APK"}]}"""
