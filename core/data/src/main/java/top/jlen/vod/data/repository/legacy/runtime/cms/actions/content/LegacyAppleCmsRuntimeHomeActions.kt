@@ -17,7 +17,6 @@ internal fun LegacyAppleCmsRuntimeRepositoryCore.legacyClearMemoryCaches() {
     runtimeClearHistorySourceCache()
     runtimeClearPreviewItemCache()
     runtimeClearInFlightRequests()
-    runtimeResetRequestPreference()
     runtimeResetCleanupTimestamps()
 }
 

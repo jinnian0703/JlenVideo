@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import java.util.concurrent.atomic.AtomicBoolean
+import top.jlen.vod.data.isDirectMediaUrl
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -81,7 +82,7 @@ private fun maybeReportMediaUrl(
     delivered: AtomicBoolean,
     onDetected: (String) -> Unit
 ) {
-    if (!isTakeoverMediaUrl(rawUrl)) return
+    if (!isDirectMediaUrl(rawUrl)) return
     if (!delivered.compareAndSet(false, true)) return
     webView.post { onDetected(rawUrl) }
 }
@@ -94,18 +95,10 @@ private fun inspectVideoElement(
     if (delivered.get()) return
     webView.evaluateJavascript(VIDEO_INSPECT_SCRIPT, ValueCallback { result ->
         val cleaned = result.orEmpty().trim().removeSurrounding("\"").replace("\\u0026", "&")
-        if (cleaned.isNotBlank() && isTakeoverMediaUrl(cleaned) && delivered.compareAndSet(false, true)) {
+        if (isDirectMediaUrl(cleaned) && delivered.compareAndSet(false, true)) {
             onDetected(cleaned.replace("\\/", "/"))
         }
     })
-}
-
-private fun isTakeoverMediaUrl(url: String): Boolean {
-    val lower = url.lowercase()
-    return (lower.contains(".m3u8") || lower.contains(".mp4")) &&
-        !lower.contains("favicon") &&
-        !lower.contains(".css") &&
-        !lower.contains(".js")
 }
 
 private const val VIDEO_INSPECT_SCRIPT = """

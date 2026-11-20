@@ -129,15 +129,6 @@ internal fun LegacyStateRuntimeViewModelCore.legacyUpdatePlaybackSnapshot(snapsh
     persistCurrentPlaybackResume()
 }
 
-internal fun LegacyStateRuntimeViewModelCore.legacySyncFromFullscreen(result: FullscreenPlaybackResult) {
-    val syncState = syncPlayerStateFromFullscreen(currentPlayerState(), result)
-    updatePlayerState(syncState.playerState)
-    persistCurrentPlaybackResume()
-    if (syncState.shouldResolveCurrentUrl) {
-        legacyResolveCurrentPlayerUrl()
-    }
-}
-
 internal fun LegacyStateRuntimeViewModelCore.legacyRecordCurrentPlayback() {
     val item = currentPlayerState().item ?: return
     val episodePageUrl = currentPlayerState().episodePageUrl

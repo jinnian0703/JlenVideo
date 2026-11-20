@@ -966,19 +966,4 @@ private fun parsePointLogDelta(log: PointLogItem): Int? {
     return if (log.isIncome) abs(numeric) else -abs(numeric)
 }
 
-@Composable
-internal fun MembershipPane(
-    isLoading: Boolean,
-    info: MembershipInfo,
-    plans: List<MembershipPlan>,
-    isActionLoading: Boolean,
-    onUpgrade: (MembershipPlan) -> Unit
-) = LegacyMembershipPane(
-    isLoading = isLoading,
-    info = info,
-    plans = plans,
-    isActionLoading = isActionLoading,
-    onUpgrade = onUpgrade
-)
-
 internal fun String.toMembershipDuration(): String = toLegacyMembershipDuration()

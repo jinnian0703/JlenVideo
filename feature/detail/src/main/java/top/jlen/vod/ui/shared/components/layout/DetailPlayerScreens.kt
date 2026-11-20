@@ -649,14 +649,6 @@ private fun DiagnosticLine(label: String, value: String) {
     }
 }
 
-internal fun isDirectVideoUrl(url: String): Boolean {
-    val lower = url.lowercase()
-    return lower.endsWith(".m3u8") ||
-        lower.endsWith(".mp4") ||
-        lower.contains(".m3u8?") ||
-        lower.contains("/index.m3u8")
-}
-
 private fun openExternal(context: Context, url: String) {
     if (url.isBlank()) return
     runCatching {

@@ -494,8 +494,6 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
 
     fun updatePlaybackSnapshot(snapshot: PlaybackSnapshot) = legacyUpdatePlaybackSnapshot(snapshot)
 
-    fun syncFromFullscreen(result: FullscreenPlaybackResult) = legacySyncFromFullscreen(result)
-
     private fun recordCurrentPlayback() = legacyRecordCurrentPlayback()
 
     private fun resolveCurrentPlayerUrl() = legacyResolveCurrentPlayerUrl()

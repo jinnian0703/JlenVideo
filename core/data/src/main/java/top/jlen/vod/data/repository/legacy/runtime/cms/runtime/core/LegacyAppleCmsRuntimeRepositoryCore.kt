@@ -11,15 +11,10 @@ import androidx.core.text.HtmlCompat
 import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
-import com.google.gson.JsonParseException
 import com.google.gson.JsonParser
 import java.io.ByteArrayOutputStream
-import java.io.EOFException
 import java.io.IOException
-import java.net.ConnectException
 import java.net.URI
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
 import java.net.URLDecoder
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
@@ -49,13 +44,11 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.HttpException
 import top.jlen.vod.AppConfig
 import top.jlen.vod.AppRuntimeInfo
 import top.jlen.vod.RuntimeEndpoints
 import top.jlen.vod.PLAYER_DESKTOP_UA
 import top.jlen.vod.common.coroutines.runSuspendCatching
-import javax.net.ssl.SSLException
 
 open class LegacyAppleCmsRuntimeRepositoryCore(
     context: Context,
@@ -159,8 +152,6 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     internal fun runtimeClearInFlightRequests() {
         inFlightRequests.clear()
     }
-
-    internal fun runtimeResetRequestPreference() = Unit
 
     internal fun runtimeResetCleanupTimestamps() {
         lastMemoryCacheCleanupAt = 0L
@@ -618,67 +609,6 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
 
     private suspend fun loadFreshHome(forceRefresh: Boolean): HomePayload =
         legacyLoadFreshHome(forceRefresh)
-/*
-        val (latestPage, recommendedItems) = coroutineScope {
-            val latestDeferred = async {
-                runCatching {
-                    loadLatestCursorPage(cursor = "")
-                }.getOrElse {
-                    CursorPagedVodItems()
-                }
-            }
-            val recommendationsDeferred = async {
-                runCatching {
-                    val rawItems = requestApi { getRecommendations(limit = 16) }
-                        .data
-                        ?.rows
-                        .orEmpty()
-                        .distinctBy { it.vodId }
-                    filterPlayablePreviewItems(rawItems)
-                }.getOrDefault(emptyList())
-            }
-            latestDeferred.await() to recommendationsDeferred.await()
-        }
-        val homeDocument = if (recommendedItems.isEmpty()) {
-            runCatching { fetchDocument("$baseUrl/") }.getOrNull()
-        } else {
-            null
-        }
-        val latest = latestPage.items
-        val featured = recommendedItems.ifEmpty {
-            homeDocument?.let { parseLevelOneItemsFromHomePage(it, limit = 16) }.orEmpty()
-        }
-        val categories = loadBrowsableCategories(homeDocument = homeDocument, forceRefresh = forceRefresh)
-        val selectedCategory = categories.firstOrNull()
-        val selectedCategoryPage = selectedCategory?.let { category ->
-            runCatching {
-                loadCategoryCursorPage(typeId = category.typeId, cursor = "")
-            }.getOrNull()
-        }
-        rememberPreviewItems(latest + featured + selectedCategoryPage?.items.orEmpty())
-
-        if (latest.isEmpty() && featured.isEmpty() && categories.isEmpty()) {
-            throw IOException("首页内容解析失败")
-        }
-        return HomePayload(
-            slides = emptyList(),
-            hot = emptyList(),
-            featured = featured,
-            latest = latest,
-            sections = emptyList(),
-            categories = categories,
-            selectedCategory = selectedCategory,
-            categoryVideos = selectedCategoryPage?.items.orEmpty(),
-            latestCursor = latestPage.nextCursor,
-            latestHasMore = latestPage.hasMore,
-            categoryCursor = selectedCategoryPage?.nextCursor.orEmpty(),
-            categoryHasMore = selectedCategoryPage?.hasMore ?: false
-        ).also { payload ->
-            cacheHomePayload(payload)
-            cleanupCachesIfNeeded()
-        }
-    }
-*/
 
     suspend fun loadByCategory(typeId: String): List<VodItem> = legacyLoadByCategory(typeId)
 
@@ -3502,20 +3432,6 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     private suspend fun <T> requestApi(block: suspend AppleCmsApi.() -> T): T =
         primaryApi.block()
 
-    private fun shouldFailoverToBackup(error: Throwable): Boolean =
-        generateSequence(error) { it.cause }.any { cause ->
-            when (cause) {
-                is HttpException -> cause.code() in TRANSIENT_API_STATUS_CODES
-                is JsonParseException,
-                is EOFException,
-                is UnknownHostException,
-                is ConnectException,
-                is SocketTimeoutException,
-                is SSLException,
-                is IOException -> true
-                else -> false
-            }
-        }
 
     private fun parseUserProfileSession(document: Document): AuthSession {
         val cookieSession = currentSession()
@@ -4523,7 +4439,6 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
         private const val MAX_SEARCH_CACHE_ENTRIES = 24
         private const val MAX_HISTORY_SOURCE_CACHE_ENTRIES = 96
         private const val MAX_PREVIEW_ITEM_CACHE_ENTRIES = 256
-        private val TRANSIENT_API_STATUS_CODES = setOf(500, 502, 503, 504, 521, 522, 523, 524)
         private const val HOT_SEARCH_MOBILE_UA =
             "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) " +
                 "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 " +

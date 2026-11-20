@@ -82,7 +82,7 @@ internal fun appendTimestamp(url: String): String {
     return "$url${separator}t=${System.currentTimeMillis()}"
 }
 
-internal fun isDirectMediaUrl(url: String): Boolean {
+fun isDirectMediaUrl(url: String): Boolean {
     val path = url.substringBefore('?').substringBefore('#')
     return path.endsWith(".m3u8", true) || path.endsWith(".mp4", true)
 }

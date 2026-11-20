@@ -80,6 +80,7 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import top.jlen.vod.data.Episode
 import top.jlen.vod.data.VodItem
+import top.jlen.vod.data.isDirectMediaUrl
 
 private const val EXPANDED_PLAYBACK_WINDOW_MIN_DP = 600
 
@@ -110,7 +111,7 @@ fun PlayerScreen(
     val downloadLabels = top.jlen.vod.offline.episodeDownloadLabels(downloadVod, state.selectedSourceIndex, source?.name.orEmpty())
     val playUrl = state.playUrl
     val resolveError = state.resolveError
-    val directPlayable = playUrl.isNotBlank() && isDirectVideoUrl(playUrl)
+    val directPlayable = isDirectMediaUrl(playUrl)
     var isFullscreen by rememberSaveable {
         mutableStateOf(false)
     }
