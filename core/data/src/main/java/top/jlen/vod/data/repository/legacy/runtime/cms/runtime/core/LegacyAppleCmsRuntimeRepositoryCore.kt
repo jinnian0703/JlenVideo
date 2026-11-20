@@ -1607,7 +1607,9 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             ?.takeIf(String::isNotBlank)
             ?.let(::normalizeLoginFailureMessage)
 
-        throw IOException(failureMessage ?: "登录失败，请检查账号或密码")
+        val message = failureMessage ?: "登录失败，请检查账号或密码"
+        if (authResponse?.code == 1002) throw LoginCaptchaRejected(message)
+        throw CmsApiError(authResponse?.code ?: 0, message)
     }
 
     suspend fun loadRegisterPageForApp(): RegisterPage =

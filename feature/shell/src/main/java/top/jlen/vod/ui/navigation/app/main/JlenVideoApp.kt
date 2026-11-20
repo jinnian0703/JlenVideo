@@ -426,9 +426,9 @@ fun JlenVideoApp() {
                         onOpenLink = openAnnouncementLink
                     )
                 }
-                viewModel.loginChallenge?.let { image ->
-                    LoginChallengeDialog(image, viewModel.accountState.isLoading, viewModel::dismissLoginChallenge,
-                        viewModel::submitLoginChallenge, viewModel::login)
+                viewModel.loginChallenge?.let { challenge ->
+                    LoginChallengeDialog(challenge, viewModel.accountState.isLoading, viewModel::dismissLoginChallenge,
+                        viewModel::submitLoginChallenge, viewModel::refreshLoginChallenge)
                 }
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     val useNavigationRail = maxWidth >= NAVIGATION_RAIL_MIN_WIDTH

@@ -34,11 +34,21 @@ import top.jlen.vod.data.VodItem
 
 open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidViewModel(application) {
     private val repository = AppleCmsRepository(application)
-    var loginChallenge by mutableStateOf<ByteArray?>(null)
-        internal set
+    internal val loginChallenges = LoginChallengeController {
+        withContext(Dispatchers.IO) { repository.appApi.captcha() }
+    }
+    val loginChallenge get() = loginChallenges.state
 
-    fun dismissLoginChallenge() { loginChallenge = null }
-    fun submitLoginChallenge(answer: String) { legacyLogin(answer) }
+    fun dismissLoginChallenge() = loginChallenges.dismiss()
+    fun submitLoginChallenge(answer: String) { if (loginChallenge?.image != null) legacyLogin(answer) }
+    fun refreshLoginChallenge() {
+        if (accountState.isLoading || loginChallenge == null) return
+        viewModelScope.launch {
+            updateAccountState(beginLogin(currentAccountState()))
+            loginChallenges.loadImage()
+            updateAccountState(currentAccountState().copy(isLoading = false))
+        }
+    }
 
     suspend fun unlockContent(vodId: String, type: Int, password: String) = withContext(Dispatchers.IO) {
         repository.appApi.unlock(vodId, type, password)

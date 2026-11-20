@@ -195,6 +195,7 @@ private fun LegacyStateRuntimeViewModelCore.startFindPasswordCodeCountdown() {
 
 internal fun LegacyStateRuntimeViewModelCore.legacyLogin(verification: String? = null) {
     if (currentAccountState().isLoading) return
+    val submittedChallenge = loginChallenge
     val userName = currentAccountState().userName.trim()
     val password = currentAccountState().password
     if (userName.isBlank()) {
@@ -209,28 +210,28 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLogin(verification: String? =
     viewModelScope.launch {
         updateAccountState(beginLogin(currentAccountState()))
         runStateCatching {
-            withContext(Dispatchers.IO) {
-                val repo = legacyRepository()
-                if (verification == null && repo.appApi.loginCaptchaRequired()) {
-                    val image = repo.appApi.captcha()
-                    withContext(Dispatchers.Main) { loginChallenge = image }
-                    null
-                } else {
-                    repo.loginForApp(userName, password, verification.orEmpty())
-                }
+            val repo = legacyRepository()
+            if (verification == null && withContext(Dispatchers.IO) { repo.appApi.loginCaptchaRequired() }) {
+                loginChallenges.loadImage()
+                null
+            } else {
+                withContext(Dispatchers.IO) { repo.loginForApp(userName, password, verification.orEmpty()) }
             }
         }.onSuccess { session ->
             if (session == null) {
                 updateAccountState(currentAccountState().copy(isLoading = false))
                 return@onSuccess
             }
-            loginChallenge = null
+            dismissLoginChallenge()
             updateAccountState(loggedInAccountState(currentAccountState(), session))
             updateFollowState(FollowUiState(isLoggedIn = true))
             legacyShowCachedFollowContent()
             selectAccountSection(AccountSection.Overview, forceRefresh = true)
         }.onFailure { error ->
-            loginChallenge = null
+            if (submittedChallenge != null && loginChallenges.handleSubmitError(submittedChallenge, error)) {
+                updateAccountState(currentAccountState().copy(isLoading = false))
+                return@onFailure
+            }
             updateAccountState(
                 accountStateWithLoginError(
                     currentAccountState(),

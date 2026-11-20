@@ -13,6 +13,8 @@ import kotlinx.coroutines.sync.withLock
 
 class CmsApiError(val code: Int, message: String) : IOException(message)
 
+class LoginCaptchaRejected(message: String) : IOException(message)
+
 class CmsAppApi internal constructor(client: OkHttpClient, base: String) {
     private val http = client.newBuilder().followRedirects(false).build()
     private val api = (base.trimEnd('/') + "/api.php/").toHttpUrl()
@@ -60,7 +62,12 @@ class CmsAppApi internal constructor(client: OkHttpClient, base: String) {
     }
 
     suspend fun login(name: String, password: String, verify: String) {
-        request("user/login", form = mapOf("user_name" to name, "user_pwd" to password, "verify" to verify))
+        try {
+            request("user/login", form = mapOf("user_name" to name, "user_pwd" to password, "verify" to verify))
+        } catch (error: CmsApiError) {
+            if (error.code == 1002) throw LoginCaptchaRejected(error.message.orEmpty())
+            throw error
+        }
     }
 
     suspend fun unlock(vod: String, type: Int, password: String) {

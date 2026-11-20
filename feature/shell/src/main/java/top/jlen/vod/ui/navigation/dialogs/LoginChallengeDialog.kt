@@ -33,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,9 +41,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -50,19 +56,22 @@ import androidx.compose.ui.window.Dialog
 
 @Composable
 internal fun LoginChallengeDialog(
-    image: ByteArray,
+    challenge: LoginChallengeState,
     busy: Boolean,
     dismiss: () -> Unit,
     submit: (String) -> Unit,
     refresh: () -> Unit
 ) {
+    val image = challenge.image
     var answer by remember(image) { mutableStateOf("") }
-    val bitmap = remember(image) { BitmapFactory.decodeByteArray(image, 0, image.size)?.asImageBitmap() }
+    val bitmap = remember(image) { image?.let { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() } }
+    val focusRequester = remember { FocusRequester() }
     val canSubmit = !busy && bitmap != null && answer.isNotBlank()
     val onSubmit = { if (canSubmit) submit(answer.trim()) }
     val controlShape = RoundedCornerShape(UiDimens.ControlRadius)
 
     Dialog(onDismissRequest = dismiss) {
+        LaunchedEffect(bitmap) { if (bitmap != null) focusRequester.requestFocus() }
         Surface(
             modifier = Modifier.widthIn(max = 400.dp).fillMaxWidth(),
             shape = RoundedCornerShape(28.dp),
@@ -103,7 +112,7 @@ internal fun LoginChallengeDialog(
                         if (bitmap != null) {
                             Image(bitmap, "图形验证码", modifier = Modifier.fillMaxWidth().height(64.dp), contentScale = ContentScale.Fit)
                         } else {
-                            Text("图片未能显示", style = MaterialTheme.typography.bodyMedium, color = UiPalette.TextSecondary)
+                            Text(if (busy) "正在加载验证码…" else "图片未能显示", style = MaterialTheme.typography.bodyMedium, color = UiPalette.TextSecondary)
                         }
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -115,8 +124,12 @@ internal fun LoginChallengeDialog(
                 OutlinedTextField(
                     value = answer,
                     onValueChange = { answer = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                     label = { Text("验证码") },
+                    isError = challenge.invalidAnswer && answer.isBlank(),
+                    supportingText = challenge.message?.takeUnless { challenge.invalidAnswer && answer.isNotBlank() }?.let { message ->
+                        { Text(message, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
+                    },
                     singleLine = true,
                     readOnly = busy || bitmap == null,
                     shape = controlShape,

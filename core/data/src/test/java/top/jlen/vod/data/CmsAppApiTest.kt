@@ -22,6 +22,28 @@ class CmsAppApiTest {
         return CmsAppApi(http, "https://cms.example/site/")
     }
 
+    @Test fun loginSeparatesCaptchaRejectionFromCredentialErrors() = runBlocking {
+        val codes = ArrayDeque(listOf(1002, 1003, 1))
+        val client = api { """{"code":${codes.removeFirst()},"msg":"response"}""" }
+        assertTrue(runCatching { client.login("user", "password", "old") }.exceptionOrNull() is LoginCaptchaRejected)
+        assertEquals(1003, (runCatching { client.login("user", "password", "new") }.exceptionOrNull() as CmsApiError).code)
+        client.login("user", "correct", "next")
+    }
+
+    @Test fun failureReportKeepsLineAndEpisodeNumbersOneBased() = runBlocking {
+        val reports = mutableListOf<List<String>>()
+        val client = api { request ->
+            assertEquals("/site/api.php/ulog/report_fail", request.url.encodedPath)
+            val form = request.body as FormBody
+            val fields = (0 until form.size).associate { form.name(it) to form.value(it) }
+            reports += listOf("vod_id", "sid", "nid", "play_from").map(fields::getValue)
+            """{"code":1}"""
+        }
+        client.reportFailure("", "42", 0, 0, "A")
+        client.reportFailure("", "42", 1, 2, "B")
+        assertEquals(listOf(listOf("42", "1", "1", "A"), listOf("42", "2", "3", "B")), reports)
+    }
+
     @Test fun progressUsesSessionCsrfAndServerUnits() = runBlocking {
         val writes = mutableListOf<Request>()
         val client = api { request ->
