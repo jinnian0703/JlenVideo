@@ -16,15 +16,35 @@ internal fun digest(text: String): String = MessageDigest.getInstance("SHA-256")
 internal class OfflineProblem(message: String) : IOException(message)
 internal data class LocalVideo(val file: File, val quality: String)
 
+internal data class TransferProgress(
+    val bytes: Long, val totalBytes: Long, val receivedBytes: Long, val percent: Int, val quality: String
+)
+
+/** Bytes already on disk never enter the rate calculation. Sample even during a stalled read. */
+internal class DownloadRate(private var timeMs: Long) {
+    private var previousBytes = 0L
+    fun sample(receivedBytes: Long, nowMs: Long): Long {
+        val interval = nowMs - timeMs
+        if (interval <= 0) return 0
+        val rate = ((receivedBytes - previousBytes).coerceAtLeast(0) * 1000.0 / interval).toLong()
+        previousBytes = receivedBytes
+        timeMs = nowMs
+        return rate
+    }
+}
+
 /** Publishes the local entry point only after every referenced byte has been saved. */
 internal class OfflineTransfer(
     private val client: OkHttpClient, private val dir: File,
     private val checkActive: () -> Unit,
-    private val progress: (Long, Int, String) -> Unit
+    private val progress: (TransferProgress) -> Unit
 ) {
     private val assets = linkedMapOf<HttpUrl, String>()
     private var quality = "原画质"
     private var saved = 0L
+    private var received = 0L
+    private fun report(bytes: Long, percent: Int, total: Long = -1) =
+        progress(TransferProgress(bytes, total, received, percent, quality))
     private fun checkSpace(needed: Long = 0) {
         if (dir.usableSpace - needed < 32L * 1024 * 1024) throw OfflineProblem("存储空间不足，请释放空间后重试")
     }
@@ -82,9 +102,10 @@ internal class OfflineTransfer(
                 if (start == 0L && (!stream.request(8) || stream.buffer.clone().apply { skip(4) }.readUtf8(4) !in setOf("ftyp", "moov", "mdat", "wide", "free")))
                     throw OfflineProblem("该线路没有返回可下载的 MP4 视频")
                 var nbytes = start
+                report(start, if (total > 0) (100.0 * start / total).toInt().coerceAtMost(99) else -1, total)
                 pump(stream.inputStream()) { buf, n ->
                     out.write(buf, 0, n); nbytes += n
-                    progress(nbytes, if (total > 0) (100.0 * nbytes / total).toInt().coerceAtMost(99) else -1, quality)
+                    report(nbytes, if (total > 0) (100.0 * nbytes / total).toInt().coerceAtMost(99) else -1, total)
                 }
                 if (total >= 0 && nbytes != total) throw IOException("视频下载不完整")
             }
@@ -100,6 +121,7 @@ internal class OfflineTransfer(
             checkActive()
             if (sinceCheck >= 1024 * 1024) { checkSpace(); sinceCheck = 0 }
             val n = input.read(buf); if (n < 0) break
+            received += n
             write(buf, n); sinceCheck += n
         }
     }
@@ -163,11 +185,11 @@ internal class OfflineTransfer(
                 if (r.code != 200 || r.header("Content-Type").orEmpty().contains("html", true)) throw OfflineProblem("分片不可下载，请更换线路")
                 val body = r.body!!; val tmp = File(dir, "segment.part"); val len = body.contentLength()
                 if (len > 0) checkSpace(len)
-                tmp.outputStream().use { out -> pump(body.byteStream()) { buf, n -> out.write(buf,0,n); progress(saved + tmp.length(), index * 100 / assets.size, quality) } }
+                tmp.outputStream().use { out -> pump(body.byteStream()) { buf, n -> out.write(buf,0,n); report(saved + tmp.length(), index * 99 / assets.size) } }
                 if (tmp.length() == 0L || (len >= 0 && len != tmp.length())) throw IOException("分片下载不完整")
                 publish(tmp, file)
             }
-            saved += file.length(); progress(saved, (index + 1) * 99 / assets.size, quality)
+            saved += file.length(); report(saved, (index + 1) * 99 / assets.size)
         }
         checkActive(); lists["index.m3u8"] = entry
         lists.forEach { (name, text) -> val tmp = File(dir,"playlist.part"); tmp.writeText(text); publish(tmp,File(dir,name)) }

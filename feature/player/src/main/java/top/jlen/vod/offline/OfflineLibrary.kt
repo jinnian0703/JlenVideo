@@ -25,21 +25,23 @@ import top.jlen.vod.PLAYER_DESKTOP_UA
 import top.jlen.vod.data.AppleCmsRepository
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicReference
 import java.util.UUID
 
 internal enum class Stage { QUEUED, ACTIVE, PAUSED, FAILED, DONE }
 internal data class Entry(val id: String, val vod: String, val title: String, val source: String, val si: Int,
     val ei: Int, val episode: String, val page: String, val created: Long, val stage: Stage = Stage.QUEUED,
-    val bytes: Long = 0, val percent: Int = -1, val quality: String = "", val file: String = "", val error: String = "") {
+    val bytes: Long = 0, val percent: Int = -1, val quality: String = "", val file: String = "", val error: String = "",
+    val totalBytes: Long = -1, val bytesPerSecond: Long = 0) {
     fun json() = JSONObject().apply {
         put("vod",vod); put("title",title); put("source",source); put("si",si); put("ei",ei); put("episode",episode)
         put("page",page); put("created",created); put("stage",stage.name); put("bytes",bytes); put("percent",percent)
-        put("quality",quality); put("file",file); put("error",error)
+        put("totalBytes",totalBytes); put("quality",quality); put("file",file); put("error",error)
     }.toString()
     companion object {
         fun read(id: String, raw: String) = JSONObject(raw).run {
             Entry(id,getString("vod"),getString("title"),getString("source"),getInt("si"),getInt("ei"),getString("episode"),getString("page"),getLong("created"),
-                Stage.valueOf(getString("stage")).let { if (it == Stage.ACTIVE) Stage.QUEUED else it },optLong("bytes"),optInt("percent",-1),optString("quality"), optString("file"),optString("error")) }
+                Stage.valueOf(getString("stage")).let { if (it == Stage.ACTIVE) Stage.QUEUED else it },optLong("bytes"),optInt("percent",-1),optString("quality"), optString("file"),optString("error"), optLong("totalBytes", -1)) }
     }
 }
 
@@ -94,7 +96,7 @@ internal class OfflineLibrary private constructor(private val app: Context) {
     @Synchronized fun pauseOrResume(row: Entry) {
         val current = entries.value.find { it.id == row.id } ?: return
         val stage = when(current.stage) { Stage.QUEUED,Stage.ACTIVE -> Stage.PAUSED; Stage.PAUSED,Stage.FAILED -> Stage.QUEUED; Stage.DONE -> return }
-        replace(current.copy(stage = stage,error = "")); if(active?.id == current.id) interrupt(); schedule()
+        replace(current.copy(stage = stage,error = "",bytesPerSecond = 0)); if(active?.id == current.id) interrupt(); schedule()
     }
     @Synchronized fun remove(ids: Set<String>) {
         val removed = entries.value.filter { it.id in ids }; entries.value = entries.value - removed.toSet()
@@ -136,24 +138,39 @@ internal class OfflineLibrary private constructor(private val app: Context) {
             if (entries.value.find { it.id == row.id }?.stage != Stage.QUEUED || !networkAllowed()) return
             active = run; replace(row.copy(stage = Stage.ACTIVE))
         }
-        var last = 0L
         try {
             val media = repo.resolvePlayUrl(row.page); job.ensureActive()
             if (media.useWebPlayer) throw OfflineProblem("该线路只能在线播放，请更换线路")
-            val result = OfflineTransfer(client,File(root,row.id),{job.ensureActive()}, { bytes,percent,quality ->
-                val now = SystemClock.elapsedRealtime()
-                if(now - last >= 450) synchronized(this) {
-                    last = now; if(job.isActive && active === run) replace(row.copy(stage=Stage.ACTIVE,bytes=bytes,percent=percent,quality=quality),false)
+            val result = coroutineScope {
+                val latest = AtomicReference<TransferProgress?>()
+                val rate = DownloadRate(SystemClock.elapsedRealtime())
+                fun publishProgress(speed: Long, sample: TransferProgress) = synchronized(this@OfflineLibrary) {
+                    if (job.isActive && active === run) replace(row.copy(stage = Stage.ACTIVE, bytes = sample.bytes,
+                        totalBytes = sample.totalBytes, percent = sample.percent, quality = sample.quality, bytesPerSecond = speed), false)
                 }
-            }).download(media.url)
+                val ticker = launch(Dispatchers.Default) {
+                    while (isActive) {
+                        delay(750)
+                        val sample = latest.get()
+                        val speed = rate.sample(sample?.receivedBytes ?: 0, SystemClock.elapsedRealtime())
+                        if (sample != null) publishProgress(speed, sample)
+                    }
+                }
+                try {
+                    OfflineTransfer(client, File(root, row.id), { job.ensureActive() }, latest::set).download(media.url)
+                } finally {
+                    ticker.cancelAndJoin()
+                    latest.get()?.let { publishProgress(0, it) }
+                }
+            }
             val quality = if(result.file.extension == "mp4") verifyMp4(result.file) else result.quality
             val size = result.file.parentFile!!.listFiles()?.sumOf { it.length() } ?: result.file.length()
-            synchronized(this) { job.ensureActive(); replace(row.copy(stage=Stage.DONE,bytes=size,percent=100,quality=quality,file=result.file.name,error="")) }
+            synchronized(this) { job.ensureActive(); replace(row.copy(stage=Stage.DONE,bytes=size,totalBytes=size,bytesPerSecond=0,percent=100,quality=quality,file=result.file.name,error="")) }
         } catch(e: Exception) {
             synchronized(this) { val current = entries.value.find { it.id == row.id }
                 if(current?.stage == Stage.ACTIVE) {
-                    if(!job.isActive || !networkAllowed()) replace(current.copy(stage=Stage.QUEUED))
-                    else replace(current.copy(stage=Stage.FAILED,error=when {
+                    if(!job.isActive || !networkAllowed()) replace(current.copy(stage=Stage.QUEUED, bytesPerSecond=0))
+                    else replace(current.copy(stage=Stage.FAILED,bytesPerSecond=0,error=when {
                         e is OfflineProblem -> e.message.orEmpty()
                         e.message.orEmpty().contains("ENOSPC",true) -> "空间不足，请释放空间后重试"
                         e is IOException -> "读取片源失败，请检查网络后重试"

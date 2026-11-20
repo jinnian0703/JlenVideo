@@ -52,6 +52,7 @@ import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.NewReleases
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Whatshot
@@ -123,7 +124,7 @@ import top.jlen.vod.data.sanitizeUserFacingComposite
 
 @Composable
 internal fun HomeTopBlock(
-    onRefresh: () -> Unit,
+    onOpenDownloads: () -> Unit,
     noticeState: NoticeUiState,
     onRefreshAnnouncements: () -> Unit,
     onOpenAnnouncementList: () -> Unit,
@@ -145,7 +146,7 @@ internal fun HomeTopBlock(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 CircleActionButton(icon = Icons.Rounded.NewReleases, onClick = onOpenAnnouncementList)
-                CircleActionButton(icon = Icons.Rounded.Refresh, onClick = onRefresh)
+                CircleActionButton(icon = Icons.Rounded.Download, description = "下载管理", onClick = onOpenDownloads)
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
@@ -382,7 +383,7 @@ private fun AnnouncementTickerStrip(
 }
 
 @Composable
-internal fun CircleActionButton(icon: ImageVector, onClick: () -> Unit) {
+internal fun CircleActionButton(icon: ImageVector, description: String? = null, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(42.dp)
@@ -391,7 +392,7 @@ internal fun CircleActionButton(icon: ImageVector, onClick: () -> Unit) {
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        Icon(imageVector = icon, contentDescription = null, tint = UiPalette.Ink)
+        Icon(imageVector = icon, contentDescription = description, tint = UiPalette.Ink)
     }
 }
 

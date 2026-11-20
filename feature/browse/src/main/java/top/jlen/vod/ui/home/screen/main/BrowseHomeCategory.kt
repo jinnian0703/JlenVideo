@@ -147,6 +147,7 @@ fun HomeScreen(
     initialScrollOffset: Int = 0,
     onScrollPositionChange: (Int, Int) -> Unit = { _, _ -> },
     onRefresh: () -> Unit,
+    onOpenDownloads: () -> Unit,
     onRefreshAnnouncements: () -> Unit,
     onLoadMore: () -> Unit,
     onOpenDetail: (String) -> Unit,
@@ -229,7 +230,7 @@ fun HomeScreen(
         ) {
             item(key = "home_top", contentType = "home_top") {
                 HomeTopBlock(
-                    onRefresh = onRefresh,
+                    onOpenDownloads = onOpenDownloads,
                     noticeState = noticeState,
                     onRefreshAnnouncements = onRefreshAnnouncements,
                     onOpenAnnouncementList = onOpenAnnouncementList,

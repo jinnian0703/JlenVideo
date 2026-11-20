@@ -382,6 +382,7 @@ fun JlenVideoApp() {
             launchSingleTop = true
         }
     }
+    val openDownloads: () -> Unit = { navController.navigate("downloads") { launchSingleTop = true } }
     val backToAccount: () -> Unit = {
         if (!navController.popBackStack()) {
             navController.navigate("account") {
@@ -514,6 +515,7 @@ fun JlenVideoApp() {
                                             homeScroll.update(index, offset)
                                         },
                                         onRefresh = viewModel::refreshHomeAndClearCaches,
+                                        onOpenDownloads = openDownloads,
                                         onRefreshAnnouncements = { viewModel.refreshNotices(forceRefresh = true) },
                                         onLoadMore = viewModel::loadMoreHome,
                                         onOpenDetail = openDetail,
@@ -659,7 +661,7 @@ fun JlenVideoApp() {
                                         onSendFindPasswordCode = viewModel::sendFindPasswordCode,
                                         onFindPassword = viewModel::findPassword,
                                         onOpenSettingsUpdate = { openAccountSettingsChild("account/settings/update") },
-                                        onOpenDownloads = { openAccountSettingsChild("account/downloads") },
+                                        onOpenDownloads = openDownloads,
                                         onOpenSettingsCache = { openAccountSettingsChild("account/settings/cache") },
                                         onOpenSettingsLogs = { openAccountSettingsChild("account/settings/logs") },
                                         onOpenSettingsAbout = { openAccountSettingsChild("account/settings/about") },
@@ -703,8 +705,8 @@ fun JlenVideoApp() {
                                         onDownloadUpdate = openUpdateLink
                                     )
                                 }
-                                composable("account/downloads") {
-                                    top.jlen.vod.offline.DownloadsScreen(onBack = backToAccount)
+                                composable("downloads") {
+                                    top.jlen.vod.offline.DownloadsScreen(onBack = { navController.popBackStack() })
                                 }
                                 composable("account/settings/cache") {
                                     LaunchedEffect(Unit) {
@@ -1268,6 +1270,7 @@ private fun PlayerRouteScreen(
         return
     }
     PlayerScreen(
+        vodId = vodId,
         state = state,
         onBack = onBack,
         onSelectEpisode = viewModel::selectPlayerEpisode,

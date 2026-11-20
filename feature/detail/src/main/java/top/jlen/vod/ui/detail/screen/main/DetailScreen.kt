@@ -211,7 +211,7 @@ fun DetailScreen(
                         )
                     }
                     source?.let { selected ->
-                        item { top.jlen.vod.offline.DownloadEpisodeHeader(downloadVod, item.displayTitle, state.selectedSourceIndex, selected, downloadLabels) }
+                        item { SectionTitle(title = "选集播放", action = selected.name, onAction = {}) }
                         item {
                             EpisodePanel(
                                 episodes = selected.episodes,

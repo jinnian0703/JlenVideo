@@ -85,6 +85,7 @@ private const val EXPANDED_PLAYBACK_WINDOW_MIN_DP = 600
 
 @Composable
 fun PlayerScreen(
+    vodId: String,
     state: PlayerUiState,
     onBack: () -> Unit,
     onSelectEpisode: (Int) -> Unit,
@@ -103,6 +104,9 @@ fun PlayerScreen(
         configuration.screenWidthDp,
         configuration.screenHeightDp
     ) >= EXPANDED_PLAYBACK_WINDOW_MIN_DP
+    val downloadVod = state.item?.vodId.orEmpty().ifBlank { state.item?.siteVodId.orEmpty() }.ifBlank { vodId }
+    val source = state.sources.getOrNull(state.selectedSourceIndex)
+    val downloadLabels = top.jlen.vod.offline.episodeDownloadLabels(downloadVod, state.selectedSourceIndex, source?.name.orEmpty())
     val playUrl = state.playUrl
     val resolveError = state.resolveError
     val directPlayable = playUrl.isNotBlank() && isDirectVideoUrl(playUrl)
@@ -399,11 +403,15 @@ fun PlayerScreen(
 
                 if (state.episodes.isNotEmpty()) {
                     item(key = "episode_title") {
-                        SectionTitle(title = "切换选集", action = null, onAction = {})
+                        if (source != null && downloadVod.isNotBlank()) {
+                            top.jlen.vod.offline.DownloadEpisodeHeader(downloadVod, state.title, state.selectedSourceIndex,
+                                source, state.selectedEpisodeIndex, downloadLabels)
+                        } else SectionTitle(title = "切换选集", action = null, onAction = {})
                     }
                     item(key = "episode_panel") {
                         EpisodePanel(
                             episodes = state.episodes,
+                            downloadLabels = downloadLabels,
                             selectedIndex = state.selectedEpisodeIndex,
                             pauseMarquee = false,
                             onEpisodeClick = onSelectEpisode

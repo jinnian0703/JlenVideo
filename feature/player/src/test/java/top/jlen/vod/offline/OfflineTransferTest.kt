@@ -16,7 +16,7 @@ class OfflineTransferTest {
             override fun dispatch(request: RecordedRequest) = MockResponse().setBody(Buffer().write(block(request.requestUrl!!.encodedPath)))
         }; start()
     }
-    private fun transfer(dir: File) = OfflineTransfer(OkHttpClient(), dir, {}, { _,_,_ -> })
+    private fun transfer(dir: File, progress: (TransferProgress) -> Unit = {}) = OfflineTransfer(OkHttpClient(), dir, {}, progress)
     @Test fun lastSegmentIsLocalAfterServerStops() {
         val server = serve { when(it) {
             "/master.m3u8" -> "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=10,RESOLUTION=640x360\nsub/list.m3u8"
@@ -43,7 +43,7 @@ class OfflineTransferTest {
         server.use {
             server.enqueue(MockResponse().setHeader("ETag", "\"v1\"").setBody(Buffer().write(bytes)))
             val url = server.url("/clip.mp4").toString()
-            val pausing = OfflineTransfer(OkHttpClient(), dir, {}, { _, _, _ -> throw java.util.concurrent.CancellationException() })
+            val pausing = OfflineTransfer(OkHttpClient(), dir, {}, { if (it.receivedBytes > 0) throw java.util.concurrent.CancellationException() })
             assertThrows(java.util.concurrent.CancellationException::class.java) { pausing.download(url) }
             val offset = File(dir, "video.part").length().toInt()
             assertTrue(offset in 1 until bytes.size)
@@ -51,7 +51,12 @@ class OfflineTransferTest {
             server.enqueue(MockResponse().setResponseCode(206).setHeader("ETag", "\"v1\"")
                 .setHeader("Content-Range", "bytes $offset-${bytes.lastIndex}/${bytes.size}")
                 .setBody(Buffer().write(bytes, offset, bytes.size - offset)))
-            assertArrayEquals(bytes, transfer(dir).download(url).file.readBytes())
+            val samples = mutableListOf<TransferProgress>()
+            assertArrayEquals(bytes, transfer(dir, samples::add).download(url).file.readBytes())
+            assertEquals(offset.toLong(), samples.first().bytes)
+            assertEquals(0L, samples.first().receivedBytes)
+            assertTrue(samples.all { it.totalBytes == bytes.size.toLong() })
+            assertEquals((bytes.size - offset).toLong(), samples.last().receivedBytes)
             server.takeRequest()
             val resumed = server.takeRequest()
             assertEquals("bytes=$offset-", resumed.getHeader("Range"))
@@ -86,10 +91,31 @@ class OfflineTransferTest {
             assertFalse(File(dir, "index.m3u8").exists())
             server.enqueue(MockResponse().setBody(playlist))
             server.enqueue(MockResponse().setBody("last segment"))
-            assertTrue(transfer(dir).download(url).file.isFile)
+            val samples = mutableListOf<TransferProgress>()
+            assertTrue(transfer(dir, samples::add).download(url).file.isFile)
+            assertTrue(samples.all { it.totalBytes == -1L })
+            assertEquals(0L, samples.first().receivedBytes)
+            assertEquals("last segment".length.toLong(), samples.last().receivedBytes)
             assertEquals(listOf("/clip.m3u8", "/a.ts", "/b.ts", "/clip.m3u8", "/b.ts"), List(server.requestCount) { server.takeRequest().path })
         }
     }
+    @Test fun rateUsesElapsedTimeAndDropsToZeroWhenStalled() {
+        val rate = DownloadRate(2000)
+        assertEquals(4000L, rate.sample(3000, 2750))
+        assertEquals(1000L, rate.sample(4500, 4250))
+        assertEquals(0L, rate.sample(4500, 5000))
+    }
+
+    @Test fun chunkedMp4HasUnknownTotalWhileDownloading() {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setChunkedBody("0000ftypvideo", 3))
+            val samples = mutableListOf<TransferProgress>()
+            val file = transfer(tmp.newFolder(), samples::add).download(server.url("/clip.mp4").toString()).file
+            assertTrue(samples.all { it.totalBytes == -1L && it.percent == -1 })
+            assertEquals(file.length(), samples.last().receivedBytes)
+        }
+    }
+
     /** Optional integration run: create real short fixtures with ffmpeg, then decode the tail with the HTTP server shut down. */
     @Test fun decodeOfflineTailForBothFormats() {
         val tool = System.getenv("JLEN_TEST_FFMPEG"); org.junit.Assume.assumeTrue(!tool.isNullOrBlank())
