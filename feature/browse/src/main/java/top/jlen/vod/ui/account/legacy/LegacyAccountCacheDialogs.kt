@@ -62,7 +62,7 @@ internal fun ClearCacheConfirmDialog(
                         .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
                     Text(
-                        text = "缓存设置",
+                        text = "存储管理",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = UiPalette.DangerText

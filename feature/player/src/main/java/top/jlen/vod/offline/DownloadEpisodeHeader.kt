@@ -34,7 +34,7 @@ fun episodeDownloadLabels(vod: String, si: Int, source: String): Map<Int, String
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DownloadEpisodeHeader(vod: String, title: String, si: Int, source: PlaySource, current: Int, labels: Map<Int, String>) {
+fun DownloadEpisodeHeader(vod: String, title: String, poster: String, si: Int, source: PlaySource, current: Int, labels: Map<Int, String>) {
     val context = LocalContext.current
     var picking by remember(vod, si, source) { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -81,7 +81,7 @@ fun DownloadEpisodeHeader(vod: String, title: String, si: Int, source: PlaySourc
             }
             Spacer(Modifier.height(14.dp))
             Button(modifier = Modifier.fillMaxWidth(), enabled = selection.isNotEmpty(), onClick = {
-                OfflineLibrary.get(context).add(vod, title, source.name, si, selection.sorted().map { i ->
+                OfflineLibrary.get(context).add(vod, title, poster, source.name, si, source.episodes.size == 1, selection.sorted().map { i ->
                     Triple(i, source.episodes[i].name, source.episodes[i].url)
                 })
                 picking = false

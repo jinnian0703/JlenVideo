@@ -662,6 +662,7 @@ fun JlenVideoApp() {
                                         onFindPassword = viewModel::findPassword,
                                         onOpenSettingsUpdate = { openAccountSettingsChild("account/settings/update") },
                                         onOpenDownloads = openDownloads,
+                                        onOpenDownloadSettings = { openAccountSettingsChild("account/settings/downloads") },
                                         onOpenSettingsCache = { openAccountSettingsChild("account/settings/cache") },
                                         onOpenSettingsLogs = { openAccountSettingsChild("account/settings/logs") },
                                         onOpenSettingsAbout = { openAccountSettingsChild("account/settings/about") },
@@ -705,6 +706,9 @@ fun JlenVideoApp() {
                                         onDownloadUpdate = openUpdateLink
                                     )
                                 }
+                                composable("account/settings/downloads") {
+                                    top.jlen.vod.offline.DownloadSettingsScreen(onBack = backToAccount)
+                                }
                                 composable("downloads") {
                                     top.jlen.vod.offline.DownloadsScreen(onBack = { navController.popBackStack() })
                                 }
@@ -722,7 +726,12 @@ fun JlenVideoApp() {
                                         onRefreshCacheSize = viewModel::refreshCacheSize,
                                         onSetCacheRetention = viewModel::setCacheRetention,
                                         onSetCacheSizeLimit = viewModel::setCacheSizeLimit,
-                                        onClearAppCache = viewModel::clearAppCache
+                                        onClearAppCache = viewModel::clearAppCache,
+                                        storageOverview = {
+                                            top.jlen.vod.offline.StorageOverview(
+                                                viewModel.accountState.cacheSizeSummary, viewModel.accountState.isCacheSizeLoading, openDownloads
+                                            )
+                                        }
                                     )
                                 }
                                 composable("account/settings/agreement") {

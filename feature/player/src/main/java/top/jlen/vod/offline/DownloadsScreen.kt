@@ -2,6 +2,7 @@ package top.jlen.vod.offline
 
 import android.content.Intent
 import android.text.format.Formatter
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -9,7 +10,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material3.*
@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import top.jlen.vod.ui.UiPalette
 import top.jlen.vod.ui.appTopInsetsPadding
 
 internal val Stage.label get() = when (this) {
@@ -37,6 +38,9 @@ fun DownloadsScreen(onBack: () -> Unit) {
     var selected by remember { mutableStateOf(emptySet<String>()) }
     var deleting by remember { mutableStateOf(emptySet<String>()) }
     var completed by rememberSaveable { mutableStateOf(rows.isNotEmpty() && rows.all { it.stage == Stage.DONE }) }
+    val disk = rememberDiskUsage(lib)
+    val groups = rows.groupBy { it.vod }
+    var toggled by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
     val done = rows.count { it.stage == Stage.DONE }
     val visible = rows.filter { (it.stage == Stage.DONE) == completed }
     val visibleIds = visible.mapTo(mutableSetOf()) { it.id }
@@ -44,7 +48,7 @@ fun DownloadsScreen(onBack: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     fun size(n: Long) = Formatter.formatShortFileSize(context, n)
     LaunchedEffect(lib) { lib.schedule() }
-    Column(Modifier.fillMaxSize().appTopInsetsPadding()) {
+    Column(Modifier.fillMaxSize().background(UiPalette.BackgroundTop).appTopInsetsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
             Text("下载管理", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -55,22 +59,15 @@ fun DownloadsScreen(onBack: () -> Unit) {
         LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item(key = "storage") {
-                Surface(shape = RoundedCornerShape(20.dp), color = colors.primary.copy(alpha = .09f)) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Rounded.VideoLibrary, null, Modifier.size(20.dp), tint = colors.primary)
-                            Text("离线存储", style = MaterialTheme.typography.labelLarge)
+                Surface(shape = RoundedCornerShape(22.dp), color = UiPalette.SurfaceStrong) {
+                    Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Icon(Icons.Rounded.VideoLibrary, null, Modifier.size(30.dp), tint = UiPalette.Accent)
+                        Column(Modifier.weight(1f)) {
+                            Text("离线文件占用", style = MaterialTheme.typography.labelLarge, color = UiPalette.TextSecondary)
+                            Text(disk?.let { size(it.downloads) } ?: "统计中…", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                         }
-                        Text(size(rows.sumOf { it.bytes }), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                        Text("本机可用 ${size(lib.root.usableSpace)}", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-                        HorizontalDivider(Modifier.padding(vertical = 12.dp), color = colors.primary.copy(alpha = .15f))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("允许移动网络下载", style = MaterialTheme.typography.bodyMedium)
-                                Text(if (mobile) "可能产生流量费用" else "仅在 Wi-Fi 下下载", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-                            }
-                            Switch(checked = mobile, onCheckedChange = lib::setMobile)
-                        }
+                        Text("${groups.size} 部影片", style = MaterialTheme.typography.labelLarge, color = UiPalette.TextSecondary)
                     }
                 }
             }
@@ -99,10 +96,20 @@ fun DownloadsScreen(onBack: () -> Unit) {
                 }
             }
             visible.groupBy { it.vod }.forEach { (vod, group) ->
-                item(key = "title:$vod") {
-                    Text(group.first().title, Modifier.padding(top = 6.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                val first = group.first()
+                val all = groups.getValue(vod)
+                val key = "$completed:$vod"
+                val expanded = manage || (if (completed) key in toggled else key !in toggled)
+                item(key = "album:$vod") {
+                    val folders = all.map { it.folder.ifEmpty { it.id } }.distinct()
+                    val bytes = disk?.let { scan -> folders.sumOf { scan.folders[it] ?: 0L } }
+                    val cover = all.firstOrNull { it.folder in disk?.covers.orEmpty() }?.let(lib::cover)
+                    DownloadAlbumCard(first.title, cover, all.count { it.stage == Stage.DONE }, all.all { it.single } && all.size == 1,
+                        bytes?.let(::size) ?: "统计中…", expanded, manage) {
+                        toggled = ArrayList(if (key in toggled) toggled - key else toggled + key)
+                    }
                 }
-                items(group, key = { it.id }) { row ->
+                if (expanded) items(group, key = { it.id }) { row ->
                     DownloadRow(row, allowed, mobile, manage, row.id in chosen,
                         toggle = { selected = if (row.id in selected) selected - row.id else selected + row.id },
                         play = { context.startActivity(Intent(context, OfflinePlayerActivity::class.java).putExtra("id", row.id)) },
@@ -111,12 +118,10 @@ fun DownloadsScreen(onBack: () -> Unit) {
             }
         }
     }
-    if (deleting.isNotEmpty()) AlertDialog(onDismissRequest = { deleting = emptySet() },
-        icon = { Icon(Icons.Rounded.DeleteOutline, null, tint = colors.error) }, title = { Text("移除 ${deleting.size} 集？") },
-        text = { Text("将取消所选任务，并删除这些剧集在本机保存的文件。") },
-        confirmButton = { Button(colors = ButtonDefaults.buttonColors(containerColor = colors.error), onClick = {
-            lib.remove(deleting); selected -= deleting; deleting = emptySet()
-        }) { Text("确认移除") } }, dismissButton = { TextButton(onClick = { deleting = emptySet() }) { Text("保留") } })
+    val targets = rows.filter { it.id in deleting }
+    if (targets.isNotEmpty()) RemoveDownloadsDialog(targets, onDismiss = { deleting = emptySet() }, onConfirm = {
+        lib.remove(deleting); selected -= deleting; deleting = emptySet()
+    })
 }
 
 @Composable

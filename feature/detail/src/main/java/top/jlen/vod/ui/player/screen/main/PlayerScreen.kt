@@ -404,7 +404,7 @@ fun PlayerScreen(
                 if (state.episodes.isNotEmpty()) {
                     item(key = "episode_title") {
                         if (source != null && downloadVod.isNotBlank()) {
-                            top.jlen.vod.offline.DownloadEpisodeHeader(downloadVod, state.title, state.selectedSourceIndex,
+                            top.jlen.vod.offline.DownloadEpisodeHeader(downloadVod, state.title, state.item?.vodPic.orEmpty(), state.selectedSourceIndex,
                                 source, state.selectedEpisodeIndex, downloadLabels)
                         } else SectionTitle(title = "切换选集", action = null, onAction = {})
                     }

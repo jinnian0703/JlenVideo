@@ -171,6 +171,7 @@ internal fun LegacyAccountScreen(
     onFindPassword: () -> Unit,
     onOpenSettingsUpdate: () -> Unit,
     onOpenDownloads: () -> Unit,
+    onOpenDownloadSettings: () -> Unit,
     onOpenSettingsCache: () -> Unit,
     onOpenSettingsLogs: () -> Unit,
     onOpenSettingsAbout: () -> Unit,
@@ -431,6 +432,7 @@ internal fun LegacyAccountScreen(
                             isCacheSizeLoading = state.isCacheSizeLoading,
                             hasCrashLog = state.hasCrashLog,
                             onOpenUpdate = onOpenSettingsUpdate,
+                            onOpenDownloads = onOpenDownloadSettings,
                             onOpenCache = onOpenSettingsCache,
                             onOpenLogs = onOpenSettingsLogs,
                             onOpenAbout = onOpenSettingsAbout
@@ -523,6 +525,7 @@ internal fun LegacyAccountScreen(
                                         isCacheSizeLoading = state.isCacheSizeLoading,
                                         hasCrashLog = state.hasCrashLog,
                                         onOpenUpdate = onOpenSettingsUpdate,
+                                        onOpenDownloads = onOpenDownloadSettings,
                                         onOpenCache = onOpenSettingsCache,
                                         onOpenLogs = onOpenSettingsLogs,
                                         onOpenAbout = onOpenSettingsAbout
@@ -898,7 +901,7 @@ internal fun CacheSettingsSection(
     }
 
     AccountToolSection(
-        title = "缓存设置",
+        title = "缓存管理",
         description = "管理内容缓存和图片缓存"
     ) {
         Card(

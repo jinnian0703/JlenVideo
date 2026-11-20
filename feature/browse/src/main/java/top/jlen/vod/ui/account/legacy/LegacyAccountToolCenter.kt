@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Cached
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Groups
@@ -86,6 +87,7 @@ fun AccountSettingsHomePane(
     isCacheSizeLoading: Boolean,
     hasCrashLog: Boolean,
     onOpenUpdate: () -> Unit,
+    onOpenDownloads: () -> Unit,
     onOpenCache: () -> Unit,
     onOpenLogs: () -> Unit,
     onOpenAbout: () -> Unit
@@ -111,12 +113,19 @@ fun AccountSettingsHomePane(
             onClick = onOpenUpdate
         )
         AccountSettingsEntryCard(
-            title = "缓存设置",
-            description = "保存时间：${cacheRetention.label} / 上限：${cacheSizeLimit.label}",
+            title = "下载设置",
+            description = "移动网络下载与并行下载数",
+            meta = "可同时下载 1–5 个任务",
+            icon = Icons.Rounded.Download,
+            onClick = onOpenDownloads
+        )
+        AccountSettingsEntryCard(
+            title = "存储管理",
+            description = "查看手机容量、管理下载和缓存",
             meta = when {
                 isCacheSizeLoading -> "总缓存：统计中..."
                 !cacheSizeSummary.isAvailable -> "总缓存：无法统计"
-                else -> "总缓存：${formatCacheSize(cacheSizeSummary.totalBytes)}"
+                else -> "缓存 ${formatCacheSize(cacheSizeSummary.totalBytes)} / 上限 ${cacheSizeLimit.label} · ${cacheRetention.label}"
             },
             icon = Icons.Rounded.Cached,
             onClick = onOpenCache
@@ -359,13 +368,15 @@ fun AccountCacheSettingsScreen(
     onRefreshCacheSize: () -> Unit,
     onSetCacheRetention: (CacheRetentionOption) -> Unit,
     onSetCacheSizeLimit: (CacheSizeLimitOption) -> Unit,
-    onClearAppCache: () -> Unit
+    onClearAppCache: () -> Unit,
+    storageOverview: @Composable () -> Unit
 ) {
     AccountSettingsScaffold(
-        title = "缓存设置",
-        subtitle = "管理内容缓存和图片缓存",
+        title = "存储管理",
+        subtitle = "查看手机容量，管理离线影片和缓存",
         onBack = onBack
     ) {
+        item { storageOverview() }
         item {
             CacheSettingsSection(
                 retention = cacheRetention,

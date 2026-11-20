@@ -38,7 +38,7 @@ class OfflinePlayerActivity : Activity() {
         val library = OfflineLibrary.get(this)
         val item = library.entries.value.firstOrNull { it.id == intent.getStringExtra("id") && it.stage == Stage.DONE }
         if(item == null) { fail("该下载已被删除"); return }
-        row = item; video = File(File(library.root,row.id),row.file)
+        row = item; video = File(library.episodeDir(row),row.file)
         if (!video.isFile) { fail("离线文件不存在，请删除后重新下载"); return }
         title = "${row.title} · ${row.episode}"
         view = PlayerView(this)
