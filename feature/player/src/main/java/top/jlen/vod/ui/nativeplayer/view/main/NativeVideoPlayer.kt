@@ -1147,12 +1147,13 @@ fun NativeVideoPlayer(
                 )
             }
 
-            if (!localFilesOnly) CastPlaybackButton(
+            CastPlaybackButton(
                 url = url,
                 title = title,
                 subtitle = listOf(sourceName, episodeName).filter(String::isNotBlank).joinToString(" · "),
                 positionMs = currentPosition,
                 visible = controlsShown,
+                mirrorOnly = localFilesOnly,
                 onInteraction = { markInteraction() },
                 modifier = Modifier
                     .align(Alignment.TopEnd)

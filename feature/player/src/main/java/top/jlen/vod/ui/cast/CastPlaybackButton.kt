@@ -74,7 +74,8 @@ internal fun CastPlaybackButton(
     positionMs: Long,
     visible: Boolean,
     onInteraction: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    mirrorOnly: Boolean = false
 ) {
     val context = LocalContext.current
     var dialogVisible by remember { mutableStateOf(false) }
@@ -88,6 +89,14 @@ internal fun CastPlaybackButton(
     val wirelessDisplayName = rememberWirelessDisplayName(context)
     val latestPosition by rememberUpdatedState(positionMs.coerceAtLeast(0L))
     val mediaTitle = listOf(title, subtitle).filter(String::isNotBlank).joinToString(" · ")
+
+    fun openWirelessDisplay() {
+        if (launchWirelessDisplaySettings(context)) {
+            dialogVisible = false
+        } else {
+            Toast.makeText(context, "当前系统不支持无线显示器投屏", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     LaunchedEffect(connectedDevice) {
         if (connectedDevice != null) dialogVisible = false
@@ -108,17 +117,17 @@ internal fun CastPlaybackButton(
         IconButton(
             onClick = {
                 onInteraction()
-                dialogVisible = true
+                if (mirrorOnly) openWirelessDisplay() else dialogVisible = true
             },
             modifier = Modifier.fillMaxSize()
         ) {
             Icon(
-                imageVector = if (connectedDevice != null || wirelessDisplayName != null) {
+                imageVector = if ((!mirrorOnly && connectedDevice != null) || wirelessDisplayName != null) {
                     Icons.Rounded.CastConnected
                 } else {
                     Icons.Rounded.Cast
                 },
-                contentDescription = "投屏",
+                contentDescription = if (mirrorOnly) "屏幕镜像投屏" else "投屏",
                 tint = Color.White
             )
         }
@@ -141,13 +150,7 @@ internal fun CastPlaybackButton(
                 dialogVisible = false
                 DlnaCastSession.disconnect()
             },
-            onOpenWirelessDisplay = {
-                if (launchWirelessDisplaySettings(context)) {
-                    dialogVisible = false
-                } else {
-                    Toast.makeText(context, "当前系统不支持无线显示器投屏", Toast.LENGTH_SHORT).show()
-                }
-            }
+            onOpenWirelessDisplay = ::openWirelessDisplay
         )
     }
 }
