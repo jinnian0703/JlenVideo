@@ -1,6 +1,7 @@
 package top.jlen.vod.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -22,10 +23,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 
 private const val EPISODES_PER_PAGE = 30
 
@@ -51,45 +54,58 @@ fun PlayerEpisodePicker(
     val first = page * EPISODES_PER_PAGE
     val end = minOf(first + EPISODES_PER_PAGE, episodes.size)
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(20.dp), color = Color(0xFF1B2028), contentColor = Color.White) {
-            Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("选集", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Rounded.Close, contentDescription = "关闭选集")
-                    }
-                }
-                LazyRow(state = rememberLazyListState(sourceIndex), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(sources.size) { index ->
-                        PickerOption(sources[index].name.ifBlank { "线路 ${index + 1}" }, index == sourceIndex) {
-                            selectedSource = index
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Row(Modifier.fillMaxSize()) {
+            Spacer(Modifier.weight(1f).fillMaxHeight().pointerInput(onDismiss) {
+                detectTapGestures { onDismiss() }
+            })
+            Surface(
+                modifier = Modifier.fillMaxWidth(1f / 3f).fillMaxHeight(),
+                shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp),
+                color = Color(0xFF1B2028),
+                contentColor = Color.White
+            ) {
+                Column(Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("选集", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                        IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Rounded.Close, contentDescription = "关闭选集")
                         }
                     }
-                }
-                if (lastPage > 0) key(sourceIndex) {
-                    LazyRow(state = rememberLazyListState(page), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(lastPage + 1) { index ->
-                            val start = index * EPISODES_PER_PAGE
-                            PickerOption("${start + 1}–${minOf(start + EPISODES_PER_PAGE, episodes.size)}", index == page) {
-                                selectedPage = index
+                    LazyRow(state = rememberLazyListState(sourceIndex), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(sources.size) { index ->
+                            PickerOption(sources[index].name.ifBlank { "线路 ${index + 1}" }, index == sourceIndex) {
+                                selectedSource = index
                             }
                         }
                     }
-                }
-                if (episodes.isEmpty()) {
-                    Text("该线路暂无剧集", modifier = Modifier.padding(vertical = 12.dp))
-                } else key(sourceIndex, page) {
-                    val startIndex = if (playingThisSource && playingEpisode in first until end) playingEpisode - first else 0
-                    LazyVerticalGrid(columns = GridCells.Adaptive(76.dp), state = rememberLazyGridState(startIndex),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(end - first) { offset ->
-                            val index = first + offset
-                            val playing = playingThisSource && index == playingEpisode
-                            PickerOption(episodes[index].ifBlank { "第 ${index + 1} 集" }, playing) {
-                                onDismiss()
-                                if (!playing) onPick(sourceIndex, index)
+                    if (lastPage > 0) key(sourceIndex) {
+                        LazyRow(state = rememberLazyListState(page), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(lastPage + 1) { index ->
+                                val start = index * EPISODES_PER_PAGE
+                                PickerOption("${start + 1}–${minOf(start + EPISODES_PER_PAGE, episodes.size)}", index == page) {
+                                    selectedPage = index
+                                }
+                            }
+                        }
+                    }
+                    if (episodes.isEmpty()) {
+                        Text("该线路暂无剧集", modifier = Modifier.padding(vertical = 12.dp))
+                    } else key(sourceIndex, page) {
+                        val startIndex = if (playingThisSource && playingEpisode in first until end) playingEpisode - first else 0
+                        LazyVerticalGrid(columns = GridCells.Adaptive(76.dp), state = rememberLazyGridState(startIndex),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(end - first) { offset ->
+                                val index = first + offset
+                                val playing = playingThisSource && index == playingEpisode
+                                PickerOption(episodes[index].ifBlank { "第 ${index + 1} 集" }, playing) {
+                                    onDismiss()
+                                    if (!playing) onPick(sourceIndex, index)
+                                }
                             }
                         }
                     }
