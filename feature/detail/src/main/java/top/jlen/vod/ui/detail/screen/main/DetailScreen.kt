@@ -49,6 +49,7 @@ fun DetailScreen(
     onDismissActionMessage: () -> Unit,
     onRetry: () -> Unit,
     onUnlock: suspend (Int, String) -> Unit,
+    checkDownloadSources: suspend (String) -> List<top.jlen.vod.data.PlaySource>,
     onPlay: (String, Int, Int) -> Unit
 ) {
     val isDarkTheme = isSystemInDarkTheme()
@@ -75,7 +76,7 @@ fun DetailScreen(
             val source = state.selectedSource
             val downloadVod = item.vodId.ifBlank { item.siteVodId }.ifBlank { state.requestedVodId.orEmpty() }
             var downloadPrompt by rememberSaveable(downloadVod) { mutableStateOf(DownloadPrompt.Closed) }
-            val needsDownloadPassword = item.downloadPassword == 1 && item.downloadGroups.isNullOrEmpty()
+            val needsDownloadPassword = item.downloadLocked
             when (downloadPrompt) {
                 DownloadPrompt.Password -> ContentUnlockPrompt("下载", onDismiss = { downloadPrompt = DownloadPrompt.Closed },
                     onVerified = { downloadPrompt = DownloadPrompt.Episodes }) { onUnlock(5, it) }
@@ -85,7 +86,7 @@ fun DetailScreen(
                     }
                     DownloadEpisodeDialog(downloadVod, item.displayTitle, item.vodPic.orEmpty(), sources,
                         initialSource = if (item.downloadGroups.isNullOrEmpty()) state.selectedSourceIndex else 0,
-                        loading = state.isLoading, onDismiss = { downloadPrompt = DownloadPrompt.Closed })
+                        loading = state.isLoading, checkSources = checkDownloadSources, onDismiss = { downloadPrompt = DownloadPrompt.Closed })
                 }
                 DownloadPrompt.Closed -> Unit
             }
@@ -159,7 +160,7 @@ fun DetailScreen(
                         }
 
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            if (item.playPassword == 1 && state.sources.none { it.episodes.isNotEmpty() }) {
+                            if (item.playLocked) {
                                 ContentUnlock("播放") { onUnlock(4, it) }
                             }
                             Button(

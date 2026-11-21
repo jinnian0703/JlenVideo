@@ -22,9 +22,13 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshPlayerSources() {
 
     viewModelScope.launch {
         runStateCatching {
-            withContext(Dispatchers.IO) { legacyRepository().loadDetail(vodId, forceRefresh = true) }
+            withContext(Dispatchers.IO) { legacyRepository().loadMediaDetailForApp(vodId) }
         }.onSuccess { detailItem ->
             if (detailItem == null || currentPlayerState().item?.vodId != vodId) {
+                return@onSuccess
+            }
+            if (detailItem.playLocked) {
+                updatePlayerState(failedHistoryPlayerState(detailItem.displayTitle, "请先在影片详情页输入播放密码"))
                 return@onSuccess
             }
 
@@ -48,6 +52,10 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRefreshPlayerSources() {
                 legacyResolveCurrentPlayerUrl()
             } else if (refreshedState.sourcesChanged) {
                 updatePlayerState(playerStateAfterSourceRefresh(currentPlayerState()))
+            }
+        }.onFailure { error ->
+            if (error is top.jlen.vod.data.CmsApiError && error.code == 1012 && currentPlayerState().item?.vodId == vodId) {
+                updatePlayerState(failedHistoryPlayerState(currentItem.displayTitle, "请先在影片详情页输入密码"))
             }
         }
     }

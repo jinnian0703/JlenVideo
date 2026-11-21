@@ -29,10 +29,14 @@ class OfflineManagementTest {
         val playback = listOf(PlaySource("空线路", emptyList()), PlaySource("在线播放", listOf(episode)))
         val dedicated = listOf(CmsSourceGroup("空下载源"), CmsSourceGroup("离线专线", listOf(episode)))
 
-        assertEquals(listOf(PlaySource("离线专线", listOf(episode))), resolveDownloadSources(dedicated, true, playback))
+        assertTrue(resolveDownloadSources(dedicated, true, playback).isEmpty())
+        assertEquals(listOf(PlaySource("离线专线", listOf(episode))), resolveDownloadSources(dedicated, false, playback))
         assertTrue(resolveDownloadSources(emptyList(), true, playback).isEmpty())
         assertTrue(resolveDownloadSources(listOf(CmsSourceGroup("空下载源")), false, playback).isEmpty())
         assertEquals(playback, resolveDownloadSources(emptyList(), false, playback))
+        val fresh = playback.last().copy(episodes = listOf(episode.copy(url = "https://example.org/renewed.mp4")))
+        assertEquals(fresh, checkedDownloadSource(listOf(fresh), 0, playback.last(), setOf(0)))
+        assertTrue(runCatching { checkedDownloadSource(emptyList(), 0, playback.last(), setOf(0)) }.isFailure)
     }
 
     @Test fun albumStatusCombinesOnlyActiveSpeedsAndExplainsBlockedTransfers() {

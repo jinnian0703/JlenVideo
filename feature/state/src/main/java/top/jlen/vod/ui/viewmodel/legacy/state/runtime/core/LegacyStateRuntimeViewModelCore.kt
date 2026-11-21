@@ -52,7 +52,21 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
     }
 
     suspend fun unlockContent(vodId: String, type: Int, password: String) = withContext(Dispatchers.IO) {
-        repository.appApi.unlock(vodId, type, password)
+        repository.appApi.unlock(repository.mediaVodId(vodId), type, password)
+    }
+
+    suspend fun currentDownloadSources(vodId: String) = withContext(Dispatchers.IO) {
+        val item = repository.loadMediaDetailForApp(vodId) ?: throw java.io.IOException("未找到影片，请重新打开详情页")
+        if (item.downloadLocked) throw java.io.IOException("下载需要密码，请重新打开影片并输入下载密码")
+        top.jlen.vod.offline.resolveDownloadSources(item.downloadGroups.orEmpty(), item.downloadLocked, repository.parseSources(item))
+    }
+
+    suspend fun unlockPlayerDownload(vodId: String, password: String) {
+        unlockContent(vodId, 5, password)
+        val fresh = withContext(Dispatchers.IO) { repository.loadMediaDetailForApp(vodId) }
+        check(fresh != null && !fresh.downloadLocked) { "未能确认下载权限，请重试" }
+        val state = currentPlayerState()
+        if (state.item?.vodId == fresh.vodId) updatePlayerState(state.copy(item = fresh))
     }
 
     internal var cloudProgressKey = ""
@@ -480,13 +494,11 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
 
     fun openHistoryRecord(item: UserCenterItem) = legacyOpenHistoryRecord(item)
 
-    fun resumeHistoryRecord(item: UserCenterItem) = legacyResumeHistoryRecord(item)
-
-    private fun openHistoryRecordDirectly(item: UserCenterItem) = legacyOpenHistoryRecordDirectly(item)
+    fun resumeHistoryRecord(item: UserCenterItem) = legacyOpenHistoryRecord(item)
 
     fun loadDetail(vodId: String) = legacyLoadDetail(vodId)
 
-    fun reloadUnlockedDetail(vodId: String) = legacyLoadDetail(vodId, forceRefresh = true)
+    fun reloadUnlockedDetail(vodId: String) = legacyLoadDetail(vodId, afterUnlock = true)
 
     fun consumePendingDetailResume() {
         updateDetailState(detailStateWithoutPendingResume(currentDetailState()))

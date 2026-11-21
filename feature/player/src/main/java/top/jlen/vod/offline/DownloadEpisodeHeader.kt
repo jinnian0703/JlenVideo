@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import top.jlen.vod.data.PlaySource
 import top.jlen.vod.AppConfig
 import top.jlen.vod.data.CmsSourceGroup
@@ -33,7 +35,8 @@ import top.jlen.vod.ui.SingleChoiceChip
 import top.jlen.vod.ui.UiPalette
 
 fun resolveDownloadSources(groups: List<CmsSourceGroup>, passwordRequired: Boolean, playback: List<PlaySource>): List<PlaySource> {
-    if (groups.isEmpty()) return if (passwordRequired) emptyList() else playback
+    if (passwordRequired) return emptyList()
+    if (groups.isEmpty()) return playback
     return groups.toSources { raw ->
         runCatching { java.net.URI(AppConfig.appleCmsBaseUrl).resolve(raw).toString() }.getOrDefault(raw)
     }.filter { it.episodes.isNotEmpty() }
@@ -41,7 +44,7 @@ fun resolveDownloadSources(groups: List<CmsSourceGroup>, passwordRequired: Boole
 
 @Composable
 fun CmsDownloadHeader(vod: String, title: String, poster: String, groups: List<CmsSourceGroup>, current: Int,
-                      picking: Boolean, onPickingChange: (Boolean) -> Unit) {
+                      picking: Boolean, onPickingChange: (Boolean) -> Unit, checkSources: suspend (String) -> List<PlaySource>) {
     val sources = remember(groups) { resolveDownloadSources(groups, false, emptyList()) }
     if (sources.isEmpty()) {
         Text("切换选集", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleMedium)
@@ -51,7 +54,7 @@ fun CmsDownloadHeader(vod: String, title: String, poster: String, groups: List<C
     val index = selectedSource.coerceIn(sources.indices)
     val source = sources[index]
     DownloadEpisodeHeader(vod, title, poster, index, source, current.coerceIn(source.episodes.indices),
-        episodeDownloadLabels(vod, index, source.name), picking, onPickingChange) {
+        episodeDownloadLabels(vod, index, source.name), picking, onPickingChange, checkSources) {
         if (sources.size > 1) LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             items(sources.size) { i ->
                 SingleChoiceChip(sources[i].name, i == index) { selectedSource = i }
@@ -73,7 +76,7 @@ fun episodeDownloadLabels(vod: String, si: Int, source: String): Map<Int, String
 
 @Composable
 fun DownloadEpisodeHeader(vod: String, title: String, poster: String, si: Int, source: PlaySource, current: Int, labels: Map<Int, String>,
-                          picking: Boolean, onPickingChange: (Boolean) -> Unit, sourcePicker: @Composable () -> Unit = {}) {
+                          picking: Boolean, onPickingChange: (Boolean) -> Unit, checkSources: suspend (String) -> List<PlaySource>, sourcePicker: @Composable () -> Unit = {}) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(if (picking) "下载选集" else "切换选集", Modifier.weight(1f), color = UiPalette.Ink,
             style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -96,7 +99,8 @@ fun DownloadEpisodeHeader(vod: String, title: String, poster: String, si: Int, s
         DownloadEpisodeSelection(si, source, current, labels, selection, { picked = it }, Modifier.padding(12.dp),
             inDialog = false, sourcePicker = sourcePicker) {
             AddEpisodesButton(selection.size, available.isEmpty()) {
-                OfflineLibrary.get(context).addEpisodes(vod, title, poster, si, source, selection)
+                val fresh = checkedDownloadSource(checkSources(vod), si, source, selection)
+                OfflineLibrary.get(context).addEpisodes(vod, title, poster, si, fresh, selection)
                 onPickingChange(false)
                 Toast.makeText(context, "已加入下载管理", Toast.LENGTH_SHORT).show()
             }
@@ -106,7 +110,7 @@ fun DownloadEpisodeHeader(vod: String, title: String, poster: String, si: Int, s
 
 @Composable
 fun DownloadEpisodeDialog(vod: String, title: String, poster: String, sources: List<PlaySource>, initialSource: Int,
-                          loading: Boolean, onDismiss: () -> Unit) {
+                          loading: Boolean, checkSources: suspend (String) -> List<PlaySource>, onDismiss: () -> Unit) {
     val indices = remember(sources) { sources.indices.filter { sources[it].episodes.isNotEmpty() } }
     var selected by rememberSaveable(vod) { mutableIntStateOf(initialSource) }
     val index = selected.takeIf { it in indices } ?: indices.firstOrNull()
@@ -148,8 +152,11 @@ fun DownloadEpisodeDialog(vod: String, title: String, poster: String, sources: L
                         }
                     }) {
                         AddEpisodesButton(selectedEpisodes.values.sumOf { it.size }, labels[index].orEmpty().size == source.episodes.size) {
-                            selectedEpisodes.filterValues { it.isNotEmpty() }.forEach { (line, episodes) ->
-                                lib.addEpisodes(vod, title, poster, line, sources[line], episodes)
+                            val fresh = checkSources(vod)
+                            val selected = selectedEpisodes.filterValues { it.isNotEmpty() }
+                            val checked = selected.mapValues { (line, episodes) -> checkedDownloadSource(fresh, line, sources[line], episodes) }
+                            selected.forEach { (line, episodes) ->
+                                lib.addEpisodes(vod, title, poster, line, checked.getValue(line), episodes)
                             }
                             onDismiss()
                             Toast.makeText(context, "已加入下载管理", Toast.LENGTH_SHORT).show()
@@ -167,12 +174,33 @@ private fun OfflineLibrary.addEpisodes(vod: String, title: String, poster: Strin
 }
 
 @Composable
-private fun AddEpisodesButton(count: Int, lineAlreadyAdded: Boolean, onAdd: () -> Unit) {
-    Button(modifier = Modifier.fillMaxWidth(), enabled = count > 0, onClick = onAdd,
+private fun AddEpisodesButton(count: Int, lineAlreadyAdded: Boolean, onAdd: suspend () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var checking by remember { mutableStateOf(false) }
+    Button(modifier = Modifier.fillMaxWidth(), enabled = count > 0 && !checking, onClick = {
+        if (!checking) {
+            checking = true
+            scope.launch {
+                try { onAdd() }
+                catch (cancel: CancellationException) { throw cancel }
+                catch (error: Exception) { Toast.makeText(context, error.message ?: "未能确认下载权限，请重试", Toast.LENGTH_LONG).show() }
+                finally { checking = false }
+            }
+        }
+    },
         colors = ButtonDefaults.buttonColors(containerColor = UiPalette.Ink, contentColor = UiPalette.Surface)) {
         Text(if (count == 0 && lineAlreadyAdded) "本线路剧集均已加入下载" else "加入下载（$count 集）")
     }
 }
+
+internal fun checkedDownloadSource(fresh: List<PlaySource>, index: Int, displayed: PlaySource, selected: Set<Int>): PlaySource =
+    fresh.getOrNull(index)?.takeIf { source ->
+        source.name == displayed.name && selected.all { i ->
+            val episode = source.episodes.getOrNull(i)
+            episode != null && episode.url.isNotBlank() && episode.name == displayed.episodes.getOrNull(i)?.name
+        }
+    } ?: throw java.io.IOException("下载线路或选集已变化，请重新打开影片选择")
 
 @Composable
 private fun DownloadEpisodeSelection(si: Int, source: PlaySource, current: Int, labels: Map<Int, String>,

@@ -153,4 +153,41 @@ class CmsAppApiTest {
         assertTrue(item.downloadGroups!!.isEmpty())
         assertTrue(item.passwordProtected)
     }
+
+    @Test fun passwordsGrantOnlyTheirOwnActionForTheCurrentSession() = runBlocking {
+        val granted = mutableSetOf<String>()
+        val client = api { request -> when (request.url.encodedPath.substringAfter("api.php/")) {
+            "app/bootstrap" -> """{"code":1,"data":{"access":{"public_api_enabled":1}}}"""
+            "vod/verify_pwd" -> {
+                val form = request.body as FormBody
+                val fields = (0 until form.size).associate { form.name(it) to form.value(it) }
+                assertEquals("42", fields["id"])
+                if (fields["pwd"] == "pwd-${fields["type"]}") {
+                    granted += fields.getValue("type")
+                    """{"code":1}"""
+                } else """{"code":1012,"msg":"密码错误"}"""
+            }
+            "vod/get_play_info", "vod/get_down_info" -> {
+                assertEquals("42", request.url.queryParameter("id"))
+                val type = if (request.url.encodedPath.endsWith("get_play_info")) "4" else "5"
+                if (type in granted) """{"code":1,"info":{"vod_id":42}}""" else """{"code":1012}"""
+            }
+            else -> error("Unexpected request")
+        } }
+        val group = CmsSourceGroup("专线", listOf(Episode("正片", "https://example.test/1.mp4")))
+        val item = VodItem(vodId = "42", playPassword = 1, downloadPassword = 1, playGroups = listOf(group), downloadGroups = emptyList())
+        val locked = client.checkMediaAccess(item)
+        assertTrue(locked.playLocked)
+        assertTrue(locked.playGroups.orEmpty().isEmpty())
+        assertTrue(runCatching { client.unlock("42", 5, "wrong") }.exceptionOrNull() is CmsApiError)
+        client.unlock("42", 4, "pwd-4")
+        val playing = client.checkMediaAccess(item)
+        assertFalse(playing.playLocked)
+        assertEquals(listOf(group), playing.playGroups)
+        assertTrue(playing.downloadLocked)
+        client.unlock("42", 5, "pwd-5")
+        assertFalse(client.checkMediaAccess(item).downloadLocked)
+        granted.clear()
+        assertTrue(client.checkMediaAccess(playing).playLocked)
+    }
 }

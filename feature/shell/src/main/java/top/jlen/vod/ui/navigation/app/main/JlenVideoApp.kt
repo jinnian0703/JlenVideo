@@ -110,8 +110,6 @@ import java.nio.charset.StandardCharsets
 import top.jlen.vod.RuntimeEndpoints
 import top.jlen.vod.data.AppUpdateInfo
 import top.jlen.vod.data.VodItem
-import top.jlen.vod.data.PlaySource
-import top.jlen.vod.data.Episode
 
 private const val ONBOARDING_PREFS = "jlen_video_onboarding"
 private const val KEY_ACCEPTED_USER_AGREEMENT = "accepted_user_agreement"
@@ -668,7 +666,7 @@ fun JlenVideoApp() {
                                         onSelectSection = viewModel::selectAccountSection,
                                         onChangePortrait = { portraitPicker.launch("image/*") },
                                         onOpenHistoryRecord = { item ->
-                                            // 记录本身也写入路由，详情失效或没有 vodId 时仍可恢复直达播放。
+                                            // 用旧地址匹配当前获准访问的选集。
                                             navController.navigate(
                                                 playerRoute(
                                                     vodId = resolveHistoryVodId(item),
@@ -889,32 +887,18 @@ fun JlenVideoApp() {
                                         },
                                         onDismissActionMessage = viewModel::dismissDetailActionMessage,
                                         onRetry = { viewModel.loadDetail(vodId) },
+                                        checkDownloadSources = viewModel::currentDownloadSources,
                                         onUnlock = { type, password ->
                                             viewModel.unlockContent(vodId, type, password)
-                                            viewModel.reloadUnlockedDetail(vodId)
-                                        },
-                                        onPlay = { title, sourceIndex, episodeIndex ->
-                                            val pendingResume = routeDetailState.pendingResumePlayback
-                                            val resumeSnapshot = if (
-                                                pendingResume != null &&
-                                                pendingResume.sourceIndex == sourceIndex &&
-                                                pendingResume.episodeIndex == episodeIndex
-                                            ) {
-                                                PlaybackSnapshot(
-                                                    positionMs = pendingResume.positionMs,
-                                                    speed = pendingResume.speed
-                                                )
-                                            } else {
-                                                PlaybackSnapshot()
+                                            viewModel.reloadUnlockedDetail(vodId).join()
+                                            val refreshed = viewModel.detailState
+                                            check(refreshed.matchesDetailRoute(vodId) && refreshed.item != null &&
+                                                !(type == 4 && refreshed.item?.playLocked == true) &&
+                                                !(type == 5 && refreshed.item?.downloadLocked == true)) {
+                                                refreshed.error ?: "未能确认解锁状态，请重试"
                                             }
-                                            viewModel.openPlayer(
-                                                title = title,
-                                                item = routeDetailState.item,
-                                                sources = routeDetailState.sources,
-                                                sourceIndex = sourceIndex,
-                                                episodeIndex = episodeIndex,
-                                                snapshot = resumeSnapshot
-                                            )
+                                        },
+                                        onPlay = { _, sourceIndex, episodeIndex ->
                                             openPlayerRoute(vodId, sourceIndex, episodeIndex)
                                         }
                                     )
@@ -959,7 +943,10 @@ fun JlenVideoApp() {
                                         viewModel = viewModel,
                                         features = viewingFeatures,
                                         onUnlockFilm = { id ->
-                                            navController.navigate(detailRoute(id)) { popUpTo(entry.destination.id) { inclusive = true } }
+                                            navController.navigate(detailRoute(id)) {
+                                                popUpTo(entry.destination.id) { inclusive = true }
+                                                launchSingleTop = true
+                                            }
                                         },
                                         onLogin = {
                                             viewModel.setAccountAuthMode(AccountAuthMode.Login)
@@ -1241,32 +1228,17 @@ private fun PlayerRouteScreen(
             ?: entry.arguments?.getInt("episodeIndex") ?: -1
         val resumeUrl = entry.savedStateHandle.get<String>("player_episode_url")
             ?: entry.arguments?.getString("resumeUrl").orEmpty()
-        val current = viewModel.playerState
         val followSource = entry.arguments?.getString("followSource")?.takeUnless {
             entry.savedStateHandle.contains("player_episode")
         }
-        val matchesItem = if (vodId.isNotBlank()) {
-            current.item?.matchesDetailRoute(vodId) == true
-        } else {
-            resumeUrl.isNotBlank() && current.episodePageUrl == resumeUrl
-        }
-        if (
-            followSource == null && matchesItem && current.currentEpisode != null &&
-            (sourceIndex < 0 || current.selectedSourceIndex == sourceIndex) &&
-            (episodeIndex < 0 || current.selectedEpisodeIndex == episodeIndex)
-        ) {
-            ready = true
-            return@LaunchedEffect
-        }
-
         var detail: DetailUiState? = null
         if (vodId.isNotBlank()) {
             // 请求完成后再开播；离开路由时取消本次请求，不让后台恢复覆盖后来打开的影片。
             val loadJob = viewModel.loadDetail(vodId)
             try {
-                loadJob?.join()
+                loadJob.join()
             } finally {
-                if (!currentCoroutineContext().isActive) loadJob?.cancel()
+                if (!currentCoroutineContext().isActive) loadJob.cancel()
             }
             detail = viewModel.detailState.takeIf {
                 it.matchesDetailRoute(vodId)
@@ -1274,12 +1246,8 @@ private fun PlayerRouteScreen(
         }
         val item = detail?.item
         val sources = detail?.sources.orEmpty()
-        if (detail?.detailLocked == true || (item?.playPassword == 1 && sources.isEmpty())) {
-            if (followSource != null) {
-                onUnlockFilm(vodId)
-                return@LaunchedEffect
-            }
-            loadError = "请先在影片详情页输入密码后播放"
+        if (detail?.detailLocked == true || item?.playLocked == true) {
+            onUnlockFilm(vodId)
             return@LaunchedEffect
         }
         if (item != null && sources.isNotEmpty()) {
@@ -1307,15 +1275,6 @@ private fun PlayerRouteScreen(
                 PlaybackSnapshot()
             }
             viewModel.openPlayer(item.displayTitle, item, sources, selectedSource, selectedEpisode, snapshot)
-        } else if (resumeUrl.isNotBlank()) {
-            // 保留原有历史记录的直达兜底，参数随导航栈保存，进程重建后同样有效。
-            viewModel.openPlayer(
-                title = historyTitle.ifBlank { "继续观看" },
-                item = null,
-                sources = listOf(PlaySource("继续观看", listOf(Episode("继续观看", resumeUrl)))),
-                sourceIndex = 0,
-                episodeIndex = 0
-            )
         } else {
             loadError = detail?.error ?: if (item != null) "暂无可播放的线路" else "未找到影片详情，请重试"
             return@LaunchedEffect
@@ -1324,9 +1283,6 @@ private fun PlayerRouteScreen(
     }
 
     val state = viewModel.playerState
-    LaunchedEffect(ready, state.item?.vodId) {
-        if (ready) viewModel.refreshPlayerSources()
-    }
     LaunchedEffect(ready, state.selectedSourceIndex, state.selectedEpisodeIndex, state.episodePageUrl) {
         if (ready) {
             // 包含切集、切源和全屏返回后的选择；重建时优先恢复最新选择而非入口的旧选集。
@@ -1366,9 +1322,9 @@ private fun PlayerRouteScreen(
         onSelectSource = viewModel::selectPlayerSource,
         onPickEpisode = viewModel::pickPlayerEpisode,
         onRefreshSources = viewModel::refreshPlayerSources,
+        checkDownloadSources = viewModel::currentDownloadSources,
         onUnlockDownload = { password ->
-            viewModel.unlockContent(state.item?.vodId ?: vodId, 5, password)
-            viewModel.refreshPlayerSources()
+            viewModel.unlockPlayerDownload(state.item?.vodId ?: vodId, password)
         },
         onPlayNext = viewModel::playNextEpisode,
         onPlaybackSnapshotChange = { snapshot ->

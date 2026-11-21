@@ -112,6 +112,7 @@ fun PlayerScreen(
     onPickEpisode: (Int, Int) -> Unit,
     onRefreshSources: () -> Unit,
     onUnlockDownload: suspend (String) -> Unit,
+    checkDownloadSources: suspend (String) -> List<top.jlen.vod.data.PlaySource>,
     onPlayNext: () -> Unit,
     onPlaybackSnapshotChange: (PlaybackSnapshot) -> Unit,
     onDetectedStream: (String) -> Unit,
@@ -509,14 +510,14 @@ fun PlayerScreen(
 
                 if (state.episodes.isNotEmpty()) {
                     item(key = "episode_title") {
-                        if (state.item?.downloadPassword == 1 && state.item?.downloadGroups.isNullOrEmpty()) {
+                        if (state.item?.downloadLocked == true) {
                             ContentUnlock("下载", inline = true, verify = onUnlockDownload)
                         } else if (!state.item?.downloadGroups.isNullOrEmpty()) {
                             top.jlen.vod.offline.CmsDownloadHeader(downloadVod, state.title, state.item?.vodPic.orEmpty(),
-                                state.item?.downloadGroups.orEmpty(), state.selectedEpisodeIndex, pickingDownloads, { pickingDownloads = it })
+                                state.item?.downloadGroups.orEmpty(), state.selectedEpisodeIndex, pickingDownloads, { pickingDownloads = it }, checkDownloadSources)
                         } else if (source != null && downloadVod.isNotBlank()) {
                             top.jlen.vod.offline.DownloadEpisodeHeader(downloadVod, state.title, state.item?.vodPic.orEmpty(), state.selectedSourceIndex,
-                                source, state.selectedEpisodeIndex, downloadLabels, pickingDownloads, { pickingDownloads = it })
+                                source, state.selectedEpisodeIndex, downloadLabels, pickingDownloads, { pickingDownloads = it }, checkDownloadSources)
                         } else SectionTitle(title = "切换选集", action = null, onAction = {})
                     }
                     if (!pickingDownloads) item(key = "episode_panel") {

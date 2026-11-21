@@ -76,6 +76,25 @@ class CmsAppApi internal constructor(client: OkHttpClient, base: String) {
         catch (error: CmsApiError) { if (error.code != 1002) throw error }
     }
 
+    internal suspend fun checkMediaAccess(item: VodItem): VodItem {
+        if (item.playPassword != 1 && item.downloadPassword != 1) return item
+        suspend fun granted(path: String): Boolean = try {
+            request(path, mapOf("id" to item.vodId)).firstObject("info")?.firstString("vod_id") == item.vodId
+        } catch (_: IOException) {
+            // An unavailable permission endpoint cannot grant access or block the other action.
+            false
+        }
+        val playAllowed = item.playPassword != 1 || granted("vod/get_play_info")
+        val downloadAllowed = item.downloadPassword != 1 || granted("vod/get_down_info")
+        return item.copy(
+            playSessionVerified = playAllowed,
+            downloadSessionVerified = downloadAllowed,
+            playGroups = if (playAllowed) item.playGroups else emptyList(),
+            vodPlayUrl = item.vodPlayUrl.takeIf { playAllowed },
+            downloadGroups = if (downloadAllowed) item.downloadGroups else emptyList()
+        )
+    }
+
     suspend fun favorite(vod: String): Boolean? {
         if (config().firstObject("access")?.firstInt("public_api_enabled") != 1) return null
         return request("user/get_favorites_status", mapOf("vod_ids" to vod, "mid" to "1", "ulog_type" to "2"))

@@ -114,14 +114,14 @@ internal fun LegacyStateRuntimeViewModelCore.legacyDismissDetailActionMessage() 
 internal fun LegacyStateRuntimeViewModelCore.legacyOpenHistoryRecord(item: UserCenterItem) {
     val resolvedVodId = resolveHistoryVodId(item)
     if (resolvedVodId.isBlank()) {
-        legacyOpenHistoryRecordDirectly(item)
+        updatePlayerState(failedHistoryPlayerState(item.title, "无法确认影片编号，请从片库重新打开"))
         return
     }
 
     updatePlayerState(resolvingHistoryPlayerState(item.title))
     viewModelScope.launch {
         runStateCatching {
-            withContext(Dispatchers.IO) { legacyRepository().loadDetail(resolvedVodId) }
+            withContext(Dispatchers.IO) { legacyRepository().loadMediaDetailForApp(resolvedVodId) }
         }.onSuccess { detailItem ->
             if (detailItem == null) {
                 updatePlayerState(
@@ -148,34 +148,8 @@ internal fun LegacyStateRuntimeViewModelCore.legacyOpenHistoryRecord(item: UserC
     }
 }
 
-internal fun LegacyStateRuntimeViewModelCore.legacyResumeHistoryRecord(item: UserCenterItem) {
-    val resolvedVodId = resolveHistoryVodId(item)
-    if (resolvedVodId.isBlank()) {
-        legacyOpenHistoryRecordDirectly(item)
-        return
-    }
-
-    updatePlayerState(resolvingHistoryPlayerState(item.title))
-    viewModelScope.launch {
-        runStateCatching {
-            withContext(Dispatchers.IO) { legacyRepository().loadDetail(resolvedVodId) }
-        }.onSuccess { detailItem ->
-            if (detailItem == null) {
-                legacyOpenHistoryRecordDirectly(item)
-                return@onSuccess
-            }
-
-            val sources = legacyRepository().parseSources(detailItem)
-            openHistoryWithProgress(item, detailItem, sources)
-        }.onFailure { error ->
-            if (error is top.jlen.vod.data.CmsApiError) updatePlayerState(failedHistoryPlayerState(item.title, "请先在影片详情页解锁"))
-            else legacyOpenHistoryRecordDirectly(item)
-        }
-    }
-}
-
 private suspend fun LegacyStateRuntimeViewModelCore.openHistoryWithProgress(item: UserCenterItem, detail: VodItem, sources: List<top.jlen.vod.data.PlaySource>) {
-    if (detail.playPassword == 1 && sources.isEmpty()) {
+    if (detail.playLocked) {
         updatePlayerState(failedHistoryPlayerState(item.title, "请先在影片详情页输入播放密码"))
         return
     }
@@ -190,74 +164,18 @@ private suspend fun LegacyStateRuntimeViewModelCore.openHistoryWithProgress(item
         latest?.episodeIndex ?: selected.episodeIndex, PlaybackSnapshot(positionMs = latest?.positionMs ?: 0L, speed = latest?.speed ?: 1f))
 }
 
-internal fun LegacyStateRuntimeViewModelCore.legacyOpenHistoryRecordDirectly(item: UserCenterItem) {
-    val resumeUrl = item.playUrl.ifBlank { item.actionUrl }
-    if (resumeUrl.isBlank()) {
-        updatePlayerState(failedHistoryPlayerState(item.title, "无法恢复该条播放记录"))
-        return
-    }
-
-    legacyOpenPlayer(
-        title = item.title,
-        item = null,
-        sources = buildHistoryFallbackSources(item, resumeUrl),
-        sourceIndex = 0,
-        episodeIndex = 0
-    )
-}
-
-internal fun LegacyStateRuntimeViewModelCore.legacyLoadDetail(vodId: String, forceRefresh: Boolean = false): Job? {
-    // 连续进入不同详情时取消旧请求，避免旧请求回写到后来打开的同名路由。
+internal fun LegacyStateRuntimeViewModelCore.legacyLoadDetail(vodId: String, afterUnlock: Boolean = false): Job {
     currentDetailLoadJob()?.cancel()
-    val currentState = currentDetailState()
-    val currentItem = currentState.item
-    if (!forceRefresh && currentItem != null && !currentItem.passwordProtected && currentItem.matchesDetailRoute(vodId) && currentState.sources.isNotEmpty()) {
-        val resumeBucket = resolvePlaybackResumeBucket(currentItem, vodId)
-        val resumeRecord = resolvePlaybackResumeRecordForSources(resumeBucket, currentState.sources)
-        updateDetailState(
-            detailStateWithResumeBucket(currentState, resumeBucket, resumeRecord)
-                .copy(requestedVodId = vodId, isLoading = false, error = null)
-        )
-        return viewModelScope.launch { syncDetailAccount(vodId, currentItem, currentState.sources) }.also(::replaceDetailLoadJob)
-    }
-
+    val state = currentDetailState()
+    updateDetailState(beginDetailLoad(state, afterUnlock && state.matchesDetailRoute(vodId), vodId))
     return viewModelScope.launch {
-        val existingState = currentDetailState()
-        val currentRouteItem = existingState.item?.takeIf { it.matchesDetailRoute(vodId) }
-        val cachedItem = currentRouteItem ?: legacyRepository().peekDetailForApp(vodId)
-        val keepCurrentContent = cachedItem != null
-        if (cachedItem != null && currentRouteItem == null) {
-            val cachedSources = legacyRepository().parseSources(cachedItem)
-            val resumeBucket = resolvePlaybackResumeBucket(cachedItem, vodId)
-            val resumeRecord = resolvePlaybackResumeRecordForSources(resumeBucket, cachedSources)
-            updateDetailState(
-                loadedDetailState(
-                    item = cachedItem,
-                    sources = cachedSources,
-                    isFavorited = currentAccountState().favoriteItems.any { favorite -> favorite.vodId == cachedItem.vodId },
-                    selectedSourceIndex = resumeRecord?.sourceIndex?.coerceIn(0, (cachedSources.lastIndex).coerceAtLeast(0)) ?: 0,
-                    playbackResumeBucket = resumeBucket,
-                    pendingResumePlayback = resumeRecord,
-                    requestedVodId = vodId
-                ).copy(isLoading = true)
-            )
-        } else {
-            updateDetailState(
-                beginDetailLoad(existingState, keepCurrentContent && currentRouteItem != null, vodId)
-            )
-        }
         runStateCatching {
-            withContext(Dispatchers.IO) { legacyRepository().loadDetail(vodId, forceRefresh) }
+            withContext(Dispatchers.IO) { legacyRepository().loadMediaDetailForApp(vodId) }
         }.onSuccess { item ->
             // 期间已切换到其他详情页时丢弃旧结果，避免覆盖新页面
             if (currentDetailState().requestedVodId != vodId) return@onSuccess
             if (item == null) {
-                val fallbackState = currentDetailState()
-                if (fallbackState.item?.matchesDetailRoute(vodId) == true) {
-                    updateDetailState(fallbackState.copy(isLoading = false, error = null))
-                } else {
-                    updateDetailState(missingDetailState(vodId))
-                }
+                updateDetailState(missingDetailState(vodId))
             } else {
                 val sources = legacyRepository().parseSources(item)
                 val resumeBucket = resolvePlaybackResumeBucket(item, vodId)
@@ -286,14 +204,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyLoadDetail(vodId: String, for
                 updateDetailState(DetailUiState(requestedVodId = vodId, detailLocked = true))
                 return@onFailure
             }
-            val fallbackState = currentDetailState()
-            if (fallbackState.item?.matchesDetailRoute(vodId) == true) {
-                updateDetailState(fallbackState.copy(isLoading = false, error = null))
-            } else {
-                updateDetailState(
-                    detailStateWithLoadError(toUserFacingMessage(error, "详情加载失败"), vodId)
-                )
-            }
+            updateDetailState(detailStateWithLoadError(toUserFacingMessage(error, "详情加载失败"), vodId))
         }
     }.also(::replaceDetailLoadJob)
 }

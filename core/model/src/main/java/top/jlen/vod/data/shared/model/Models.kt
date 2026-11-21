@@ -142,9 +142,13 @@ data class VodItem(
     @SerializedName("download_sources") val downloadGroups: List<CmsSourceGroup>? = null,
     @SerializedName("vod_pwd") val detailPassword: Int = 0,
     @SerializedName("vod_pwd_play") val playPassword: Int = 0,
-    @SerializedName("vod_pwd_down") val downloadPassword: Int = 0
+    @SerializedName("vod_pwd_down") val downloadPassword: Int = 0,
+    @Transient val playSessionVerified: Boolean = false,
+    @Transient val downloadSessionVerified: Boolean = false
 ) {
     val passwordProtected: Boolean get() = detailPassword == 1 || playPassword == 1 || downloadPassword == 1
+    val playLocked: Boolean get() = playPassword == 1 && !playSessionVerified
+    val downloadLocked: Boolean get() = downloadPassword == 1 && !downloadSessionVerified
 
     val displayTitle: String
         get() = vodName.ifBlank { "未命名影片" }
