@@ -32,32 +32,9 @@ internal suspend fun <T> viewingRequest(action: suspend () -> T): Result<T> = tr
     Result.success(action())
 } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
 
-@Composable
-internal fun MessageComposer(title: String, maxLength: Int, onDismiss: () -> Unit,
-                             onSend: suspend (String) -> Unit) {
-    var text by rememberSaveable { mutableStateOf("") }
-    var error by remember { mutableStateOf<String?>(null) }
-    var sending by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    AlertDialog(onDismissRequest = { if (!sending) onDismiss() }, title = { Text(title) }, text = {
-        Column {
-            OutlinedTextField(text, { text = it.take(maxLength); error = null }, enabled = !sending,
-                label = { Text("内容") }, maxLines = 4, supportingText = { Text(error ?: "${text.length}/$maxLength") }, isError = error != null)
-        }
-    }, confirmButton = {
-        TextButton(enabled = text.isNotBlank() && !sending, onClick = {
-            sending = true
-            scope.launch {
-                viewingRequest { onSend(text.trim()) }.onSuccess { onDismiss() }.onFailure { error = it.message ?: "发送失败，请重试" }
-                sending = false
-            }
-        }) { Text(if (sending) "发送中…" else "发送") }
-    }, dismissButton = { TextButton(onClick = onDismiss, enabled = !sending) { Text("取消") } })
-}
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun FilmDiscussion(api: CmsAppApi, vod: String, user: String, onLogin: () -> Unit) {
+internal fun FilmDiscussion(api: CmsAppApi, vod: String, user: String, onLogin: () -> Unit, modifier: Modifier = Modifier) {
     var messages by remember(vod) { mutableStateOf(emptyList<ChatLine>()) }
     var notice by remember { mutableStateOf<String?>(null) }
     var readError by remember { mutableStateOf<String?>(null) }
@@ -88,7 +65,7 @@ internal fun FilmDiscussion(api: CmsAppApi, vod: String, user: String, onLogin: 
         }
     }
     LaunchedEffect(list.canScrollBackward) { if (!list.canScrollBackward) unread = 0 }
-    Column(Modifier.fillMaxSize().navigationBarsPadding().imePadding().padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
+    Column(modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
         Text("影片讨论", Modifier.padding(vertical = 4.dp), style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold, color = UiPalette.Ink)
         (readError ?: notice)?.let { Text(it, style = MaterialTheme.typography.bodySmall,

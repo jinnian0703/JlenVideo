@@ -20,6 +20,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -132,7 +133,6 @@ fun NativeVideoPlayer(
     timedComments: List<top.jlen.vod.data.TimedComment> = emptyList(),
     danmakuEnabled: Boolean = false,
     onToggleDanmaku: (() -> Unit)? = null,
-    onWriteDanmaku: ((Long) -> Unit)? = null,
     quickDanmakuField: (@Composable (Modifier, () -> Long, (Boolean) -> Unit) -> Unit)? = null,
     inlineHeightLimit: Dp? = null,
     liveMode: Boolean = false
@@ -802,10 +802,12 @@ fun NativeVideoPlayer(
                 .background(if (fullscreenMode) Color.Black else UiPalette.BackgroundBottom)
                 .onSizeChanged { contentSize = it }
         ) {
-            val controlChipWidth = if (fullscreenMode) minOf(76.dp, (maxWidth - 56.dp) / 4) else 44.dp
             val showQuickField = fullscreenMode && danmakuEnabled && onToggleDanmaku != null && quickDanmakuField != null && !isCasting
-            val singleRowMinWidth = if (showQuickField) 860.dp else 560.dp
-            val useStackedFullscreenControls = fullscreenMode && (maxHeight > maxWidth || maxWidth < singleRowMinWidth)
+            val controlChipWidth = when {
+                !fullscreenMode -> 44.dp
+                showQuickField -> 54.dp
+                else -> minOf(76.dp, (maxWidth - 56.dp) / 4)
+            }
             key(playbackIdentity) {
                 AndroidView(
                     factory = { viewContext ->
@@ -1201,7 +1203,7 @@ fun NativeVideoPlayer(
                         .padding(
                             top = when {
                                 !fullscreenMode -> 24.dp
-                                useStackedFullscreenControls -> 112.dp
+                                maxHeight > maxWidth -> 112.dp
                                 else -> 60.dp
                             }
                         )
@@ -1410,7 +1412,7 @@ fun NativeVideoPlayer(
                                     height = controlChipHeight, textStyle = controlPillTextStyle,
                                     onClick = { markInteraction(); onToggleDanmaku() })
                                 if (showQuickField) quickDanmakuField?.invoke(
-                                    Modifier.weight(1f, fill = false).widthIn(max = 320.dp), { player.currentPosition },
+                                    Modifier.width(if (editingDanmaku) 180.dp else 120.dp), { player.currentPosition },
                                     { focused ->
                                         editingDanmaku = focused
                                         if (focused) {
@@ -1491,27 +1493,15 @@ fun NativeVideoPlayer(
                         }
                     }
 
-                    if (useStackedFullscreenControls) {
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        val rowWidth = maxWidth
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            playbackStatusControls(Modifier.fillMaxWidth())
-                        }
-                        if (!editingDanmaku) Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            playbackActionControls()
-                        }
-                    } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = if (fullscreenMode) Modifier.horizontalScroll(rememberScrollState()).widthIn(min = rowWidth)
+                                else Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            playbackStatusControls(if (showQuickField) Modifier.weight(1f).padding(end = 8.dp) else Modifier)
+                            playbackStatusControls(if (showQuickField) Modifier.padding(end = 8.dp) else Modifier)
                             if (!editingDanmaku) playbackActionControls()
                         }
                     }
@@ -1542,8 +1532,9 @@ fun NativeVideoPlayer(
         }
     }
     if (!fullscreenMode && onToggleDanmaku != null) {
-        PortraitDanmakuBar(danmakuEnabled, onToggleDanmaku, !isCasting && onWriteDanmaku != null) {
-            onWriteDanmaku?.invoke(player.currentPosition)
+        PortraitDanmakuBar(danmakuEnabled, onToggleDanmaku) { modifier ->
+            if (!isCasting) quickDanmakuField?.invoke(modifier, { player.currentPosition }, {})
+            else Text("投屏中", modifier, color = UiPalette.TextSecondary)
         }
     }
 }

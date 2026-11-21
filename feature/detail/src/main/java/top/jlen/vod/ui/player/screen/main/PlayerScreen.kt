@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -134,13 +136,15 @@ fun PlayerScreen(
         if (window == null || !(hasDanmaku || hasChat)) return@DisposableEffect onDispose { }
         val original = window.attributes.softInputMode
         val withoutAdjustMode = original and WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST.inv()
-        window.setSoftInputMode(withoutAdjustMode or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        // Edge-to-edge Compose reserves the IME space. Prevent the window from also moving the page.
+        val adjust = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+            else WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        window.setSoftInputMode(withoutAdjustMode or adjust)
         onDispose { window.setSoftInputMode(original) }
     }
     val currentDanmakuAvailable = rememberUpdatedState(hasDanmaku)
     val prefs = remember(context) { context.getSharedPreferences("player_interaction", Context.MODE_PRIVATE) }
     var danmakuOn by remember { mutableStateOf(prefs.getBoolean("danmaku", false)) }
-    var writingAt by remember(thread) { mutableStateOf<Long?>(null) }
     var reload by remember(thread) { mutableIntStateOf(0) }
     var messages by remember(thread) { mutableStateOf(emptyList<TimedComment>()) }
     var discussing by rememberSaveable(downloadVod) { mutableStateOf(false) }
@@ -156,13 +160,6 @@ fun PlayerScreen(
             android.widget.Toast.makeText(context, "弹幕加载失败，可关闭后重试", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
-    if (hasDanmaku) writingAt?.let { stamp -> key(thread) {
-        MessageComposer("发弹幕 · ${stamp / 60000}分${stamp / 1000 % 60}秒", 200, { writingAt = null }) {
-            publishDanmaku(stamp, it)
-            danmakuOn = true
-            prefs.edit().putBoolean("danmaku", true).apply()
-        }
-    } }
     var isFullscreen by rememberSaveable {
         mutableStateOf(false)
     }
@@ -327,6 +324,8 @@ fun PlayerScreen(
     }
 
     var pickerOpen by rememberSaveable(vodId, isFullscreen) { mutableStateOf(false) }
+    var pickingDownloads by rememberSaveable(downloadVod, state.selectedSourceIndex) { mutableStateOf(false) }
+    BackHandler(enabled = pickingDownloads && !isFullscreen && !discussing) { pickingDownloads = false }
     val hasSources = state.sources.isNotEmpty()
     val playerContent = remember(
         playUrl,
@@ -340,10 +339,12 @@ fun PlayerScreen(
             var quickDraft by rememberSaveable { mutableStateOf("") }
             var sending by remember { mutableStateOf(false) }
             val scope = rememberCoroutineScope()
-            val chatPlayerHeight = if (!fullscreen && discussing) {
-                val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-                LocalConfiguration.current.screenHeightDp.dp * (if (keyboardOpen) .17f else .35f)
-            } else null
+            val keyboardOpen = !fullscreen && WindowInsets.ime.getBottom(LocalDensity.current) > 0
+            val chatPlayerHeight = when {
+                keyboardOpen -> 96.dp
+                !fullscreen && discussing -> LocalConfiguration.current.screenHeightDp.dp * .35f
+                else -> null
+            }
             NativeVideoPlayer(
                 url = playUrl,
                 title = state.title,
@@ -359,19 +360,30 @@ fun PlayerScreen(
                     danmakuOn = !danmakuOn
                     prefs.edit().putBoolean("danmaku", danmakuOn).apply()
                 }) else null,
-                onWriteDanmaku = { stamp -> if (currentUser.isBlank()) login() else writingAt = stamp },
                 quickDanmakuField = { modifier, position, onFocus ->
-                    QuickDanmakuField(modifier, quickDraft, sending, { quickDraft = it }, onFocus,
+                    var startedAt by remember(thread) { mutableStateOf<Long?>(null) }
+                    QuickDanmakuField(modifier, fullscreen, quickDraft, sending, { quickDraft = it }, { focused ->
+                        if (focused && quickDraft.isEmpty()) startedAt = position()
+                        onFocus(focused)
+                    },
                         login = if (currentUser.isBlank()) ({ login() }) else null,
                         onSend = { clearFocus ->
                             val text = quickDraft.trim()
                             if (!sending && text.isNotEmpty()) {
-                                val stamp = position()
+                                val stamp = if (fullscreen) position() else startedAt ?: position()
                                 sending = true
                                 scope.launch {
                                     try {
                                         viewingRequest { publishDanmaku(stamp, text) }
-                                            .onSuccess { quickDraft = ""; clearFocus() }
+                                            .onSuccess {
+                                                quickDraft = ""
+                                                startedAt = null
+                                                if (!fullscreen && !danmakuOn) {
+                                                    danmakuOn = true
+                                                    prefs.edit().putBoolean("danmaku", true).apply()
+                                                }
+                                                clearFocus()
+                                            }
                                             .onFailure { android.widget.Toast.makeText(context, it.message ?: "发送失败，请重试", android.widget.Toast.LENGTH_SHORT).show() }
                                     } finally { sending = false }
                                 }
@@ -408,7 +420,7 @@ fun PlayerScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (isFullscreen) Modifier else Modifier.appTopInsetsPadding())
+                .then(if (isFullscreen) Modifier else Modifier.appTopInsetsPadding().navigationBarsPadding().imePadding())
         ) {
             Box(
                 modifier = Modifier
@@ -447,7 +459,7 @@ fun PlayerScreen(
                 PlaybackTabs(discussing, onSelect = { discussing = it })
             }
             if (hasChat && discussing && !isFullscreen) key(downloadVod) {
-                FilmDiscussion(api, downloadVod, user, onLogin)
+                FilmDiscussion(api, downloadVod, user, onLogin, Modifier.weight(1f))
             } else LazyColumn(
                 modifier = Modifier
                     .weight(1f)
@@ -500,16 +512,16 @@ fun PlayerScreen(
                 if (state.episodes.isNotEmpty()) {
                     item(key = "episode_title") {
                         if (state.item?.downloadPassword == 1 && state.item?.downloadGroups.isNullOrEmpty()) {
-                            ContentUnlock("下载", onUnlockDownload)
+                            ContentUnlock("下载", inline = true, verify = onUnlockDownload)
                         } else if (!state.item?.downloadGroups.isNullOrEmpty()) {
                             top.jlen.vod.offline.CmsDownloadHeader(downloadVod, state.title, state.item?.vodPic.orEmpty(),
-                                state.item?.downloadGroups.orEmpty(), state.selectedEpisodeIndex)
+                                state.item?.downloadGroups.orEmpty(), state.selectedEpisodeIndex, pickingDownloads, { pickingDownloads = it })
                         } else if (source != null && downloadVod.isNotBlank()) {
                             top.jlen.vod.offline.DownloadEpisodeHeader(downloadVod, state.title, state.item?.vodPic.orEmpty(), state.selectedSourceIndex,
-                                source, state.selectedEpisodeIndex, downloadLabels)
+                                source, state.selectedEpisodeIndex, downloadLabels, pickingDownloads, { pickingDownloads = it })
                         } else SectionTitle(title = "切换选集", action = null, onAction = {})
                     }
-                    item(key = "episode_panel") {
+                    if (!pickingDownloads) item(key = "episode_panel") {
                         EpisodePanel(
                             episodes = state.episodes,
                             downloadLabels = downloadLabels,

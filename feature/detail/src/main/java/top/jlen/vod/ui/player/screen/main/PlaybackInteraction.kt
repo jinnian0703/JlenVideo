@@ -53,7 +53,7 @@ internal fun PlaybackTabs(discussing: Boolean, onSelect: (Boolean) -> Unit) {
 }
 
 @Composable
-internal fun QuickDanmakuField(modifier: Modifier, draft: String, sending: Boolean, onChange: (String) -> Unit,
+internal fun QuickDanmakuField(modifier: Modifier, fullscreen: Boolean, draft: String, sending: Boolean, onChange: (String) -> Unit,
                              onFocus: (Boolean) -> Unit, login: (() -> Unit)?, onSend: (() -> Unit) -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val updateFocus by rememberUpdatedState(onFocus)
@@ -68,26 +68,30 @@ internal fun QuickDanmakuField(modifier: Modifier, draft: String, sending: Boole
     DisposableEffect(Unit) { onDispose { focused = false; updateFocus(false) } }
     val canSend = !sending && draft.isNotBlank()
     val submit = { if (canSend) onSend { if (focused) focusManager.clearFocus() } }
-    Row(modifier.clip(CircleShape).background(Color.Black.copy(alpha = .72f))
-        .border(1.dp, Color.White.copy(alpha = if (focused) .85f else .42f), CircleShape)
+    val ink = if (fullscreen) Color.White else UiPalette.Ink
+    val hint = if (fullscreen) Color.White.copy(alpha = .8f) else UiPalette.TextSecondary
+    val outline = if (focused) ink else if (fullscreen) Color.White.copy(alpha = .38f) else UiPalette.BorderSoft
+    val height = if (fullscreen) 34.dp else 48.dp
+    Row(modifier.clip(CircleShape).background(if (fullscreen) Color.Black.copy(alpha = .55f) else UiPalette.Surface)
+        .border(1.dp, outline, CircleShape)
         .then(if (login != null) Modifier.clickable(role = Role.Button, onClick = login) else Modifier)
-        .heightIn(min = 48.dp).padding(start = 14.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (login != null) Text("登录发弹幕", style = MaterialTheme.typography.bodyMedium, color = Color.White)
+        .height(height).padding(start = 12.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (login != null) Text("登录发弹幕", style = MaterialTheme.typography.labelLarge, color = hint, maxLines = 1)
         else {
-            BasicTextField(draft, { onChange(it.take(200)) },
+            BasicTextField(draft, { onChange(it.replace('\n', ' ').replace('\r', ' ').take(200)) },
                 Modifier.weight(1f).onFocusChanged { focused = it.isFocused; updateFocus(it.isFocused) }
                     .semantics { contentDescription = "快速发弹幕" },
-                singleLine = true, readOnly = sending, textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
-                cursorBrush = SolidColor(Color.White), keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                singleLine = true, readOnly = sending, textStyle = MaterialTheme.typography.bodyMedium.copy(color = ink),
+                cursorBrush = SolidColor(ink), keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { submit() }), decorationBox = { input ->
-                    Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
-                        if (draft.isEmpty()) Text("发弹幕…", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = .8f))
+                    Box(Modifier.fillMaxHeight(), contentAlignment = Alignment.CenterStart) {
+                        if (draft.isEmpty()) Text("发弹幕…", style = MaterialTheme.typography.bodyMedium, color = hint, maxLines = 1)
                         input()
                     }
                 })
-            IconButton(onClick = submit, enabled = canSend) {
-                if (sending) CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
-                else Icon(Icons.AutoMirrored.Rounded.Send, "发送弹幕", Modifier.size(18.dp), tint = Color.White.copy(alpha = if (canSend) 1f else .48f))
+            IconButton(onClick = submit, enabled = canSend, modifier = Modifier.size(height)) {
+                if (sending) CircularProgressIndicator(Modifier.size(16.dp), color = ink, strokeWidth = 2.dp)
+                else Icon(Icons.AutoMirrored.Rounded.Send, "发送弹幕", Modifier.size(16.dp), tint = if (canSend) ink else hint.copy(alpha = .55f))
             }
         }
     }
