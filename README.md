@@ -10,15 +10,15 @@ JlenVideo 是一个基于 Kotlin、Jetpack Compose 和 Media3 的 Android 视频
 | 项目 | 值 |
 | --- | --- |
 | Application Id | `top.jlen.vod` |
-| 当前版本 | `2.1.2.5` |
-| 当前 versionCode | `42` |
+| 当前版本 | `2.1.3.0` |
+| 当前 versionCode | `43` |
 | minSdk | `24` |
 | targetSdk | `34` |
 | compileSdk | `34` |
 | JVM Target | `17` |
 | 默认站点 | `https://cms.jlen.top/` |
 
-本次更新详见 [2.1.2.5 更新日志](docs/releases/2.1.2.5.md)。
+本次更新详见 [2.1.3.0 更新日志](docs/releases/2.1.3.0.md)。
 
 相关仓库：
 
