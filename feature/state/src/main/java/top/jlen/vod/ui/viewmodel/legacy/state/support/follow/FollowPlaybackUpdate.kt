@@ -10,23 +10,29 @@ internal val followPlaybackComparator = compareByDescending<FollowUpItem> { it.h
     .thenBy { it.title }
 
 // 网络刷新/后台重建结束时，不覆盖期间产生的更新续播信息。
-internal fun mergeNewerFollowPlayback(loaded: List<FollowUpItem>, current: List<FollowUpItem>): List<FollowUpItem> {
+internal fun mergeNewerFollowPlayback(loaded: List<FollowUpItem>, current: List<FollowUpItem>,
+                                      releasesAtStart: Map<String, FollowUpItem>? = null): List<FollowUpItem> {
     val currentById = current.associateBy { it.vodId }
-    return loaded.map { item ->
-        val newer = currentById[item.vodId]
-        if (newer == null || (newer.lastWatchedAtMillis ?: 0L) <= (item.lastWatchedAtMillis ?: 0L)) item
-        else {
-            val hasUpdate = item.latestEpisodeIndex?.let { it > newer.watchedEpisodeIndex && newer.watchedEpisodeIndex >= 0 } ?: false
-            item.copy(
+    return loaded.map { loadedItem ->
+        val newer = currentById[loadedItem.vodId] ?: return@map loadedItem
+        val initial = releasesAtStart?.get(loadedItem.vodId)
+        val releaseChanged = releasesAtStart != null && (initial?.latestEpisodeIndex != newer.latestEpisodeIndex ||
+            initial?.latestEpisodeLabel != newer.latestEpisodeLabel)
+        val keepRelease = newer.latestEpisodeIndex != null && (releaseChanged || loadedItem.latestEpisodeIndex == null)
+        val keepProgress = (newer.lastWatchedAtMillis ?: 0L) > (loadedItem.lastWatchedAtMillis ?: 0L)
+        if (!keepRelease && !keepProgress) return@map loadedItem
+        var item = if (keepRelease) loadedItem.copy(latestEpisodeIndex = newer.latestEpisodeIndex, latestEpisodeLabel = newer.latestEpisodeLabel) else loadedItem
+        if (keepProgress) {
+            item = item.copy(
                 watchedEpisodeIndex = newer.watchedEpisodeIndex,
                 watchedEpisodeLabel = newer.watchedEpisodeLabel,
                 lastWatchedAtMillis = newer.lastWatchedAtMillis,
                 lastWatchedAtText = newer.lastWatchedAtText,
-                sourceName = newer.sourceName,
-                hasUpdate = hasUpdate,
-                updateLabel = if (hasUpdate) "更新至第${item.latestEpisodeIndex!! + 1}集" else ""
+                sourceName = newer.sourceName
             )
         }
+        val hasUpdate = item.latestEpisodeIndex?.let { it > item.watchedEpisodeIndex && item.watchedEpisodeIndex >= 0 } ?: false
+        item.copy(hasUpdate = hasUpdate, updateLabel = if (hasUpdate) "更新至第${item.latestEpisodeIndex!! + 1}集" else "")
     }.sortedWith(followPlaybackComparator)
 }
 

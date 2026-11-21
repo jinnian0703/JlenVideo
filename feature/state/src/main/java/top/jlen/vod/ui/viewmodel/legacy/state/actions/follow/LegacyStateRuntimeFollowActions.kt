@@ -166,6 +166,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRebuildFollowContent(forceUpd
     val ownerKey = currentFollowOwnerKey()
     val history = currentAccountState().historyItems
     val refreshVersion = currentFollowRefreshVersion()
+    val releasesAtStart = current.items.associateBy { it.vodId }
     viewModelScope.launch {
         val items = withContext(Dispatchers.IO) {
             buildFollowItems(
@@ -177,7 +178,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacyRebuildFollowContent(forceUpd
         if (!currentAccountState().session.isLoggedIn || ownerKey != currentFollowOwnerKey() ||
             refreshVersion != currentFollowRefreshVersion() || favorites != currentAccountState().favoriteItems
         ) return@launch
-        val mergedItems = mergeNewerFollowPlayback(items, currentFollowState().items)
+        val mergedItems = mergeNewerFollowPlayback(items, currentFollowState().items, releasesAtStart)
         updateFollowState(
             currentFollowState().copy(
                 isLoading = false,
@@ -324,16 +325,7 @@ private suspend fun LegacyStateRuntimeViewModelCore.buildFollowItem(
         ?.updatedAt
         ?.takeIf { it > 0L }
 
-    val latestEpisode = parseLatestEpisodeInfo(
-        listOfNotNull(
-            detailItem?.resolvedUpdateLabel,
-            detailItem?.resolvedSubtitle,
-            detailItem?.resolvedBadgeText,
-            favorite.subtitle,
-            bestHistory?.subtitle,
-            cached?.latestEpisodeLabel
-        )
-    )
+    val latestEpisode = resolveFollowRelease(detailItem, favorite.subtitle, cached)
     val hasUpdate = latestEpisode?.index != null &&
         watchedEpisodeIndex >= 0 &&
         latestEpisode.index > watchedEpisodeIndex
@@ -400,14 +392,7 @@ private fun LegacyStateRuntimeViewModelCore.buildFollowItemFromDetail(
     val sourceName = localResume?.sourceName
         ?.takeIf { it.isNotBlank() }
         ?: cached?.sourceName.orEmpty()
-    val latestEpisode = parseLatestEpisodeInfo(
-        listOf(
-            item.resolvedUpdateLabel,
-            item.resolvedSubtitle,
-            item.resolvedBadgeText,
-            cached?.latestEpisodeLabel.orEmpty()
-        )
-    )
+    val latestEpisode = resolveFollowRelease(item, "", cached)
     val hasUpdate = latestEpisode?.index != null &&
         watchedEpisodeIndex >= 0 &&
         latestEpisode.index > watchedEpisodeIndex
@@ -498,40 +483,6 @@ private fun buildFollowWatchTimeText(
     hasHistory -> "已加入追剧，尚无本地续播时间"
     else -> "已加入追剧，尚无观看记录"
 }
-
-private data class ParsedLatestEpisode(
-    val index: Int,
-    val label: String
-)
-
-private fun parseLatestEpisodeInfo(values: List<String>): ParsedLatestEpisode? {
-    values.forEach { raw ->
-        val text = sanitizeUserFacingComposite(raw)
-        if (text.isBlank()) return@forEach
-
-        parseEpisodeIndex(text, Regex("""更新至第\s*(\d{1,4})\s*集?"""))
-            ?.let { return ParsedLatestEpisode(it, "更新至第${it + 1}集") }
-        parseEpisodeIndex(text, Regex("""更新至\s*(\d{1,4})\s*集?"""))
-            ?.let { return ParsedLatestEpisode(it, "更新至第${it + 1}集") }
-        parseEpisodeIndex(text, Regex("""第\s*(\d{1,4})\s*集"""))
-            ?.let { return ParsedLatestEpisode(it, "更新至第${it + 1}集") }
-        parseEpisodeIndex(text, Regex("""全\s*(\d{1,4})\s*集"""))
-            ?.let { return ParsedLatestEpisode(it, "全${it + 1}集") }
-        parseEpisodeIndex(text, Regex("""共\s*(\d{1,4})\s*集"""))
-            ?.let { return ParsedLatestEpisode(it, "共${it + 1}集") }
-        parseEpisodeIndex(text, Regex("""(\d{1,4})\s*集全"""))
-            ?.let { return ParsedLatestEpisode(it, "${it + 1}集全") }
-    }
-    return null
-}
-
-private fun parseEpisodeIndex(text: String, regex: Regex): Int? =
-    regex.find(text)
-        ?.groupValues
-        ?.getOrNull(1)
-        ?.toIntOrNull()
-        ?.takeIf { it > 0 }
-        ?.minus(1)
 
 private val followItemComparator = compareByDescending<FollowUpItem> { it.hasUpdate }
     .thenByDescending { it.lastWatchedAtMillis ?: 0L }

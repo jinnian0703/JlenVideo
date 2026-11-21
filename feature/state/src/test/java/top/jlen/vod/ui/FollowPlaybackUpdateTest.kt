@@ -3,6 +3,9 @@ package top.jlen.vod.ui
 import org.junit.Assert.*
 import org.junit.Test
 import top.jlen.vod.data.PlaybackResumeRecord
+import top.jlen.vod.data.CmsSourceGroup
+import top.jlen.vod.data.Episode
+import top.jlen.vod.data.VodItem
 
 class FollowPlaybackUpdateTest {
     private val card = FollowUpItem(vodId = "1", title = "测试", latestEpisodeIndex = 9,
@@ -55,5 +58,30 @@ class FollowPlaybackUpdateTest {
     @Test fun newerLoadedRecordWins() {
         val loaded = card.copy(lastWatchedAtMillis = 240_000L)
         assertSame(loaded, mergeNewerFollowPlayback(listOf(loaded), listOf(card)).single())
+    }
+
+    @Test fun favoriteKeepsItsReleaseAcrossAListRefreshAndAnOlderRebuild() {
+        val detail = VodItem(vodRemarks = "更新至第24集")
+        val release = requireNotNull(resolveFollowRelease(detail, "", null))
+        val saved = card.copy(latestEpisodeIndex = release.index, latestEpisodeLabel = release.label, watchedEpisodeIndex = 0)
+        assertEquals(FollowRelease(23, "更新至第24集"), resolveFollowRelease(null, "线路一 | 第1集", saved))
+        assertNull(resolveFollowRelease(null, "线路一 | 第1集", null))
+
+        val old = saved.copy(latestEpisodeIndex = 0, latestEpisodeLabel = "更新至第1集", hasUpdate = false)
+        val rebuilt = mergeNewerFollowPlayback(listOf(old), listOf(saved), mapOf(old.vodId to old)).single()
+        assertEquals("更新至第24集", rebuilt.latestEpisodeLabel)
+        assertEquals(0, rebuilt.watchedEpisodeIndex)
+        assertTrue(rebuilt.hasUpdate)
+    }
+
+    @Test fun refreshUsesAllPlaylistLinesAndAcceptsExplicitCatalogCorrections() {
+        val detail = VodItem(vodPlayUrl = "第12集\$url#第1集\$url", playGroups = listOf(
+            CmsSourceGroup("线路二", listOf(Episode("第16集", "url"), Episode("第1集", "url")))
+        ))
+        assertEquals(FollowRelease(15, "更新至第16集"), resolveFollowRelease(detail, "", null))
+        val partial = detail.copy(playGroups = null, vodPlayUrl = "第1集\$url")
+        assertEquals(9, resolveFollowRelease(partial, "", card)?.index)
+        assertEquals(FollowRelease(10, "更新至第11集"), resolveFollowRelease(null, "更新至11集", card))
+        assertEquals(FollowRelease(0, "更新至第1集"), resolveFollowRelease(detail.copy(vodRemarks = "更新至第1集"), "", card))
     }
 }
