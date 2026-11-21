@@ -7,11 +7,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
+import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -19,7 +22,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
@@ -42,7 +49,7 @@ internal fun FilmDiscussion(api: CmsAppApi, vod: String, user: String, onLogin: 
     var loading by remember { mutableStateOf(true) }
     var draft by rememberSaveable(vod, user) { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
-    var report by remember { mutableStateOf<ChatLine?>(null) }
+    var report by remember(vod, user) { mutableStateOf<ChatLine?>(null) }
     var unread by remember { mutableIntStateOf(0) }
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -124,10 +131,101 @@ internal fun FilmDiscussion(api: CmsAppApi, vod: String, user: String, onLogin: 
             }
         }
     }
-    report?.let { line -> AlertDialog(onDismissRequest = { report = null }, title = { Text("举报这条发言？") },
-        text = { Text(line.text, maxLines = 3) }, dismissButton = { TextButton(onClick = { report = null }) { Text("取消") } },
-        confirmButton = { TextButton(onClick = {
-            report = null
-            scope.launch { notice = viewingRequest { api.reportChat(user, line.id) }.fold({ "已提交举报" }, { it.message ?: "举报失败" }) }
-        }) { Text("举报") } }) }
+    report?.let { line ->
+        ReportCommentDialog(
+            author = if (line.authorId == user) "我" else line.author.ifBlank { "观众" },
+            comment = line.text,
+            onDismiss = { report = null },
+            onReport = { api.reportChat(user, line.id) },
+            onReported = {
+                notice = "已提交举报"
+                report = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun ReportCommentDialog(
+    author: String,
+    comment: String,
+    onDismiss: () -> Unit,
+    onReport: suspend () -> Unit,
+    onReported: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var submitting by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = { if (!submitting) onDismiss() },
+        shape = RoundedCornerShape(28.dp),
+        containerColor = UiPalette.Surface,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    Modifier.size(40.dp).background(UiPalette.DangerSurface, RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Rounded.Flag, contentDescription = null, tint = UiPalette.DangerText)
+                }
+                Text("举报这条评论？", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
+                    color = UiPalette.Ink)
+            }
+        },
+        text = {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
+                    shape = RoundedCornerShape(16.dp),
+                    color = UiPalette.SurfaceSoft
+                ) {
+                    Column(
+                        Modifier.heightIn(max = 200.dp).verticalScroll(rememberScrollState()).padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(author, style = MaterialTheme.typography.labelMedium, color = UiPalette.TextSecondary,
+                            fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(comment, style = MaterialTheme.typography.bodyMedium, color = UiPalette.Ink)
+                    }
+                }
+                error?.let { message ->
+                    Text(message, Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                        style = MaterialTheme.typography.bodySmall, color = UiPalette.DangerText)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !submitting) {
+                Text("取消", color = UiPalette.TextSecondary)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (!submitting) {
+                        submitting = true
+                        error = null
+                        scope.launch {
+                            viewingRequest(onReport)
+                                .onSuccess { onReported() }
+                                .onFailure {
+                                    submitting = false
+                                    error = it.localizedMessage?.takeIf(String::isNotBlank) ?: "举报失败，请重试"
+                                }
+                        }
+                    }
+                },
+                enabled = !submitting,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = UiPalette.DangerText, contentColor = UiPalette.DangerSurface)
+            ) {
+                Text(when {
+                    submitting -> "提交中…"
+                    error != null -> "重试举报"
+                    else -> "确认举报"
+                }, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    )
 }
