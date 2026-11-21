@@ -17,12 +17,14 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,6 +39,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -76,7 +80,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -94,6 +97,7 @@ import top.jlen.vod.data.*
 
 private const val EXPANDED_PLAYBACK_WINDOW_MIN_DP = 600
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PlayerScreen(
     vodId: String,
@@ -131,23 +135,13 @@ fun PlayerScreen(
     val thread = EpisodeThread(downloadVod, state.selectedSourceIndex, state.selectedEpisodeIndex)
     val hasDanmaku = features.danmaku && validVod && source?.episodes?.getOrNull(state.selectedEpisodeIndex) != null
     val hasChat = features.chat && validVod
-    DisposableEffect(activity, hasDanmaku || hasChat) {
-        val window = activity?.window
-        if (window == null || !(hasDanmaku || hasChat)) return@DisposableEffect onDispose { }
-        val original = window.attributes.softInputMode
-        val withoutAdjustMode = original and WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST.inv()
-        // Edge-to-edge Compose reserves the IME space. Prevent the window from also moving the page.
-        val adjust = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
-            else WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
-        window.setSoftInputMode(withoutAdjustMode or adjust)
-        onDispose { window.setSoftInputMode(original) }
-    }
     val currentDanmakuAvailable = rememberUpdatedState(hasDanmaku)
     val prefs = remember(context) { context.getSharedPreferences("player_interaction", Context.MODE_PRIVATE) }
     var danmakuOn by remember { mutableStateOf(prefs.getBoolean("danmaku", false)) }
     var reload by remember(thread) { mutableIntStateOf(0) }
     var messages by remember(thread) { mutableStateOf(emptyList<TimedComment>()) }
     var discussing by rememberSaveable(downloadVod) { mutableStateOf(false) }
+    var inlineDanmakuFocused by remember(thread) { mutableStateOf(false) }
     val currentUser by rememberUpdatedState(user)
     val login by rememberUpdatedState(onLogin)
     suspend fun publishDanmaku(stamp: Long, text: String) {
@@ -325,6 +319,9 @@ fun PlayerScreen(
 
     var pickerOpen by rememberSaveable(vodId, isFullscreen) { mutableStateOf(false) }
     var pickingDownloads by rememberSaveable(downloadVod, state.selectedSourceIndex) { mutableStateOf(false) }
+    val inlineKeyboardOpen = !isFullscreen && WindowInsets.isImeVisible
+    val writingDiscussion = inlineKeyboardOpen && discussing && !inlineDanmakuFocused
+    val showPortraitDanmaku by rememberUpdatedState(!writingDiscussion)
     BackHandler(enabled = pickingDownloads && !isFullscreen && !discussing) { pickingDownloads = false }
     val hasSources = state.sources.isNotEmpty()
     val playerContent = remember(
@@ -339,12 +336,7 @@ fun PlayerScreen(
             var quickDraft by rememberSaveable { mutableStateOf("") }
             var sending by remember { mutableStateOf(false) }
             val scope = rememberCoroutineScope()
-            val keyboardOpen = !fullscreen && WindowInsets.ime.getBottom(LocalDensity.current) > 0
-            val chatPlayerHeight = when {
-                keyboardOpen -> 96.dp
-                !fullscreen && discussing -> LocalConfiguration.current.screenHeightDp.dp * .35f
-                else -> null
-            }
+            val chatPlayerHeight = if (!fullscreen && discussing) LocalConfiguration.current.screenHeightDp.dp * .35f else null
             NativeVideoPlayer(
                 url = playUrl,
                 title = state.title,
@@ -356,13 +348,14 @@ fun PlayerScreen(
                 timedComments = messages,
                 inlineHeightLimit = chatPlayerHeight,
                 danmakuEnabled = danmakuOn && currentDanmakuAvailable.value,
-                onToggleDanmaku = if (currentDanmakuAvailable.value) ({
+                onToggleDanmaku = if (currentDanmakuAvailable.value && (fullscreen || showPortraitDanmaku)) ({
                     danmakuOn = !danmakuOn
                     prefs.edit().putBoolean("danmaku", danmakuOn).apply()
                 }) else null,
                 quickDanmakuField = { modifier, position, onFocus ->
                     var startedAt by remember(thread) { mutableStateOf<Long?>(null) }
                     QuickDanmakuField(modifier, fullscreen, quickDraft, sending, { quickDraft = it }, { focused ->
+                        if (!fullscreen) inlineDanmakuFocused = focused
                         if (focused && quickDraft.isEmpty()) startedAt = position()
                         onFocus(focused)
                     },
@@ -422,12 +415,16 @@ fun PlayerScreen(
                 .fillMaxSize()
                 .then(if (isFullscreen) Modifier else Modifier.appTopInsetsPadding().navigationBarsPadding().imePadding())
         ) {
-            Box(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(UiPalette.BackgroundBottom)
             ) {
-                Column {
+                // Keep the video at its viewing height. On short windows the header can scroll
+                // to the active editor without measuring the video against the keyboard.
+                val headerScroll = rememberScrollState()
+                val editorSpace = if (writingDiscussion) 104.dp else 0.dp
+                Column(Modifier.heightIn(max = (maxHeight - editorSpace).coerceAtLeast(0.dp)).verticalScroll(headerScroll)) {
                     DetailTopBar(
                         title = state.title.ifBlank { "播放器" },
                         onBack = ::closePlayerScreen,
@@ -455,11 +452,12 @@ fun PlayerScreen(
                     }
                 }
             }
-            if (hasChat && !isFullscreen) {
+            if (hasChat && !isFullscreen && !inlineKeyboardOpen) {
                 PlaybackTabs(discussing, onSelect = { discussing = it })
             }
             if (hasChat && discussing && !isFullscreen) key(downloadVod) {
-                FilmDiscussion(api, downloadVod, user, onLogin, Modifier.weight(1f))
+                FilmDiscussion(api, downloadVod, user, onLogin, Modifier.weight(1f), compact = inlineKeyboardOpen,
+                    showComposer = !inlineKeyboardOpen || !inlineDanmakuFocused)
             } else LazyColumn(
                 modifier = Modifier
                     .weight(1f)

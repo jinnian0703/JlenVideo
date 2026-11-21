@@ -34,7 +34,8 @@ internal suspend fun <T> viewingRequest(action: suspend () -> T): Result<T> = tr
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun FilmDiscussion(api: CmsAppApi, vod: String, user: String, onLogin: () -> Unit, modifier: Modifier = Modifier) {
+internal fun FilmDiscussion(api: CmsAppApi, vod: String, user: String, onLogin: () -> Unit, modifier: Modifier = Modifier,
+                            compact: Boolean = false, showComposer: Boolean = true) {
     var messages by remember(vod) { mutableStateOf(emptyList<ChatLine>()) }
     var notice by remember { mutableStateOf<String?>(null) }
     var readError by remember { mutableStateOf<String?>(null) }
@@ -66,7 +67,7 @@ internal fun FilmDiscussion(api: CmsAppApi, vod: String, user: String, onLogin: 
     }
     LaunchedEffect(list.canScrollBackward) { if (!list.canScrollBackward) unread = 0 }
     Column(modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
-        Text("影片讨论", Modifier.padding(vertical = 4.dp), style = MaterialTheme.typography.titleMedium,
+        if (!compact) Text("影片讨论", Modifier.padding(vertical = 4.dp), style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold, color = UiPalette.Ink)
         (readError ?: notice)?.let { Text(it, style = MaterialTheme.typography.bodySmall,
             color = if (readError != null) UiPalette.DangerText else UiPalette.TextSecondary) }
@@ -97,9 +98,10 @@ internal fun FilmDiscussion(api: CmsAppApi, vod: String, user: String, onLogin: 
                     }
                 }
             }
-            if (unread > 0) FilledTonalButton(modifier = Modifier.align(Alignment.CenterHorizontally),
+            if (unread > 0 && !compact) FilledTonalButton(modifier = Modifier.align(Alignment.CenterHorizontally),
                 onClick = { scope.launch { list.scrollToItem(0); unread = 0 } }) { Text("查看 $unread 条新消息") }
         }
+        if (!showComposer) return@Column
         val dock = Modifier.fillMaxWidth().padding(vertical = 6.dp)
         if (user.isBlank()) Button(onClick = onLogin, modifier = dock.heightIn(min = 48.dp),
             colors = ButtonDefaults.buttonColors(containerColor = UiPalette.Ink, contentColor = UiPalette.Surface)) { Text("登录参与讨论") }

@@ -23,7 +23,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -52,19 +51,20 @@ internal fun PlaybackTabs(discussing: Boolean, onSelect: (Boolean) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun QuickDanmakuField(modifier: Modifier, fullscreen: Boolean, draft: String, sending: Boolean, onChange: (String) -> Unit,
                              onFocus: (Boolean) -> Unit, login: (() -> Unit)?, onSend: (() -> Unit) -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val updateFocus by rememberUpdatedState(onFocus)
     val focusManager = LocalFocusManager.current
-    val imeOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val imeOpen = WindowInsets.isImeVisible
     var sawKeyboard by remember { mutableStateOf(false) }
     LaunchedEffect(focused, imeOpen) {
-        if (focused && sawKeyboard && !imeOpen) focusManager.clearFocus()
+        if (fullscreen && focused && sawKeyboard && !imeOpen) focusManager.clearFocus()
         sawKeyboard = focused && imeOpen
     }
-    BackHandler(enabled = focused) { focusManager.clearFocus() }
+    BackHandler(enabled = focused && imeOpen) { focusManager.clearFocus() }
     DisposableEffect(Unit) { onDispose { focused = false; updateFocus(false) } }
     val canSend = !sending && draft.isNotBlank()
     val submit = { if (canSend) onSend { if (focused) focusManager.clearFocus() } }
