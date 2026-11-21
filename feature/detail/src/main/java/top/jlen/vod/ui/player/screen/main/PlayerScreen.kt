@@ -511,7 +511,7 @@ fun PlayerScreen(
                 if (state.episodes.isNotEmpty()) {
                     item(key = "episode_title") {
                         if (state.item?.downloadLocked == true) {
-                            ContentUnlock("下载", inline = true, verify = onUnlockDownload)
+                            ContentUnlock("下载", filmTitle = state.title, inline = true, verify = onUnlockDownload)
                         } else if (!state.item?.downloadGroups.isNullOrEmpty()) {
                             top.jlen.vod.offline.CmsDownloadHeader(downloadVod, state.title, state.item?.vodPic.orEmpty(),
                                 state.item?.downloadGroups.orEmpty(), state.selectedEpisodeIndex, pickingDownloads, { pickingDownloads = it }, checkDownloadSources)

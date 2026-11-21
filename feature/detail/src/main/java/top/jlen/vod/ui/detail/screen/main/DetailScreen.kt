@@ -57,10 +57,12 @@ fun DetailScreen(
     val detailItem = state.item
 
     when {
-        state.detailLocked -> Column(Modifier.appTopInsetsPadding().padding(16.dp)) {
-            Text("这部影片的详情需要密码")
-            ContentUnlock("详情") { onUnlock(1, it) }
-            androidx.compose.material3.TextButton(onClick = onBack) { Text("返回") }
+        state.detailLocked -> Column(Modifier.fillMaxSize().background(UiPalette.BackgroundBottom)) {
+            DetailTopBar(title = "影片详情", onBack = onBack)
+            Column(Modifier.padding(UiDimens.PagePadding), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("这部影片的详情需要密码才能查看。", color = UiPalette.TextSecondary)
+                ContentUnlock("详情") { onUnlock(1, it) }
+            }
         }
         state.isLoading && detailItem == null -> LoadingPane("正在加载详情...")
         !errorMessage.isNullOrBlank() -> Box(modifier = Modifier.appTopInsetsPadding()) {
@@ -78,7 +80,7 @@ fun DetailScreen(
             var downloadPrompt by rememberSaveable(downloadVod) { mutableStateOf(DownloadPrompt.Closed) }
             val needsDownloadPassword = item.downloadLocked
             when (downloadPrompt) {
-                DownloadPrompt.Password -> ContentUnlockPrompt("下载", onDismiss = { downloadPrompt = DownloadPrompt.Closed },
+                DownloadPrompt.Password -> ContentUnlockPrompt("下载", filmTitle = item.displayTitle, onDismiss = { downloadPrompt = DownloadPrompt.Closed },
                     onVerified = { downloadPrompt = DownloadPrompt.Episodes }) { onUnlock(5, it) }
                 DownloadPrompt.Episodes -> {
                     val sources = remember(item.downloadGroups, needsDownloadPassword, state.sources) {
@@ -161,9 +163,8 @@ fun DetailScreen(
 
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             if (item.playLocked) {
-                                ContentUnlock("播放") { onUnlock(4, it) }
-                            }
-                            Button(
+                                ContentUnlock("播放", filmTitle = item.displayTitle) { onUnlock(4, it) }
+                            } else Button(
                                 onClick = {
                                     if (primarySource != null) {
                                         onPlay(item.displayTitle, primarySourceIndex, primaryEpisodeIndex)
