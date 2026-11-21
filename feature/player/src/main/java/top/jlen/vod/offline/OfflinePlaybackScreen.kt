@@ -80,6 +80,7 @@ internal fun OfflinePlaybackScreen(downloadId: String, onClose: () -> Unit) {
         }
         DisposableEffect(checkpoint) { onDispose { checkpoint.flush() } }
         FullscreenPlayerContent(
+            vodId = row.vod, sourceIndex = row.si, canAutoAdvance = next?.ei == row.ei + 1,
             url = uri.toString(), title = row.title, sourceName = row.source, episodeName = row.episode,
             hasNextEpisode = next != null, initialSnapshot = initial,
             onPlaybackSnapshotChanged = checkpoint::update,

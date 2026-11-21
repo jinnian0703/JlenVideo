@@ -340,6 +340,8 @@ fun PlayerScreen(
             val chatPlayerHeight = if (!fullscreen && discussing) LocalConfiguration.current.screenHeightDp.dp * .35f else null
             NativeVideoPlayer(
                 url = playUrl,
+                vodId = downloadVod,
+                sourceIndex = state.selectedSourceIndex,
                 title = state.title,
                 sourceName = state.sourceName,
                 episodeName = state.episodeName,

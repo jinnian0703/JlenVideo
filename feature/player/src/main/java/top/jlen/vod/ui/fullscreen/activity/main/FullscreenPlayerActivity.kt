@@ -103,6 +103,9 @@ class FullscreenPlayerActivity : AppCompatActivity() {
 @Composable
 internal fun FullscreenPlayerContent(
     url: String,
+    vodId: String,
+    sourceIndex: Int,
+    canAutoAdvance: Boolean,
     title: String,
     sourceName: String,
     episodeName: String,
@@ -125,6 +128,9 @@ internal fun FullscreenPlayerContent(
         if (url.isNotBlank()) {
             NativeVideoPlayer(
                 url = url,
+                vodId = vodId,
+                sourceIndex = sourceIndex,
+                canAutoAdvance = canAutoAdvance,
                 title = title,
                 sourceName = sourceName,
                 episodeName = episodeName,
@@ -135,7 +141,7 @@ internal fun FullscreenPlayerContent(
                 initialSnapshot = initialSnapshot,
                 onPlaybackSnapshotChanged = onPlaybackSnapshotChanged,
                 onPlaybackEnded = {
-                    if (hasNextEpisode) {
+                    if (canAutoAdvance) {
                         onNextEpisode()
                     }
                 },

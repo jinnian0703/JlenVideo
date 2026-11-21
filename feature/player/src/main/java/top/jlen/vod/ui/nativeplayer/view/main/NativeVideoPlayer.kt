@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentCut
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
@@ -135,7 +136,10 @@ fun NativeVideoPlayer(
     onToggleDanmaku: (() -> Unit)? = null,
     quickDanmakuField: (@Composable (Modifier, () -> Long, (Boolean) -> Unit) -> Unit)? = null,
     inlineHeightLimit: Dp? = null,
-    liveMode: Boolean = false
+    liveMode: Boolean = false,
+    vodId: String = "",
+    sourceIndex: Int = -1,
+    canAutoAdvance: Boolean = hasNextEpisode
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -158,6 +162,14 @@ fun NativeVideoPlayer(
     val snapshotCallbackForPlayback = remember(playbackIdentity) { onPlaybackSnapshotChanged }
     val activePlaybackIdentity = rememberUpdatedState(playbackIdentity)
     val latestFullscreenToggleCallback = rememberUpdatedState(onToggleFullscreen)
+    val skipKey = remember(vodId, sourceName, sourceIndex, liveMode) {
+        if (liveMode) null else episodeSkipKey(vodId, sourceName, sourceIndex)
+    }
+    val skipPrefs = remember(context) { context.getSharedPreferences("episode_skip_rules", Context.MODE_PRIVATE) }
+    var skipRules by remember(skipKey) { mutableStateOf(skipKey?.let { EpisodeSkipRules.load(skipPrefs, it) } ?: EpisodeSkipRules()) }
+    val skipSession = remember(player, skipKey, skipRules) { EpisodeSkipSession(skipRules) }
+    val latestCanAutoAdvance by rememberUpdatedState(canAutoAdvance)
+    var markerSnapshot by remember(player, skipKey) { mutableStateOf<PlaybackSnapshot?>(null) }
     var isPlaying by remember(player) { mutableStateOf(player?.isPlaying == true) }
     var currentPosition by remember(player) { mutableLongStateOf(0L) }
     var duration by remember(player) { mutableLongStateOf(0L) }
@@ -547,7 +559,8 @@ fun NativeVideoPlayer(
                     }
 
                     Lifecycle.Event.ON_START -> {
-                        if (shouldResumeOnStart && !castOwnsPlayback()) {
+                        if (skipKey != null) skipRules = EpisodeSkipRules.load(skipPrefs, skipKey)
+                        if (shouldResumeOnStart && markerSnapshot == null && !castOwnsPlayback()) {
                             player.play()
                             isPlaying = true
                             showPausedOverlay = false
@@ -589,7 +602,7 @@ fun NativeVideoPlayer(
             player.seekTo(initialSnapshot.positionMs)
             currentPosition = initialSnapshot.positionMs
         }
-        val shouldPlayLocally = initialSnapshot.playWhenReady && !castOwnsPlayback()
+        val shouldPlayLocally = initialSnapshot.playWhenReady && markerSnapshot == null && !castOwnsPlayback()
         player.playWhenReady = shouldPlayLocally
         isPlaying = shouldPlayLocally
         showPausedOverlay = false
@@ -655,7 +668,7 @@ fun NativeVideoPlayer(
         }
     }
 
-    LaunchedEffect(player) {
+    LaunchedEffect(player, skipSession) {
         if (player == null) return@LaunchedEffect
         while (true) {
             isPlaying = player.isPlaying
@@ -672,6 +685,13 @@ fun NativeVideoPlayer(
                 showPausedOverlay = false
             }
             duration = player.duration.coerceAtLeast(0L)
+            if (player.isPlaying && player.isCurrentMediaItemSeekable && !isDragging &&
+                gestureMode == PlayerGestureMode.None && markerSnapshot == null && !castOwnsPlayback()) {
+                skipSession.seekTarget(player.currentPosition, duration, latestCanAutoAdvance)?.let { target ->
+                    player.seekTo(target)
+                    dispatchSnapshot(force = true)
+                }
+            }
             if (!isDragging) {
                 currentPosition = player.currentPosition.coerceAtLeast(0L)
                 sliderPosition = if (duration > 0) {
@@ -696,7 +716,7 @@ fun NativeVideoPlayer(
             playbackState != Player.STATE_ENDED
         ) {
             repeat(if (fullscreenMode) 4 else 3) {
-                if (castOwnsPlayback()) return@repeat
+                if (castOwnsPlayback() || markerSnapshot != null || isUserPaused) return@repeat
                 player.play()
                 delay(if (fullscreenMode) 350L else 500L)
                 if (hasStartedPlaybackOnce || player.isPlaying) {
@@ -1221,7 +1241,7 @@ fun NativeVideoPlayer(
                                     WindowInsetsSides.Horizontal + WindowInsetsSides.Top
                                 )
                             )
-                            .padding(start = 16.dp, top = 16.dp, end = 136.dp)
+                            .padding(start = 16.dp, top = 16.dp, end = if (skipKey != null) 172.dp else 136.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -1278,6 +1298,23 @@ fun NativeVideoPlayer(
                                 }
                             }
                         }
+                    }
+                }
+
+                if (fullscreenMode && skipKey != null && !isCasting) {
+                    IconButton(
+                        onClick = {
+                            markerSnapshot = currentSnapshot()
+                            pausePlaybackByUser()
+                            speedMenuExpanded = false
+                        },
+                        enabled = player.isCurrentMediaItemSeekable && duration > 0,
+                        modifier = Modifier.align(Alignment.TopEnd)
+                            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top))
+                            .padding(top = 16.dp, end = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) 112.dp else 64.dp)
+                            .size(48.dp)
+                    ) {
+                        Icon(Icons.Rounded.ContentCut, contentDescription = "片头片尾", tint = Color.White.copy(alpha = if (duration > 0) 1f else .5f))
                     }
                 }
 
@@ -1531,6 +1568,15 @@ fun NativeVideoPlayer(
             }
         }
     }
+    markerSnapshot?.let { snapshot ->
+        if (skipKey != null) EpisodeSkipPanel(sourceName.ifBlank { "当前线路" }, snapshot.positionMs, snapshot.durationMs, skipRules,
+            onChange = { rules -> rules.save(skipPrefs, skipKey); skipRules = rules },
+            onDismiss = {
+                markerSnapshot = null
+                if (snapshot.playWhenReady && !castOwnsPlayback()) resumePlaybackByUser()
+                markInteraction()
+            })
+    }
     if (!fullscreenMode && onToggleDanmaku != null) {
         PortraitDanmakuBar(danmakuEnabled, onToggleDanmaku) { modifier ->
             if (!isCasting) quickDanmakuField?.invoke(modifier, { player.currentPosition }, {})
@@ -1718,7 +1764,7 @@ private fun PlayerView.applyPlayerViewLayout(resizeMode: Int) {
     }
 }
 
-private fun formatMillis(value: Long): String {
+internal fun formatMillis(value: Long): String {
     if (value <= 0L) return "00:00"
     val totalSeconds = value / 1000
     val seconds = totalSeconds % 60
