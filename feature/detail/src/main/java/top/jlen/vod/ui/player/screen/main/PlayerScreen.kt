@@ -397,7 +397,7 @@ fun PlayerScreen(
 
                 if (state.sources.isNotEmpty()) {
                     item(key = "source_title") {
-                        SectionTitle(title = "切换线路", action = state.sourceName, onAction = {})
+                        SectionTitle(title = "切换线路", caption = "共 ${state.episodes.size} 集")
                     }
                     item(key = "source_row") {
                         SourceRow(

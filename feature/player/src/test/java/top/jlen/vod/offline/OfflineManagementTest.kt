@@ -11,6 +11,19 @@ import org.junit.Test
 import java.io.File
 
 class OfflineManagementTest {
+    @Test fun albumStatusCombinesOnlyActiveSpeedsAndExplainsBlockedTransfers() {
+        fun entry(stage: Stage, speed: Long = 0L) = Entry("id", "vod", "影片", "线路", 0, 0, "集", "url", 0L,
+            stage = stage, bytesPerSecond = speed)
+        val pending = listOf(entry(Stage.ACTIVE, 200), entry(Stage.ACTIVE, 300), entry(Stage.PAUSED, 100), entry(Stage.FAILED))
+        fun status(rows: List<Entry>, allowed: Boolean, mobile: Boolean = false) =
+            albumTransferStatus(rows, allowed, mobile) { "$it B" }
+
+        assertEquals("下载中 · 500 B/s · 1 项失败", status(pending, true))
+        assertEquals("等待 Wi-Fi · 1 项失败", status(pending, false))
+        assertEquals("等待网络", status(listOf(entry(Stage.QUEUED)), false, true))
+        assertEquals("已暂停", status(listOf(entry(Stage.PAUSED)), false))
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test fun changingLimitFillsSlotsInOrderWithoutInterruptingExistingTransfers() = runTest {
         val waiting = (1..6).toMutableList()

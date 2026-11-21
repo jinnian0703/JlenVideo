@@ -220,7 +220,7 @@ fun DetailScreen(
                         )
                     }
                     source?.let { selected ->
-                        item { SectionTitle(title = "选集播放", action = selected.name, onAction = {}) }
+                        item { SectionTitle(title = "选集播放", caption = "共 ${selected.episodes.size} 集") }
                         item {
                             EpisodePanel(
                                 episodes = selected.episodes,

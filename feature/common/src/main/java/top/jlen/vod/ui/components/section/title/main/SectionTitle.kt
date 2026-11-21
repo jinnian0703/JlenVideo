@@ -26,9 +26,10 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SectionTitle(
     title: String,
-    action: String?,
+    action: String? = null,
     icon: @Composable (() -> Unit)? = null,
-    onAction: () -> Unit
+    caption: String? = null,
+    onAction: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -58,7 +59,7 @@ fun SectionTitle(
                 color = UiPalette.Ink
             )
         }
-        if (!action.isNullOrBlank()) {
+        if (!action.isNullOrBlank() && onAction != null) {
             TextButton(
                 onClick = onAction,
                 colors = ButtonDefaults.textButtonColors(
@@ -78,6 +79,8 @@ fun SectionTitle(
                     modifier = Modifier.width(16.dp)
                 )
             }
+        } else if (caption != null) {
+            Text(caption, style = MaterialTheme.typography.labelLarge, color = UiPalette.TextSecondary)
         }
     }
 }

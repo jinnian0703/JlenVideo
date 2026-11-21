@@ -12,6 +12,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -72,7 +76,7 @@ fun PlayerEpisodePicker(
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("选集", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                        IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
+                        IconButton(onClick = onDismiss) {
                             Icon(Icons.Rounded.Close, contentDescription = "关闭选集")
                         }
                     }
@@ -97,12 +101,12 @@ fun PlayerEpisodePicker(
                         Text("该线路暂无剧集", modifier = Modifier.padding(vertical = 12.dp))
                     } else key(sourceIndex, page) {
                         val startIndex = if (playingThisSource && playingEpisode in first until end) playingEpisode - first else 0
-                        LazyVerticalGrid(columns = GridCells.Adaptive(76.dp), state = rememberLazyGridState(startIndex),
+                        LazyVerticalGrid(columns = GridCells.Adaptive(88.dp), state = rememberLazyGridState(startIndex),
                             horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             items(end - first) { offset ->
                                 val index = first + offset
                                 val playing = playingThisSource && index == playingEpisode
-                                PickerOption(episodes[index].ifBlank { "第 ${index + 1} 集" }, playing) {
+                                EpisodeOption(episodes[index].ifBlank { "第 ${index + 1} 集" }, playing) {
                                     onDismiss()
                                     if (!playing) onPick(sourceIndex, index)
                                 }
@@ -118,9 +122,28 @@ fun PlayerEpisodePicker(
 @Composable
 private fun PickerOption(label: String, selected: Boolean, onClick: () -> Unit) {
     Text(label, modifier = Modifier.clip(RoundedCornerShape(10.dp))
-        .background(if (selected) Color(0xFFD5E8FF) else Color.White.copy(alpha = 0.08f))
+        .background(if (selected) Color.White.copy(alpha = 0.20f) else Color.Transparent)
         .selectable(selected = selected, onClick = onClick).padding(horizontal = 12.dp, vertical = 8.dp),
-        color = if (selected) Color(0xFF122941) else Color.White,
+        color = if (selected) Color.White else Color.White.copy(alpha = 0.72f),
         style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center,
         maxLines = 1, overflow = TextOverflow.Ellipsis)
+}
+
+@Composable
+private fun EpisodeOption(label: String, playing: Boolean, onClick: () -> Unit) {
+    val foreground = if (playing) Color(0xFF122941) else Color.White
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+            .background(if (playing) Color(0xFFD5E8FF) else Color.White.copy(alpha = 0.08f))
+            .selectable(selected = playing, onClick = onClick)
+            .semantics { if (playing) stateDescription = "正在播放" }
+            .heightIn(min = 48.dp).padding(horizontal = 6.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (playing) Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp), tint = foreground)
+        Text(label, color = foreground, style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (playing) FontWeight.Bold else FontWeight.Medium, textAlign = TextAlign.Center,
+            maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
 }

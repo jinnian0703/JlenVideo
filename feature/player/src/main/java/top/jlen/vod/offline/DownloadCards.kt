@@ -23,7 +23,7 @@ import top.jlen.vod.ui.UiPalette
 import java.io.File
 
 @Composable
-internal fun DownloadAlbumCard(title: String, cover: File?, downloaded: Int, single: Boolean, size: String,
+internal fun DownloadAlbumCard(title: String, cover: File?, summary: String, status: String?,
     expanded: Boolean, managing: Boolean, toggle: () -> Unit) {
     Surface(shape = RoundedCornerShape(20.dp), color = UiPalette.Surface, border = BorderStroke(1.dp, UiPalette.Border)) {
         Row(Modifier.fillMaxWidth().clickable(enabled = !managing, onClickLabel = if (expanded) "收起剧集" else "展开剧集", onClick = toggle)
@@ -35,7 +35,10 @@ internal fun DownloadAlbumCard(title: String, cover: File?, downloaded: Int, sin
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, color = UiPalette.Ink, fontWeight = FontWeight.Bold,
                     maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text("已下载 $downloaded ${if (single) "部" else "集"} · $size", style = MaterialTheme.typography.bodySmall, color = UiPalette.TextSecondary)
+                Text(summary, style = MaterialTheme.typography.bodySmall, color = UiPalette.TextSecondary)
+                if (status != null) {
+                    Text(status, style = MaterialTheme.typography.labelMedium, color = UiPalette.Ink)
+                }
             }
             if (!managing) Icon(if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, null, tint = UiPalette.TextSecondary)
         }

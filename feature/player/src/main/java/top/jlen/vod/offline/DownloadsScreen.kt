@@ -27,6 +27,23 @@ internal val Stage.label get() = when (this) {
     Stage.QUEUED -> "排队中"; Stage.ACTIVE -> "下载中"; Stage.PAUSED -> "已暂停"; Stage.FAILED -> "下载失败"; Stage.DONE -> "已下载"
 }
 
+private fun waitingForNetwork(mobileAllowed: Boolean) = if (mobileAllowed) "等待网络" else "等待 Wi-Fi"
+
+internal fun albumTransferStatus(pending: List<Entry>, allowed: Boolean, mobile: Boolean, formatSize: (Long) -> String): String? {
+    val active = pending.filter { it.stage == Stage.ACTIVE }
+    val queued = pending.count { it.stage == Stage.QUEUED }
+    val failed = pending.count { it.stage == Stage.FAILED }
+    val status = when {
+        !allowed && (active.isNotEmpty() || queued > 0) -> waitingForNetwork(mobile)
+        active.isNotEmpty() -> "下载中 · ${formatSize(active.sumOf { it.bytesPerSecond })}/s"
+        queued > 0 -> "排队中"
+        pending.any { it.stage == Stage.PAUSED } -> "已暂停"
+        else -> null
+    }
+    if (failed == 0) return status
+    return listOfNotNull(status, "$failed 项失败").joinToString(" · ")
+}
+
 @Composable
 fun DownloadsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -104,8 +121,12 @@ fun DownloadsScreen(onBack: () -> Unit) {
                     val folders = all.map { it.folder.ifEmpty { it.id } }.distinct()
                     val bytes = disk?.let { scan -> folders.sumOf { scan.folders[it] ?: 0L } }
                     val cover = all.firstOrNull { it.folder in disk?.covers.orEmpty() }?.let(lib::cover)
-                    DownloadAlbumCard(first.title, cover, all.count { it.stage == Stage.DONE }, all.all { it.single } && all.size == 1,
-                        bytes?.let(::size) ?: "统计中…", expanded, manage) {
+                    val finished = all.count { it.stage == Stage.DONE }
+                    val unit = if (all.singleOrNull()?.single == true) "部" else "集"
+                    val count = if (completed) "已下载 $finished $unit" else "已完成 $finished/${all.size} $unit"
+                    val summary = "$count · ${bytes?.let(::size) ?: "统计中…"}"
+                    val status = if (completed) null else albumTransferStatus(group, allowed, mobile, ::size)
+                    DownloadAlbumCard(first.title, cover, summary, status, expanded, manage) {
                         toggled = ArrayList(if (key in toggled) toggled - key else toggled + key)
                     }
                 }
@@ -134,7 +155,7 @@ private fun DownloadRow(row: Entry, allowed: Boolean, mobile: Boolean, manage: B
     val running = row.stage == Stage.ACTIVE && allowed
     val status = when {
         row.stage == Stage.FAILED -> row.error.ifBlank { row.stage.label }
-        !allowed && row.stage in setOf(Stage.QUEUED, Stage.ACTIVE) -> if (mobile) "等待网络" else "等待 Wi-Fi"
+        !allowed && row.stage in setOf(Stage.QUEUED, Stage.ACTIVE) -> waitingForNetwork(mobile)
         else -> row.stage.label
     }
     Surface(shape = RoundedCornerShape(16.dp), color = colors.surface) {
