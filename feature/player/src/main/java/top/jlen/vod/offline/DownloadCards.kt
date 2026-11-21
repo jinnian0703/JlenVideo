@@ -48,7 +48,7 @@ internal fun DownloadAlbumCard(title: String, cover: File?, summary: String, sta
 @Composable
 internal fun RemoveDownloadsDialog(rows: List<Entry>, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     val action = when {
-        rows.all { it.stage == Stage.DONE } -> "删除下载"
+        rows.all { it.stage == Stage.DONE } -> "删除文件"
         rows.none { it.stage == Stage.DONE } -> "取消下载"
         else -> "移除所选项目"
     }
@@ -60,7 +60,7 @@ internal fun RemoveDownloadsDialog(rows: List<Entry>, onDismiss: () -> Unit, onC
                 Text("$action？", style = MaterialTheme.typography.headlineSmall, color = UiPalette.Ink, fontWeight = FontWeight.Bold)
                 Text(when (action) {
                     "取消下载" -> "所选任务将停止，已经下载的部分也会从手机移除。"
-                    "删除下载" -> "所选视频将从手机移除，需要重新下载才能离线观看。"
+                    "删除文件" -> "所选视频将从手机移除，需要重新下载才能离线观看。"
                     else -> "所选任务和对应的本地视频将从手机移除。"
                 }, style = MaterialTheme.typography.bodyMedium, color = UiPalette.TextSecondary)
                 Surface(color = UiPalette.SurfaceSoft, shape = RoundedCornerShape(14.dp)) {

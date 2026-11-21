@@ -11,9 +11,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
@@ -21,11 +26,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import top.jlen.vod.offline.DownloadEpisodeDialog
+import top.jlen.vod.offline.resolveDownloadSources
+
+private enum class DownloadPrompt { Closed, Password, Episodes }
 
 @Composable
 fun DetailScreen(
@@ -62,6 +75,21 @@ fun DetailScreen(
             val item = detailItem
             val source = state.selectedSource
             val downloadVod = item.vodId.ifBlank { item.siteVodId }.ifBlank { state.requestedVodId.orEmpty() }
+            var downloadPrompt by rememberSaveable(downloadVod) { mutableStateOf(DownloadPrompt.Closed) }
+            val needsDownloadPassword = item.downloadPassword == 1 && item.downloadGroups.isNullOrEmpty()
+            when (downloadPrompt) {
+                DownloadPrompt.Password -> ContentUnlockPrompt("下载", onDismiss = { downloadPrompt = DownloadPrompt.Closed },
+                    onVerified = { downloadPrompt = DownloadPrompt.Episodes }) { onUnlock(5, it) }
+                DownloadPrompt.Episodes -> {
+                    val sources = remember(item.downloadGroups, needsDownloadPassword, state.sources) {
+                        resolveDownloadSources(item.downloadGroups.orEmpty(), needsDownloadPassword, state.sources)
+                    }
+                    DownloadEpisodeDialog(downloadVod, item.displayTitle, item.vodPic.orEmpty(), sources,
+                        initialSource = if (item.downloadGroups.isNullOrEmpty()) state.selectedSourceIndex else 0,
+                        loading = state.isLoading, onDismiss = { downloadPrompt = DownloadPrompt.Closed })
+                }
+                DownloadPrompt.Closed -> Unit
+            }
             val downloadLabels = top.jlen.vod.offline.episodeDownloadLabels(downloadVod, state.selectedSourceIndex, source?.name.orEmpty())
             val detailSubtitle = remember(item, state.sources) {
                 resolvedDetailSubtitle(item).ifBlank { "站内资源" }
@@ -148,7 +176,7 @@ fun DetailScreen(
                                 shape = androidx.compose.foundation.shape.RoundedCornerShape(UiDimens.ControlRadius),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = UiPalette.Accent,
-                                    contentColor = UiPalette.AccentText
+                                    contentColor = Color(0xFF20100D)
                                 )
                             ) {
                                 Text(primaryActionLabel, fontWeight = FontWeight.ExtraBold)
@@ -182,7 +210,8 @@ fun DetailScreen(
                                 }
 
                                 OutlinedButton(
-                                    onClick = onBack,
+                                    onClick = { downloadPrompt = if (needsDownloadPassword) DownloadPrompt.Password else DownloadPrompt.Episodes },
+                                    enabled = downloadVod.isNotBlank(),
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(UiDimens.SecondaryButtonHeight),
@@ -193,7 +222,9 @@ fun DetailScreen(
                                         contentColor = UiPalette.TextPrimary
                                     )
                                 ) {
-                                    Text("返回", fontWeight = FontWeight.Bold)
+                                    Icon(Icons.Rounded.Download, null, Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("下载", fontWeight = FontWeight.Bold)
                                 }
                             }
                         }

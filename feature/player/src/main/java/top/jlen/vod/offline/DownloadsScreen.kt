@@ -65,7 +65,7 @@ fun DownloadsScreen(onBack: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     fun size(n: Long) = Formatter.formatShortFileSize(context, n)
     LaunchedEffect(lib) { lib.schedule() }
-    Column(Modifier.fillMaxSize().background(UiPalette.BackgroundTop).appTopInsetsPadding()) {
+    Column(Modifier.fillMaxSize().background(UiPalette.BackgroundTop).appTopInsetsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
             Text("下载管理", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -73,7 +73,7 @@ fun DownloadsScreen(onBack: () -> Unit) {
                 Text(if (manage) "完成" else "管理")
             }
         }
-        LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
+        LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item(key = "storage") {
                 Surface(shape = RoundedCornerShape(22.dp), color = UiPalette.SurfaceStrong) {
@@ -95,20 +95,12 @@ fun DownloadsScreen(onBack: () -> Unit) {
                     }
                 }
             }
-            if (manage && visible.isNotEmpty()) item(key = "batch") {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    TextButton(onClick = { selected = if (chosen == visibleIds) emptySet() else visibleIds }) {
-                        Text(if (chosen == visibleIds) "取消全选" else "全选")
-                    }
-                    TextButton(enabled = chosen.isNotEmpty(), onClick = { deleting = chosen }) { Text("删除（${chosen.size}）") }
-                }
-            }
             if (visible.isEmpty()) item(key = "empty") {
                 Column(Modifier.fillMaxWidth().padding(vertical = 28.dp), horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(if (completed) Icons.Rounded.VideoLibrary else Icons.Rounded.Download, null, Modifier.size(32.dp), tint = colors.primary)
                     Text(if (completed) "还没有离线剧集" else "暂无下载任务", style = MaterialTheme.typography.titleMedium)
-                    Text(if (completed) "下载完成后，可在这里离线播放。" else "在播放页点「下载选集」即可添加。", color = colors.onSurfaceVariant,
+                    Text(if (completed) "下载完成后，可在这里离线播放。" else "在影片详情页点「下载」，或在播放页点「下载选集」。", color = colors.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium)
                 }
             }
@@ -138,10 +130,25 @@ fun DownloadsScreen(onBack: () -> Unit) {
                 }
             }
         }
+        if (manage) Surface(color = UiPalette.Surface, shadowElevation = 4.dp) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(enabled = visibleIds.isNotEmpty(), onClick = {
+                    selected = if (chosen == visibleIds) emptySet() else visibleIds
+                }) { Text(if (chosen.isNotEmpty() && chosen == visibleIds) "取消全选" else "全选") }
+                Text("已选 ${chosen.size} 项", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge,
+                    color = UiPalette.TextSecondary)
+                Button(enabled = chosen.isNotEmpty(), onClick = { deleting = chosen }, colors = ButtonDefaults.buttonColors(
+                    containerColor = UiPalette.DangerSurface, contentColor = UiPalette.DangerText)) {
+                    Text(if (completed) "删除文件" else "取消下载")
+                }
+            }
+        }
     }
-    val targets = rows.filter { it.id in deleting }
+    val targets = visible.filter { it.id in deleting }
+    LaunchedEffect(deleting, targets.isEmpty()) { if (targets.isEmpty() && deleting.isNotEmpty()) deleting = emptySet() }
     if (targets.isNotEmpty()) RemoveDownloadsDialog(targets, onDismiss = { deleting = emptySet() }, onConfirm = {
-        lib.remove(deleting); selected -= deleting; deleting = emptySet()
+        lib.remove(deleting, completed); selected -= deleting; deleting = emptySet()
     })
 }
 

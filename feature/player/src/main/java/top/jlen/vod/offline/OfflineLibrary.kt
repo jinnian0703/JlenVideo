@@ -116,8 +116,10 @@ internal class OfflineLibrary private constructor(private val app: Context) {
         val stage = when(current.stage) { Stage.QUEUED,Stage.ACTIVE -> Stage.PAUSED; Stage.PAUSED,Stage.FAILED -> Stage.QUEUED; Stage.DONE -> return }
         replace(current.copy(stage = stage,error = "",bytesPerSecond = 0)); if(stage == Stage.PAUSED) active[current.id]?.stop(); wake.trySend(Unit); schedule()
     }
-    @Synchronized fun remove(ids: Set<String>) {
-        val removed = entries.value.filter { it.id in ids }; entries.value = entries.value - removed.toSet()
+    @Synchronized fun remove(ids: Set<String>, completed: Boolean) {
+        val removed = entries.value.filter { it.id in ids && (it.stage == Stage.DONE) == completed }
+        if (removed.isEmpty()) return
+        entries.value = entries.value - removed.toSet()
         val pending = removed.map { it.id to it.folder }
         val edit = prefs.edit()
         pending.forEach { (id, folder) -> edit.remove(id).putString(REMOVING + id, folder) }

@@ -8,9 +8,23 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Test
+import top.jlen.vod.data.CmsSourceGroup
+import top.jlen.vod.data.Episode
+import top.jlen.vod.data.PlaySource
 import java.io.File
 
 class OfflineManagementTest {
+    @Test fun downloadPickerUsesDedicatedSourcesAndOnlyFallsBackWhenUnlocked() {
+        val episode = Episode("第一集", "https://example.org/video.mp4")
+        val playback = listOf(PlaySource("空线路", emptyList()), PlaySource("在线播放", listOf(episode)))
+        val dedicated = listOf(CmsSourceGroup("空下载源"), CmsSourceGroup("离线专线", listOf(episode)))
+
+        assertEquals(listOf(PlaySource("离线专线", listOf(episode))), resolveDownloadSources(dedicated, true, playback))
+        assertTrue(resolveDownloadSources(emptyList(), true, playback).isEmpty())
+        assertTrue(resolveDownloadSources(listOf(CmsSourceGroup("空下载源")), false, playback).isEmpty())
+        assertEquals(playback, resolveDownloadSources(emptyList(), false, playback))
+    }
+
     @Test fun albumStatusCombinesOnlyActiveSpeedsAndExplainsBlockedTransfers() {
         fun entry(stage: Stage, speed: Long = 0L) = Entry("id", "vod", "影片", "线路", 0, 0, "集", "url", 0L,
             stage = stage, bytesPerSecond = speed)

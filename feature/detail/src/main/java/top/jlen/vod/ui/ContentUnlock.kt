@@ -13,7 +13,12 @@ import kotlinx.coroutines.launch
 internal fun ContentUnlock(label: String, inline: Boolean = false, verify: suspend (String) -> Unit) {
     var showing by remember { mutableStateOf(false) }
     if (!showing || !inline) TextButton(onClick = { showing = true }) { Text("输入${label}密码") }
-    if (!showing) return
+    if (showing) ContentUnlockPrompt(label, inline, onDismiss = { showing = false }, verify = verify)
+}
+
+@Composable
+internal fun ContentUnlockPrompt(label: String, inline: Boolean = false, onDismiss: () -> Unit,
+                                onVerified: () -> Unit = onDismiss, verify: suspend (String) -> Unit) {
     var answer by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -28,16 +33,16 @@ internal fun ContentUnlock(label: String, inline: Boolean = false, verify: suspe
     val submit: @Composable () -> Unit = { TextButton(enabled = answer.isNotBlank() && !busy, onClick = {
         busy = true
         scope.launch {
-            try { verify(answer); showing = false }
+            try { verify(answer); onVerified() }
             catch (cancel: CancellationException) { throw cancel }
             catch (failure: Exception) { error = failure.message ?: "验证失败，请重试" }
             finally { busy = false }
         }
     }) { Text("解锁") } }
-    val cancel: @Composable () -> Unit = { TextButton(enabled = !busy, onClick = { showing = false }) { Text("取消") } }
+    val cancel: @Composable () -> Unit = { TextButton(enabled = !busy, onClick = onDismiss) { Text("取消") } }
     if (inline) Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         input()
         Row { submit(); cancel() }
-    } else AlertDialog(onDismissRequest = { if (!busy) showing = false }, title = { Text("${label}密码") },
+    } else AlertDialog(onDismissRequest = { if (!busy) onDismiss() }, title = { Text("${label}密码") },
         text = input, confirmButton = submit, dismissButton = cancel)
 }
