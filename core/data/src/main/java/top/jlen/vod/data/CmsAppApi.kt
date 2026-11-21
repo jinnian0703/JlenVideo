@@ -31,7 +31,7 @@ class CmsAppApi internal constructor(client: OkHttpClient, base: String) {
 
     suspend fun cookieLoginEnabled() = config().firstObject("auth")?.firstInt("cookie_enabled") == 1
 
-    private suspend fun request(path: String, query: Map<String, String> = emptyMap(),
+    internal suspend fun request(path: String, query: Map<String, String> = emptyMap(),
                                 form: Map<String, String>? = null, csrf: String = ""): JsonObject {
         val url = api.newBuilder().addPathSegments(path).apply {
             query.forEach { (key, value) -> addQueryParameter(key, value) }
@@ -48,7 +48,7 @@ class CmsAppApi internal constructor(client: OkHttpClient, base: String) {
         }
     }
 
-    private suspend fun token(user: String): String {
+    internal suspend fun token(user: String): String {
         val info = request("auth/me").firstObject("info")
         if (info?.firstString("user_id") != user) throw IOException("登录状态已变更，请重新登录")
         return info.firstString("csrf_token").ifBlank { throw IOException("登录已失效，请重新登录") }
@@ -106,6 +106,13 @@ class CmsAppApi internal constructor(client: OkHttpClient, base: String) {
     }
 
     suspend fun tasksEnabled() = config().firstObject("features")?.firstInt("tasks") == 1
+
+    suspend fun viewingFeatures(): ViewingFeatures {
+        val config = config()
+        if (config.firstObject("access")?.firstInt("public_api_enabled") != 1) return ViewingFeatures()
+        val flags = config.firstObject("features")
+        return ViewingFeatures(flags?.firstInt("danmaku") == 1, flags?.firstInt("chatroom") == 1, flags?.firstInt("live") == 1)
+    }
 
     suspend fun signIn(user: String): String = request("task/daily_sign", form = emptyMap(), csrf = token(user)).firstString("msg").ifBlank { "签到成功" }
 }

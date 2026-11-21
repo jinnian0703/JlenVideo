@@ -250,6 +250,14 @@ fun JlenVideoApp() {
     }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    var loadedViewingFeatures by remember { mutableStateOf<top.jlen.vod.data.ViewingFeatures?>(null) }
+    val viewingFeatures = loadedViewingFeatures ?: top.jlen.vod.data.ViewingFeatures()
+    LaunchedEffect(hasAcceptedUserAgreement, currentRoute) {
+        if (hasAcceptedUserAgreement) try {
+            loadedViewingFeatures = viewModel.viewingApi.viewingFeatures()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+          catch (_: Exception) { if (loadedViewingFeatures == null) loadedViewingFeatures = top.jlen.vod.data.ViewingFeatures() }
+    }
     val currentTopLevelRoute = normalizeTopLevelRoute(currentRoute)
     var pendingTopLevelRoute by rememberSaveable { mutableStateOf<String?>(null) }
     var homeScrollToTopSignal by rememberSaveable { mutableStateOf(0) }
@@ -486,18 +494,22 @@ fun JlenVideoApp() {
                                         onExit = { activity?.finish() }
                                     )
                                 }
-                                composable(ROUTE_ONBOARDING_LOGIN) {
+                                fun registerLogin(route: String, returnToFilm: Boolean) = composable(route) {
+                                    val finishLogin: () -> Unit = {
+                                        if (returnToFilm) navController.popBackStack() else completeFirstLoginPrompt("home")
+                                    }
                                     LaunchedEffect(viewModel.accountState.session.isLoggedIn) {
                                         if (viewModel.accountState.session.isLoggedIn) {
-                                            completeFirstLoginPrompt("home")
+                                            finishLogin()
                                         }
                                     }
                                     FirstLoginOnboardingScreen(
                                         state = viewModel.accountState,
+                                        returnToFilm = returnToFilm,
                                         onUserNameChange = viewModel::updateLoginUserName,
                                         onPasswordChange = viewModel::updateLoginPassword,
                                         onLogin = viewModel::login,
-                                        onSkip = { completeFirstLoginPrompt("home") },
+                                        onSkip = finishLogin,
                                         onAuthModeChange = viewModel::setAccountAuthMode,
                                         onRegisterEditorChange = viewModel::updateRegisterEditor,
                                         onRefreshRegisterCaptcha = viewModel::refreshRegisterCaptcha,
@@ -508,6 +520,8 @@ fun JlenVideoApp() {
                                         onFindPassword = viewModel::findPassword
                                     )
                                 }
+                                registerLogin(ROUTE_ONBOARDING_LOGIN, returnToFilm = false)
+                                registerLogin("account/film-login", returnToFilm = true)
                                 composable("home") {
                                     HomeScreen(
                                         state = viewModel.homeState,
@@ -520,6 +534,7 @@ fun JlenVideoApp() {
                                         },
                                         onRefresh = viewModel::refreshHomeAndClearCaches,
                                         onOpenDownloads = openDownloads,
+                                        onOpenLive = if (viewingFeatures.live) ({ navController.navigate("live") { launchSingleTop = true } }) else null,
                                         onRefreshAnnouncements = { viewModel.refreshNotices(forceRefresh = true) },
                                         onLoadMore = viewModel::loadMoreHome,
                                         onOpenDetail = openDetail,
@@ -714,6 +729,10 @@ fun JlenVideoApp() {
                                 }
                                 composable("downloads") {
                                     top.jlen.vod.offline.DownloadsScreen(onBack = { navController.popBackStack() })
+                                }
+                                composable("live") {
+                                    if (viewingFeatures.live) LiveScreen(viewModel.viewingApi) { navController.popBackStack() }
+                                    else if (loadedViewingFeatures != null) LaunchedEffect(Unit) { navController.popBackStack() }
                                 }
                                 composable("account/settings/cache") {
                                     LaunchedEffect(Unit) {
@@ -916,6 +935,11 @@ fun JlenVideoApp() {
                                     PlayerRouteScreen(
                                         entry = entry,
                                         viewModel = viewModel,
+                                        features = viewingFeatures,
+                                        onLogin = {
+                                            viewModel.setAccountAuthMode(AccountAuthMode.Login)
+                                            navController.navigate("account/film-login") { launchSingleTop = true }
+                                        },
                                         onBack = { navController.popBackStack() }
                                     )
                                 }
@@ -1169,6 +1193,8 @@ private fun playerRoute(
 private fun PlayerRouteScreen(
     entry: NavBackStackEntry,
     viewModel: AppViewModel,
+    features: top.jlen.vod.data.ViewingFeatures,
+    onLogin: () -> Unit,
     onBack: () -> Unit
 ) {
     // Navigation 已解码字符串参数，不再 Uri.decode，避免百分号被二次解码。
@@ -1291,6 +1317,10 @@ private fun PlayerRouteScreen(
     }
     PlayerScreen(
         vodId = vodId,
+        api = viewModel.viewingApi,
+        features = features,
+        user = viewModel.accountState.session.takeIf { it.isLoggedIn }?.userId.orEmpty(),
+        onLogin = onLogin,
         state = state,
         onBack = onBack,
         onSelectEpisode = viewModel::selectPlayerEpisode,

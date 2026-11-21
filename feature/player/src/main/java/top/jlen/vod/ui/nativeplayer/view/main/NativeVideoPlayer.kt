@@ -127,7 +127,12 @@ fun NativeVideoPlayer(
     onClose: (() -> Unit)? = null,
     localFilesOnly: Boolean = false,
     onOpenEpisodePicker: (() -> Unit)? = null,
-    onPlaybackError: (() -> Unit)? = null
+    onPlaybackError: (() -> Unit)? = null,
+    timedComments: List<top.jlen.vod.data.TimedComment> = emptyList(),
+    danmakuEnabled: Boolean = false,
+    onToggleDanmaku: (() -> Unit)? = null,
+    onWriteDanmaku: ((Long) -> Unit)? = null,
+    liveMode: Boolean = false
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -576,7 +581,7 @@ fun NativeVideoPlayer(
         }
         player.playbackParameters = PlaybackParameters(initialSnapshot.speed)
         speed = initialSnapshot.speed
-        if (kotlin.math.abs(player.currentPosition - initialSnapshot.positionMs) > 900L) {
+        if (!liveMode && kotlin.math.abs(player.currentPosition - initialSnapshot.positionMs) > 900L) {
             player.seekTo(initialSnapshot.positionMs)
             currentPosition = initialSnapshot.positionMs
         }
@@ -833,6 +838,9 @@ fun NativeVideoPlayer(
                 )
             }
 
+            if (danmakuEnabled && timedComments.isNotEmpty() && !isCasting) {
+                DanmakuOverlay(timedComments, isPlaying, currentPosition) { player.currentPosition }
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -859,7 +867,7 @@ fun NativeVideoPlayer(
                                 }
 
                                 if (
-                                    fullscreenMode &&
+                                    fullscreenMode && !liveMode &&
                                     contentSize.width > 0 &&
                                     event.x >= contentSize.width / 2f &&
                                     playbackState != Player.STATE_ENDED
@@ -914,7 +922,7 @@ fun NativeVideoPlayer(
 
                                 if (gestureMode == PlayerGestureMode.None) {
                                     gestureMode = when {
-                                        absDeltaX >= absDeltaY && duration > 0L -> PlayerGestureMode.Seek
+                                        absDeltaX >= absDeltaY && duration > 0L && !liveMode -> PlayerGestureMode.Seek
                                         gestureStartX < contentSize.width / 2f -> PlayerGestureMode.Brightness
                                         else -> PlayerGestureMode.Volume
                                     }
@@ -1321,7 +1329,7 @@ fun NativeVideoPlayer(
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Spacer(modifier = Modifier.height(4.dp))
-                    Slider(
+                    if (!liveMode) Slider(
                         value = sliderPosition,
                         onValueChange = {
                             if (!isDragging) {
@@ -1384,7 +1392,7 @@ fun NativeVideoPlayer(
                                 )
                             }
                             Text(
-                                text = "${formatMillis(currentPosition)}/${formatMillis(duration)}",
+                                text = if (liveMode) "直播" else "${formatMillis(currentPosition)}/${formatMillis(duration)}",
                                 color = Color.White,
                                 style = if (fullscreenMode) {
                                     MaterialTheme.typography.bodyLarge
@@ -1394,6 +1402,11 @@ fun NativeVideoPlayer(
                                 maxLines = 1,
                                 overflow = TextOverflow.Clip
                             )
+                            if (fullscreenMode && onToggleDanmaku != null) {
+                                ControlChip(text = if (danmakuEnabled) "弹幕开" else "弹幕关", width = 64.dp,
+                                    height = controlChipHeight, textStyle = controlPillTextStyle,
+                                    onClick = { markInteraction(); onToggleDanmaku() })
+                            }
                         }
                     }
                     val playbackActionControls: @Composable () -> Unit = {
@@ -1412,7 +1425,7 @@ fun NativeVideoPlayer(
                                         markInteraction()
                                     }
                                 )
-                                ControlChip(
+                                if (!liveMode) ControlChip(
                                     text = speedLabel(speed),
                                     width = controlChipWidth,
                                     height = controlChipHeight,
@@ -1425,7 +1438,7 @@ fun NativeVideoPlayer(
                             }
                             if (onOpenEpisodePicker != null) {
                                 ControlChip(
-                                    text = "选集",
+                                    text = if (liveMode) "频道" else "选集",
                                     width = controlChipWidth,
                                     height = controlChipHeight,
                                     textStyle = controlPillTextStyle,
@@ -1512,6 +1525,16 @@ fun NativeVideoPlayer(
                             WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
                         )
                 )
+            }
+        }
+    }
+    if (!fullscreenMode && onToggleDanmaku != null) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.FilterChip(selected = danmakuEnabled, onClick = onToggleDanmaku,
+                label = { Text(if (danmakuEnabled) "弹幕已开" else "弹幕已关") })
+            Spacer(Modifier.weight(1f))
+            androidx.compose.material3.TextButton(onClick = { onWriteDanmaku?.invoke(player.currentPosition) }, enabled = !isCasting) {
+                Text("发弹幕")
             }
         }
     }

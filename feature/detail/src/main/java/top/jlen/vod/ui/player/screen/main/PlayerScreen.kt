@@ -58,6 +58,8 @@ import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -81,12 +83,17 @@ import kotlinx.coroutines.delay
 import top.jlen.vod.data.Episode
 import top.jlen.vod.data.VodItem
 import top.jlen.vod.data.isDirectMediaUrl
+import top.jlen.vod.data.*
 
 private const val EXPANDED_PLAYBACK_WINDOW_MIN_DP = 600
 
 @Composable
 fun PlayerScreen(
     vodId: String,
+    api: CmsAppApi,
+    features: ViewingFeatures,
+    user: String,
+    onLogin: () -> Unit,
     state: PlayerUiState,
     onBack: () -> Unit,
     onSelectEpisode: (Int) -> Unit,
@@ -113,6 +120,32 @@ fun PlayerScreen(
     val playUrl = state.playUrl
     val resolveError = state.resolveError
     val directPlayable = resolveError == null && isDirectMediaUrl(playUrl)
+    val validVod = downloadVod.toLongOrNull()?.let { it > 0 } == true
+    val thread = EpisodeThread(downloadVod, state.selectedSourceIndex, state.selectedEpisodeIndex)
+    val hasDanmaku = features.danmaku && validVod && source?.episodes?.getOrNull(state.selectedEpisodeIndex) != null
+    val hasChat = features.chat && validVod
+    val currentDanmakuAvailable = rememberUpdatedState(hasDanmaku)
+    val prefs = remember(context) { context.getSharedPreferences("player_interaction", Context.MODE_PRIVATE) }
+    var danmakuOn by remember { mutableStateOf(prefs.getBoolean("danmaku", false)) }
+    var writingAt by remember(thread) { mutableStateOf<Long?>(null) }
+    var reload by remember(thread) { mutableIntStateOf(0) }
+    var messages by remember(thread) { mutableStateOf(emptyList<TimedComment>()) }
+    var discussing by rememberSaveable(downloadVod) { mutableStateOf(false) }
+    val currentUser by rememberUpdatedState(user)
+    LaunchedEffect(thread, hasDanmaku, danmakuOn, reload) {
+        if (hasDanmaku && danmakuOn) viewingRequest { api.danmaku(thread) }.onSuccess { messages = it }.onFailure {
+            android.widget.Toast.makeText(context, "弹幕加载失败，可关闭后重试", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+    if (hasDanmaku) writingAt?.let { stamp -> key(thread) {
+        MessageComposer("发弹幕 · ${stamp / 60000}分${stamp / 1000 % 60}秒", 200, { writingAt = null }) {
+            api.sendDanmaku(currentUser, thread, stamp, it)
+            danmakuOn = true
+            prefs.edit().putBoolean("danmaku", true).apply()
+            reload++
+            android.widget.Toast.makeText(context, "弹幕已发送", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    } }
     var isFullscreen by rememberSaveable {
         mutableStateOf(false)
     }
@@ -280,6 +313,7 @@ fun PlayerScreen(
     val hasSources = state.sources.isNotEmpty()
     val playerContent = remember(
         playUrl,
+        thread,
         state.title,
         state.sourceName,
         state.episodeName,
@@ -294,6 +328,13 @@ fun PlayerScreen(
                 hasNextEpisode = state.hasNextEpisode,
                 onNextEpisode = onPlayNext,
                 onOpenEpisodePicker = openEpisodePicker,
+                timedComments = messages,
+                danmakuEnabled = danmakuOn && currentDanmakuAvailable.value,
+                onToggleDanmaku = if (currentDanmakuAvailable.value) ({
+                    danmakuOn = !danmakuOn
+                    prefs.edit().putBoolean("danmaku", danmakuOn).apply()
+                }) else null,
+                onWriteDanmaku = { stamp -> if (currentUser.isBlank()) onLogin() else writingAt = stamp },
                 onPlaybackError = { onResolveFallbackFailed("视频播放失败，请刷新或切换线路") },
                 onToggleFullscreen = { snapshot, _ ->
                     setFullscreen(!fullscreen, snapshot)
@@ -359,7 +400,16 @@ fun PlayerScreen(
                     }
                 }
             }
-            LazyColumn(
+            if (hasChat && !isFullscreen) {
+                androidx.compose.material3.TabRow(selectedTabIndex = if (discussing) 1 else 0) {
+                    listOf("选集", "讨论").forEachIndexed { index, label ->
+                        androidx.compose.material3.Tab(selected = discussing == (index == 1), onClick = { discussing = index == 1 }, text = { Text(label) })
+                    }
+                }
+            }
+            if (hasChat && discussing && !isFullscreen) key(downloadVod) {
+                FilmDiscussion(api, downloadVod, user, onLogin)
+            } else LazyColumn(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
@@ -550,7 +600,7 @@ private data class PlayerTransitionFeedback(
     val detail: String? = null
 )
 
-private tailrec fun Context.findActivity(): Activity? = when (this) {
+internal tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null

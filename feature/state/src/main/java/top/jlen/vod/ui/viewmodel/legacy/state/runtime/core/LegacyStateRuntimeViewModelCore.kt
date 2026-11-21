@@ -34,6 +34,7 @@ import top.jlen.vod.data.VodItem
 
 open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidViewModel(application) {
     private val repository = AppleCmsRepository(application)
+    val viewingApi get() = repository.appApi
     internal val loginChallenges = LoginChallengeController {
         withContext(Dispatchers.IO) { repository.appApi.captcha() }
     }

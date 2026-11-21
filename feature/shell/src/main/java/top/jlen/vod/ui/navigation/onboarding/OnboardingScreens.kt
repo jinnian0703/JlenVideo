@@ -239,6 +239,7 @@ private fun AgreementSection(
 @Composable
 fun FirstLoginOnboardingScreen(
     state: AccountUiState,
+    returnToFilm: Boolean = false,
     onUserNameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onLogin: () -> Unit,
@@ -258,9 +259,9 @@ fun FirstLoginOnboardingScreen(
         else -> "登录账号"
     }
     val subtitle = when (state.authMode) {
-        AccountAuthMode.Register -> "创建账号后，可继续在这里登录并完成首次引导。"
+        AccountAuthMode.Register -> "创建账号后即可登录。"
         AccountAuthMode.FindPassword -> "重置密码后，可返回登录并继续进入应用。"
-        else -> "登录后可同步追剧、播放记录和会员积分，也可以先跳过进入首页。"
+        else -> if (returnToFilm) "登录后可发弹幕、参与影片讨论。" else "登录后可同步追剧、播放记录和会员积分，也可以先跳过进入首页。"
     }
 
     Column(
@@ -364,7 +365,7 @@ fun FirstLoginOnboardingScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                text = "跳过，先逛逛",
+                text = if (returnToFilm) "返回播放页" else "跳过，先逛逛",
                 fontWeight = FontWeight.Bold,
                 color = UiPalette.TextSecondary
             )
