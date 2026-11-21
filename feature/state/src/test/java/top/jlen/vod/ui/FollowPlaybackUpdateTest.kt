@@ -55,6 +55,12 @@ class FollowPlaybackUpdateTest {
     @Test fun refreshDoesNotResurrectRemovedFavorite() {
         assertTrue(mergeNewerFollowPlayback(emptyList(), listOf(card)).isEmpty())
     }
+
+    @Test fun oldFollowSubtitlesDropOnlyStandaloneSourceLabels() {
+        assertEquals("", resolveFollowSubtitle("1080zyk", "1080zyk | 1080ZYK | 1080zyk"))
+        assertEquals("动画 | liangzi版访谈", resolveFollowSubtitle("liangzi", null, "liangzi", "liangzi | liangzi | 动画 | liangzi版访谈"))
+    }
+
     @Test fun newerLoadedRecordWins() {
         val loaded = card.copy(lastWatchedAtMillis = 240_000L)
         assertSame(loaded, mergeNewerFollowPlayback(listOf(loaded), listOf(card)).single())

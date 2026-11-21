@@ -7,6 +7,14 @@ import org.junit.Test
 
 class ParsingRegressionTest {
     @Test
+    fun refreshingHistoryKeepsOneSourceAndPreservesEpisodeAndMetadata() {
+        var subtitle = " 1080ZYK | 1080zyk | 线路1 · 第1集 | 1080zyk版幕后花絮"
+        subtitle = replaceHistorySourceLabel(subtitle, "liangzi", "1080zyk")
+        repeat(3) { subtitle = replaceHistorySourceLabel(subtitle, "liangzi", "liangzi") }
+        assertEquals("liangzi | 第1集 | 1080zyk版幕后花絮", subtitle)
+    }
+
+    @Test
     fun mediaDetectionUsesPathAndIgnoresQueryAndFragment() {
         assertTrue(isDirectMediaUrl("https://example.test/clip.MP4?expires=42#play"))
         assertTrue(isDirectMediaUrl("https://example.test/index.m3u8#start"))

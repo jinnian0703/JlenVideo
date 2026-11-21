@@ -15,6 +15,7 @@ import top.jlen.vod.data.PlaybackResumeRecord
 import top.jlen.vod.data.UserCenterItem
 import top.jlen.vod.data.VodItem
 import top.jlen.vod.data.sanitizeUserFacingComposite
+import top.jlen.vod.data.withoutHistorySourceLabels
 
 internal fun LegacyStateRuntimeViewModelCore.legacyRefreshFollowContent(forceRefresh: Boolean = false) {
     val runningRefresh = currentFollowRefreshJob()
@@ -341,15 +342,6 @@ private suspend fun LegacyStateRuntimeViewModelCore.buildFollowItem(
         ?: favorite.title.takeIf { it.isNotBlank() }
         ?: cached?.title
         ?: return null
-    val subtitle = listOfNotNull(
-        detailItem?.resolvedSubtitle?.takeIf { it.isNotBlank() },
-        favorite.subtitle.takeIf { it.isNotBlank() },
-        bestHistory?.subtitle?.takeIf { it.isNotBlank() },
-        cached?.subtitle?.takeIf { it.isNotBlank() }
-    )
-        .map(::sanitizeUserFacingComposite)
-        .firstOrNull { it.isNotBlank() }
-        .orEmpty()
     val sourceName = localResume?.sourceName
         ?.takeIf { it.isNotBlank() }
         ?: bestHistory?.sourceName
@@ -360,7 +352,7 @@ private suspend fun LegacyStateRuntimeViewModelCore.buildFollowItem(
         vodId = vodId,
         title = title,
         poster = detailItem?.vodPic ?: cached?.poster,
-        subtitle = subtitle,
+        subtitle = resolveFollowSubtitle(sourceName, detailItem?.resolvedSubtitle, favorite.subtitle, cached?.subtitle),
         latestEpisodeLabel = latestEpisodeLabel,
         latestEpisodeIndex = latestEpisode?.index,
         watchedEpisodeIndex = watchedEpisodeIndex,
@@ -401,7 +393,7 @@ private fun LegacyStateRuntimeViewModelCore.buildFollowItemFromDetail(
         vodId = vodId,
         title = item.displayTitle.takeIf { it.isNotBlank() } ?: cached?.title.orEmpty(),
         poster = item.vodPic ?: cached?.poster,
-        subtitle = item.resolvedSubtitle.takeIf { it.isNotBlank() } ?: cached?.subtitle.orEmpty(),
+        subtitle = resolveFollowSubtitle(sourceName, item.resolvedSubtitle, cached?.subtitle),
         latestEpisodeLabel = latestEpisode?.label.orEmpty(),
         latestEpisodeIndex = latestEpisode?.index,
         watchedEpisodeIndex = watchedEpisodeIndex,
@@ -418,6 +410,11 @@ private fun LegacyStateRuntimeViewModelCore.buildFollowItemFromDetail(
         sourceName = sourceName
     )
 }
+
+internal fun resolveFollowSubtitle(sourceName: String, vararg candidates: String?): String =
+    candidates.asSequence().filterNotNull()
+        .map { withoutHistorySourceLabels(sanitizeUserFacingComposite(it), sourceName) }
+        .firstOrNull(String::isNotBlank).orEmpty()
 
 private fun resolveFollowVodId(item: VodItem): String =
     item.vodId.trim()

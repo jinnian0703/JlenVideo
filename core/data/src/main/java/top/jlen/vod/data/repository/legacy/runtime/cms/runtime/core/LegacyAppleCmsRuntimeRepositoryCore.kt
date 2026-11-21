@@ -2551,7 +2551,7 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
             } else {
                 item.copy(
                     sourceName = sourceName,
-                    subtitle = replaceHistorySourceLabel(item.subtitle, sourceName)
+                    subtitle = replaceHistorySourceLabel(item.subtitle, sourceName, item.sourceName)
                 )
             }
         }

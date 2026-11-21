@@ -25,6 +25,7 @@ internal class FollowCacheStore(context: Context) {
             ?.items
             .orEmpty()
             .filter { item -> item.vodId.isNotBlank() && item.title.isNotBlank() }
+            .map { item -> item.copy(subtitle = resolveFollowSubtitle(item.sourceName, item.subtitle)) }
         return memory.putIfAbsent(key, items) ?: items
     }
 

@@ -117,14 +117,28 @@ internal fun formatHistoryRouteLabel(route: PlayRoute): String {
     }
 }
 
-internal fun replaceHistorySourceLabel(subtitle: String, sourceName: String): String {
+private val numberedHistorySource = Regex("""线路\d+""")
+private val historyEpisodeLabel = Regex("""第\d+集""")
+
+fun withoutHistorySourceLabels(subtitle: String, vararg sourceNames: String): String {
+    fun isSource(label: String) = numberedHistorySource.matches(label) ||
+        sourceNames.any { it.trim().equals(label, ignoreCase = true) }
+
+    return subtitle.splitToSequence('|').map(String::trim).mapNotNull { part ->
+        val label = part.substringBeforeLast('·').trim()
+        val episode = part.substringAfterLast('·', "").trim()
+        when {
+            part.isEmpty() || isSource(part) -> null
+            historyEpisodeLabel.matches(episode) && isSource(label) -> episode
+            else -> part
+        }
+    }.joinToString(" | ")
+}
+
+internal fun replaceHistorySourceLabel(subtitle: String, sourceName: String, previousSourceName: String): String {
     if (subtitle.isBlank() || sourceName.isBlank()) return subtitle
-    val replaced = subtitle.replaceFirst(Regex("^线路\\d+"), sourceName)
-    return if (replaced == subtitle) {
-        "$sourceName | $subtitle"
-    } else {
-        replaced
-    }
+    val metadata = withoutHistorySourceLabels(subtitle, sourceName, previousSourceName)
+    return listOf(sourceName.trim(), metadata).filter(String::isNotBlank).joinToString(" | ")
 }
 
 internal suspend fun collectAllUserCenterItems(
