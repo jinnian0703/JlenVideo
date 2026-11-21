@@ -762,77 +762,35 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     }
 
     suspend fun loadHotSearchGroups(forceRefresh: Boolean = false): List<HotSearchGroup> {
-        if (!forceRefresh) {
-            hotSearchCache
-                ?.takeIf { isCacheValid(it.timestampMs, runtimeCacheRetentionMs()) }
-                ?.value
-                ?.let { return it }
-
-            hotSearchCacheStore.load()
-                ?.takeIf { isCacheValid(it.cachedAt, runtimeCacheRetentionMs()) }
-                ?.groups
-                ?.takeIf { it.isNotEmpty() }
-                ?.let { cachedGroups ->
-                    hotSearchCache = CachedValue(
-                        value = cachedGroups,
-                        timestampMs = System.currentTimeMillis()
-                    )
-                    return cachedGroups
-                }
-        }
-
-        val staleGroups = hotSearchCacheStore.load()?.groups.orEmpty()
-        return if (forceRefresh) {
-            loadFreshHotSearchGroups()
-        } else {
-            awaitSharedRequest("hot_search") {
-                hotSearchCache
-                    ?.takeIf { isCacheValid(it.timestampMs, runtimeCacheRetentionMs()) }
-                    ?.value
-                    ?: runSuspendCatching { loadFreshHotSearchGroups() }
-                        .getOrElse { error ->
-                            staleGroups.takeIf { it.isNotEmpty() } ?: throw error
-                        }
-            }
-        }
-    }
-
-    private suspend fun loadFreshHotSearchGroups(): List<HotSearchGroup> {
-        val groups = coroutineScope {
-            listOf(
-                async {
-                    runSuspendCatching { loadTencentHotSearchGroup(limit = 10) }
-                        .getOrNull()
-                },
-                async {
-                    runSuspendCatching { loadIqiyiHotSearchGroup(limit = 10) }
-                        .getOrNull()
-                },
-                async {
-                    runSuspendCatching { loadYoukuHotSearchGroup(limit = 10) }
-                        .getOrNull()
-                },
-                async {
-                    runSuspendCatching { loadMgtvHotSearchGroup(limit = 10) }
-                        .getOrNull()
-                }
-            ).awaitAll()
-                .filterNotNull()
-                .filter { it.items.isNotEmpty() }
-        }
-
-        hotSearchCache = CachedValue(
-            value = groups,
-            timestampMs = System.currentTimeMillis()
-        )
-        hotSearchCacheStore.save(
-            HotSearchCacheSnapshot(
-                groups = groups,
-                cachedAt = System.currentTimeMillis()
+        return awaitSharedRequest("hot_search") {
+            val cached = hotSearchCache ?: hotSearchCacheStore.load()?.let { CachedValue(it.groups, it.cachedAt) }
+            val valid = cached?.takeIf { isCacheValid(it.timestampMs, runtimeCacheRetentionMs()) }
+            val reuse = if (forceRefresh) emptyList() else valid?.value.orEmpty()
+            val loaders: Map<String, suspend (Int) -> HotSearchGroup> = linkedMapOf(
+                "腾讯视频" to ::loadTencentHotSearchGroup,
+                "爱奇艺" to ::loadIqiyiHotSearchGroup,
+                "优酷" to ::loadYoukuHotSearchGroup,
+                "芒果TV" to ::loadMgtvHotSearchGroup
             )
-        )
-        cleanupCachesIfNeeded()
-        return groups
+            val existing = reuse.filter { it.items.isNotEmpty() }.associateBy { it.platform }
+            if (loaders.keys.all(existing::containsKey)) return@awaitSharedRequest loaders.keys.map(existing::getValue)
+
+            val fresh = coroutineScope {
+                loaders.filterKeys { it !in existing }.values.map { load ->
+                    async { runSuspendCatching { load(10) }.getOrNull()?.takeIf { it.items.isNotEmpty() } }
+                }.awaitAll().filterNotNull()
+            }
+            if (fresh.isEmpty()) {
+                return@awaitSharedRequest cached?.value?.takeIf { it.isNotEmpty() } ?: throw IOException("热搜加载失败")
+            }
+            val combined = (reuse + fresh).associateBy { it.platform }
+            val groups = loaders.keys.mapNotNull(combined::get)
+            val timestamp = if (existing.isEmpty()) System.currentTimeMillis() else valid!!.timestampMs
+            hotSearchCache = CachedValue(groups, timestamp)
+            hotSearchCacheStore.save(HotSearchCacheSnapshot(groups, timestamp))
+            cleanupCachesIfNeeded()
+            groups
+        }
     }
 
     suspend fun loadLatestRelease(currentVersion: String): AppUpdateInfo {
@@ -2174,31 +2132,8 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     }
 
     private suspend fun loadTencentHotSearchGroup(limit: Int): HotSearchGroup {
-        val sourceUrl = RuntimeEndpoints.tencentHotSearchUrl
-        val document = fetchDocument(sourceUrl)
-        val items = document.select(".mod_rank_search_list .hotlist li a")
-            .mapIndexedNotNull { index, anchor ->
-                val keyword = sanitizeHotSearchKeyword(
-                    platform = "腾讯视频",
-                    raw = decodeSiteText(
-                    anchor.selectFirst(".name")?.text().orEmpty()
-                        .ifBlank { anchor.attr("title") }
-                    )
-                )
-                if (keyword.isBlank()) return@mapIndexedNotNull null
-                HotSearchItem(
-                    rank = anchor.selectFirst(".num")?.text()?.toIntOrNull() ?: (index + 1),
-                    keyword = keyword,
-                    platform = "腾讯视频",
-                    sourceUrl = normalizeAgainst(anchor.attr("href"), sourceUrl)
-                )
-            }
-            .distinctBy { it.keyword }
-            .take(limit)
-        return HotSearchGroup(
-            platform = "腾讯视频",
-            items = items
-        )
+        val json = fetchHtml(RuntimeEndpoints.tencentHotSearchUrl, referer = "https://v.qq.com/")
+        return parseTencentHotSearch(json, limit)
     }
 
     private suspend fun loadIqiyiHotSearchGroup(limit: Int): HotSearchGroup {
@@ -2312,66 +2247,8 @@ open class LegacyAppleCmsRuntimeRepositoryCore(
     }
 
     private suspend fun loadMgtvHotSearchGroup(limit: Int): HotSearchGroup {
-        val sourceUrl = RuntimeEndpoints.mgtvHotSearchUrl
-        val document = fetchDocument(sourceUrl)
-        val section = document.select(".m-list-single")
-            .firstOrNull { element ->
-                element.selectFirst(".title span")
-                    ?.text()
-                    ?.contains("\u70ed\u64ad") == true
-            }
-            ?: document.selectFirst(".m-list-single")
-
-        val items = section?.select(".hitv_horizontal-title a")
-            ?.mapIndexedNotNull { index, anchor ->
-                val keyword = sanitizeHotSearchKeyword(
-                    platform = "芒果TV",
-                    raw = decodeSiteText(
-                    anchor.attr("title").ifBlank { anchor.text() }
-                    )
-                )
-                if (keyword.isBlank()) return@mapIndexedNotNull null
-                HotSearchItem(
-                    rank = index + 1,
-                    keyword = keyword,
-                    platform = "\u8292\u679cTV",
-                    sourceUrl = normalizeAgainst(anchor.attr("href"), sourceUrl)
-                )
-            }
-            .orEmpty()
-            .distinctBy { it.keyword }
-            .take(limit)
-
-        return HotSearchGroup(
-            platform = "\u8292\u679cTV",
-            items = items
-        )
-    }
-
-    private fun sanitizeHotSearchKeyword(platform: String, raw: String): String {
-        val normalized = raw
-            .replace(Regex("\\s+"), " ")
-            .trim()
-            .removePrefix("#")
-            .trim()
-        if (normalized.isBlank()) return ""
-
-        val withoutEmojiSuffix = normalized
-            .replace(Regex("[\\p{So}\\p{Cn}]+.*$"), "")
-            .trim()
-
-        val cleaned = when (platform) {
-            "优酷" -> withoutEmojiSuffix
-            "芒果TV" -> withoutEmojiSuffix
-                .replace(Regex("\\s+加更版$"), "")
-                .replace(Regex("·[^·]*vlog$", RegexOption.IGNORE_CASE), "")
-                .trim()
-            else -> withoutEmojiSuffix
-        }
-
-        return cleaned
-            .replace(Regex("[\\p{Punct}·・：:：、，。！!？?]+$"), "")
-            .trim()
+        val json = fetchHtml(RuntimeEndpoints.mgtvHotSearchUrl, referer = "https://m.mgtv.com/")
+        return parseMgtvHotSearch(json, limit)
     }
 
     private fun parseVodCards(root: Element): List<VodItem> =

@@ -559,7 +559,7 @@ fun JlenVideoApp() {
                                         onOpenSearchResults = openSearchResults,
                                         onSearchHistory = viewModel::searchHistory,
                                         onClearHistory = viewModel::clearSearchHistory,
-                                        onLoadHotSearches = viewModel::refreshHotSearches
+                                        onLoadHotSearches = { viewModel.refreshHotSearches(forceRefresh = true) }
                                     )
                                 }
                                 composable("follow") {

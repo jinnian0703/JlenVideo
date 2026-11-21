@@ -37,9 +37,8 @@ object RuntimeEndpoints {
         decode(290, intArrayOf(330, 309, 276, 271, 493, 391, 499, 468, 619, 596, 630, 518, 743, 667, 695, 668, 895, 798, 801, 832, 995, 917, 931, 905, 1089, 1098, 1060, 1065, 1276, 1250))
     }
 
-    val tencentHotSearchUrl: String by lazy {
-        decode(307, intArrayOf(347, 294, 261, 480, 476, 500, 450, 547, 605, 612, 536, 761, 649, 677, 650, 873, 780, 800, 776, 1013, 944, 972, 956, 914, 1136, 1097, 1142, 1095, 1251, 1163, 1213, 1179, 1383, 1345, 1332, 1297, 1533, 1485, 1445))
-    }
+    const val tencentHotSearchUrl =
+        "https://pbaccess.video.qq.com/trpc.tencentvideohotlistdata.hotlistdata.DoSearchHotListHttp/getSearchHotListHttp?ChannelID=&PageSize=10&PageNum=0&SceneID=2"
 
     val iqiyiHotSearchUrl: String by lazy {
         decode(324, intArrayOf(300, 279, 502, 465, 435, 485, 465, 562, 587, 556, 525, 695, 721, 678, 671, 876, 861, 893, 785, 1022, 989, 992, 924, 1132, 1090, 1056, 1049, 1208, 1272, 1156, 1201, 1322, 1356, 1324, 1295, 1508))
@@ -49,9 +48,8 @@ object RuntimeEndpoints {
         decode(341, intArrayOf(317, 256, 487, 450, 418, 458, 544, 513, 544, 578, 754, 709, 700, 643, 882, 776, 806, 779, 1006, 909))
     }
 
-    val mgtvHotSearchUrl: String by lazy {
-        decode(358, intArrayOf(270, 497, 464, 435, 401, 571, 527, 528, 553, 522, 747, 661, 695, 670, 876, 833, 888, 790, 1019, 990, 1021))
-    }
+    const val mgtvHotSearchUrl =
+        "https://mobileso.bz.mgtv.com/msite/entrance/v2"
 
     private fun decode(key: Int, values: IntArray): String = buildString(values.size) {
         values.forEachIndexed { index, value ->

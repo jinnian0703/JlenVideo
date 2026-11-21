@@ -35,7 +35,7 @@ internal fun LegacyStateRuntimeViewModelCore.legacySearch(keyword: String) {
 }
 
 internal fun LegacyStateRuntimeViewModelCore.legacyRefreshHotSearches(forceRefresh: Boolean = false) {
-    if (!forceRefresh && (currentSearchState().hotSearchGroups.isNotEmpty() || currentSearchState().isHotSearchLoading)) {
+    if (currentSearchState().isHotSearchLoading) {
         return
     }
     viewModelScope.launch {
