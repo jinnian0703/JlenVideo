@@ -91,6 +91,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -132,6 +133,8 @@ fun NativeVideoPlayer(
     danmakuEnabled: Boolean = false,
     onToggleDanmaku: (() -> Unit)? = null,
     onWriteDanmaku: ((Long) -> Unit)? = null,
+    quickDanmakuField: (@Composable (Modifier, () -> Long, (Boolean) -> Unit) -> Unit)? = null,
+    inlineHeightLimit: Dp? = null,
     liveMode: Boolean = false
 ) {
     val context = LocalContext.current
@@ -165,6 +168,7 @@ fun NativeVideoPlayer(
     var speedMenuExpanded by remember(playbackIdentity, fullscreenMode) { mutableStateOf(false) }
     var shouldResumeOnStart by remember(playbackIdentity) { mutableStateOf(false) }
     var controlsVisible by remember(fullscreenMode, playbackIdentity) { mutableStateOf(true) }
+    var editingDanmaku by remember(fullscreenMode, playbackIdentity) { mutableStateOf(false) }
     var controlsVersion by remember(fullscreenMode, playbackIdentity) { mutableLongStateOf(0L) }
     var hasHandledEnded by remember(playbackIdentity) { mutableStateOf(false) }
     var playbackState by remember(player) { mutableStateOf(player?.playbackState ?: Player.STATE_IDLE) }
@@ -284,10 +288,10 @@ fun NativeVideoPlayer(
         controlsVersion++
         autoHideJob?.cancel()
         autoHideJob = null
-        if (fullscreenMode && controlsVisible && !playerLocked) {
+        if (fullscreenMode && controlsVisible && !playerLocked && !editingDanmaku) {
             autoHideJob = scope.launch {
                 delay(3_000L)
-                controlsVisible = false
+                if (!editingDanmaku) controlsVisible = false
                 autoHideJob = null
             }
         }
@@ -703,7 +707,7 @@ fun NativeVideoPlayer(
         hasCompletedInitialOverlayDelay = true
     }
 
-    LaunchedEffect(fullscreenMode, controlsVisible, playerLocked) {
+    LaunchedEffect(fullscreenMode, controlsVisible, playerLocked, editingDanmaku) {
         if (!fullscreenMode) {
             speedMenuExpanded = false
             autoHideJob?.cancel()
@@ -725,7 +729,7 @@ fun NativeVideoPlayer(
             }
             return@LaunchedEffect
         }
-        if (!controlsVisible || playerLocked) {
+        if (!controlsVisible || playerLocked || editingDanmaku) {
             autoHideJob?.cancel()
             autoHideJob = null
             return@LaunchedEffect
@@ -768,10 +772,8 @@ fun NativeVideoPlayer(
                 playbackState == Player.STATE_BUFFERING ||
                     (player.playWhenReady && !hasStartedPlaybackOnce)
                 )
-    val embeddedPlayerHeight = when {
-        lastReportedLandscape == false -> 420.dp
-        else -> 228.dp
-    }
+    val preferredHeight = if (lastReportedLandscape == false) 420.dp else 228.dp
+    val embeddedPlayerHeight = minOf(preferredHeight, inlineHeightLimit ?: preferredHeight)
     val embeddedResizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     val controlPillTextStyle = if (fullscreenMode) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelMedium
     val controlChipHeight = if (fullscreenMode) 36.dp else 32.dp
@@ -801,9 +803,9 @@ fun NativeVideoPlayer(
                 .onSizeChanged { contentSize = it }
         ) {
             val controlChipWidth = if (fullscreenMode) minOf(76.dp, (maxWidth - 56.dp) / 4) else 44.dp
-            val useStackedFullscreenControls = fullscreenMode && (
-                maxHeight > maxWidth || maxWidth < 560.dp
-            )
+            val showQuickField = fullscreenMode && danmakuEnabled && onToggleDanmaku != null && quickDanmakuField != null && !isCasting
+            val singleRowMinWidth = if (showQuickField) 860.dp else 560.dp
+            val useStackedFullscreenControls = fullscreenMode && (maxHeight > maxWidth || maxWidth < singleRowMinWidth)
             key(playbackIdentity) {
                 AndroidView(
                     factory = { viewContext ->
@@ -1329,7 +1331,7 @@ fun NativeVideoPlayer(
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Spacer(modifier = Modifier.height(4.dp))
-                    if (!liveMode) Slider(
+                    if (!liveMode && !editingDanmaku) Slider(
                         value = sliderPosition,
                         onValueChange = {
                             if (!isDragging) {
@@ -1370,12 +1372,13 @@ fun NativeVideoPlayer(
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    val playbackStatusControls: @Composable () -> Unit = {
+                    val playbackStatusControls: @Composable (Modifier) -> Unit = { statusModifier ->
                         Row(
+                            modifier = statusModifier,
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            IconButton(
+                            if (!editingDanmaku) IconButton(
                                 onClick = {
                                     if (player.isPlaying) {
                                         pausePlaybackByUser()
@@ -1391,7 +1394,7 @@ fun NativeVideoPlayer(
                                     tint = Color.White
                                 )
                             }
-                            Text(
+                            if (!editingDanmaku) Text(
                                 text = if (liveMode) "直播" else "${formatMillis(currentPosition)}/${formatMillis(duration)}",
                                 color = Color.White,
                                 style = if (fullscreenMode) {
@@ -1406,6 +1409,16 @@ fun NativeVideoPlayer(
                                 ControlChip(text = if (danmakuEnabled) "弹幕开" else "弹幕关", width = 64.dp,
                                     height = controlChipHeight, textStyle = controlPillTextStyle,
                                     onClick = { markInteraction(); onToggleDanmaku() })
+                                if (showQuickField) quickDanmakuField?.invoke(
+                                    Modifier.weight(1f, fill = false).widthIn(max = 320.dp), { player.currentPosition },
+                                    { focused ->
+                                        editingDanmaku = focused
+                                        if (focused) {
+                                            pendingSingleTapJob?.cancel()
+                                            autoHideJob?.cancel()
+                                        }
+                                    }
+                                )
                             }
                         }
                     }
@@ -1483,9 +1496,9 @@ fun NativeVideoPlayer(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            playbackStatusControls()
+                            playbackStatusControls(Modifier.fillMaxWidth())
                         }
-                        Row(
+                        if (!editingDanmaku) Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.End,
                             verticalAlignment = Alignment.CenterVertically
@@ -1498,8 +1511,8 @@ fun NativeVideoPlayer(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            playbackStatusControls()
-                            playbackActionControls()
+                            playbackStatusControls(if (showQuickField) Modifier.weight(1f).padding(end = 8.dp) else Modifier)
+                            if (!editingDanmaku) playbackActionControls()
                         }
                     }
                 }
@@ -1529,13 +1542,8 @@ fun NativeVideoPlayer(
         }
     }
     if (!fullscreenMode && onToggleDanmaku != null) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            androidx.compose.material3.FilterChip(selected = danmakuEnabled, onClick = onToggleDanmaku,
-                label = { Text(if (danmakuEnabled) "弹幕已开" else "弹幕已关") })
-            Spacer(Modifier.weight(1f))
-            androidx.compose.material3.TextButton(onClick = { onWriteDanmaku?.invoke(player.currentPosition) }, enabled = !isCasting) {
-                Text("发弹幕")
-            }
+        PortraitDanmakuBar(danmakuEnabled, onToggleDanmaku, !isCasting && onWriteDanmaku != null) {
+            onWriteDanmaku?.invoke(player.currentPosition)
         }
     }
 }

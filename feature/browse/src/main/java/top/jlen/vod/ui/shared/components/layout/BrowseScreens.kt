@@ -125,7 +125,6 @@ import top.jlen.vod.data.sanitizeUserFacingComposite
 @Composable
 internal fun HomeTopBlock(
     onOpenDownloads: () -> Unit,
-    onOpenLive: (() -> Unit)?,
     noticeState: NoticeUiState,
     onRefreshAnnouncements: () -> Unit,
     onOpenAnnouncementList: () -> Unit,
@@ -152,10 +151,6 @@ internal fun HomeTopBlock(
         }
         Spacer(modifier = Modifier.height(16.dp))
         SearchDock(onClick = onOpenSearch)
-        if (onOpenLive != null) {
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onOpenLive) { Text("电视直播") }
-        }
         Spacer(modifier = Modifier.height(14.dp))
         AnnouncementTickerStrip(
             state = noticeState,

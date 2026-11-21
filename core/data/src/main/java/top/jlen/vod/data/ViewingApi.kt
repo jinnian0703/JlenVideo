@@ -9,7 +9,7 @@ data class EpisodeThread(val vod: String, val sourceIndex: Int, val episodeIndex
     internal fun params() = mapOf("vod_id" to vod, "sid" to (sourceIndex + 1).toString(), "nid" to (episodeIndex + 1).toString())
 }
 data class TimedComment(val id: Int, val timeMs: Long, val text: String, val color: String, val type: Int)
-data class ChatLine(val id: Int, val author: String, val text: String)
+data class ChatLine(val id: Int, val authorId: String, val author: String, val text: String)
 data class LiveCategory(val id: Int, val name: String)
 data class LiveSource(val name: String, val url: String)
 data class LiveChannel(val id: Int, val name: String, val category: String, val sources: List<LiveSource>)
@@ -33,7 +33,7 @@ suspend fun CmsAppApi.sendDanmaku(user: String, thread: EpisodeThread, positionM
 
 suspend fun CmsAppApi.chat(vod: String, after: Int): List<ChatLine> =
     request("chatroom/get_list", mapOf("vod_id" to vod, "after_id" to after.toString())).firstObject("info")?.rows("rows").orEmpty().mapNotNull {
-        ChatLine(it.firstInt("chat_id") ?: return@mapNotNull null, it.firstString("user_name"), it.firstString("chat_content"))
+        ChatLine(it.firstInt("chat_id") ?: return@mapNotNull null, it.firstString("user_id"), it.firstString("user_name"), it.firstString("chat_content"))
     }
 
 suspend fun CmsAppApi.sendChat(user: String, vod: String, text: String) {

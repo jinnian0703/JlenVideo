@@ -45,7 +45,7 @@ class CmsAppApiTest {
                 "chatroom/get_list" -> {
                     assertEquals("42", request.url.queryParameter("vod_id"))
                     assertEquals("99", request.url.queryParameter("after_id"))
-                    """{"code":1,"info":{"rows":[{"chat_id":100,"user_name":"观众","chat_content":"好看"}],"last_id":100}}"""
+                    """{"code":1,"info":{"rows":[{"chat_id":100,"user_id":7,"user_name":"观众","chat_content":"好看"}],"last_id":100}}"""
                 }
                 "danmaku/get_list" -> {
                     assertEquals("2", request.url.queryParameter("sid"))
@@ -68,7 +68,7 @@ class CmsAppApiTest {
             }
         }
         val episode = EpisodeThread("42", 1, 2)
-        assertEquals(100, client.chat("42", 99).single().id)
+        assertEquals(ChatLine(100, "7", "观众", "好看"), client.chat("42", 99).single())
         assertEquals(15250L, client.danmaku(episode).single().timeMs)
         client.sendDanmaku("7", episode, 15250, "好看")
         client.sendChat("7", "42", "好看")

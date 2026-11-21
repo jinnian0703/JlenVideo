@@ -52,6 +52,7 @@ import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.LiveTv
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
@@ -232,7 +233,6 @@ fun HomeScreen(
             item(key = "home_top", contentType = "home_top") {
                 HomeTopBlock(
                     onOpenDownloads = onOpenDownloads,
-                    onOpenLive = onOpenLive,
                     noticeState = noticeState,
                     onRefreshAnnouncements = onRefreshAnnouncements,
                     onOpenAnnouncementList = onOpenAnnouncementList,
@@ -321,6 +321,9 @@ fun HomeScreen(
                     )
                 }
             }
+            if (onOpenLive != null) {
+                item(key = "home_live", contentType = "live_entry") { LiveEntry(onOpenLive) }
+            }
             item(key = "home_latest_title", contentType = "section_title") {
                 SectionTitle(
                     title = "最近更新",
@@ -356,6 +359,31 @@ fun HomeScreen(
     }
 }
 
+@Composable
+private fun LiveEntry(onOpen: () -> Unit) {
+    Card(
+        onClick = onOpen,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(UiDimens.CardRadius),
+        colors = CardDefaults.cardColors(containerColor = UiPalette.Surface),
+        border = BorderStroke(1.dp, UiPalette.Border)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(UiPalette.Accent.copy(alpha = .09f), Color.Transparent)))
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.size(50.dp).background(UiPalette.PlayerBackground, RoundedCornerShape(15.dp)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.LiveTv, null, Modifier.size(28.dp), tint = Color.White)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("电视直播", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = UiPalette.Ink)
+                Text("进入频道列表", style = MaterialTheme.typography.bodySmall, color = UiPalette.TextSecondary)
+            }
+            Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, Modifier.size(20.dp), tint = UiPalette.Ink)
+        }
+    }
+}
 
 
 

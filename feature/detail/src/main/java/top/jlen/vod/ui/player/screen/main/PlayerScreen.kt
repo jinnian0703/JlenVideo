@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -58,6 +60,7 @@ import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
@@ -71,6 +74,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -80,6 +84,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import top.jlen.vod.data.Episode
 import top.jlen.vod.data.VodItem
 import top.jlen.vod.data.isDirectMediaUrl
@@ -124,6 +129,14 @@ fun PlayerScreen(
     val thread = EpisodeThread(downloadVod, state.selectedSourceIndex, state.selectedEpisodeIndex)
     val hasDanmaku = features.danmaku && validVod && source?.episodes?.getOrNull(state.selectedEpisodeIndex) != null
     val hasChat = features.chat && validVod
+    DisposableEffect(activity, hasDanmaku || hasChat) {
+        val window = activity?.window
+        if (window == null || !(hasDanmaku || hasChat)) return@DisposableEffect onDispose { }
+        val original = window.attributes.softInputMode
+        val withoutAdjustMode = original and WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST.inv()
+        window.setSoftInputMode(withoutAdjustMode or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        onDispose { window.setSoftInputMode(original) }
+    }
     val currentDanmakuAvailable = rememberUpdatedState(hasDanmaku)
     val prefs = remember(context) { context.getSharedPreferences("player_interaction", Context.MODE_PRIVATE) }
     var danmakuOn by remember { mutableStateOf(prefs.getBoolean("danmaku", false)) }
@@ -132,6 +145,12 @@ fun PlayerScreen(
     var messages by remember(thread) { mutableStateOf(emptyList<TimedComment>()) }
     var discussing by rememberSaveable(downloadVod) { mutableStateOf(false) }
     val currentUser by rememberUpdatedState(user)
+    val login by rememberUpdatedState(onLogin)
+    suspend fun publishDanmaku(stamp: Long, text: String) {
+        api.sendDanmaku(currentUser, thread, stamp, text)
+        reload++
+        android.widget.Toast.makeText(context, "弹幕已发送", android.widget.Toast.LENGTH_SHORT).show()
+    }
     LaunchedEffect(thread, hasDanmaku, danmakuOn, reload) {
         if (hasDanmaku && danmakuOn) viewingRequest { api.danmaku(thread) }.onSuccess { messages = it }.onFailure {
             android.widget.Toast.makeText(context, "弹幕加载失败，可关闭后重试", android.widget.Toast.LENGTH_SHORT).show()
@@ -139,11 +158,9 @@ fun PlayerScreen(
     }
     if (hasDanmaku) writingAt?.let { stamp -> key(thread) {
         MessageComposer("发弹幕 · ${stamp / 60000}分${stamp / 1000 % 60}秒", 200, { writingAt = null }) {
-            api.sendDanmaku(currentUser, thread, stamp, it)
+            publishDanmaku(stamp, it)
             danmakuOn = true
             prefs.edit().putBoolean("danmaku", true).apply()
-            reload++
-            android.widget.Toast.makeText(context, "弹幕已发送", android.widget.Toast.LENGTH_SHORT).show()
         }
     } }
     var isFullscreen by rememberSaveable {
@@ -320,6 +337,13 @@ fun PlayerScreen(
         state.hasNextEpisode
     ) {
         movableContentOf<Boolean, (() -> Unit)?> { fullscreen, openEpisodePicker ->
+            var quickDraft by rememberSaveable { mutableStateOf("") }
+            var sending by remember { mutableStateOf(false) }
+            val scope = rememberCoroutineScope()
+            val chatPlayerHeight = if (!fullscreen && discussing) {
+                val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+                LocalConfiguration.current.screenHeightDp.dp * (if (keyboardOpen) .17f else .35f)
+            } else null
             NativeVideoPlayer(
                 url = playUrl,
                 title = state.title,
@@ -329,12 +353,31 @@ fun PlayerScreen(
                 onNextEpisode = onPlayNext,
                 onOpenEpisodePicker = openEpisodePicker,
                 timedComments = messages,
+                inlineHeightLimit = chatPlayerHeight,
                 danmakuEnabled = danmakuOn && currentDanmakuAvailable.value,
                 onToggleDanmaku = if (currentDanmakuAvailable.value) ({
                     danmakuOn = !danmakuOn
                     prefs.edit().putBoolean("danmaku", danmakuOn).apply()
                 }) else null,
-                onWriteDanmaku = { stamp -> if (currentUser.isBlank()) onLogin() else writingAt = stamp },
+                onWriteDanmaku = { stamp -> if (currentUser.isBlank()) login() else writingAt = stamp },
+                quickDanmakuField = { modifier, position, onFocus ->
+                    QuickDanmakuField(modifier, quickDraft, sending, { quickDraft = it }, onFocus,
+                        login = if (currentUser.isBlank()) ({ login() }) else null,
+                        onSend = { clearFocus ->
+                            val text = quickDraft.trim()
+                            if (!sending && text.isNotEmpty()) {
+                                val stamp = position()
+                                sending = true
+                                scope.launch {
+                                    try {
+                                        viewingRequest { publishDanmaku(stamp, text) }
+                                            .onSuccess { quickDraft = ""; clearFocus() }
+                                            .onFailure { android.widget.Toast.makeText(context, it.message ?: "发送失败，请重试", android.widget.Toast.LENGTH_SHORT).show() }
+                                    } finally { sending = false }
+                                }
+                            }
+                        })
+                },
                 onPlaybackError = { onResolveFallbackFailed("视频播放失败，请刷新或切换线路") },
                 onToggleFullscreen = { snapshot, _ ->
                     setFullscreen(!fullscreen, snapshot)
@@ -401,11 +444,7 @@ fun PlayerScreen(
                 }
             }
             if (hasChat && !isFullscreen) {
-                androidx.compose.material3.TabRow(selectedTabIndex = if (discussing) 1 else 0) {
-                    listOf("选集", "讨论").forEachIndexed { index, label ->
-                        androidx.compose.material3.Tab(selected = discussing == (index == 1), onClick = { discussing = index == 1 }, text = { Text(label) })
-                    }
-                }
+                PlaybackTabs(discussing, onSelect = { discussing = it })
             }
             if (hasChat && discussing && !isFullscreen) key(downloadVod) {
                 FilmDiscussion(api, downloadVod, user, onLogin)
