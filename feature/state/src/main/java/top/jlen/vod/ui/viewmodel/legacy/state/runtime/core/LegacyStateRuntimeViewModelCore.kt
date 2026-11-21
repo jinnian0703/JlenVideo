@@ -353,6 +353,11 @@ open class LegacyStateRuntimeViewModelCore(application: Application) : AndroidVi
 
     fun clearSearchHistory() = legacyClearSearchHistory()
 
+    fun restoreSearchHistory(previous: List<String>) {
+        searchHistoryStore.restore(previous)
+        updateSearchState(searchStateWithHistory(currentSearchState(), searchHistoryStore.load()))
+    }
+
     fun search(keyword: String) = legacySearch(keyword)
 
     fun refreshHotSearches(forceRefresh: Boolean = false) = legacyRefreshHotSearches(forceRefresh)

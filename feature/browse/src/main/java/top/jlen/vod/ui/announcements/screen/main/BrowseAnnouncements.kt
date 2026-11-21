@@ -60,7 +60,7 @@ fun AnnouncementListScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    CircleActionButton(icon = Icons.AutoMirrored.Rounded.ArrowBack, onClick = onBack)
+                    CircleActionButton(icon = Icons.AutoMirrored.Rounded.ArrowBack, description = "返回", onClick = onBack)
                     Text(
                         text = "公告",
                         style = MaterialTheme.typography.headlineSmall,
@@ -129,7 +129,7 @@ fun AnnouncementDetailScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        CircleActionButton(icon = Icons.AutoMirrored.Rounded.ArrowBack, onClick = onBack)
+                        CircleActionButton(icon = Icons.AutoMirrored.Rounded.ArrowBack, description = "返回", onClick = onBack)
                         Text(
                             text = "公告详情",
                             style = MaterialTheme.typography.headlineSmall,
@@ -162,7 +162,7 @@ fun AnnouncementDetailScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        CircleActionButton(icon = Icons.AutoMirrored.Rounded.ArrowBack, onClick = onBack)
+                        CircleActionButton(icon = Icons.AutoMirrored.Rounded.ArrowBack, description = "返回", onClick = onBack)
                         Text(
                             text = "公告详情",
                             style = MaterialTheme.typography.headlineSmall,

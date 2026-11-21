@@ -441,6 +441,11 @@ fun AccountCrashLogSettingsScreen(
     onDeleteIssueLog: (String) -> Unit
 ) {
     val context = LocalContext.current
+    var confirmClear by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    if (confirmClear && hasCrashLog) {
+        ClearRecordsConfirmDialog("问题日志", "本机保存的问题日志将全部删除，清空后不可恢复。",
+            onDismiss = { confirmClear = false }, onConfirm = { confirmClear = false; onClearCrashLog() })
+    }
     AccountSettingsScaffold(
         title = "问题日志",
         subtitle = "排查本机运行问题",
@@ -467,7 +472,7 @@ fun AccountCrashLogSettingsScreen(
                         Text("刷新", maxLines = 1)
                     }
                     OutlinedButton(
-                        onClick = onClearCrashLog,
+                        onClick = { confirmClear = true },
                         enabled = hasCrashLog,
                         modifier = Modifier
                             .weight(1f)

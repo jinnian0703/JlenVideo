@@ -1,10 +1,11 @@
 package top.jlen.vod.data
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.core.content.edit
 
-class SearchHistoryStore(context: Context) {
-    private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+class SearchHistoryStore internal constructor(private val prefs: SharedPreferences) {
+    constructor(context: Context) : this(context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE))
 
     fun load(): List<String> =
         prefs.getStringSet(KEY_HISTORY, emptySet())
@@ -25,6 +26,14 @@ class SearchHistoryStore(context: Context) {
             addAll(load().filterNot { it.equals(normalized, ignoreCase = true) })
         }.take(MAX_SIZE)
 
+        write(updated)
+    }
+
+    fun restore(previous: List<String>) {
+        write((load() + previous).distinctBy { it.lowercase() }.take(MAX_SIZE))
+    }
+
+    private fun write(updated: List<String>) {
         prefs.edit {
             putStringSet(
                 KEY_HISTORY,

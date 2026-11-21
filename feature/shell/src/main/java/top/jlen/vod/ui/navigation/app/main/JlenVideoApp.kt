@@ -92,6 +92,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
+import kotlinx.coroutines.launch
 import androidx.navigation.navArgument
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -116,7 +122,7 @@ private const val ROUTE_ONBOARDING_LOGIN = "onboarding/login"
 private const val TRAFFIC_CAPTURE_CHECK_MS = 2_000L
 private const val ROUTE_SEARCH_RESULTS = "search/results/{query}"
 // 播放页携带 vodId/线路/选集参数，进程重建后可据此恢复播放
-private const val ROUTE_PLAYER = "player?vodId={vodId}&sourceIndex={sourceIndex}&episodeIndex={episodeIndex}&resumeUrl={resumeUrl}&title={title}"
+private const val ROUTE_PLAYER = "player?vodId={vodId}&sourceIndex={sourceIndex}&episodeIndex={episodeIndex}&resumeUrl={resumeUrl}&title={title}&followSource={followSource}"
 // 宽度达到该值时底部导航改为左侧 NavigationRail
 private val NAVIGATION_RAIL_MIN_WIDTH = 600.dp
 
@@ -207,6 +213,8 @@ fun JlenVideoApp() {
     }
     val viewModel: AppViewModel = viewModel()
     val navController = rememberNavController()
+    val snackbar = remember { SnackbarHostState() }
+    val snackbarScope = rememberCoroutineScope()
     val onboardingPrefs = remember(context) {
         context.getSharedPreferences(ONBOARDING_PREFS, Context.MODE_PRIVATE)
     }
@@ -441,6 +449,7 @@ fun JlenVideoApp() {
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     val useNavigationRail = maxWidth >= NAVIGATION_RAIL_MIN_WIDTH
                     Scaffold(
+                        snackbarHost = { SnackbarHost(snackbar) },
                         containerColor = Color.Transparent,
                         contentWindowInsets = rootContentInsets,
                         bottomBar = {
@@ -573,7 +582,15 @@ fun JlenVideoApp() {
                                         onQueryChange = viewModel::updateQuery,
                                         onOpenSearchResults = openSearchResults,
                                         onSearchHistory = viewModel::searchHistory,
-                                        onClearHistory = viewModel::clearSearchHistory,
+                                        onClearHistory = {
+                                            val previous = viewModel.searchState.history.toList()
+                                            viewModel.clearSearchHistory()
+                                            snackbar.currentSnackbarData?.dismiss()
+                                            snackbarScope.launch {
+                                                val result = snackbar.showSnackbar("已清空搜索记录", "撤销", duration = SnackbarDuration.Short)
+                                                if (result == SnackbarResult.ActionPerformed) viewModel.restoreSearchHistory(previous)
+                                            }
+                                        },
                                         onLoadHotSearches = { viewModel.refreshHotSearches(forceRefresh = true) }
                                     )
                                 }
@@ -591,6 +608,10 @@ fun JlenVideoApp() {
                                     }
                                     FollowScreen(
                                         state = viewModel.followState,
+                                        onResume = { film ->
+                                            navController.navigate(playerRoute(film.vodId, -1, film.watchedEpisodeIndex,
+                                                title = film.title, followSource = film.sourceName)) { launchSingleTop = true }
+                                        },
                                         onRefresh = { viewModel.refreshFollowContent(forceRefresh = true) },
                                         onOpenDetail = openDetail,
                                         onOpenAccount = { navigateToTopLevel("account") },
@@ -910,6 +931,7 @@ fun JlenVideoApp() {
                                 composable(
                                     route = ROUTE_PLAYER,
                                     arguments = listOf(
+                                        navArgument("followSource") { type = NavType.StringType; nullable = true; defaultValue = null },
                                         navArgument("vodId") {
                                             type = NavType.StringType
                                             defaultValue = ""
@@ -936,6 +958,9 @@ fun JlenVideoApp() {
                                         entry = entry,
                                         viewModel = viewModel,
                                         features = viewingFeatures,
+                                        onUnlockFilm = { id ->
+                                            navController.navigate(detailRoute(id)) { popUpTo(entry.destination.id) { inclusive = true } }
+                                        },
                                         onLogin = {
                                             viewModel.setAccountAuthMode(AccountAuthMode.Login)
                                             navController.navigate("account/film-login") { launchSingleTop = true }
@@ -1185,15 +1210,18 @@ private fun playerRoute(
     sourceIndex: Int,
     episodeIndex: Int,
     resumeUrl: String = "",
-    title: String = ""
+    title: String = "",
+    followSource: String? = null
 ): String = "player?vodId=${Uri.encode(vodId.trim())}&sourceIndex=$sourceIndex&episodeIndex=$episodeIndex" +
-    "&resumeUrl=${Uri.encode(resumeUrl)}&title=${Uri.encode(title)}"
+    "&resumeUrl=${Uri.encode(resumeUrl)}&title=${Uri.encode(title)}" +
+    (followSource?.let { "&followSource=${Uri.encode(it)}" } ?: "")
 
 @Composable
 private fun PlayerRouteScreen(
     entry: NavBackStackEntry,
     viewModel: AppViewModel,
     features: top.jlen.vod.data.ViewingFeatures,
+    onUnlockFilm: (String) -> Unit,
     onLogin: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -1214,13 +1242,16 @@ private fun PlayerRouteScreen(
         val resumeUrl = entry.savedStateHandle.get<String>("player_episode_url")
             ?: entry.arguments?.getString("resumeUrl").orEmpty()
         val current = viewModel.playerState
+        val followSource = entry.arguments?.getString("followSource")?.takeUnless {
+            entry.savedStateHandle.contains("player_episode")
+        }
         val matchesItem = if (vodId.isNotBlank()) {
             current.item?.matchesDetailRoute(vodId) == true
         } else {
             resumeUrl.isNotBlank() && current.episodePageUrl == resumeUrl
         }
         if (
-            matchesItem && current.currentEpisode != null &&
+            followSource == null && matchesItem && current.currentEpisode != null &&
             (sourceIndex < 0 || current.selectedSourceIndex == sourceIndex) &&
             (episodeIndex < 0 || current.selectedEpisodeIndex == episodeIndex)
         ) {
@@ -1244,18 +1275,26 @@ private fun PlayerRouteScreen(
         val item = detail?.item
         val sources = detail?.sources.orEmpty()
         if (detail?.detailLocked == true || (item?.playPassword == 1 && sources.isEmpty())) {
+            if (followSource != null) {
+                onUnlockFilm(vodId)
+                return@LaunchedEffect
+            }
             loadError = "请先在影片详情页输入密码后播放"
             return@LaunchedEffect
         }
         if (item != null && sources.isNotEmpty()) {
             val resume = detail?.pendingResumePlayback
+            val followResume = resume?.takeIf { followSource != null && it.episodeIndex in sources.getOrNull(it.sourceIndex)?.episodes.orEmpty().indices }
             val selectedSource = sourceIndex.takeIf { it in sources.indices }
+                ?: followResume?.sourceIndex
+                ?: sources.indexOfFirst { it.name == followSource && it.episodes.isNotEmpty() }.takeIf { it >= 0 }
                 ?: resume?.sourceIndex?.takeIf { it in sources.indices }
-                ?: 0
+                ?: sources.indexOfFirst { it.episodes.isNotEmpty() }.coerceAtLeast(0)
             val episodes = sources[selectedSource].episodes
             val matchedEpisode = episodes.indexOfFirst { resumeUrl.isNotBlank() && it.url == resumeUrl }
             val selectedEpisode = (
                 matchedEpisode.takeIf { it >= 0 }
+                    ?: followResume?.episodeIndex
                     ?: episodeIndex.takeIf { it >= 0 }
                     ?: resume?.episodeIndex?.takeIf { resume.sourceIndex == selectedSource }
                     ?: 0

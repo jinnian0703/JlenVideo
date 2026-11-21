@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 fun FollowScreen(
     state: FollowUiState,
     onRefresh: () -> Unit,
+    onResume: (FollowUpItem) -> Unit,
     onOpenDetail: (String) -> Unit,
     onOpenAccount: () -> Unit,
     onOpenLibrary: () -> Unit
@@ -134,7 +135,7 @@ fun FollowScreen(
                         key = { "follow_update_${it.vodId}" },
                         contentType = { "follow_item" }
                     ) { item ->
-                        FollowUpCard(item = item, onOpenDetail = onOpenDetail)
+                        FollowUpCard(item = item, onOpenDetail = onOpenDetail, onResume = onResume)
                     }
                 }
 
@@ -159,7 +160,7 @@ fun FollowScreen(
                         key = { "follow_continue_${it.vodId}" },
                         contentType = { "follow_item" }
                     ) { item ->
-                        FollowUpCard(item = item, onOpenDetail = onOpenDetail)
+                        FollowUpCard(item = item, onOpenDetail = onOpenDetail, onResume = onResume)
                     }
                 }
             }
@@ -170,6 +171,7 @@ fun FollowScreen(
 @Composable
 private fun FollowUpCard(
     item: FollowUpItem,
+    onResume: (FollowUpItem) -> Unit,
     onOpenDetail: (String) -> Unit
 ) {
     val badgeText = rememberFollowPosterBadge(item)
@@ -311,12 +313,12 @@ private fun FollowUpCard(
                         )
                     }
                     Button(
-                        onClick = { onOpenDetail(item.vodId) },
+                        onClick = { if (item.watchedEpisodeIndex >= 0) onResume(item) else onOpenDetail(item.vodId) },
                         modifier = Modifier.height(UiDimens.CompactButtonHeight),
                         shape = RoundedCornerShape(UiDimens.ControlRadius),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (item.hasUpdate) UiPalette.Accent else UiPalette.SurfaceSoft,
-                            contentColor = if (item.hasUpdate) UiPalette.AccentText else UiPalette.Ink
+                            contentColor = if (item.hasUpdate) UiPalette.OnAccentButton else UiPalette.Ink
                         )
                     ) {
                         Text(

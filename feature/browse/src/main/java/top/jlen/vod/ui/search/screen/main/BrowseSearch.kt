@@ -371,7 +371,7 @@ fun SearchResultsScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                CircleActionButton(icon = Icons.AutoMirrored.Rounded.ArrowBack, onClick = onBack)
+                CircleActionButton(icon = Icons.AutoMirrored.Rounded.ArrowBack, description = "返回", onClick = onBack)
                 Text(
                     text = "搜索结果",
                     style = MaterialTheme.typography.headlineSmall,

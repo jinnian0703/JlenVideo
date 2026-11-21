@@ -44,7 +44,7 @@ object UiPalette {
         accentGlow = Color(0xFFFFE3DE),
         textPrimary = Color(0xFF1C1C22),
         textSecondary = Color(0xFF5F6673),
-        textMuted = Color(0xFF9EA5B1),
+        textMuted = Color(0xFF626B77),
         ink = Color(0xFF25252B),
         heroStart = Color(0xFFB9E5FF),
         heroEnd = Color(0xFFF7FBFF),
@@ -97,6 +97,7 @@ object UiPalette {
 
     val Accent: Color get() = colors.accent
     val AccentSoft: Color get() = colors.accentSoft
+    val OnAccentButton = Color(0xFF20100D)
     val AccentText: Color get() = colors.accentText
     val AccentGlow: Color get() = colors.accentGlow
 

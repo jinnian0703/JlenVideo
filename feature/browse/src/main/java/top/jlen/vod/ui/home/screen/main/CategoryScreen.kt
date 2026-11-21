@@ -314,7 +314,7 @@ private fun CategoryFilterHeader(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(categories, key = { it.typeId }, contentType = { "library_category" }) { category ->
-                            LibraryFilterChip(
+                            SingleChoiceChip(
                                 text = category.typeName,
                                 selected = category.typeId == state.selectedCategory?.typeId,
                                 onClick = { onSelectCategory(category) }
@@ -347,35 +347,11 @@ private fun CategoryFilterRow(group: CategoryFilterGroup, selected: String, onSe
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item(key = "all") {
-                LibraryFilterChip("全部", selected.isBlank()) { onSelect(group.key, "") }
+                SingleChoiceChip("全部", selected.isBlank()) { onSelect(group.key, "") }
             }
             items(group.options, key = { "option_$it" }) { option ->
-                LibraryFilterChip(option, selected == option) { onSelect(group.key, option) }
+                SingleChoiceChip(option, selected == option) { onSelect(group.key, option) }
             }
         }
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun LibraryFilterChip(text: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(text, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium) },
-        modifier = Modifier.heightIn(min = 48.dp),
-        shape = RoundedCornerShape(14.dp),
-        colors = FilterChipDefaults.filterChipColors(
-            containerColor = UiPalette.SurfaceSoft,
-            labelColor = UiPalette.Ink,
-            selectedContainerColor = UiPalette.Ink,
-            selectedLabelColor = UiPalette.Surface
-        ),
-        border = FilterChipDefaults.filterChipBorder(
-            enabled = true,
-            selected = selected,
-            borderColor = UiPalette.Border,
-            selectedBorderColor = UiPalette.Ink
-        )
-    )
 }

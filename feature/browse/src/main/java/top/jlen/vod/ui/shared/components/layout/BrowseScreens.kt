@@ -145,7 +145,7 @@ internal fun HomeTopBlock(
                 color = UiPalette.Ink
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                CircleActionButton(icon = Icons.Rounded.NewReleases, onClick = onOpenAnnouncementList)
+                CircleActionButton(icon = Icons.Rounded.NewReleases, description = "公告", onClick = onOpenAnnouncementList)
                 CircleActionButton(icon = Icons.Rounded.Download, description = "下载管理", onClick = onOpenDownloads)
             }
         }
@@ -383,16 +383,11 @@ private fun AnnouncementTickerStrip(
 }
 
 @Composable
-internal fun CircleActionButton(icon: ImageVector, description: String? = null, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(42.dp)
-            .clip(CircleShape)
-            .background(UiPalette.Surface)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(imageVector = icon, contentDescription = description, tint = UiPalette.Ink)
+internal fun CircleActionButton(icon: ImageVector, description: String, onClick: () -> Unit) {
+    androidx.compose.material3.IconButton(onClick = onClick, modifier = Modifier.size(48.dp)) {
+        Box(Modifier.size(42.dp).background(UiPalette.Surface, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(imageVector = icon, contentDescription = description, tint = UiPalette.Ink)
+        }
     }
 }
 
@@ -485,13 +480,13 @@ fun FeaturedCard(
             if (badgeText.isNotBlank()) {
                 Text(
                     text = badgeText,
-                    color = UiPalette.Surface,
+                    color = UiPalette.OnAccentButton,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .padding(16.dp)
                         .clip(RoundedCornerShape(UiDimens.PillRadius))
-                        .background(UiPalette.Accent.copy(alpha = 0.86f))
+                        .background(UiPalette.Accent)
                         .padding(horizontal = 10.dp, vertical = 5.dp)
                 )
             }
@@ -519,7 +514,7 @@ fun FeaturedCard(
                         text = item.displayTitle,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.ExtraBold,
-                        color = UiPalette.Surface,
+                        color = Color.White,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -527,7 +522,7 @@ fun FeaturedCard(
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(UiDimens.PillRadius))
-                        .background(UiPalette.Surface.copy(alpha = 0.14f))
+                        .background(Color.White.copy(alpha = 0.14f))
                         .padding(horizontal = 10.dp, vertical = 7.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -536,12 +531,12 @@ fun FeaturedCard(
                         text = "查看详情",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = UiPalette.Surface
+                        color = Color.White
                     )
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
                         contentDescription = null,
-                        tint = UiPalette.Surface,
+                        tint = Color.White,
                         modifier = Modifier.size(16.dp)
                     )
                 }

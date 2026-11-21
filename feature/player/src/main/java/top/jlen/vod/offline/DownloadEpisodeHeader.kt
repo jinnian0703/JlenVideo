@@ -29,6 +29,7 @@ import top.jlen.vod.data.PlaySource
 import top.jlen.vod.AppConfig
 import top.jlen.vod.data.CmsSourceGroup
 import top.jlen.vod.data.toSources
+import top.jlen.vod.ui.SingleChoiceChip
 import top.jlen.vod.ui.UiPalette
 
 fun resolveDownloadSources(groups: List<CmsSourceGroup>, passwordRequired: Boolean, playback: List<PlaySource>): List<PlaySource> {
@@ -53,7 +54,7 @@ fun CmsDownloadHeader(vod: String, title: String, poster: String, groups: List<C
         episodeDownloadLabels(vod, index, source.name), picking, onPickingChange) {
         if (sources.size > 1) LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             items(sources.size) { i ->
-                FilterChip(selected = i == index, onClick = { selectedSource = i }, label = { Text(sources[i].name) })
+                SingleChoiceChip(sources[i].name, i == index) { selectedSource = i }
             }
         }
     }
@@ -86,10 +87,20 @@ fun DownloadEpisodeHeader(vod: String, title: String, poster: String, si: Int, s
         }
     }
     if (!picking) return
+    val context = LocalContext.current
+    val available = source.episodes.indices.filterNot(labels::containsKey).toSet()
+    var picked by rememberSaveable(vod, si, source.name) { mutableStateOf(setOf(current).intersect(available)) }
+    val selection = picked.intersect(available)
     Surface(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), color = UiPalette.Surface,
         shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, UiPalette.Border)) {
-        DownloadEpisodeSelection(vod, title, poster, si, source, current, labels, Modifier.padding(12.dp),
-            inDialog = false, onAdded = { onPickingChange(false) }, sourcePicker = sourcePicker)
+        DownloadEpisodeSelection(si, source, current, labels, selection, { picked = it }, Modifier.padding(12.dp),
+            inDialog = false, sourcePicker = sourcePicker) {
+            AddEpisodesButton(selection.size, available.isEmpty()) {
+                OfflineLibrary.get(context).addEpisodes(vod, title, poster, si, source, selection)
+                onPickingChange(false)
+                Toast.makeText(context, "已加入下载管理", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 }
 
@@ -114,13 +125,34 @@ fun DownloadEpisodeDialog(vod: String, title: String, poster: String, sources: L
                     Text(if (loading) "正在加载下载线路…" else "暂无可下载的剧集", color = UiPalette.TextSecondary)
                 } else {
                     val source = sources[index]
-                    DownloadEpisodeSelection(vod, title, poster, index, source, -1, episodeDownloadLabels(vod, index, source.name),
-                        Modifier.weight(1f, fill = false), inDialog = true, onAdded = onDismiss) {
+                    val context = LocalContext.current
+                    val lib = OfflineLibrary.get(context)
+                    fun labelsForFilm(rows: List<Entry>) = rows.filter { it.vod == vod && sources.getOrNull(it.si)?.name == it.source }
+                        .groupBy { it.si }.mapValues { (_, entries) -> entries.associate { it.ei to it.stage.label } }
+                    val labelFlow = remember(vod, sources) { lib.entries.map(::labelsForFilm).distinctUntilChanged() }
+                    val labels by labelFlow.collectAsState(remember(vod, sources) { labelsForFilm(lib.entries.value) })
+                    var picks by rememberSaveable(vod, sources) {
+                        val initial = if (source.episodes.size == 1) mapOf(index to setOf(0)) else emptyMap()
+                        mutableStateOf(initial)
+                    }
+                    val selectedEpisodes = picks.mapValues { (line, episodes) ->
+                        episodes.filterTo(mutableSetOf()) { it in sources.getOrNull(line)?.episodes.orEmpty().indices && it !in labels[line].orEmpty() }
+                    }
+                    DownloadEpisodeSelection(index, source, -1, labels[index].orEmpty(), selectedEpisodes[index].orEmpty(),
+                        { picks = picks + (index to it) }, Modifier.weight(1f, fill = false), inDialog = true, sourcePicker = {
                         if (indices.size > 1) LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             items(indices.size) { position ->
                                 val i = indices[position]
-                                FilterChip(selected = i == index, onClick = { selected = i }, label = { Text(sources[i].name) })
+                                SingleChoiceChip(sources[i].name, i == index) { selected = i }
                             }
+                        }
+                    }) {
+                        AddEpisodesButton(selectedEpisodes.values.sumOf { it.size }, labels[index].orEmpty().size == source.episodes.size) {
+                            selectedEpisodes.filterValues { it.isNotEmpty() }.forEach { (line, episodes) ->
+                                lib.addEpisodes(vod, title, poster, line, sources[line], episodes)
+                            }
+                            onDismiss()
+                            Toast.makeText(context, "已加入下载管理", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -129,27 +161,29 @@ fun DownloadEpisodeDialog(vod: String, title: String, poster: String, sources: L
     }
 }
 
+private fun OfflineLibrary.addEpisodes(vod: String, title: String, poster: String, index: Int, source: PlaySource, selected: Set<Int>) {
+    val episodes = selected.sorted().map { i -> Triple(i, source.episodes[i].name, source.episodes[i].url) }
+    add(vod, title, poster, source.name, index, source.episodes.size == 1, episodes)
+}
+
 @Composable
-private fun DownloadEpisodeSelection(vod: String, title: String, poster: String, si: Int, source: PlaySource, current: Int,
-                                     labels: Map<Int, String>, modifier: Modifier, inDialog: Boolean,
-                                     onAdded: () -> Unit, sourcePicker: @Composable () -> Unit) {
-    val context = LocalContext.current
+private fun AddEpisodesButton(count: Int, lineAlreadyAdded: Boolean, onAdd: () -> Unit) {
+    Button(modifier = Modifier.fillMaxWidth(), enabled = count > 0, onClick = onAdd,
+        colors = ButtonDefaults.buttonColors(containerColor = UiPalette.Ink, contentColor = UiPalette.Surface)) {
+        Text(if (count == 0 && lineAlreadyAdded) "本线路剧集均已加入下载" else "加入下载（$count 集）")
+    }
+}
+
+@Composable
+private fun DownloadEpisodeSelection(si: Int, source: PlaySource, current: Int, labels: Map<Int, String>,
+                                     selection: Set<Int>, onSelection: (Set<Int>) -> Unit, modifier: Modifier, inDialog: Boolean,
+                                     sourcePicker: @Composable () -> Unit, submit: @Composable () -> Unit) {
     val available = remember(source, labels) { source.episodes.indices.filterNot(labels::containsKey).toSet() }
-    var picked by rememberSaveable(vod, si, source.name) {
-        val initial = if (inDialog && source.episodes.size == 1) 0 else current
-        mutableStateOf(setOf(initial).intersect(available))
-    }
-    val selection = picked.intersect(available)
-    val submit: @Composable () -> Unit = {
-        Button(modifier = Modifier.fillMaxWidth(), enabled = selection.isNotEmpty(),
-            colors = ButtonDefaults.buttonColors(containerColor = UiPalette.Ink, contentColor = UiPalette.Surface), onClick = {
-                OfflineLibrary.get(context).add(vod, title, poster, source.name, si, source.episodes.size == 1, selection.sorted().map { i ->
-                    Triple(i, source.episodes[i].name, source.episodes[i].url)
-                })
-                onAdded()
-                Toast.makeText(context, "已加入下载管理", Toast.LENGTH_SHORT).show()
-            }) { Text(if (available.isEmpty()) "本线路剧集均已加入下载" else "加入下载（${selection.size} 集）") }
-    }
+    val pageSize = 30
+    val pages = (source.episodes.size + pageSize - 1) / pageSize
+    var page by rememberSaveable(si, source.name, pages) { mutableIntStateOf(current.coerceAtLeast(0) / pageSize) }
+    val indices = page * pageSize until minOf((page + 1) * pageSize, source.episodes.size)
+    val availableOnPage = indices.filterTo(mutableSetOf(), available::contains)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val choices = if (inDialog) Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()) else Modifier
         Column(choices, verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -157,22 +191,21 @@ private fun DownloadEpisodeSelection(vod: String, title: String, poster: String,
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${source.name} · 共 ${source.episodes.size} 集", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge,
                     color = UiPalette.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                TextButton(enabled = available.isNotEmpty(), onClick = { picked = if (selection == available) emptySet() else available }) {
-                    Text(if (available.isNotEmpty() && selection == available) "取消全选" else "全选")
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (pages > 1) TextButton(enabled = availableOnPage.isNotEmpty(), onClick = {
+                    onSelection(toggleDownloadScope(selection, availableOnPage))
+                }) { Text(if (availableOnPage.isNotEmpty() && selection.containsAll(availableOnPage)) "取消本页" else "选本页") }
+                TextButton(enabled = available.isNotEmpty(), onClick = { onSelection(toggleDownloadScope(selection, available)) }) {
+                    Text(if (available.isNotEmpty() && selection == available) "取消整条线路" else "选整条线路")
                 }
             }
             if (!inDialog) submit()
-            val pageSize = 30
-            val pages = (source.episodes.size + pageSize - 1) / pageSize
-            var page by rememberSaveable(vod, si, source.name, pages) { mutableIntStateOf(current.coerceAtLeast(0) / pageSize) }
             if (pages > 1) LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(pages) { p ->
-                    FilterChip(selected = p == page, onClick = { page = p }, label = {
-                        Text("${p * pageSize + 1}–${minOf((p + 1) * pageSize, source.episodes.size)}")
-                    })
+                    SingleChoiceChip("${p * pageSize + 1}–${minOf((p + 1) * pageSize, source.episodes.size)}", p == page) { page = p }
                 }
             }
-            val indices = page * pageSize until minOf((page + 1) * pageSize, source.episodes.size)
             BoxWithConstraints {
                 val columns = (maxWidth / 88.dp).toInt().coerceIn(2, 6)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -183,7 +216,7 @@ private fun DownloadEpisodeSelection(vod: String, title: String, poster: String,
                                 Surface(Modifier.weight(1f), shape = RoundedCornerShape(12.dp),
                                     color = if (chosen) UiPalette.AccentGlow else UiPalette.SurfaceSoft) {
                                     Column(Modifier.toggleable(chosen, enabled = i in available, role = Role.Checkbox) { checked ->
-                                        picked = if (checked) picked + i else picked - i
+                                        onSelection(if (checked) selection + i else selection - i)
                                     }.heightIn(min = 48.dp).padding(8.dp), verticalArrangement = Arrangement.Center) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             if (chosen) Icon(Icons.Rounded.Check, null, Modifier.size(16.dp), tint = UiPalette.Accent)
@@ -205,3 +238,6 @@ private fun DownloadEpisodeSelection(vod: String, title: String, poster: String,
         if (inDialog) submit()
     }
 }
+
+internal fun toggleDownloadScope(selection: Set<Int>, scope: Set<Int>): Set<Int> =
+    if (selection.containsAll(scope)) selection - scope else selection + scope

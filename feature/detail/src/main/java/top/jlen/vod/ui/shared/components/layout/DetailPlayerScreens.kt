@@ -43,13 +43,13 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Icon
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -127,19 +127,7 @@ internal fun SourceRow(
             key = { index, name -> "$name-$index" },
             contentType = { _, _ -> "source" }
         ) { index, name ->
-            val selected = index == selectedIndex
-            AssistChip(
-                onClick = { onSelectSource(index) },
-                label = { Text(name) },
-                colors = AssistChipDefaults.assistChipColors(
-                    containerColor = if (selected) UiPalette.Ink else UiPalette.Surface,
-                    labelColor = if (selected) UiPalette.Surface else UiPalette.Ink
-                ),
-                border = AssistChipDefaults.assistChipBorder(
-                    borderColor = if (selected) UiPalette.Ink else UiPalette.BorderSoft,
-                    enabled = true
-                )
-            )
+            SingleChoiceChip(name, index == selectedIndex) { onSelectSource(index) }
         }
     }
 }
@@ -172,7 +160,7 @@ internal fun DetailHero(item: VodItem, onBack: () -> Unit, darkMode: Boolean = i
                     )
                 )
         )
-        DetailTopBar(title = item.displayTitle, onBack = onBack)
+        DetailTopBar(title = item.displayTitle, onBack = onBack, darkMode = darkMode)
         Card(
             modifier = Modifier
                 .align(Alignment.Center)
@@ -292,23 +280,7 @@ internal fun EpisodePanel(
                         val selected = pageIndex == currentPage
                         val start = pageIndex * pageSize + 1
                         val end = minOf((pageIndex + 1) * pageSize, episodes.size)
-                        OutlinedButton(
-                            onClick = { currentPage = pageIndex },
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, if (selected) UiPalette.Accent else UiPalette.Border),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = if (selected) UiPalette.AccentGlow else UiPalette.SurfaceSoft,
-                                contentColor = if (selected) UiPalette.Accent else UiPalette.Ink
-                            ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = "$start-$end",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-                                maxLines = 1
-                            )
-                        }
+                        SingleChoiceChip("$start–$end", selected) { currentPage = pageIndex }
                     }
                 }
             }
@@ -657,7 +629,7 @@ private fun openExternal(context: Context, url: String) {
 }
 
 @Composable
-fun DetailTopBar(title: String, onBack: () -> Unit, darkMode: Boolean = false) {
+fun DetailTopBar(title: String, onBack: () -> Unit, darkMode: Boolean = isSystemInDarkTheme()) {
     val background = if (darkMode) Color(0x66101419) else Color.White.copy(alpha = 0.82f)
     val contentColor = if (darkMode) Color.White else UiPalette.Ink
     val showTitle = title.isNotBlank()
@@ -673,20 +645,10 @@ fun DetailTopBar(title: String, onBack: () -> Unit, darkMode: Boolean = false) {
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .clip(CircleShape)
-                .background(background)
-                .clickable { onBack() },
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "<",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = contentColor
-            )
+        IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+            Box(Modifier.size(42.dp).background(background, CircleShape), contentAlignment = Alignment.Center) {
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回", tint = contentColor)
+            }
         }
         if (showTitle) {
             Spacer(modifier = Modifier.width(12.dp))

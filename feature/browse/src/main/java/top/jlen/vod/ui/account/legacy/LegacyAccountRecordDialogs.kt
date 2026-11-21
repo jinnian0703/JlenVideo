@@ -29,6 +29,11 @@ internal fun ClearHistoryConfirmDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
+    ClearRecordsConfirmDialog("播放记录", "将删除 $count 条已加载记录，清空后不可恢复。", onDismiss, onConfirm)
+}
+
+@Composable
+internal fun ClearRecordsConfirmDialog(label: String, message: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -46,20 +51,20 @@ internal fun ClearHistoryConfirmDialog(
                         .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
                     Text(
-                        text = "播放记录",
+                        text = label,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = UiPalette.DangerText
                     )
                 }
                 Text(
-                    text = "清空播放记录",
+                    text = "清空$label",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold,
                     color = UiPalette.Ink
                 )
                 Text(
-                    text = "确认清空播放记录？",
+                    text = "确认清空${label}？",
                     style = MaterialTheme.typography.bodyMedium,
                     color = UiPalette.TextSecondary
                 )
@@ -68,7 +73,7 @@ internal fun ClearHistoryConfirmDialog(
                     shape = RoundedCornerShape(18.dp)
                 ) {
                     Text(
-                        text = "将删除 $count 条已加载记录，清空后不可恢复。",
+                        text = message,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 13.dp),

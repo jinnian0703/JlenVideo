@@ -31,7 +31,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
@@ -176,7 +175,7 @@ fun DetailScreen(
                                 shape = androidx.compose.foundation.shape.RoundedCornerShape(UiDimens.ControlRadius),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = UiPalette.Accent,
-                                    contentColor = Color(0xFF20100D)
+                                    contentColor = UiPalette.OnAccentButton
                                 )
                             ) {
                                 Text(primaryActionLabel, fontWeight = FontWeight.ExtraBold)

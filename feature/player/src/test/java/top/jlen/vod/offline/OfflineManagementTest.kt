@@ -14,6 +14,16 @@ import top.jlen.vod.data.PlaySource
 import java.io.File
 
 class OfflineManagementTest {
+    @Test fun pageSelectionSkipsExistingDownloadsAndPreservesOtherPages() {
+        val available = (0 until 65).toSet() - setOf(31, 40)
+        val page = available.intersect((30 until 60).toSet())
+        val picked = toggleDownloadScope(setOf(3, 32, 64), page)
+        assertEquals(page + setOf(3, 64), picked)
+        assertEquals(setOf(3, 64), toggleDownloadScope(picked, page))
+        assertEquals(available, toggleDownloadScope(picked, available))
+        assertTrue(toggleDownloadScope(available, available).isEmpty())
+    }
+
     @Test fun downloadPickerUsesDedicatedSourcesAndOnlyFallsBackWhenUnlocked() {
         val episode = Episode("第一集", "https://example.org/video.mp4")
         val playback = listOf(PlaySource("空线路", emptyList()), PlaySource("在线播放", listOf(episode)))

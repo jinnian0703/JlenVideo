@@ -108,7 +108,7 @@ fun LiveScreen(api: CmsAppApi, onBack: () -> Unit) {
                     Text(current.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = UiPalette.Ink)
                     if (current.sources.size > 1) LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(current.sources.size) { index ->
-                            LiveFilter("线路 ${index + 1} · ${current.sources[index].name}", line == index) {
+                            SingleChoiceChip("线路 ${index + 1} · ${current.sources[index].name}", line == index) {
                                 line = index
                                 picker = false
                             }
@@ -121,7 +121,7 @@ fun LiveScreen(api: CmsAppApi, onBack: () -> Unit) {
                     Text("频道列表", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = UiPalette.Ink)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         items(listOf(LiveCategory(0, "全部")) + categories.filter { it.id != 0 }, key = { it.id }) { cat ->
-                            LiveFilter(cat.name, category == cat.id) { category = cat.id }
+                            SingleChoiceChip(cat.name, category == cat.id) { category = cat.id }
                         }
                     }
                     if (categoryError != null) TextButton(onClick = { categoryRetry++ }) { Text("分类加载失败 · 重试") }
@@ -174,13 +174,6 @@ fun LiveScreen(api: CmsAppApi, onBack: () -> Unit) {
             Box(Modifier.padding(vertical = 12.dp)) { browser() }
         }
     }
-}
-
-@Composable
-private fun LiveFilter(label: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(selected, onClick, label = { Text(label) }, shape = RoundedCornerShape(16.dp),
-        colors = FilterChipDefaults.filterChipColors(containerColor = UiPalette.Surface, labelColor = UiPalette.TextSecondary,
-            selectedContainerColor = UiPalette.Ink, selectedLabelColor = UiPalette.Surface))
 }
 
 @Composable
